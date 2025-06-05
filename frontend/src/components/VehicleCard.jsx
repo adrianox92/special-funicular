@@ -133,7 +133,7 @@ const VehicleCard = ({ vehicle, onDelete }) => {
           <Badge bg="secondary">{vehicle.traction}</Badge>
         </div>
         <div>
-          {vehicle.total_price !== undefined && vehicle.total_price !== null ? (
+          {vehicle.total_price !== undefined && vehicle.total_price !== null && vehicle.total_price !== vehicle.price ? (
             <>
               {vehicle.price && (
                 <>

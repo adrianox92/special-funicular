@@ -23,6 +23,10 @@ Aplicación web para gestionar y mostrar una colección de coches Scalextric. De
   - Por tipo de vehículo
   - Por estado de modificación
   - Por compatibilidad digital
+- 📤 Exportación de datos:
+  - Exportación a CSV de la colección completa
+  - Incluye especificaciones técnicas y modificaciones
+  - Descarga de fichas técnicas en PDF
 - 🎨 Interfaz moderna y responsive usando Bootstrap
 - 📱 Diseño adaptable a diferentes dispositivos
 - 🧭 Navegación intuitiva con barra de navegación
@@ -158,7 +162,6 @@ El proyecto se encuentra en desarrollo activo con las siguientes característica
   - [ ] Evolución de tiempos por vehículo
   - [ ] Gráficos de evolución de precios
   - [ ] Comparativa de rendimiento por tipo de vehículo
-- [ ] Exportación de datos
 - [ ] Búsqueda avanzada
 - [ ] Comparativa de precios entre vehículos similares
 - [ ] Gráficos de evolución de tiempos
@@ -248,3 +251,15 @@ Estos archivos son generados automáticamente durante el desarrollo y no deben s
 ```bash
 npm install
 ```
+
+## Tipos de Vehículos
+
+La aplicación soporta los siguientes tipos de vehículos:
+- Rally
+- GT
+- LMP
+- Clásico
+- DTM
+- F1
+- Camiones
+- Raid

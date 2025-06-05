@@ -100,6 +100,10 @@ const AddVehicle = () => {
                 <option>GT</option>
                 <option>LMP</option>
                 <option>Clásico</option>
+                <option>DTM</option>
+                <option>F1</option>
+                <option>Camiones</option>
+                <option>Raid</option>
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
