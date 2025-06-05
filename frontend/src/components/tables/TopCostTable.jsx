@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Table, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Bar } from 'recharts';
+import { Link } from 'react-router-dom';
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('es-ES', {
@@ -154,7 +155,9 @@ const TopCostTable = ({ data }) => {
                 <tr key={vehicle.id}>
                   <td>
                     <div className="d-flex align-items-center">
-                      <span className="me-2">{`${vehicle.manufacturer} ${vehicle.model}`}</span>
+                      <Link to={`/vehicles/${vehicle.id}`} className="text-decoration-none">
+                        <span className="me-2">{`${vehicle.manufacturer} ${vehicle.model}`}</span>
+                      </Link>
                       {vehicle.modified && (
                         <Badge bg="primary" className="ms-2">Mod</Badge>
                       )}

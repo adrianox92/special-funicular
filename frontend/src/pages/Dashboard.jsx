@@ -12,6 +12,7 @@ import MetricCard from '../components/MetricCard';
 import VehiclesByTypeChart from '../components/charts/VehiclesByTypeChart';
 import ModificationPieChart from '../components/charts/ModificationPieChart';
 import TopCostTable from '../components/tables/TopCostTable';
+import TopComponentsTable from '../components/tables/TopComponentsTable';
 import PerformanceByTypeChart from '../components/charts/PerformanceByTypeChart';
 import InvestmentTimelineChart from '../components/charts/InvestmentTimelineChart';
 import api from '../lib/axios';
@@ -35,6 +36,7 @@ const Dashboard = () => {
     vehiclesByType: [],
     modificationStats: { modified: 0, stock: 0 },
     topCostVehicles: [],
+    topComponents: [],
     performanceByType: {}
   });
 
@@ -154,8 +156,8 @@ const Dashboard = () => {
                 subtitle={`${metrics.modifiedVehicles || 0} modificados`}
                 icon="bi-car-front"
                 details={{
-                  lastUpdate: metrics.lastUpdate,
-                  stockVehicles: metrics.stockVehicles || 0
+                  'Ultima actualización': metrics.lastUpdate,
+                  'Vehículos de serie': metrics.stockVehicles || 0
                 }}
               />
             </Col>
@@ -166,8 +168,8 @@ const Dashboard = () => {
                 subtitle={`${metrics.averageInvestmentPerVehicle || 0} € por vehículo modificado`}
                 icon="bi-currency-euro"
                 details={{
-                  lastUpdate: metrics.lastUpdate,
-                  totalModifiedVehicles: metrics.modifiedVehicles || 0
+                  'Ultima actualización': metrics.lastUpdate,
+                  'Total de Vehículos modificados': metrics.modifiedVehicles || 0
                 }}
               />
             </Col>
@@ -178,8 +180,8 @@ const Dashboard = () => {
                 subtitle="Porcentaje medio de incremento"
                 icon="bi-graph-up"
                 details={{
-                  lastUpdate: metrics.lastUpdate,
-                  totalModifiedVehicles: metrics.modifiedVehicles || 0
+                  'Ultima actualización': metrics.lastUpdate,
+                  'Total de Vehículos modificados': metrics.modifiedVehicles || 0
                 }}
                 formatValue={formatPercentage}
                 valueColor="info"
@@ -196,9 +198,9 @@ const Dashboard = () => {
                 subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)}
                 icon="bi-trophy"
                 details={{
-                  lastUpdate: metrics.highestIncrementVehicle?.purchase_date,
-                  basePrice: metrics.highestIncrementVehicle?.price,
-                  totalPrice: metrics.highestIncrementVehicle?.total_price
+                  'Ultima actualización': metrics.highestIncrementVehicle?.purchase_date,
+                  'Precio Base': metrics.highestIncrementVehicle?.price,
+                  'Precio Total': metrics.highestIncrementVehicle?.total_price
                 }}
                 formatValue={formatPercentage}
                 valueColor="warning"
@@ -211,10 +213,10 @@ const Dashboard = () => {
                 subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)}
                 icon="bi-stopwatch"
                 details={{
-                  lastUpdate: metrics.bestTimeVehicle?.timing_date,
-                  circuit: metrics.bestTimeVehicle?.circuit,
-                  laps: metrics.bestTimeVehicle?.laps,
-                  lane: metrics.bestTimeVehicle?.lane
+                  'Ultima actualización': metrics.bestTimeVehicle?.timing_date,
+                  'Circuito': metrics.bestTimeVehicle?.circuit,
+                  'Vueltas': metrics.bestTimeVehicle?.laps,
+                  'Carril': metrics.bestTimeVehicle?.lane
                 }}
                 formatValue={formatTime}
                 valueColor="success"
@@ -242,9 +244,15 @@ const Dashboard = () => {
             </Col>
           </Row>
 
-          <Row>
+          <Row className="g-3 mb-4">
             <Col xs={12}>
               <TopCostTable data={chartsData.topCostVehicles || []} />
+            </Col>
+          </Row>
+
+          <Row className="g-3">
+            <Col xs={12}>
+              <TopComponentsTable data={chartsData.topComponents || []} />
             </Col>
           </Row>
         </>

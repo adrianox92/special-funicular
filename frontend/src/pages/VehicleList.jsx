@@ -26,11 +26,27 @@ const VehicleList = () => {
   const loadVehicles = async (page = 1) => {
     try {
       const response = await api.get(`/vehicles?page=${page}&limit=25`);
-      setVehicles(response.data.vehicles);
-      setFiltered(response.data.vehicles);
-      setPagination(response.data.pagination);
+      // Asegurarnos de que vehicles sea un array
+      const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
+      setVehicles(vehiclesData);
+      setFiltered(vehiclesData);
+      setPagination(response.data.pagination || {
+        total: 0,
+        page: 1,
+        limit: 25,
+        totalPages: 0
+      });
     } catch (error) {
       console.error('Error al cargar vehículos:', error);
+      // En caso de error, establecer arrays vacíos
+      setVehicles([]);
+      setFiltered([]);
+      setPagination({
+        total: 0,
+        page: 1,
+        limit: 25,
+        totalPages: 0
+      });
     }
   };
 

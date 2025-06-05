@@ -387,6 +387,92 @@ router.get('/charts', async (req, res) => {
       incrementPercentage: ((vehicle.total_price - vehicle.price) / vehicle.price) * 100
     }));
 
+    // 5. Componentes más utilizados en modificaciones
+    const { data: componentsData, error: componentsError } = await supabase
+      .from('technical_specs')
+      .select(`
+        id,
+        is_modification,
+        components!inner (
+          id,
+          element,
+          sku,
+          price,
+          component_type,
+          url
+        ),
+        vehicles!inner (
+          id,
+          model,
+          manufacturer
+        )
+      `)
+      .eq('is_modification', true)
+      .eq('vehicles.user_id', req.user.id);
+
+    if (componentsError) throw componentsError;
+
+    // Procesar datos de componentes agrupando por SKU y component_type
+    const componentUsage = {};
+    componentsData.forEach(spec => {
+      const vehicleInfo = {
+        id: spec.vehicles.id,
+        model: spec.vehicles.model,
+        manufacturer: spec.vehicles.manufacturer
+      };
+
+      spec.components.forEach(component => {
+        // Usar combinación de SKU y component_type como clave
+        const componentKey = component.sku 
+          ? `${component.sku}-${component.component_type}`
+          : `no-sku-${component.id}-${component.component_type}`;
+        
+        if (!componentUsage[componentKey]) {
+          componentUsage[componentKey] = {
+            id: component.id, // Mantener el ID del primer componente encontrado
+            name: component.element,
+            sku: component.sku,
+            component_type: component.component_type,
+            unitPrice: component.price,
+            urls: new Set(), // Usar Set para evitar URLs duplicadas
+            totalInvestment: 0,
+            usageCount: 0,
+            vehicles: []
+          };
+        }
+        
+        componentUsage[componentKey].usageCount++;
+        componentUsage[componentKey].totalInvestment += component.price;
+        
+        // Añadir vehículo si no está ya en la lista
+        if (!componentUsage[componentKey].vehicles.some(v => v.id === vehicleInfo.id)) {
+          componentUsage[componentKey].vehicles.push(vehicleInfo);
+        }
+
+        // Añadir URL si existe y no está duplicada
+        if (component.url) {
+          componentUsage[componentKey].urls.add(component.url);
+        }
+
+        // Si encontramos un componente con la misma combinación SKU-tipo pero diferente nombre o precio,
+        // actualizamos con la información más reciente
+        if (component.element !== componentUsage[componentKey].name ||
+            component.price !== componentUsage[componentKey].unitPrice) {
+          componentUsage[componentKey].name = component.element;
+          componentUsage[componentKey].unitPrice = component.price;
+        }
+      });
+    });
+
+    // Convertir Sets de URLs a arrays antes de enviar la respuesta
+    const topComponents = Object.values(componentUsage)
+      .map(component => ({
+        ...component,
+        urls: Array.from(component.urls)
+      }))
+      .sort((a, b) => b.totalInvestment - a.totalInvestment)
+      .slice(0, 10); // Top 10 componentes
+
     res.json({
       vehiclesByType: Object.entries(typeStats).map(([type, stats]) => ({
         type,
@@ -408,7 +494,8 @@ router.get('/charts', async (req, res) => {
         circuit: lap.circuit,
         date: lap.timing_date
       })),
-      topCostVehicles: topCostVehiclesProcessed
+      topCostVehicles: topCostVehiclesProcessed,
+      topComponents
     });
   } catch (error) {
     console.error('Error al obtener datos de gráficos:', error);
