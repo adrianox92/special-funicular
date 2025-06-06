@@ -16,6 +16,11 @@ Aplicación web para gestionar y mostrar una colección de coches Scalextric. De
   - Promedio de incremento de precio
   - Vehículo con mayor incremento porcentual
   - Vehículo con mejor tiempo absoluto
+- 🤖 Insights con IA:
+  - Análisis automático de la colección
+  - Generación de insights personalizados
+  - Actualización semanal de recomendaciones
+  - Sugerencias de mejora basadas en datos
 - 🚗 Gestión completa de vehículos (crear, leer, actualizar, eliminar)
 - 🖼️ Soporte para imágenes de vehículos
 - 🔍 Sistema de filtrado avanzado:
@@ -47,6 +52,11 @@ Aplicación web para gestionar y mostrar una colección de coches Scalextric. De
   - Ordenación por mejor tiempo
   - Cálculo de diferencias entre tiempos
   - Visualización de especificaciones técnicas históricas
+- ✅ Insights con IA:
+  - Análisis automático de la colección
+  - Generación de insights personalizados
+  - Actualización semanal de recomendaciones
+  - Sugerencias de mejora basadas en datos
 
 ## Tecnologías Utilizadas
 
@@ -152,7 +162,11 @@ El proyecto se encuentra en desarrollo activo con las siguientes característica
   - Ordenación por mejor tiempo
   - Cálculo de diferencias
   - Visualización de especificaciones técnicas históricas
-  - Filtrado avanzado
+- ✅ Insights con IA:
+  - Análisis automático de la colección
+  - Generación de insights personalizados
+  - Actualización semanal de recomendaciones
+  - Sugerencias de mejora basadas en datos
 
 ## Próximas Características
 
@@ -194,43 +208,42 @@ El dashboard proporciona una visión general de la colección con métricas clav
 - Mejor tiempo de vuelta
 
 #### Visualizaciones (Fase 2)
+- **Gráfico de Barras Horizontales**: Distribución de vehículos por marca
+  - Muestra la proporción de cada marca en la colección
+  - Ordenado por cantidad de vehículos
+  - Etiquetas con cantidad y porcentaje
+  - Tooltips detallados
+- **Gráfico de Barras Horizontales**: Distribución de vehículos por tienda de compra
+  - Visualización de las tiendas donde se han adquirido los vehículos
+  - Ordenado por cantidad de vehículos
+  - Etiquetas con cantidad y porcentaje
+  - Tooltips interactivos
 - **Gráfico de Barras Apiladas**: Distribución de vehículos por tipo, mostrando la proporción de vehículos modificados vs. serie para cada tipo.
   - Barras apiladas para mejor comparación visual
   - Tooltips detallados al pasar el ratón
   - Ordenación por total de vehículos
   - Leyenda interactiva
+- **Gráfico de Donut**: Proporción de vehículos modificados vs. serie en la colección
+  - Visualización clara de la distribución
+  - Etiquetas con porcentajes
+  - Tooltips interactivos
+- **Gráfico de Barras**: Rendimiento por tipo de vehículo
+  - Comparativa de tiempos medios por tipo
+  - Tooltips con detalles de los mejores tiempos
+  - Etiquetas de tiempo formateadas
+- **Gráfico de Línea**: Evolución de la inversión en la colección
+  - Seguimiento trimestral del valor total
+  - Tooltips con detalles de vehículos por trimestre
+  - Etiquetas de valor formateadas en euros
 
-- **Gráfico Circular**: Proporción de vehículos modificados vs. serie.
-  - Etiquetas dentro del gráfico para mejor legibilidad
-  - Tooltips con información detallada
-  - Porcentajes calculados automáticamente
-  - Leyenda en la parte inferior
-
-- **Tabla de Costes**: Top 5 vehículos por coste.
-  - Ordenación por columnas (precio base, total o incremento)
-  - Gráficos de barras para visualizar incrementos
-  - Badges para identificar vehículos modificados
-  - Formato de moneda y porcentajes
-  - Indicadores visuales de incremento (rojo para positivo, gris para negativo)
-
-#### Tecnologías Utilizadas
-- **Frontend**:
-  - React con React Bootstrap para la interfaz
-  - Recharts para visualizaciones interactivas
-  - Componentes reutilizables y responsivos
-  - Diseño moderno con sombras y efectos hover
-
-- **Backend**:
-  - Node.js con Express
-  - PostgreSQL para almacenamiento
-  - Endpoints optimizados para datos del dashboard
-  - Cálculos estadísticos en tiempo real
-
-#### Próximas Mejoras (Fase 3)
-- Gráfico de tendencia temporal (sparkline) para evolución de vehículos
-- Vista alternativa de Top Rentables (relación tiempo/precio)
-- Filtros adicionales para análisis personalizado
-- Exportación de datos y reportes
+#### Insights con IA (Fase 2)
+- **Análisis Automático**: Generación de insights personalizados usando GPT-4
+  - Análisis de distribución de la colección
+  - Recomendaciones de crecimiento
+  - Identificación de oportunidades de mejora
+  - Actualización semanal automática
+  - Cacheo de insights para optimizar costes
+  - Integración con métricas existentes
 
 ## Gestión de Archivos
 

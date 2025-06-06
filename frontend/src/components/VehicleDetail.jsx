@@ -85,6 +85,10 @@ const VehicleDetail = () => {
               <Form.Control name="model" value={vehicle.model || ''} disabled readOnly />
             </Form.Group>
             <Form.Group className="mb-3">
+              <Form.Label>Referencia</Form.Label>
+              <Form.Control name="reference" value={vehicle.reference || ''} disabled readOnly />
+            </Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Fabricante</Form.Label>
               <Form.Control name="manufacturer" value={vehicle.manufacturer || ''} disabled readOnly />
             </Form.Group>

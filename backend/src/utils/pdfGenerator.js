@@ -65,6 +65,7 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
       const basicData = [
         ['Tipo', vehicle.type],
         ['Tracción', vehicle.traction],
+        ['Referencia', vehicle.reference || '-'],
         ['Precio Original', `${Number(vehicle.price).toFixed(2)}€`],
         ['Precio Actual', `${Number(vehicle.total_price).toFixed(2) || Number(vehicle.price).toFixed(2)}€`],
         ['Fecha de Compra', new Date(vehicle.purchase_date).toLocaleDateString()],

@@ -130,7 +130,6 @@ router.get('/metrics', async (req, res) => {
     
 
     if (bestTimeError && bestTimeError.code !== 'PGRST116') {
-      console.error('Error al obtener el mejor tiempo:', bestTimeError);
       throw bestTimeError;
     }
 
@@ -150,15 +149,12 @@ router.get('/metrics', async (req, res) => {
 
     if (performanceError) throw performanceError;
 
-    console.log('Raw performance data:', performanceByType);
 
     // Procesar datos de rendimiento por tipo
     const typePerformance = {};
     performanceByType.forEach(vehicle => {
-      console.log(`Processing vehicle ${vehicle.model}:`, vehicle.vehicle_timings);
       
       if (!vehicle.type) {
-        console.log(`Vehicle ${vehicle.model} has no type, skipping`);
         return;
       }
 
@@ -176,11 +172,9 @@ router.get('/metrics', async (req, res) => {
         return timeInSeconds !== null && timeInSeconds > 0;
       }) || [];
 
-      console.log(`Valid timings for ${vehicle.model}:`, validTimings);
 
       if (validTimings.length > 0) {
         const bestTime = Math.min(...validTimings.map(t => timeToSeconds(t.best_lap_time)));
-        console.log(`Best time for ${vehicle.model}:`, bestTime);
         
         typePerformance[vehicle.type].total_time += bestTime;
         typePerformance[vehicle.type].count++;
@@ -192,7 +186,6 @@ router.get('/metrics', async (req, res) => {
       }
     });
 
-    console.log('Processed type performance:', typePerformance);
 
     // Calcular promedios y ordenar vehículos por tipo
     Object.keys(typePerformance).forEach(type => {
@@ -204,7 +197,6 @@ router.get('/metrics', async (req, res) => {
       }
     });
 
-    console.log('Final performance by type data:', typePerformance);
 
     // Calcular evolución del valor total de la colección por trimestres
     const getQuarterStartDate = (date) => {
@@ -289,7 +281,6 @@ router.get('/metrics', async (req, res) => {
       lane: bestTimeVehicle.lane || 'No especificado'
     } : null;
 
-    console.log('Mejor tiempo - Respuesta formateada:', bestTimeResponse);
 
     res.json({
       totalVehicles,
@@ -473,6 +464,36 @@ router.get('/charts', async (req, res) => {
       .sort((a, b) => b.totalInvestment - a.totalInvestment)
       .slice(0, 10); // Top 10 componentes
 
+    // 6. Distribución de marcas
+    const { data: vehiclesByBrand, error: brandsError } = await supabase
+      .from('vehicles')
+      .select('manufacturer')
+      .eq('user_id', req.user.id);
+
+    if (brandsError) throw brandsError;
+
+    // Procesar datos de marcas
+    const brandDistribution = vehiclesByBrand.reduce((acc, vehicle) => {
+      const brand = vehicle.manufacturer;
+      acc[brand] = (acc[brand] || 0) + 1;
+      return acc;
+    }, {});
+
+    // 7. Distribución de tiendas
+    const { data: vehiclesByStore, error: storesError } = await supabase
+      .from('vehicles')
+      .select('purchase_place')
+      .eq('user_id', req.user.id);
+
+    if (storesError) throw storesError;
+
+    // Procesar datos de tiendas
+    const storeDistribution = vehiclesByStore.reduce((acc, vehicle) => {
+      const store = vehicle.purchase_place || 'No especificada';
+      acc[store] = (acc[store] || 0) + 1;
+      return acc;
+    }, {});
+
     res.json({
       vehiclesByType: Object.entries(typeStats).map(([type, stats]) => ({
         type,
@@ -495,7 +516,15 @@ router.get('/charts', async (req, res) => {
         date: lap.timing_date
       })),
       topCostVehicles: topCostVehiclesProcessed,
-      topComponents
+      topComponents,
+      brandDistribution: Object.entries(brandDistribution).map(([brand, count]) => ({
+        name: brand,
+        value: count
+      })),
+      storeDistribution: Object.entries(storeDistribution).map(([store, count]) => ({
+        name: store,
+        value: count
+      }))
     });
   } catch (error) {
     console.error('Error al obtener datos de gráficos:', error);

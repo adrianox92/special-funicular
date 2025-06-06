@@ -1,0 +1,115 @@
+.insights-carousel {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: none !important;
+}
+
+.insights-carousel .card-header {
+  border-bottom: none;
+}
+
+.insights-carousel-inner {
+  min-height: 150px;
+  background-color: #f8f9fa;
+}
+
+.insights-carousel-inner .carousel-item {
+  background-color: #f8f9fa;
+  border-radius: 0 0 0.25rem 0.25rem;
+}
+
+.insights-carousel-inner .carousel-control-prev,
+.insights-carousel-inner .carousel-control-next {
+  width: 2.5rem;
+  height: 2.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #495057;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  z-index: 2;
+  opacity: 1 !important;
+  border: 1.5px solid #1976d2;
+  color: #1976d2 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.insights-carousel .carousel-control-prev-icon::before,
+.insights-carousel .carousel-control-next-icon::before {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1976d2;
+  display: block;
+  line-height: 1;
+}
+
+.insights-carousel .carousel-control-prev {
+  left: 0.5rem;
+}
+.insights-carousel .carousel-control-next {
+  right: 0.5rem;
+}
+
+.insights-carousel-inner .carousel-item h6 {
+  font-weight: 600;
+  color: #0d6efd;
+}
+
+.insights-carousel-inner .carousel-item p {
+  color: #495057;
+  line-height: 1.5;
+}
+
+/* Animación de transición suave */
+.insights-carousel-inner .carousel-item {
+  transition: transform 0.6s ease-in-out;
+}
+
+/* Efecto hover en los controles */
+.insights-carousel-inner .carousel-control-prev:hover,
+.insights-carousel-inner .carousel-control-next:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Estilo para el botón de regenerar */
+.insights-carousel .btn-light {
+  transition: all 0.2s ease-in-out;
+}
+
+.insights-carousel .btn-light:hover {
+  background-color: #e9ecef;
+  transform: rotate(180deg);
+}
+
+/* Estilo para el spinner de regeneración */
+.insights-carousel .spinner-border {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+.insights-carousel-inner .carousel-item .p-4 {
+  padding-left: 3.5rem !important;
+  padding-right: 3.5rem !important;
+}
+
+@media (max-width: 768px) {
+  .insights-carousel-inner .carousel-item .p-4 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  .insights-carousel .carousel-control-prev,
+  .insights-carousel .carousel-control-next {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.1rem;
+  }
+}
+
+/* Ocultar el texto de las flechas */
+.insights-carousel .carousel-control-prev .visually-hidden,
+.insights-carousel .carousel-control-next .visually-hidden {
+  display: none !important;
+} 

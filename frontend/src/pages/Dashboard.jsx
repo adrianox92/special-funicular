@@ -11,10 +11,13 @@ import {
 import MetricCard from '../components/MetricCard';
 import VehiclesByTypeChart from '../components/charts/VehiclesByTypeChart';
 import ModificationPieChart from '../components/charts/ModificationPieChart';
+import BrandDistributionChart from '../components/charts/BrandDistributionChart';
+import StoreDistributionChart from '../components/charts/StoreDistributionChart';
 import TopCostTable from '../components/tables/TopCostTable';
 import TopComponentsTable from '../components/tables/TopComponentsTable';
 import PerformanceByTypeChart from '../components/charts/PerformanceByTypeChart';
 import InvestmentTimelineChart from '../components/charts/InvestmentTimelineChart';
+import InsightsCarousel from '../components/InsightsCarousel';
 import api from '../lib/axios';
 
 const Dashboard = () => {
@@ -37,7 +40,9 @@ const Dashboard = () => {
     modificationStats: { modified: 0, stock: 0 },
     topCostVehicles: [],
     topComponents: [],
-    performanceByType: {}
+    performanceByType: {},
+    brandDistribution: [],
+    storeDistribution: []
   });
 
   const [loading, setLoading] = useState(true);
@@ -147,6 +152,13 @@ const Dashboard = () => {
         </div>
       ) : (
         <>
+          {/* Carrusel de Insights de IA */}
+          <Row className="mb-4">
+            <Col xs={12}>
+              <InsightsCarousel />
+            </Col>
+          </Row>
+
           <h4 className="mb-3">Métricas de Colección</h4>
           <Row className="g-3 mb-4">
             <Col xs={12} md={4}>
@@ -189,6 +201,24 @@ const Dashboard = () => {
             </Col>
           </Row>
 
+          <Row className="g-3 mb-4">
+            <Col xs={12} lg={6}>
+              <BrandDistributionChart data={chartsData.brandDistribution || []} />
+            </Col>
+            <Col xs={12} lg={6}>
+              <StoreDistributionChart data={chartsData.storeDistribution || []} />
+            </Col>
+          </Row>
+
+          <Row className="g-3 mb-4">
+            <Col xs={12} lg={6}>
+              <VehiclesByTypeChart data={chartsData.vehiclesByType || []} />
+            </Col>
+            <Col xs={12} lg={6}>
+              <ModificationPieChart data={chartsData.modificationStats || { modified: 0, stock: 0 }} />
+            </Col>
+          </Row>
+
           <h4 className="mb-3">Métricas de Rendimiento</h4>
           <Row className="g-3 mb-4">
             <Col xs={12} md={6}>
@@ -227,16 +257,6 @@ const Dashboard = () => {
 
           <Row className="g-3 mb-4">
             <Col xs={12} lg={6}>
-              <VehiclesByTypeChart data={chartsData.vehiclesByType || []} />
-            </Col>
-            <Col xs={12} lg={6}>
-              <ModificationPieChart data={chartsData.modificationStats || { modified: 0, stock: 0 }} />
-            </Col>
-          </Row>
-
-          <Row className="g-3 mb-4">
-            <Col xs={12} lg={6}>
-              {console.log('PerformanceByType data:', metrics.performanceByType)}
               <PerformanceByTypeChart data={metrics.performanceByType || {}} />
             </Col>
             <Col xs={12} lg={6}>

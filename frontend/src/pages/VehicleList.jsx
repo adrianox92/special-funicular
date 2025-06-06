@@ -163,6 +163,7 @@ const VehicleList = () => {
       const headers = [
         'ID',
         'Modelo',
+        'Referencia',
         'Fabricante',
         'Tipo',
         'Tracción',
@@ -207,6 +208,7 @@ const VehicleList = () => {
           return [
             vehicle.id,
             `"${vehicle.model}"`,
+            `"${vehicle.reference || ''}"`,
             `"${vehicle.manufacturer}"`,
             `"${vehicle.type}"`,
             `"${vehicle.traction || ''}"`,

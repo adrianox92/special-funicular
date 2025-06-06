@@ -127,7 +127,12 @@ const VehicleCard = ({ vehicle, onDelete }) => {
       />
       <Card.Body>
         <Card.Title>{vehicle.model}</Card.Title>
-        <div className="mb-2">{vehicle.manufacturer}</div>
+        <div className="mb-2">
+          {vehicle.manufacturer}
+          {vehicle.reference && (
+            <span className="text-muted"> - {vehicle.reference}</span>
+          )}
+        </div>
         <div className="mb-2">
           <Badge bg="secondary" className="me-2">{vehicle.type}</Badge>
           <Badge bg="secondary">{vehicle.traction}</Badge>

@@ -153,10 +153,14 @@ router.put('/:id', upload.array('images'), async (req, res) => {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
 
-    const updateData = req.body;
+    const updateData = {
+      ...req.body,
+      modified: req.body.modified === 'true',
+      digital: req.body.digital === 'true'
+    };
     
     // Si no está modificado, el total_price será igual al price
-    if (updateData.modified === 'false') {
+    if (updateData.modified === false) {
       updateData.total_price = Number(updateData.price);
     }
 
@@ -207,7 +211,7 @@ router.put('/:id', upload.array('images'), async (req, res) => {
 // Crear un vehículo
 router.post('/', upload.array('images'), async (req, res) => {
   try {
-    const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital } = req.body;
+    const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, reference } = req.body;
     
     // Si no está modificado, el total_price será igual al price
     const total_price = modified === 'true' ? null : Number(price);
@@ -227,6 +231,7 @@ router.post('/', upload.array('images'), async (req, res) => {
           purchase_place, 
           modified, 
           digital,
+          reference,
           user_id: req.user.id 
         }
       ])

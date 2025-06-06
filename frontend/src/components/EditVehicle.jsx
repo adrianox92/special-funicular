@@ -1091,6 +1091,10 @@ const EditVehicle = () => {
                     <Form.Control name="model" value={vehicle.model || ''} onChange={handleChange} required />
                   </Form.Group>
                   <Form.Group className="mb-3">
+                    <Form.Label>Referencia</Form.Label>
+                    <Form.Control name="reference" value={vehicle.reference || ''} onChange={handleChange} />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
                     <Form.Label>Fabricante</Form.Label>
                     <Form.Control name="manufacturer" value={vehicle.manufacturer || ''} onChange={handleChange} required />
                   </Form.Group>

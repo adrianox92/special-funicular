@@ -48,10 +48,12 @@ app.use(express.json());
 const vehiclesRoute = require('./routes/vehicles');
 const timingsRoute = require('./routes/timings');
 const dashboardRoute = require('./routes/dashboard');
+const insightsRoute = require('./routes/insights');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
+app.use('/api', insightsRoute);
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
