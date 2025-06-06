@@ -100,6 +100,38 @@ npm start
 
 La aplicación estará disponible en [http://localhost:3000](http://localhost:3000)
 
+## Manejo Seguro de Variables de Entorno
+
+Es crucial mantener seguras las claves API y otras credenciales. Sigue estas prácticas:
+
+1. **Nunca subas archivos `.env` al repositorio**
+   - Los archivos `.env` están incluidos en `.gitignore`
+   - Si accidentalmente subiste un archivo `.env`, sigue estos pasos:
+     ```bash
+     git filter-branch --force --index-filter "git rm --cached --ignore-unmatch backend/.env" --prune-empty --tag-name-filter cat -- --all
+     git push origin --force --all
+     ```
+
+2. **Usa archivos `.env.example` como plantilla**
+   - Crea un archivo `.env.example` con la estructura pero sin valores reales
+   - Comparte este archivo con el equipo
+   - Los nuevos desarrolladores pueden copiarlo como `.env` y añadir sus valores
+
+3. **Variables de entorno requeridas**
+   ```
+   # Supabase
+   REACT_APP_SUPABASE_URL=tu_url_de_supabase
+   REACT_APP_SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
+   
+   # OpenAI (para insights)
+   OPENAI_API_KEY=tu_clave_de_openai
+   ```
+
+4. **Rotación de claves**
+   - Si una clave se expone, rótala inmediatamente
+   - Notifica al equipo para que actualicen sus archivos `.env`
+   - Considera usar un gestor de secretos para entornos de producción
+
 ## Manejo de Archivos Grandes
 
 Este proyecto utiliza Git para el control de versiones y tiene algunas consideraciones importantes:
