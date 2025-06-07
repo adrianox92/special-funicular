@@ -245,12 +245,12 @@ router.get('/metrics', async (req, res) => {
     const investmentHistory = Object.values(quarterlyData)
       .sort((a, b) => a.date - b.date)
       .map(quarter => {
-        accumulatedValue += quarter.totalValue;
+        accumulatedValue += quarter.totalValue ?? 0;
         return {
           date: quarter.date.toISOString().split('T')[0],
           endDate: quarter.endDate.toISOString().split('T')[0],
-          value: Number(accumulatedValue.toFixed(2)),
-          vehicles: quarter.vehicles.map(v => ({
+          value: Number((accumulatedValue ?? 0).toFixed(2)),
+          vehicles: (quarter.vehicles || []).filter(v => v && typeof v.total_price === 'number').map(v => ({
             model: v.model || 'Sin modelo',
             manufacturer: v.manufacturer || 'Sin marca',
             price: v.total_price ? Number(v.total_price.toFixed(2)) : 0

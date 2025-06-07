@@ -308,3 +308,48 @@ La aplicación soporta los siguientes tipos de vehículos:
 - F1
 - Camiones
 - Raid
+
+## Tests
+
+### Frontend
+
+Los tests unitarios del frontend se encuentran en la carpeta `frontend/src/__tests__/`. Para ejecutar los tests del frontend:
+
+```bash
+cd frontend
+npm test
+```
+
+#### Estructura de Tests del Frontend
+
+- `pages/Dashboard.test.jsx`: Tests del componente Dashboard
+  - Verifica el renderizado correcto del componente
+  - Prueba el manejo de estados de carga
+  - Verifica el manejo de errores de API
+  - Comprueba el formateo correcto de valores monetarios y porcentajes
+  - Verifica la actualización de datos
+
+### Backend
+
+Los tests unitarios del backend se encuentran en la carpeta `backend/__tests__/`. Para ejecutar los tests del backend:
+
+```bash
+cd backend
+npm test
+```
+
+#### Estructura de Tests del Backend
+
+- `routes/dashboard.test.js`: Tests de las rutas del Dashboard
+  - Prueba el endpoint `/dashboard/metrics`
+    - Verifica la obtención correcta de métricas
+    - Prueba el manejo de errores de base de datos
+  - Prueba el endpoint `/dashboard/charts`
+    - Verifica la obtención correcta de datos para gráficos
+    - Prueba el manejo de errores de base de datos
+
+### Mocks
+
+Los mocks necesarios para los tests se encuentran en:
+- Frontend: Los mocks se definen directamente en los archivos de test
+- Backend: `backend/__tests__/mocks/supabase.js`
