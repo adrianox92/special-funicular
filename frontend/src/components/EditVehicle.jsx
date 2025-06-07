@@ -122,17 +122,27 @@ const EditVehicle = () => {
 
   useEffect(() => {
     const observers = new Map();
+    const timeouts = new Map();
 
     const setupResizeObserver = (element, key) => {
       if (element && !observers.has(key)) {
         const observer = new ResizeObserver(entries => {
-          requestAnimationFrame(() => {
+          // Cancelar el timeout anterior si existe
+          if (timeouts.has(key)) {
+            cancelAnimationFrame(timeouts.get(key));
+          }
+          
+          // Usar requestAnimationFrame para limitar las actualizaciones
+          const timeoutId = requestAnimationFrame(() => {
             if (!Array.isArray(entries) || !entries.length) {
               return;
             }
             // Aquí podríamos hacer algo con el tamaño si fuera necesario
           });
+          
+          timeouts.set(key, timeoutId);
         });
+        
         observer.observe(element);
         observers.set(key, observer);
       }
@@ -146,7 +156,12 @@ const EditVehicle = () => {
     });
 
     return () => {
-      // Limpiar observadores
+      // Limpiar timeouts y observadores
+      timeouts.forEach(timeoutId => {
+        if (timeoutId) {
+          cancelAnimationFrame(timeoutId);
+        }
+      });
       observers.forEach(observer => observer.disconnect());
     };
   }, [previews, images]);

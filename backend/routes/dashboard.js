@@ -253,7 +253,7 @@ router.get('/metrics', async (req, res) => {
           vehicles: quarter.vehicles.map(v => ({
             model: v.model || 'Sin modelo',
             manufacturer: v.manufacturer || 'Sin marca',
-            price: Number(v.total_price.toFixed(2))
+            price: v.total_price ? Number(v.total_price.toFixed(2)) : 0
           }))
         };
       });
@@ -507,14 +507,16 @@ router.get('/charts', async (req, res) => {
         stock: totalStock,
         modifiedPercentage: (totalModified / totalVehicles) * 100
       },
-      bestLaps: bestLaps.map(lap => ({
-        id: lap.vehicles.id,
-        model: lap.vehicles.model,
-        manufacturer: lap.vehicles.manufacturer,
-        bestTime: lap.best_lap_time,
-        circuit: lap.circuit,
-        date: lap.timing_date
-      })),
+      bestLaps: bestLaps
+        .filter(lap => lap.vehicles !== null) // Filtrar registros sin vehículo
+        .map(lap => ({
+          id: lap.vehicles.id,
+          model: lap.vehicles.model || 'Sin modelo',
+          manufacturer: lap.vehicles.manufacturer || 'Sin marca',
+          bestTime: lap.best_lap_time,
+          circuit: lap.circuit || 'No especificado',
+          date: lap.timing_date
+        })),
       topCostVehicles: topCostVehiclesProcessed,
       topComponents,
       brandDistribution: Object.entries(brandDistribution).map(([brand, count]) => ({

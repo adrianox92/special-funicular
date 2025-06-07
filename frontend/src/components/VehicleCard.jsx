@@ -26,8 +26,15 @@ const VehicleCard = ({ vehicle, onDelete }) => {
 
   useEffect(() => {
     if (imgRef.current) {
+      let timeoutId;
       const resizeObserver = new ResizeObserver(entries => {
-        requestAnimationFrame(() => {
+        // Cancelar el timeout anterior si existe
+        if (timeoutId) {
+          cancelAnimationFrame(timeoutId);
+        }
+        
+        // Usar requestAnimationFrame para limitar las actualizaciones
+        timeoutId = requestAnimationFrame(() => {
           if (!Array.isArray(entries) || !entries.length) {
             return;
           }
@@ -36,7 +43,12 @@ const VehicleCard = ({ vehicle, onDelete }) => {
       });
 
       resizeObserver.observe(imgRef.current);
-      return () => resizeObserver.disconnect();
+      return () => {
+        if (timeoutId) {
+          cancelAnimationFrame(timeoutId);
+        }
+        resizeObserver.disconnect();
+      };
     }
   }, []);
 
