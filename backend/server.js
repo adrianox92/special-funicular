@@ -58,12 +58,14 @@ const timingsRoute = require('./routes/timings');
 const dashboardRoute = require('./routes/dashboard');
 const insightsRoute = require('./routes/insights');
 const authRoute = require('./routes/auth');
+const competitionRulesRoute = require('./routes/competition-rules');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
 app.use('/api', insightsRoute);
 app.use('/api/auth', authRoute);
+app.use('/api/competition-rules', competitionRulesRoute);
 
 // Montar las rutas protegidas DESPUÉS
 const competitionsRoute = require('./routes/competitions');

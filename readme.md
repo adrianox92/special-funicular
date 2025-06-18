@@ -117,6 +117,7 @@ Ejecutar los scripts SQL en Supabase:
 ```bash
 cd backend
 node scripts/migrate-add-slug.js
+node scripts/migrate-insert-templates.js
 ```
 
 ### 6. Iniciar la aplicación
@@ -162,6 +163,14 @@ npm start
 - `GET /api/competitions/:id/participants` - Participantes
 - `GET /api/competitions/:id/timings` - Tiempos registrados
 - `POST /api/competitions/:id/timings` - Registrar tiempo
+
+### Gestión de Reglas y Plantillas de Competición
+- `GET /api/competition-rules/templates` - Obtener todas las plantillas de reglas
+- `GET /api/competition-rules/competition/:competitionId` - Reglas asociadas a una competición
+- `POST /api/competition-rules` - Crear nueva regla o plantilla
+- `PUT /api/competition-rules/:id` - Editar una regla existente
+- `DELETE /api/competition-rules/:id` - Eliminar una regla o plantilla
+- `POST /api/competition-rules/apply-template/:templateId` - Clonar plantilla y asociar a competición
 
 ## Endpoints públicos añadidos
 
@@ -235,15 +244,140 @@ Este endpoint permite obtener un token JWT usando email y contraseña de un usua
 
 ## Cambios recientes
 
-## Nueva regla: Puntos por mejor tiempo por ronda
+### ✅ FASE 2 - Frontend: Editor Visual de Reglas (COMPLETADA)
 
-Ahora es posible añadir una regla de puntuación que otorga puntos adicionales al participante que consiga el mejor tiempo global de cada ronda. Esta regla se puede activar desde la gestión de reglas de la competición, seleccionando el tipo "Mejor tiempo por ronda" y definiendo cuántos puntos extra se otorgan por ronda.
+Se ha implementado completamente el editor visual de reglas para las competiciones:
 
-- El sistema sumará estos puntos automáticamente al ranking de la competición.
-- Se puede combinar con las reglas de puntuación estándar por ronda y final.
+#### Nuevos Componentes Frontend
+- **CompetitionRulesPanel.jsx** - Vista principal que reemplaza el antiguo sistema
+- **RuleFormModal.jsx** - Modal para crear y editar reglas con formulario completo
+- **TemplatesDrawer.jsx** - Drawer lateral para aplicar plantillas predefinidas
 
-Para más detalles, consulta la sección de reglas en la gestión de competiciones.
+#### Características Implementadas
+- **Aplicar plantillas**: Botón para aplicar sistemas de puntuación predefinidos
+- **Editor visual de puntos**: Interfaz intuitiva para definir puntos por posición
+- **Validaciones en tiempo real**: Verificación de campos requeridos y formatos
+- **Soporte para bonus**: Opción de bonus por mejor vuelta de cada ronda
+- **Búsqueda de plantillas**: Filtrado en tiempo real de plantillas disponibles
+- **Estados de carga**: Spinners y mensajes durante operaciones
+- **Validación de seguridad**: Deshabilitación de edición si hay tiempos registrados
+
+#### Flujo de Trabajo
+1. **Ver reglas existentes** - Lista visual con badges de tipo y bonus
+2. **Aplicar plantilla** - Seleccionar de plantillas predefinidas
+3. **Crear nueva regla** - Formulario completo con validaciones
+4. **Editar regla existente** - Modificar puntos y descripción
+5. **Eliminar regla** - Confirmación y actualización
+
+### ✅ FASE 1 - Backend: API para gestionar reglas y plantillas (COMPLETADA)
+
+Se ha implementado un sistema completo de gestión de reglas y plantillas para las competiciones:
+
+#### Nuevos Endpoints
+- `GET /api/competition-rules/templates` - Obtener todas las plantillas de reglas
+- `GET /api/competition-rules/competition/:competitionId` - Reglas asociadas a una competición
+- `POST /api/competition-rules` - Crear nueva regla o plantilla
+- `PUT /api/competition-rules/:id` - Editar una regla existente
+- `DELETE /api/competition-rules/:id` - Eliminar una regla o plantilla
+- `POST /api/competition-rules/apply-template/:templateId` - Clonar plantilla y asociar a competición
+
+#### Nuevos Campos en la Base de Datos
+- `is_template` (boolean) - Indica si es una plantilla o regla de competición
+- `created_by` (uuid) - Usuario que creó la regla/plantilla
+- `use_bonus_best_lap` (boolean) - Indica si se aplica bonus por mejor vuelta
+- `name` (text) - Nombre de la plantilla (solo para plantillas)
+
+#### Plantillas Incluidas
+- Sistema Estándar (1º=10, 2º=8, 3º=6, 4º=4, 5º=2)
+- Sistema F1 (1º=25, 2º=18, 3º=15, 4º=12, 5º=10, 6º=8, 7º=6, 8º=4, 9º=2, 10º=1)
+- Sistema Simple (1º=3, 2º=2, 3º=1)
+- Sistema con Bonus (con punto extra por mejor vuelta)
+- Puntuación Final (bonus para ganador general)
+- Sistema de Eliminación (solo primeros 3)
+- Sistema Extendido (para competiciones grandes)
 
 ---
 
 **¡Disfruta organizando tus competiciones de Scalextric! 🏁**
+
+## 🔄 Actualizaciones Recientes
+
+### v1.4.0 - Corrección de Bug: Campo category_id en Participantes
+- ✅ **Problema Resuelto**: El campo `category_id` ahora se guarda correctamente en la base de datos
+- ✅ **Validación Mejorada**: Verificación de que la categoría existe antes de asignar participantes
+- ✅ **Migración de Base de Datos**: Script para añadir el campo `category_id` a la tabla `competition_participants`
+- ✅ **Backend Actualizado**: Rutas POST y PUT para participantes ahora procesan correctamente el `category_id`
+- ✅ **Validación de Categorías**: Verificación de que la categoría pertenece a la competición correcta
+
+**Archivos Modificados:**
+- `backend/routes/competitions.js` - Rutas POST y PUT actualizadas
+- `backend/scripts/add-category-id-to-participants.sql` - Script SQL para migración
+- `backend/scripts/migrate-add-category-id.js` - Script de migración en JavaScript
+
+**Cambios Técnicos:**
+1. **Ruta POST /:id/participants**: Ahora incluye validación y procesamiento de `category_id`
+2. **Ruta PUT /:id/participants/:participantId**: Actualizada para manejar `category_id`
+3. **Validación de Categorías**: Verificación de que la categoría existe y pertenece a la competición
+4. **Migración de Base de Datos**: Campo `category_id` añadido con referencia a `competition_categories`
+
+### v1.5.0 - Refactorización del Sistema de Reglas: Bonus por Mejor Vuelta
+- ✅ **Eliminación de Tipo de Regla**: Removido el tipo "Mejor tiempo por ronda" del selector
+- ✅ **Nuevo Sistema de Bonus**: Implementado el campo `use_bonus_best_lap` para otorgar 1 punto adicional
+- ✅ **Lógica Simplificada**: El bonus se aplica automáticamente a las reglas de tipo "Por ronda"
+- ✅ **Cálculos Actualizados**: Backend modificado para usar el nuevo sistema de bonus
+- ✅ **Plantillas Limpiadas**: Eliminada la plantilla "Mejor Vuelta por Ronda" y actualizadas las existentes
+- ✅ **Documentación Actualizada**: Todas las guías actualizadas para reflejar los cambios
+
+**Archivos Modificados:**
+- `frontend/src/components/RuleFormModal.jsx` - Eliminada opción best_time_per_round
+- `frontend/src/components/CompetitionRulesPanel.jsx` - Actualizada función de descripción
+- `frontend/src/components/TemplatesDrawer.jsx` - Actualizada función de descripción
+- `backend/routes/competitions.js` - Lógica de cálculo actualizada
+- `backend/routes/publicCompetitions.js` - Lógica de cálculo actualizada
+- `backend/scripts/insert-rule-templates.sql` - Plantillas actualizadas
+- `backend/scripts/cleanup-best-time-rules.sql` - Script de limpieza
+- `backend/scripts/migrate-cleanup-best-time-rules.js` - Script de migración
+
+**Cambios Técnicos:**
+1. **Frontend**: Eliminada opción "Mejor tiempo por ronda" del selector de tipos
+2. **Backend**: Lógica de cálculo modificada para usar `use_bonus_best_lap`
+3. **Base de Datos**: Limpieza de reglas existentes con tipo `best_time_per_round`
+4. **Plantillas**: Actualizadas para usar el nuevo sistema de bonus
+5. **Documentación**: Todas las guías actualizadas para reflejar los cambios
+
+### v1.6.0 - Corrección del Cálculo de Puntos en Tiempos Agregados
+- ✅ **Problema Resuelto**: Los puntos en la pestaña "Tiempos Agregados" ahora se calculan correctamente
+- ✅ **Cálculo Unificado**: Eliminado el cálculo de puntos en el frontend, ahora se obtiene del backend
+- ✅ **Penalizaciones Consideradas**: Los puntos ahora consideran las penalizaciones aplicadas
+- ✅ **Bonus por Mejor Vuelta**: El bonus por mejor vuelta se aplica correctamente
+- ✅ **Consistencia**: Los puntos son idénticos entre `CompetitionTimings` y `CompetitionStatus`
+
+**Archivos Modificados:**
+- `frontend/src/pages/CompetitionTimings.jsx` - Eliminada función calculatePoints, puntos obtenidos del backend
+- `backend/routes/competitions.js` - Endpoint /progress actualizado para incluir puntos en participant_stats
+
+**Cambios Técnicos:**
+1. **Frontend**: Eliminada función `calculatePoints` que calculaba puntos incorrectamente
+2. **Backend**: Endpoint `/progress` ahora incluye `points` en `participant_stats`
+3. **Cálculo Unificado**: Ambos componentes usan la misma lógica de cálculo del backend
+4. **Penalizaciones**: Los puntos ahora consideran las penalizaciones aplicadas a los tiempos
+5. **Bonus**: El bonus por mejor vuelta se aplica correctamente usando `use_bonus_best_lap`
+
+## 🎯 Sistema de Puntuación
+
+El sistema de puntuación calcula automáticamente los puntos basándose en las reglas configuradas:
+
+### Tipos de Reglas
+- **Por Ronda**: Puntos por posición en cada ronda individual
+- **Final**: Puntos por posición en la clasificación final
+- **Bonus por Mejor Vuelta**: 1 punto adicional al piloto con la mejor vuelta de cada ronda
+
+### Cálculo de Puntos
+- **Puntos por Ronda**: Se asignan según la posición en cada ronda (considerando penalizaciones)
+- **Puntos Finales**: Se asignan según la posición en la clasificación general (considerando penalizaciones)
+- **Bonus**: 1 punto adicional por mejor vuelta de ronda (sin empates)
+
+### Consideraciones Importantes
+- Las penalizaciones se consideran tanto en el cálculo de puntos por ronda como en la clasificación final
+- Los puntos se calculan automáticamente en el backend y se muestran en tiempo real
+- El cálculo es consistente entre las vistas de tiempos y estado de competición

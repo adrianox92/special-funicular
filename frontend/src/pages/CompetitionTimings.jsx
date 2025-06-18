@@ -74,12 +74,14 @@ const CompetitionTimings = () => {
       const rulesResponse = await axios.get(`/competitions/${id}/rules`);
       setRules(rulesResponse.data);
       
-      // Calcular puntos
-      setTimeout(() => {
-        setPointsByParticipant(
-          calculatePoints(partResponse.data, timingsResponse.data, rulesResponse.data, compResponse.data)
-        );
-      }, 0);
+      // Obtener puntos calculados del backend usando el endpoint de progreso
+      const pointsByParticipant = {};
+      if (progressResponse.data.participant_stats) {
+        progressResponse.data.participant_stats.forEach(participant => {
+          pointsByParticipant[participant.participant_id] = participant.points || 0;
+        });
+      }
+      setPointsByParticipant(pointsByParticipant);
       
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -363,47 +365,6 @@ const CompetitionTimings = () => {
       console.error('Error al exportar PDF:', error);
       alert('Error al exportar los datos a PDF');
     }
-  };
-
-  // Lógica para calcular puntos
-  const calculatePoints = (participants, timings, rules, competition) => {
-    if (!rules || rules.length === 0) return {};
-    const points = {};
-    // Sumar puntos por ronda (todas las reglas per_round)
-    rules.filter(r => r.rule_type === 'per_round').forEach(rule => {
-      const points_structure = rule.points_structure || {};
-      for (let round = 1; round <= competition.rounds; round++) {
-        // Filtrar tiempos de la ronda
-        const roundTimings = timings.filter(t => t.round_number === round);
-        // Ordenar por tiempo total ascendente
-        const sorted = [...roundTimings].sort((a, b) => {
-          const timeA = parseFloat(a.total_time.split(':')[0]) * 60 + parseFloat(a.total_time.split(':')[1]);
-          const timeB = parseFloat(b.total_time.split(':')[0]) * 60 + parseFloat(b.total_time.split(':')[1]);
-          return timeA - timeB;
-        });
-        sorted.forEach((timing, idx) => {
-          const pos = (idx + 1).toString();
-          const pts = points_structure[pos] || 0;
-          // Usar timing.participant_id como string para la clave
-          const key = String(timing.participant_id);
-          points[key] = (points[key] || 0) + pts;
-        });
-      }
-    });
-    // Sumar puntos finales (todas las reglas final)
-    rules.filter(r => r.rule_type === 'final').forEach(rule => {
-      const points_structure = rule.points_structure || {};
-      // Usar la función getAggregatedTimes para obtener el ranking
-      const agg = getAggregatedTimes();
-      agg.forEach((data, idx) => {
-        const pos = (idx + 1).toString();
-        const pts = points_structure[pos] || 0;
-        // Usar data.id como string para la clave
-        const key = String(data.id);
-        points[key] = (points[key] || 0) + pts;
-      });
-    });
-    return points;
   };
 
   const handleOpenPenaltyModal = (timing) => {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const { calculatePoints } = require('../lib/pointsCalculator');
 
 /**
  * @swagger
@@ -335,74 +336,22 @@ router.get('/:slug/status', async (req, res) => {
     const isCompleted = timesCount >= totalRequiredTimes;
     const progressPercentage = totalRequiredTimes > 0 ? (timesCount / totalRequiredTimes) * 100 : 0;
 
-    // Calcular estadísticas por participante
-    const participantStats = participants.map(participant => {
-      const participantTimings = timings.filter(t => t.participant_id === participant.id);
-      const roundsCompleted = participantTimings.length;
-      const roundsRemaining = competition.rounds - roundsCompleted;
-      
-      // Calcular tiempo total acumulado
-      let totalTimeSeconds = 0;
-      let bestLapTime = null;
-      let totalLaps = 0;
-      let totalPenalty = 0;
-      
-      participantTimings.forEach(timing => {
-        const timeParts = timing.total_time.split(':');
-        const timeInSeconds = parseFloat(timeParts[0]) * 60 + parseFloat(timeParts[1]);
-        const penalty = Number(timing.penalty_seconds) || 0;
-        totalTimeSeconds += timeInSeconds + penalty;
-        totalPenalty += penalty;
-        
-        // Actualizar mejor vuelta
-        if (!bestLapTime || timing.best_lap_time < bestLapTime) {
-          bestLapTime = timing.best_lap_time;
-        }
-        
-        totalLaps += timing.laps;
-      });
+    // Obtener reglas de puntuación
+    const { data: rules, error: rulesError } = await supabase
+      .from('competition_rules')
+      .select('*')
+      .eq('competition_id', competition.id);
+    if (rulesError) {
+      console.error('Error al obtener reglas:', rulesError);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
 
-      // Formatear tiempo total
-      const totalMinutes = Math.floor(totalTimeSeconds / 60);
-      const totalSeconds = (totalTimeSeconds % 60).toFixed(3);
-      const totalTimeFormatted = totalTimeSeconds > 0 ? 
-        `${String(totalMinutes).padStart(2, '0')}:${totalSeconds.padStart(6, '0')}` : null;
-
-      return {
-        participant_id: participant.id,
-        driver_name: participant.driver_name,
-        vehicle_info: participant.vehicles ? 
-          `${participant.vehicles.manufacturer} ${participant.vehicles.model}` : 
-          participant.vehicle_model,
-        rounds_completed: roundsCompleted,
-        rounds_remaining: roundsRemaining,
-        total_time: totalTimeFormatted,
-        best_lap_time: bestLapTime,
-        total_laps: totalLaps,
-        total_time_seconds: totalTimeSeconds,
-        penalty_seconds: totalPenalty,
-        timings: participantTimings
-      };
-    });
-
-    // Ordenar participantes por tiempo ajustado
-    const sortedParticipants = participantStats.sort((a, b) => {
-      // Primero por completitud de rondas (descendente)
-      if (a.rounds_completed !== b.rounds_completed) {
-        return b.rounds_completed - a.rounds_completed;
-      }
-      // Si tienen las mismas rondas completadas, ordenar por tiempo total ajustado
-      if (a.total_time_seconds && b.total_time_seconds) {
-        return a.total_time_seconds - b.total_time_seconds;
-      }
-      if (a.total_time_seconds && !b.total_time_seconds) return -1;
-      if (!a.total_time_seconds && b.total_time_seconds) return 1;
-      return 0;
-    });
-
-    // Añadir posición a cada participante
-    sortedParticipants.forEach((participant, index) => {
-      participant.position = index + 1;
+    // Calcular puntos y stats usando la función centralizada
+    const { sortedParticipants } = calculatePoints({
+      competition,
+      participants,
+      timings,
+      rules
     });
 
     // Calcular mejor vuelta global
@@ -414,94 +363,6 @@ router.get('/:slug/status', async (req, res) => {
         globalBestLap = timing.best_lap_time;
         globalBestLapParticipant = participants.find(p => p.id === timing.participant_id);
       }
-    });
-
-    // Obtener reglas de puntuación
-    const { data: rules, error: rulesError } = await supabase
-      .from('competition_rules')
-      .select('*')
-      .eq('competition_id', competition.id);
-    if (rulesError) {
-      console.error('Error al obtener reglas:', rulesError);
-      return res.status(500).json({ error: 'Error interno del servidor' });
-    }
-
-    // Inicializar puntos por participante
-    const pointsByParticipant = {};
-    participants.forEach(p => { pointsByParticipant[p.id] = 0; });
-
-    // Reglas por ronda y final (puntuación estándar)
-    const perRoundRule = rules.find(r => r.rule_type === 'per_round');
-    const finalRule = rules.find(r => r.rule_type === 'final');
-    const bestTimeRule = rules.find(r => r.rule_type === 'best_time_per_round');
-
-    // Puntuación por ronda
-    if (perRoundRule) {
-      for (let round = 1; round <= competition.rounds; round++) {
-        // Tiempos de la ronda
-        const roundTimings = timings.filter(t => t.round_number === round);
-        // Solo sumar puntos si todos los participantes han registrado tiempo en la ronda
-        if (roundTimings.length === participants.length) {
-          // Ordenar por tiempo total ajustado ascendente (mejor primero)
-          const sorted = roundTimings.slice().sort((a, b) => {
-            const aTime = a.total_time_seconds ? a.total_time_seconds : Infinity;
-            const bTime = b.total_time_seconds ? b.total_time_seconds : Infinity;
-            return aTime - bTime;
-          });
-          Object.entries(perRoundRule.points_structure).forEach(([pos, pts], idx) => {
-            if (sorted[idx]) {
-              pointsByParticipant[sorted[idx].participant_id] += pts;
-            }
-          });
-        }
-      }
-    }
-
-    // Puntuación por mejor tiempo por ronda
-    let bestTimeTies = [];
-    if (bestTimeRule && bestTimeRule.points_structure?.points > 0) {
-      for (let round = 1; round <= competition.rounds; round++) {
-        const roundTimings = timings.filter(t => t.round_number === round);
-        // Solo sumar puntos si todos los participantes han registrado tiempo en la ronda
-        if (roundTimings.length === participants.length) {
-          let bestTiming = roundTimings[0];
-          roundTimings.forEach(t => {
-            if (t.best_lap_time < bestTiming.best_lap_time) {
-              bestTiming = t;
-            }
-          });
-          // Verificar si hay empate
-          const tied = roundTimings.filter(t => t.best_lap_time === bestTiming.best_lap_time);
-          if (tied.length === 1 && bestTiming && bestTiming.participant_id) {
-            pointsByParticipant[bestTiming.participant_id] += bestTimeRule.points_structure.points;
-          } else if (tied.length > 1) {
-            bestTimeTies.push({ round, time: bestTiming.best_lap_time });
-          }
-        }
-      }
-    }
-
-    // Puntuación final (solo si la competición está completada)
-    if (finalRule && isCompleted) {
-      // Ordenar participantes por tiempo total ajustado (mejor primero)
-      const finalSorted = sortedParticipants.slice().sort((a, b) => {
-        if (a.total_time_seconds && b.total_time_seconds) {
-          return a.total_time_seconds - b.total_time_seconds;
-        }
-        if (a.total_time_seconds && !b.total_time_seconds) return -1;
-        if (!a.total_time_seconds && b.total_time_seconds) return 1;
-        return 0;
-      });
-      Object.entries(finalRule.points_structure).forEach(([pos, pts], idx) => {
-        if (finalSorted[idx]) {
-          pointsByParticipant[finalSorted[idx].participant_id] += pts;
-        }
-      });
-    }
-
-    // Añadir los puntos calculados a cada participante
-    sortedParticipants.forEach(p => {
-      p.points = pointsByParticipant[p.participant_id] || 0;
     });
 
     // Preparar respuesta
@@ -528,12 +389,6 @@ router.get('/:slug/status', async (req, res) => {
         driver: globalBestLapParticipant?.driver_name
       } : null
     };
-
-    // Añadir avisos de empates en mejor vuelta
-    if (bestTimeTies.length > 0) {
-      response.best_time_ties = bestTimeTies;
-      response.best_time_ties_message = 'No se han otorgado puntos extra por mejor vuelta en las rondas con empate de tiempo.';
-    }
 
     res.json(response);
   } catch (error) {

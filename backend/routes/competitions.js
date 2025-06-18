@@ -3,6 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
+const { calculatePoints } = require('../lib/pointsCalculator');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -433,7 +434,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/participants', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
-    const { vehicle_id, driver_name, vehicle_model } = req.body;
+    const { vehicle_id, driver_name, vehicle_model, category_id } = req.body;
 
     // Verificar que la competición existe y pertenece al usuario
     const { data: competition, error: compError } = await supabase
@@ -450,6 +451,22 @@ router.post('/:id/participants', async (req, res) => {
     // Validaciones
     if (!driver_name || !driver_name.trim()) {
       return res.status(400).json({ error: 'El nombre del piloto es requerido' });
+    }
+
+    if (!category_id) {
+      return res.status(400).json({ error: 'La categoría es requerida' });
+    }
+
+    // Verificar que la categoría existe
+    const { data: category, error: catError } = await supabase
+      .from('competition_categories')
+      .select('id')
+      .eq('id', category_id)
+      .eq('competition_id', competitionId)
+      .single();
+
+    if (catError || !category) {
+      return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
     // Verificar que se proporcione exactamente una fuente de vehículo
@@ -494,6 +511,7 @@ router.post('/:id/participants', async (req, res) => {
     const participantData = {
       competition_id: competitionId,
       driver_name: driver_name.trim(),
+      category_id: category_id,
       registered_by: req.user.id
     };
 
@@ -567,7 +585,7 @@ router.get('/:id/participants', async (req, res) => {
 router.put('/:id/participants/:participantId', async (req, res) => {
   try {
     const { id: competitionId, participantId } = req.params;
-    const { vehicle_id, driver_name, vehicle_model } = req.body;
+    const { vehicle_id, driver_name, vehicle_model, category_id } = req.body;
 
     // Verificar que la competición existe y pertenece al usuario
     const { data: competition, error: compError } = await supabase
@@ -598,6 +616,20 @@ router.put('/:id/participants/:participantId', async (req, res) => {
       return res.status(400).json({ error: 'El nombre del piloto no puede estar vacío' });
     }
 
+    if (category_id) {
+      // Verificar que la categoría existe
+      const { data: category, error: catError } = await supabase
+        .from('competition_categories')
+        .select('id')
+        .eq('id', category_id)
+        .eq('competition_id', competitionId)
+        .single();
+
+      if (catError || !category) {
+        return res.status(404).json({ error: 'Categoría no encontrada' });
+      }
+    }
+
     // Verificar que se proporcione exactamente una fuente de vehículo
     if ((vehicle_id && vehicle_model) || (!vehicle_id && !vehicle_model)) {
       return res.status(400).json({ 
@@ -622,6 +654,7 @@ router.put('/:id/participants/:participantId', async (req, res) => {
     // Actualizar el participante
     const updateData = {};
     if (driver_name) updateData.driver_name = driver_name.trim();
+    if (category_id) updateData.category_id = category_id;
     if (vehicle_id) {
       updateData.vehicle_id = vehicle_id;
       updateData.vehicle_model = null;
@@ -747,7 +780,8 @@ router.get('/:id/progress', async (req, res) => {
           lane,
           driver,
           timing_date,
-          circuit
+          circuit,
+          penalty_seconds
         `)
         .in('participant_id', 
           (await supabase
@@ -784,15 +818,6 @@ router.get('/:id/progress', async (req, res) => {
     const isCompleted = timesCount >= totalRequiredTimes;
     const progressPercentage = totalRequiredTimes > 0 ? (timesCount / totalRequiredTimes) * 100 : 0;
 
-    // Calcular estadísticas por participante
-    const participantStats = Object.keys(timesByParticipant).map(participantId => ({
-      participant_id: participantId,
-      times_registered: timesByParticipant[participantId].length,
-      rounds_completed: timesByParticipant[participantId].map(t => t.round_number),
-      rounds_remaining: Array.from({length: competition.rounds}, (_, i) => i + 1)
-        .filter(round => !timesByParticipant[participantId].some(t => t.round_number === round))
-    }));
-
     // Obtener reglas de puntuación
     const { data: rules, error: rulesError } = await supabase
       .from('competition_rules')
@@ -804,74 +829,14 @@ router.get('/:id/progress', async (req, res) => {
     }
     const perRoundRule = rules.find(r => r.rule_type === 'per_round');
     const finalRule = rules.find(r => r.rule_type === 'final');
-    const bestTimeRule = rules.find(r => r.rule_type === 'best_time_per_round');
 
-    // Inicializar puntos por participante
-    const pointsByParticipant = {};
-    participantStats.forEach(p => { pointsByParticipant[p.participant_id] = 0; });
-
-    // Puntuación por ronda
-    if (perRoundRule) {
-      for (let round = 1; round <= competition.rounds; round++) {
-        const roundTimings = Object.values(timesByParticipant).map(timings => timings.find(t => t.round_number === round)).filter(Boolean);
-        // Solo sumar puntos si todos los participantes han registrado tiempo en la ronda
-        if (roundTimings.length === participantsCount) {
-          const sorted = roundTimings.slice().sort((a, b) => {
-            const aTime = a.total_time ? parseFloat(a.total_time.split(':')[0]) * 60 + parseFloat(a.total_time.split(':')[1]) : Infinity;
-            const bTime = b.total_time ? parseFloat(b.total_time.split(':')[0]) * 60 + parseFloat(b.total_time.split(':')[1]) : Infinity;
-            return aTime - bTime;
-          });
-          Object.entries(perRoundRule.points_structure).forEach(([pos, pts], idx) => {
-            if (sorted[idx]) {
-              pointsByParticipant[sorted[idx].participant_id] += pts;
-            }
-          });
-        }
-      }
-    }
-
-    // Puntuación por mejor tiempo por ronda
-    if (bestTimeRule && bestTimeRule.points_structure?.points > 0) {
-      for (let round = 1; round <= competition.rounds; round++) {
-        const roundTimings = Object.values(timesByParticipant).map(timings => timings.find(t => t.round_number === round)).filter(Boolean);
-        // Solo sumar puntos si todos los participantes han registrado tiempo en la ronda
-        if (roundTimings.length === participantsCount) {
-          let bestTiming = roundTimings[0];
-          roundTimings.forEach(t => {
-            if (t.best_lap_time < bestTiming.best_lap_time) {
-              bestTiming = t;
-            }
-          });
-          // Verificar si hay empate
-          const tied = roundTimings.filter(t => t.best_lap_time === bestTiming.best_lap_time);
-          if (tied.length === 1 && bestTiming && bestTiming.participant_id) {
-            pointsByParticipant[bestTiming.participant_id] += bestTimeRule.points_structure.points;
-          }
-        }
-      }
-    }
-
-    // Puntuación final (solo si la competición está completada)
-    if (finalRule && isCompleted) {
-      // Ordenar participantes por tiempo total (mejor primero)
-      const finalSorted = participantStats.slice().sort((a, b) => {
-        if (a.total_time && b.total_time) {
-          const aTime = a.total_time.split(':');
-          const bTime = b.total_time.split(':');
-          const aSeconds = parseFloat(aTime[0]) * 60 + parseFloat(aTime[1]);
-          const bSeconds = parseFloat(bTime[0]) * 60 + parseFloat(bTime[1]);
-          return aSeconds - bSeconds;
-        }
-        if (a.total_time && !b.total_time) return -1;
-        if (!a.total_time && b.total_time) return 1;
-        return 0;
-      });
-      Object.entries(finalRule.points_structure).forEach(([pos, pts], idx) => {
-        if (finalSorted[idx]) {
-          pointsByParticipant[finalSorted[idx].participant_id] += pts;
-        }
-      });
-    }
+    // Calcular puntos y stats usando la función centralizada
+    const { pointsByParticipant, participantStats } = calculatePoints({
+      competition,
+      participants: Object.keys(timesByParticipant).map(pid => ({ id: pid })),
+      timings: Object.values(timesByParticipant).flat(),
+      rules
+    });
 
     res.json({
       competition_id: id,

@@ -12,7 +12,7 @@ import {
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
 import CompetitionCategories from '../components/CompetitionCategories';
-import CompetitionRules from '../components/CompetitionRules';
+import CompetitionRulesPanel from '../components/CompetitionRulesPanel';
 
 const CompetitionParticipants = () => {
   const { id: competitionId } = useParams();
@@ -30,7 +30,8 @@ const CompetitionParticipants = () => {
   const [addForm, setAddForm] = useState({
     vehicle_id: '',
     driver_name: '',
-    vehicle_model: ''
+    vehicle_model: '',
+    category_id: ''
   });
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
@@ -42,7 +43,8 @@ const CompetitionParticipants = () => {
   const [editForm, setEditForm] = useState({
     vehicle_id: '',
     driver_name: '',
-    vehicle_model: ''
+    vehicle_model: '',
+    category_id: ''
   });
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState(null);
@@ -100,6 +102,11 @@ const CompetitionParticipants = () => {
       return;
     }
 
+    if (!addForm.category_id) {
+      setAddError('Debes seleccionar una categoría');
+      return;
+    }
+
     if (participantType === 'own' && !addForm.vehicle_id) {
       setAddError('Debes seleccionar un vehículo');
       return;
@@ -115,7 +122,8 @@ const CompetitionParticipants = () => {
       setAddError(null);
       
       const participantData = {
-        driver_name: addForm.driver_name.trim()
+        driver_name: addForm.driver_name.trim(),
+        category_id: addForm.category_id
       };
 
       if (participantType === 'own') {
@@ -127,7 +135,7 @@ const CompetitionParticipants = () => {
       await axios.post(`/competitions/${competitionId}/participants`, participantData);
       
       setShowAddModal(false);
-      setAddForm({ vehicle_id: '', driver_name: '', vehicle_model: '' });
+      setAddForm({ vehicle_id: '', driver_name: '', vehicle_model: '', category_id: '' });
       setParticipantType('own');
       loadCompetition(); // Recargar datos
     } catch (err) {
@@ -147,12 +155,18 @@ const CompetitionParticipants = () => {
       return;
     }
 
+    if (!editForm.category_id) {
+      setEditError('Debes seleccionar una categoría');
+      return;
+    }
+
     try {
       setEditing(true);
       setEditError(null);
       
       const participantData = {
-        driver_name: editForm.driver_name.trim()
+        driver_name: editForm.driver_name.trim(),
+        category_id: editForm.category_id
       };
 
       if (editForm.vehicle_id) {
@@ -165,7 +179,7 @@ const CompetitionParticipants = () => {
       
       setShowEditModal(false);
       setEditingParticipant(null);
-      setEditForm({ vehicle_id: '', driver_name: '', vehicle_model: '' });
+      setEditForm({ vehicle_id: '', driver_name: '', vehicle_model: '', category_id: '' });
       loadCompetition(); // Recargar datos
     } catch (err) {
       console.error('Error al editar participante:', err);
@@ -181,7 +195,8 @@ const CompetitionParticipants = () => {
     setEditForm({
       vehicle_id: participant.vehicle_id || '',
       driver_name: participant.driver_name,
-      vehicle_model: participant.vehicle_model || ''
+      vehicle_model: participant.vehicle_model || '',
+      category_id: participant.category_id || ''
     });
     setShowEditModal(true);
   }, []);
@@ -218,6 +233,13 @@ const CompetitionParticipants = () => {
     }
     return null;
   }, []);
+
+  // Obtener nombre de la categoría
+  const getCategoryName = useCallback((categoryId) => {
+    if (!competition?.categories) return 'Sin categoría';
+    const category = competition.categories.find(cat => cat.id === categoryId);
+    return category ? category.name : 'Sin categoría';
+  }, [competition?.categories]);
 
   // Generar enlace público
   const generatePublicLink = () => {
@@ -459,10 +481,10 @@ const CompetitionParticipants = () => {
               <div className="d-flex justify-content-between align-items-center">
                 <h5>Participantes Confirmados</h5>
                 <Button
-                  variant="primary" 
-                  className="mb-3"
+                  variant="primary"
+                  className="d-flex align-items-center gap-2"
                   onClick={() => setShowAddModal(true)}
-                  disabled={timesRegistered > 0}
+                  disabled={!competition.categories || competition.categories.length === 0}
                 >
                   <FaPlus /> Añadir Participante
                 </Button>
@@ -494,6 +516,7 @@ const CompetitionParticipants = () => {
                 <tr>
                   <th>#</th>
                   <th>Piloto</th>
+                  <th>Categoría</th>
                   <th>Vehículo</th>
                   {competition && competition.rules && competition.rules.length > 0 && <th>Puntos</th>}
                   <th>Acciones</th>
@@ -504,6 +527,12 @@ const CompetitionParticipants = () => {
                   <tr key={participant.id}>
                     <td>{idx + 1}</td>
                     <td>{participant.driver_name}</td>
+                    <td>
+                      <Badge bg="info" className="d-flex align-items-center gap-1">
+                        <FaTags size={10} />
+                        {getCategoryName(participant.category_id)}
+                      </Badge>
+                    </td>
                     <td>{getVehicleInfo(participant).manufacturer} {getVehicleInfo(participant).model}</td>
                     {competition && competition.rules && competition.rules.length > 0 && <td>{participant.points || 0}</td>}
                     <td>
@@ -558,7 +587,7 @@ const CompetitionParticipants = () => {
             <FaTrophy /> Reglas
           </span>
         }>
-          <CompetitionRules 
+          <CompetitionRulesPanel 
             competitionId={competitionId}
             onRuleChange={() => {}}
           />
@@ -603,6 +632,20 @@ const CompetitionParticipants = () => {
                   onChange={() => setParticipantType('external')}
                 />
               </div>
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Categoría *</Form.Label>
+              <Form.Select
+                value={addForm.category_id}
+                onChange={e => setAddForm({ ...addForm, category_id: e.target.value })}
+                required
+              >
+                <option value="">Selecciona una categoría</option>
+                {competition.categories && competition.categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </Form.Select>
             </Form.Group>
 
             <Form.Group className="mb-3">
@@ -697,6 +740,20 @@ const CompetitionParticipants = () => {
                 placeholder="Nombre del piloto"
                 required
               />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Categoría *</Form.Label>
+              <Form.Select
+                value={editForm.category_id}
+                onChange={e => setEditForm({ ...editForm, category_id: e.target.value })}
+                required
+              >
+                <option value="">Selecciona una categoría</option>
+                {competition.categories && competition.categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </Form.Select>
             </Form.Group>
 
             <Form.Group className="mb-3">
