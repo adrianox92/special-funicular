@@ -71,6 +71,23 @@ const CompetitionStatus = () => {
     // Aquí se implementaría la lógica de exportación PDF
   };
 
+  // Función para convertir mm:ss.mmm a segundos
+  function timeStringToSeconds(str) {
+    if (!str) return 0;
+    const match = str.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
+    if (!match) return 0;
+    const [, min, sec, ms] = match.map(Number);
+    return min * 60 + sec + ms / 1000;
+  }
+
+  // Función para convertir segundos a mm:ss.mmm
+  function secondsToTimeString(seconds) {
+    if (typeof seconds !== 'number' || isNaN(seconds)) return '00:00.000';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(3);
+    return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
+  }
+
   if (loading) {
     return (
       <Container className="py-5">
@@ -268,21 +285,23 @@ const CompetitionStatus = () => {
               </thead>
               <tbody>
                 {participants.map((participant, idx) => {
-                  // Calcular diferencia con el líder
+                  // El tiempo total que viene del backend ya incluye la penalización
+                  const totalTimeSeconds = timeStringToSeconds(participant.total_time);
+                  const penalty = Number(participant.penalty_seconds) || 0;
+                  
+                  // Calcular diferencia con el líder y anterior usando el tiempo total del backend
                   let leaderDiff = '-';
                   let previousDiff = '-';
-                  if (idx > 0 && participants[0].total_time && participant.total_time) {
-                    const leaderTime = parseFloat(participants[0].total_time.split(':')[0]) * 60 + parseFloat(participants[0].total_time.split(':')[1]);
-                    const currentTime = parseFloat(participant.total_time.split(':')[0]) * 60 + parseFloat(participant.total_time.split(':')[1]);
-                    const diff = currentTime - leaderTime;
+                  if (idx > 0 && participants[0].total_time) {
+                    const leaderTimeSeconds = timeStringToSeconds(participants[0].total_time);
+                    const diff = totalTimeSeconds - leaderTimeSeconds;
                     const diffMinutes = Math.floor(diff / 60);
                     const diffSeconds = (diff % 60).toFixed(3);
                     leaderDiff = diffMinutes > 0 ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}` : `+${diffSeconds}`;
                   }
-                  if (idx > 0 && participants[idx - 1].total_time && participant.total_time) {
-                    const previousTime = parseFloat(participants[idx - 1].total_time.split(':')[0]) * 60 + parseFloat(participants[idx - 1].total_time.split(':')[1]);
-                    const currentTime = parseFloat(participant.total_time.split(':')[0]) * 60 + parseFloat(participant.total_time.split(':')[1]);
-                    const diff = currentTime - previousTime;
+                  if (idx > 0 && participants[idx - 1].total_time) {
+                    const prevTimeSeconds = timeStringToSeconds(participants[idx - 1].total_time);
+                    const diff = totalTimeSeconds - prevTimeSeconds;
                     const diffMinutes = Math.floor(diff / 60);
                     const diffSeconds = (diff % 60).toFixed(3);
                     previousDiff = diffMinutes > 0 ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}` : `+${diffSeconds}`;
@@ -294,7 +313,19 @@ const CompetitionStatus = () => {
                       <td>{participant.vehicle_info}</td>
                       <td>{participant.rounds_completed}</td>
                       <td>{formatTime(participant.best_lap_time)}</td>
-                      <td>{formatTime(participant.total_time)}</td>
+                      <td>
+                        {penalty > 0 ? (
+                          <span
+                            data-bs-toggle="tooltip"
+                            title={`Original: ${secondsToTimeString(totalTimeSeconds)}`}
+                            style={{cursor: 'pointer'}}
+                          >
+                            {participant.total_time} <span style={{color: '#b8860b'}}>⚠️</span>
+                          </span>
+                        ) : (
+                          <span>{participant.total_time}</span>
+                        )}
+                      </td>
                       <td>{leaderDiff}</td>
                       <td>{previousDiff}</td>
                       {rules.length > 0 && <td>{participant.points || 0}</td>}
@@ -322,7 +353,10 @@ const CompetitionStatus = () => {
           </Card.Header>
           <Card.Body>
             <Row>
-              {participants.map((participant) => (
+              {participants.map((participant) => {
+                const totalTimeSeconds = timeStringToSeconds(participant.total_time);
+                const penalty = Number(participant.penalty_seconds) || 0;
+                return (
                 <Col key={participant.participant_id} lg={6} xl={4} className="mb-3">
                   <Card className="h-100 participant-detail-card">
                     <Card.Body>
@@ -360,7 +394,17 @@ const CompetitionStatus = () => {
                         </div>
                         <div className="col-6">
                           <div className="text-success fw-bold">
-                            {formatTime(participant.total_time)}
+                            {penalty > 0 ? (
+                              <span
+                                data-bs-toggle="tooltip"
+                                title={`Original: ${secondsToTimeString(totalTimeSeconds)}`}
+                                style={{cursor: 'pointer'}}
+                              >
+                                {participant.total_time} <span style={{color: '#b8860b'}}>⚠️</span>
+                              </span>
+                            ) : (
+                              <span>{participant.total_time}</span>
+                            )}
                           </div>
                           <small className="text-muted">Total</small>
                         </div>
@@ -370,23 +414,38 @@ const CompetitionStatus = () => {
                         <div className="mt-3">
                           <small className="text-muted d-block mb-2">Tiempos por ronda:</small>
                           <div className="row g-1">
-                            {participant.timings.map((timing) => (
-                              <div key={timing.id} className="col-6">
-                                <div className="round-timing-chip">
-                                  <small className="fw-bold">R{timing.round_number}</small>
-                                  <div className="text-muted small">
-                                    {formatTime(timing.total_time)}
+                            {participant.timings.map((timing) => {
+                              const totalTimeSeconds = timeStringToSeconds(timing.total_time);
+                              const penalty = Number(timing.penalty_seconds) || 0;
+                              return (
+                                <div key={timing.id} className="col-6">
+                                  <div className="round-timing-chip">
+                                    <small className="fw-bold">R{timing.round_number}</small>
+                                    <div className="text-muted small">
+                                      {penalty > 0 ? (
+                                        <span
+                                          data-bs-toggle="tooltip"
+                                          title={`Original: ${secondsToTimeString(totalTimeSeconds)}`}
+                                          style={{cursor: 'pointer'}}
+                                        >
+                                          {timing.total_time} <span style={{color: '#b8860b'}}>⚠️</span>
+                                        </span>
+                                      ) : (
+                                        <span>{timing.total_time}</span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
                     </Card.Body>
                   </Card>
                 </Col>
-              ))}
+                );
+              })}
             </Row>
           </Card.Body>
         </Card>

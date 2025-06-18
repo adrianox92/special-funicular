@@ -6,7 +6,7 @@ import {
 } from 'react-bootstrap';
 import { 
   FaPlus, FaEdit, FaTrash, FaArrowLeft, FaClock, FaCheck, 
-  FaExclamationTriangle, FaTrophy, FaUsers, FaFlag, FaDownload, FaFileCsv, FaFilePdf
+  FaExclamationTriangle, FaTrophy, FaUsers, FaFlag, FaDownload, FaFileCsv, FaFilePdf, FaPen
 } from 'react-icons/fa';
 import axios from '../lib/axios';
 
@@ -38,6 +38,12 @@ const CompetitionTimings = () => {
 
   const [rules, setRules] = useState([]);
   const [pointsByParticipant, setPointsByParticipant] = useState({});
+
+  // Estados para el modal de penalización
+  const [showPenaltyModal, setShowPenaltyModal] = useState(false);
+  const [penaltyTiming, setPenaltyTiming] = useState(null);
+  const [penaltyValue, setPenaltyValue] = useState(0);
+  const [penaltyLoading, setPenaltyLoading] = useState(false);
 
   // Cargar datos de la competición
   useEffect(() => {
@@ -226,6 +232,23 @@ const CompetitionTimings = () => {
     );
   };
 
+  // Función para convertir mm:ss.mmm a segundos
+  function timeStringToSeconds(str) {
+    if (!str) return 0;
+    const match = str.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
+    if (!match) return 0;
+    const [, min, sec, ms] = match.map(Number);
+    return min * 60 + sec + ms / 1000;
+  }
+
+  // Función para convertir segundos a mm:ss.mmm
+  function secondsToTimeString(seconds) {
+    if (typeof seconds !== 'number' || isNaN(seconds)) return '00:00.000';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(3);
+    return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
+  }
+
   // Función para calcular tiempos agregados por participante
   const getAggregatedTimes = () => {
     const aggregatedData = {};
@@ -236,15 +259,17 @@ const CompetitionTimings = () => {
           id: key,
           participant_id: key,
           total_time_seconds: 0,
+          penalty_seconds: 0,
           best_lap_time: null,
           rounds_completed: 0,
           total_laps: 0
         };
       }
-      // Convertir tiempo total a segundos
-      const timeParts = timing.total_time.split(':');
-      const timeInSeconds = parseFloat(timeParts[0]) * 60 + parseFloat(timeParts[1]);
-      aggregatedData[key].total_time_seconds += timeInSeconds;
+      // Convertir tiempo total a segundos y sumar penalización
+      const timeInSeconds = timeStringToSeconds(timing.total_time);
+      const penalty = Number(timing.penalty_seconds) || 0;
+      aggregatedData[key].total_time_seconds += timeInSeconds + penalty;
+      aggregatedData[key].penalty_seconds += penalty;
       // Actualizar mejor vuelta
       const lapTimeParts = timing.best_lap_time.split(':');
       const lapTimeInSeconds = parseFloat(lapTimeParts[0]) * 60 + parseFloat(lapTimeParts[1]);
@@ -379,6 +404,32 @@ const CompetitionTimings = () => {
       });
     });
     return points;
+  };
+
+  const handleOpenPenaltyModal = (timing) => {
+    setPenaltyTiming(timing);
+    setPenaltyValue(timing.penalty_seconds || 0);
+    setShowPenaltyModal(true);
+  };
+
+  const handleClosePenaltyModal = () => {
+    setShowPenaltyModal(false);
+    setPenaltyTiming(null);
+    setPenaltyValue(0);
+  };
+
+  const handleSavePenalty = async () => {
+    if (!penaltyTiming) return;
+    setPenaltyLoading(true);
+    try {
+      await axios.patch(`/competitions/competition-timings/${penaltyTiming.id}/penalty`, { penalty_seconds: Number(penaltyValue) });
+      handleClosePenaltyModal();
+      loadCompetitionData();
+    } catch (err) {
+      alert('Error al guardar la penalización');
+    } finally {
+      setPenaltyLoading(false);
+    }
   };
 
   if (loading) {
@@ -580,13 +631,11 @@ const CompetitionTimings = () => {
               const roundTimings = timings.filter(t => t.round_number === roundNumber);
               const roundStatus = getRoundStatus(roundNumber);
               
-              // Ordenar por tiempo total de menor a mayor
+              // Ordenar por tiempo ajustado
               const sortedTimings = [...roundTimings].sort((a, b) => {
-                const timeAParts = a.total_time.split(':');
-                const timeBParts = b.total_time.split(':');
-                const timeA = parseFloat(timeAParts[0]) * 60 + parseFloat(timeAParts[1]);
-                const timeB = parseFloat(timeBParts[0]) * 60 + parseFloat(timeBParts[1]);
-                return timeA - timeB;
+                const aAdjusted = (Number(a.total_time_timestamp) || 0) + (Number(a.penalty_seconds) || 0);
+                const bAdjusted = (Number(b.total_time_timestamp) || 0) + (Number(b.penalty_seconds) || 0);
+                return aAdjusted - bAdjusted;
               });
               
               // Encontrar el mejor tiempo de vuelta de la ronda
@@ -600,7 +649,7 @@ const CompetitionTimings = () => {
                 }) : null;
               
               return (
-                <Col xs={12} md={6} lg={4} key={roundNumber} className="mb-3">
+                <Col xs={12} md={6} key={roundNumber} className="mb-3">
                   <Card>
                     <Card.Body>
                       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -611,54 +660,166 @@ const CompetitionTimings = () => {
                       </div>
                       
                       {sortedTimings.length > 0 ? (
-                        <Table size="sm" className="mb-0 timing-table">
-                          <thead>
-                            <tr>
-                              <th>Pos</th>
-                              <th>Piloto</th>
-                              <th>Total</th>
-                              <th>Dif</th>
-                              <th>Mejor</th>
-                              <th>Vueltas</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sortedTimings.map((timing, index) => {
-                              const isBestLap = bestLapTime && timing.id === bestLapTime.id;
-                              const timeDiff = index === 0 ? '-' : 
-                                (() => {
-                                  const currentParts = timing.total_time.split(':');
-                                  const leaderParts = sortedTimings[0].total_time.split(':');
-                                  const currentTime = parseFloat(currentParts[0]) * 60 + parseFloat(currentParts[1]);
-                                  const leaderTime = parseFloat(leaderParts[0]) * 60 + parseFloat(leaderParts[1]);
-                                  const diff = currentTime - leaderTime;
-                                  const diffMinutes = Math.floor(diff / 60);
-                                  const diffSeconds = (diff % 60).toFixed(3);
-                                  return diffMinutes > 0 ? 
-                                    `+${diffMinutes}:${diffSeconds.padStart(6, '0')}` : 
-                                    `+${diffSeconds}`;
-                                })();
-                              
-                              return (
-                                <tr key={timing.id}>
-                                  <td>
-                                    <Badge bg={index === 0 ? 'success' : 'secondary'} className="badge-custom">
-                                      {index + 1}
-                                    </Badge>
-                                  </td>
-                                  <td>{getParticipantName(timing.participant_id)}</td>
-                                  <td className="fw-bold">{formatTime(timing.total_time)}</td>
-                                  <td className="text-muted small">{timeDiff}</td>
-                                  <td className={isBestLap ? 'fw-bold text-warning bg-warning bg-opacity-10' : ''}>
-                                    {formatTime(timing.best_lap_time)}
-                                    {isBestLap && <span className="ms-1">🏆</span>}
-                                  </td>
-                                  <td>{timing.laps}</td>
+                        <>
+                          <div className="d-none d-md-block">
+                            <Table size="sm" className="mb-0 timing-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                              <thead>
+                                <tr>
+                                  <th className="text-center" style={{width: '36px'}}>Pos</th>
+                                  <th className="text-center" style={{width: '120x'}}>Piloto</th>
+                                  <th className="text-center" style={{width: '80px'}}>Total</th>
+                                  <th className="text-center" style={{width: '60px'}}>Dif</th>
+                                  <th className="text-center" style={{width: '75px'}}>Vuelta</th>
+                                  <th className="text-center" style={{width: '50px'}}>Vueltas</th>
+                                  <th className="text-center" style={{width: '44px'}}>Penal.</th>
                                 </tr>
-                              );
-                            })}
-                          </tbody>
-                        </Table>
+                              </thead>
+                              <tbody>
+                                {sortedTimings.map((timing, index) => {
+                                  const isBestLap = bestLapTime && timing.id === bestLapTime.id;
+                                  const currentTime = timeStringToSeconds(timing.total_time) + (Number(timing.penalty_seconds) || 0);
+                                  const leaderTime = timeStringToSeconds(sortedTimings[0].total_time) + (Number(sortedTimings[0].penalty_seconds) || 0);
+                                  const diff = currentTime - leaderTime;
+                                  const timeDiff = index === 0 ? '-' : 
+                                    (() => {
+                                      const diffMinutes = Math.floor(diff / 60);
+                                      const diffSeconds = (diff % 60).toFixed(3);
+                                      return diffMinutes > 0 ? 
+                                        `+${diffMinutes}:${diffSeconds.padStart(6, '0')}` : 
+                                        `+${diffSeconds}`;
+                                    })();
+                                  return (
+                                    <tr key={timing.id} style={{fontSize: '0.95em'}}>
+                                      <td className="text-center align-middle p-1">
+                                        <Badge bg={index === 0 ? 'success' : 'secondary'} style={{fontSize: '0.85em', padding: '0.35em 0.6em'}}>
+                                          {index + 1}
+                                        </Badge>
+                                      </td>
+                                      <td className="text-center align-middle p-1" style={{wordBreak: 'break-word'}}>{getParticipantName(timing.participant_id)}</td>
+                                      <td className="fw-bold text-center align-middle p-1">
+                                        {(() => {
+                                          const base = timeStringToSeconds(timing.total_time);
+                                          const penalty = Number(timing.penalty_seconds) || 0;
+                                          const adjusted = base + penalty;
+                                          if (penalty > 0) {
+                                            return (
+                                              <span
+                                                data-bs-toggle="tooltip"
+                                                title={`Original: ${timing.total_time} + ${penalty.toFixed(3)}s penalización`}
+                                                style={{cursor: 'pointer'}}
+                                              >
+                                                {secondsToTimeString(adjusted)} <span style={{color: '#b8860b'}}>⚠️</span>
+                                              </span>
+                                            );
+                                          } else {
+                                            return <span>{secondsToTimeString(adjusted)}</span>;
+                                          }
+                                        })()}
+                                      </td>
+                                      <td className="text-center align-middle p-1 text-muted small">{timeDiff}</td>
+                                      <td className={isBestLap ? 'fw-bold text-warning bg-warning bg-opacity-10 text-center align-middle p-1' : 'text-center align-middle p-1'}>
+                                        {formatTime(timing.best_lap_time)}
+                                        {isBestLap && <Badge bg="warning" text="dark" className="ms-1" style={{fontSize: '0.85em'}}>🏆</Badge>}
+                                      </td>
+                                      <td className="text-center align-middle p-1">{timing.laps}</td>
+                                      <td className="text-center align-middle p-1">
+                                        <Button
+                                          variant="link"
+                                          size="sm"
+                                          title="Editar penalización"
+                                          onClick={() => handleOpenPenaltyModal(timing)}
+                                          style={{padding: 0, color: '#b8860b'}}
+                                        >
+                                          <FaPen />
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </Table>
+                          </div>
+                          <div className="d-md-none">
+                            <div style={{overflowX: 'auto', width: '100%'}}>
+                              <Table size="sm" className="mb-0 timing-table">
+                                <thead>
+                                  <tr>
+                                    <th>Pos</th>
+                                    <th>Piloto</th>
+                                    <th>Total</th>
+                                    <th>Dif</th>
+                                    <th>Vuelta</th>
+                                    <th>V</th>
+                                    <th>Penal.</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {sortedTimings.map((timing, index) => {
+                                    const isBestLap = bestLapTime && timing.id === bestLapTime.id;
+                                    const currentTime = timeStringToSeconds(timing.total_time) + (Number(timing.penalty_seconds) || 0);
+                                    const leaderTime = timeStringToSeconds(sortedTimings[0].total_time) + (Number(sortedTimings[0].penalty_seconds) || 0);
+                                    const diff = currentTime - leaderTime;
+                                    const timeDiff = index === 0 ? '-' : 
+                                      (() => {
+                                        const diffMinutes = Math.floor(diff / 60);
+                                        const diffSeconds = (diff % 60).toFixed(3);
+                                        return diffMinutes > 0 ? 
+                                          `+${diffMinutes}:${diffSeconds.padStart(6, '0')}` : 
+                                          `+${diffSeconds}`;
+                                      })();
+                                    return (
+                                      <tr key={timing.id} style={{fontSize: '0.93em'}}>
+                                        <td className="text-center align-middle p-1">
+                                          <Badge bg={index === 0 ? 'success' : 'secondary'} style={{fontSize: '0.8em', padding: '0.3em 0.5em'}}>
+                                            {index + 1}
+                                          </Badge>
+                                        </td>
+                                        <td className="text-center align-middle p-1" style={{wordBreak: 'break-word'}}>{getParticipantName(timing.participant_id)}</td>
+                                        <td className="fw-bold text-center align-middle p-1">
+                                          {(() => {
+                                            const base = timeStringToSeconds(timing.total_time);
+                                            const penalty = Number(timing.penalty_seconds) || 0;
+                                            const adjusted = base + penalty;
+                                            if (penalty > 0) {
+                                              return (
+                                                <span
+                                                  data-bs-toggle="tooltip"
+                                                  title={`${timing.total_time} + ${penalty.toFixed(3)}s penalización`}
+                                                  style={{cursor: 'pointer'}}
+                                                >
+                                                  {secondsToTimeString(adjusted)} <span style={{color: '#b8860b'}}>⚠️</span>
+                                                </span>
+                                              );
+                                            } else {
+                                              return <span>{secondsToTimeString(adjusted)}</span>;
+                                            }
+                                          })()}
+                                        </td>
+                                        <td className="text-center align-middle p-1 text-muted small">{timeDiff}</td>
+                                        <td className={isBestLap ? 'fw-bold text-warning bg-warning bg-opacity-10 text-center align-middle p-1' : 'text-center align-middle p-1'}>
+                                          {formatTime(timing.best_lap_time)}
+                                          {isBestLap && <Badge bg="warning" text="dark" className="ms-1" style={{fontSize: '0.8em'}}>🏆</Badge>}
+                                        </td>
+                                        <td className="text-center align-middle p-1">{timing.laps}</td>
+                                        <td className="text-center align-middle p-1">
+                                          <Button
+                                            variant="link"
+                                            size="sm"
+                                            title="Editar penalización"
+                                            onClick={() => handleOpenPenaltyModal(timing)}
+                                            style={{padding: 0, color: '#b8860b'}}
+                                          >
+                                            <FaPen />
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </Table>
+                            </div>
+                          </div>
+                        </>
                       ) : (
                         <p className="text-muted mb-0 small">No hay tiempos registrados</p>
                       )}
@@ -791,7 +952,28 @@ const CompetitionTimings = () => {
                             <td className="fw-bold">{getParticipantName(data.participant_id)}</td>
                             <td className="text-muted">{getVehicleInfo(data.participant_id)}</td>
                             <td className="text-warning fw-bold">{formatTime(data.best_lap_time)}</td>
-                            <td className="fw-bold fs-6">{data.total_time_formatted}</td>
+                            <td className="fw-bold fs-6">
+                              {(() => {
+                                // Calcular tiempo inicial sumando todos los tiempos originales (sin penalización)
+                                const base = data.total_time_seconds - data.penalty_seconds;
+                                const penalty = data.penalty_seconds;
+                                const adjusted = data.total_time_seconds;
+                                if (penalty > 0) {
+                                  return (
+                                    <span
+                                      data-bs-toggle="tooltip"
+                                      title={`Original: ${secondsToTimeString(base)} + ${penalty.toFixed(3)}s penalización`}
+                                      style={{cursor: 'pointer'}}
+                                    >
+                                      {secondsToTimeString(adjusted)} <span style={{color: '#b8860b'}}>⚠️</span>
+                                    </span>
+                                  );
+                                } else {
+                                  return <span>{secondsToTimeString(adjusted)}</span>;
+                                }
+                              })()}
+                            </td>
+                          
                             <td className="difference-column difference-leader">{leaderDiff}</td>
                             <td className="difference-column difference-previous">{previousDiff}</td>
                             <td>
@@ -965,6 +1147,37 @@ const CompetitionTimings = () => {
             </button>
           </Modal.Footer>
         </Form>
+      </Modal>
+
+      {/* Modal para editar penalización */}
+      <Modal show={showPenaltyModal} onHide={handleClosePenaltyModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Editar Penalización</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Label>Penalización (segundos)</Form.Label>
+            <Form.Control
+              type="number"
+              min="0"
+              step="0.001"
+              value={penaltyValue}
+              onChange={e => setPenaltyValue(e.target.value)}
+              autoFocus
+            />
+            <Form.Text className="text-muted">
+              Introduce los segundos de penalización que se sumarán al tiempo total de este piloto en esta ronda.
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleClosePenaltyModal} disabled={penaltyLoading}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={handleSavePenalty} disabled={penaltyLoading}>
+            {penaltyLoading ? 'Guardando...' : 'Guardar penalización'}
+          </Button>
+        </Modal.Footer>
       </Modal>
     </Container>
   );

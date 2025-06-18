@@ -317,7 +317,8 @@ router.get('/:slug/status', async (req, res) => {
         laps,
         average_time,
         lane,
-        timing_date
+        timing_date,
+        penalty_seconds
       `)
       .in('participant_id', participants.map(p => p.id))
       .order('round_number', { ascending: true })
@@ -344,12 +345,14 @@ router.get('/:slug/status', async (req, res) => {
       let totalTimeSeconds = 0;
       let bestLapTime = null;
       let totalLaps = 0;
+      let totalPenalty = 0;
       
       participantTimings.forEach(timing => {
-        // Convertir tiempo total a segundos
         const timeParts = timing.total_time.split(':');
         const timeInSeconds = parseFloat(timeParts[0]) * 60 + parseFloat(timeParts[1]);
-        totalTimeSeconds += timeInSeconds;
+        const penalty = Number(timing.penalty_seconds) || 0;
+        totalTimeSeconds += timeInSeconds + penalty;
+        totalPenalty += penalty;
         
         // Actualizar mejor vuelta
         if (!bestLapTime || timing.best_lap_time < bestLapTime) {
@@ -376,30 +379,24 @@ router.get('/:slug/status', async (req, res) => {
         total_time: totalTimeFormatted,
         best_lap_time: bestLapTime,
         total_laps: totalLaps,
+        total_time_seconds: totalTimeSeconds,
+        penalty_seconds: totalPenalty,
         timings: participantTimings
       };
     });
 
-    // Ordenar participantes por completitud y tiempo total
+    // Ordenar participantes por tiempo ajustado
     const sortedParticipants = participantStats.sort((a, b) => {
       // Primero por completitud de rondas (descendente)
       if (a.rounds_completed !== b.rounds_completed) {
         return b.rounds_completed - a.rounds_completed;
       }
-      
-      // Si tienen las mismas rondas completadas, ordenar por tiempo total
-      if (a.total_time && b.total_time) {
-        const timeAParts = a.total_time.split(':');
-        const timeBParts = b.total_time.split(':');
-        const timeA = parseFloat(timeAParts[0]) * 60 + parseFloat(timeAParts[1]);
-        const timeB = parseFloat(timeBParts[0]) * 60 + parseFloat(timeBParts[1]);
-        return timeA - timeB;
+      // Si tienen las mismas rondas completadas, ordenar por tiempo total ajustado
+      if (a.total_time_seconds && b.total_time_seconds) {
+        return a.total_time_seconds - b.total_time_seconds;
       }
-      
-      // Si uno no tiene tiempo total, el otro va primero
-      if (a.total_time && !b.total_time) return -1;
-      if (!a.total_time && b.total_time) return 1;
-      
+      if (a.total_time_seconds && !b.total_time_seconds) return -1;
+      if (!a.total_time_seconds && b.total_time_seconds) return 1;
       return 0;
     });
 
@@ -445,10 +442,10 @@ router.get('/:slug/status', async (req, res) => {
         const roundTimings = timings.filter(t => t.round_number === round);
         // Solo sumar puntos si todos los participantes han registrado tiempo en la ronda
         if (roundTimings.length === participants.length) {
-          // Ordenar por tiempo total ascendente (mejor primero)
+          // Ordenar por tiempo total ajustado ascendente (mejor primero)
           const sorted = roundTimings.slice().sort((a, b) => {
-            const aTime = a.total_time ? parseFloat(a.total_time.split(':')[0]) * 60 + parseFloat(a.total_time.split(':')[1]) : Infinity;
-            const bTime = b.total_time ? parseFloat(b.total_time.split(':')[0]) * 60 + parseFloat(b.total_time.split(':')[1]) : Infinity;
+            const aTime = a.total_time_seconds ? a.total_time_seconds : Infinity;
+            const bTime = b.total_time_seconds ? b.total_time_seconds : Infinity;
             return aTime - bTime;
           });
           Object.entries(perRoundRule.points_structure).forEach(([pos, pts], idx) => {
@@ -486,17 +483,13 @@ router.get('/:slug/status', async (req, res) => {
 
     // Puntuación final (solo si la competición está completada)
     if (finalRule && isCompleted) {
-      // Ordenar participantes por tiempo total (mejor primero)
+      // Ordenar participantes por tiempo total ajustado (mejor primero)
       const finalSorted = sortedParticipants.slice().sort((a, b) => {
-        if (a.total_time && b.total_time) {
-          const aTime = a.total_time.split(':');
-          const bTime = b.total_time.split(':');
-          const aSeconds = parseFloat(aTime[0]) * 60 + parseFloat(aTime[1]);
-          const bSeconds = parseFloat(bTime[0]) * 60 + parseFloat(bTime[1]);
-          return aSeconds - bSeconds;
+        if (a.total_time_seconds && b.total_time_seconds) {
+          return a.total_time_seconds - b.total_time_seconds;
         }
-        if (a.total_time && !b.total_time) return -1;
-        if (!a.total_time && b.total_time) return 1;
+        if (a.total_time_seconds && !b.total_time_seconds) return -1;
+        if (!a.total_time_seconds && b.total_time_seconds) return 1;
         return 0;
       });
       Object.entries(finalRule.points_structure).forEach(([pos, pts], idx) => {

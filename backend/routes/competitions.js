@@ -1049,7 +1049,26 @@ router.get('/:id/timings', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    res.json(data || []);
+    const formatTime = (seconds) => {
+      if (typeof seconds !== 'number' || isNaN(seconds)) return null;
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = (seconds % 60).toFixed(3);
+      return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
+    };
+
+    const timingsWithPenalty = (data || []).map(t => {
+      const penalty = Number(t.penalty_seconds) || 0;
+      const totalTime = Number(t.total_time_timestamp) || 0;
+      const adjustedTotal = totalTime + penalty;
+      return {
+        ...t,
+        penalty_seconds: penalty,
+        adjusted_total_time_timestamp: adjustedTotal,
+        adjusted_total_time: formatTime(adjustedTotal),
+      };
+    });
+
+    res.json(timingsWithPenalty);
   } catch (error) {
     console.error('Error en GET /competitions/:id/timings:', error);
     res.status(500).json({ error: error.message });
@@ -1345,9 +1364,11 @@ router.get('/:id/export/pdf', async (req, res) => {
 
 // Función auxiliar para generar CSV
 function generateCompetitionCSV(competition, participants, timings) {
-  const formatTime = (time) => {
-    if (!time) return '';
-    return time.replace('.', ',');
+  const formatTime = (seconds) => {
+    if (typeof seconds !== 'number' || isNaN(seconds)) return null;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(3);
+    return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
   };
 
   const getVehicleInfo = (participant) => {
@@ -1413,16 +1434,21 @@ function generateCompetitionCSV(competition, participants, timings) {
 
   // Ranking general
   csvContent += '=== RANKING GENERAL ===\n';
-  csvContent += 'Posición,Piloto,Vehículo,Mejor Vuelta,Vueltas Totales,Tiempo Total,Rondas Completadas\n';
+  csvContent += 'Posición,Piloto,Vehículo,Mejor Vuelta,Vueltas Totales,Tiempo Total,Penalización Total (s),Tiempo Ajustado,Rondas Completadas\n';
   
   sortedParticipants.forEach((participant, index) => {
     const stats = participantStats[participant.id];
+    const participantTimings = timings.filter(t => t.participant_id === participant.id);
+    const totalPenalty = participantTimings.reduce((sum, t) => sum + (Number(t.penalty_seconds) || 0), 0);
+    const adjustedTotal = stats.totalTime + totalPenalty;
     csvContent += `${index + 1},`;
     csvContent += `"${participant.driver_name}",`;
     csvContent += `"${getVehicleInfo(participant)}",`;
-    csvContent += `${formatTime(stats.bestLap.toString())},`;
+    csvContent += `${formatTime(stats.bestLap)},`;
     csvContent += `${stats.totalLaps},`;
-    csvContent += `${formatTime(stats.totalTime.toString())},`;
+    csvContent += `${formatTime(stats.totalTime)},`;
+    csvContent += `${totalPenalty.toFixed(3)},`;
+    csvContent += `${formatTime(adjustedTotal)},`;
     csvContent += `${stats.roundsCompleted}\n`;
   });
 
@@ -1430,7 +1456,7 @@ function generateCompetitionCSV(competition, participants, timings) {
 
   // Datos por ronda
   csvContent += '=== DATOS POR RONDA ===\n';
-  csvContent += 'Ronda,Piloto,Vehículo,Mejor Vuelta,Vueltas,Tiempo Total,Tiempo Promedio,Carril\n';
+  csvContent += 'Ronda,Piloto,Vehículo,Mejor Vuelta,Vueltas,Tiempo Total,Penalización (s),Tiempo Ajustado,Tiempo Promedio,Carril\n';
   
   for (let round = 1; round <= competition.rounds; round++) {
     const roundTimings = timings.filter(t => t.round_number === round);
@@ -1438,12 +1464,17 @@ function generateCompetitionCSV(competition, participants, timings) {
     roundTimings.forEach(timing => {
       const participant = participantsMap[timing.participant_id];
       if (participant) {
+        const penalty = Number(timing.penalty_seconds) || 0;
+        const totalTime = Number(timing.total_time_timestamp) || 0;
+        const adjustedTotal = totalTime + penalty;
         csvContent += `${round},`;
         csvContent += `"${participant.driver_name}",`;
         csvContent += `"${getVehicleInfo(participant)}",`;
         csvContent += `${formatTime(timing.best_lap_time)},`;
         csvContent += `${timing.laps},`;
-        csvContent += `${formatTime(timing.total_time)},`;
+        csvContent += `${formatTime(totalTime)},`;
+        csvContent += `${penalty.toFixed(3)},`;
+        csvContent += `${formatTime(adjustedTotal)},`;
         csvContent += `${formatTime(timing.average_time)},`;
         csvContent += `${timing.lane || ''}\n`;
       }
@@ -1892,6 +1923,54 @@ router.delete('/:id/signups/:signupId', async (req, res) => {
     console.error('Error en DELETE /competitions/:id/signups/:signupId:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// ==================== PENALIZACIONES ====================
+
+/**
+ * @swagger
+ * /api/competition-timings/{id}/penalty:
+ *   patch:
+ *     summary: Actualiza la penalización en segundos para un tiempo de competición
+ *     tags:
+ *       - Competiciones
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del tiempo de competición
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               penalty_seconds:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Penalización actualizada correctamente
+ *       500:
+ *         description: Error al actualizar la penalización
+ */
+router.patch('/competition-timings/:id/penalty', async (req, res) => {
+  const { id } = req.params;
+  const { penalty_seconds } = req.body;
+
+  if (typeof penalty_seconds !== 'number' || penalty_seconds < 0) {
+    return res.status(400).json({ error: 'penalty_seconds debe ser un número positivo' });
+  }
+
+  const { error } = await supabase
+    .from('competition_timings')
+    .update({ penalty_seconds })
+    .eq('id', id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 module.exports = router; 
