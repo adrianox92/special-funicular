@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Alert, Card, Button } from 'react-bootstrap';
 import { 
   FiTruck, 
   FiTool, 
@@ -8,6 +8,7 @@ import {
   FiAward,
   FiClock
 } from 'react-icons/fi';
+import { FaTrophy } from 'react-icons/fa';
 import MetricCard from '../components/MetricCard';
 import VehiclesByTypeChart from '../components/charts/VehiclesByTypeChart';
 import ModificationPieChart from '../components/charts/ModificationPieChart';
@@ -40,7 +41,6 @@ const Dashboard = () => {
     modificationStats: { modified: 0, stock: 0 },
     topCostVehicles: [],
     topComponents: [],
-    performanceByType: {},
     brandDistribution: [],
     storeDistribution: []
   });
@@ -156,6 +156,45 @@ const Dashboard = () => {
           <Row className="mb-4">
             <Col xs={12}>
               <InsightsCarousel />
+            </Col>
+          </Row>
+
+          {/* Bloque de Acciones Rápidas */}
+          <Row className="mb-4">
+            <Col xs={12} lg={6}>
+              <Card>
+                <Card.Header>
+                  <h6 className="mb-0">
+                    <FaTrophy className="me-2" />
+                    Acciones Rápidas
+                  </h6>
+                </Card.Header>
+                <Card.Body>
+                  <div className="d-grid gap-2">
+                    <Button 
+                      variant="primary" 
+                      onClick={() => window.location.href = '/competitions'}
+                    >
+                      <FaTrophy className="me-2" />
+                      Crear Nueva Competición
+                    </Button>
+                    <Button 
+                      variant="outline-primary" 
+                      onClick={() => window.location.href = '/vehicles'}
+                    >
+                      <FiTruck className="me-2" />
+                      Gestionar Vehículos
+                    </Button>
+                    <Button 
+                      variant="outline-primary" 
+                      onClick={() => window.location.href = '/timings'}
+                    >
+                      <FiClock className="me-2" />
+                      Ver Tiempos
+                    </Button>
+                  </div>
+                </Card.Body>
+              </Card>
             </Col>
           </Row>
 

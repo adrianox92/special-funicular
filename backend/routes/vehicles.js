@@ -25,6 +25,132 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
 
+/**
+ * @swagger
+ * /api/vehicles/export:
+ *   get:
+ *     summary: Exporta todos los vehículos del usuario
+ *     tags:
+ *       - Vehículos
+ *     responses:
+ *       200:
+ *         description: Exportación de vehículos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *
+ * /api/vehicles/{id}:
+ *   get:
+ *     summary: Obtiene un vehículo por ID
+ *     tags:
+ *       - Vehículos
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del vehículo
+ *     responses:
+ *       200:
+ *         description: Detalles del vehículo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *   put:
+ *     summary: Actualiza un vehículo por ID y sus imágenes
+ *     tags:
+ *       - Vehículos
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del vehículo
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Vehículo actualizado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *
+ * /api/vehicles/{id}/images:
+ *   get:
+ *     summary: Obtiene las imágenes de un vehículo
+ *     tags:
+ *       - Vehículos
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del vehículo
+ *     responses:
+ *       200:
+ *         description: Imágenes del vehículo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *
+ * /api/vehicles:
+ *   post:
+ *     summary: Crea un nuevo vehículo
+ *     tags:
+ *       - Vehículos
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       201:
+ *         description: Vehículo creado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *
+ * /api/vehicles/{id}/images/{viewType}:
+ *   delete:
+ *     summary: Elimina una imagen específica de un vehículo
+ *     tags:
+ *       - Vehículos
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del vehículo
+ *       - in: path
+ *         name: viewType
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tipo de vista de la imagen
+ *     responses:
+ *       200:
+ *         description: Imagen eliminada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ */
 // Endpoint para exportar todos los vehículos
 router.get('/export', async (req, res) => {
   try {
@@ -44,6 +170,70 @@ router.get('/export', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/vehicles:
+ *   get:
+ *     summary: Obtiene la lista de vehículos del usuario autenticado
+ *     tags:
+ *       - Vehículos
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Número de página para la paginación
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Cantidad de resultados por página
+ *     responses:
+ *       200:
+ *         description: Lista de vehículos y paginación
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 vehicles:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       model:
+ *                         type: string
+ *                       manufacturer:
+ *                         type: string
+ *                       image:
+ *                         type: string
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *             examples:
+ *               ejemplo:
+ *                 value:
+ *                   vehicles:
+ *                     - id: "1"
+ *                       model: "Audi R8"
+ *                       manufacturer: "Audi"
+ *                       image: "https://.../audi.jpg"
+ *                   pagination:
+ *                     total: 1
+ *                     page: 1
+ *                     limit: 25
+ *                     totalPages: 1
+ */
 // Obtener todos los vehículos (con paginación)
 router.get('/', async (req, res) => {
   try {

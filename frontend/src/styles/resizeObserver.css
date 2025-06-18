@@ -1,0 +1,65 @@
+/* Estilos para manejar problemas de ResizeObserver */
+
+/* Forzar repaint en elementos que podrían causar problemas */
+.modal,
+.modal-dialog,
+.modal-content,
+.tab-content,
+.tab-pane {
+  will-change: auto;
+}
+
+/* Prevenir overflow que podría causar problemas de resize */
+.container,
+.row,
+.col {
+  overflow: hidden;
+}
+
+/* Optimizar transiciones que podrían afectar ResizeObserver */
+.fade,
+.collapse,
+.collapsing {
+  transition: none !important;
+}
+
+/* Forzar layout estable en componentes Bootstrap */
+.progress,
+.progress-bar,
+.badge,
+.btn {
+  contain: layout style;
+}
+
+/* Prevenir resize loops en elementos flexibles */
+.d-flex,
+.flex-column,
+.flex-grow-1 {
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Optimizar elementos que cambian de tamaño frecuentemente */
+.card,
+.card-body,
+.list-group,
+.list-group-item {
+  contain: layout;
+}
+
+/* Prevenir problemas con elementos que se muestran/ocultan */
+.show,
+.hide {
+  transition: none;
+}
+
+/* Optimizar modales que podrían causar problemas */
+.modal-backdrop {
+  contain: layout style paint;
+}
+
+/* Prevenir problemas con elementos que cambian de visibilidad */
+.invisible,
+.visible {
+  transition: none;
+} 

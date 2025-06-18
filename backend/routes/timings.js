@@ -8,6 +8,29 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
 
+/**
+ * @swagger
+ * /api/timings:
+ *   get:
+ *     summary: Obtiene todos los tiempos de todos los vehículos del usuario
+ *     tags:
+ *       - Tiempos
+ *     parameters:
+ *       - in: query
+ *         name: circuit
+ *         schema:
+ *           type: string
+ *         description: Filtrar por nombre de circuito
+ *     responses:
+ *       200:
+ *         description: Lista de tiempos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
 // Obtener todos los tiempos de todos los vehículos del usuario
 router.get('/', async (req, res) => {
   try {

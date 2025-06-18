@@ -1,355 +1,249 @@
-# Scalextric Collection
+# 🏁 Scalextric Collection - Gestión de Competiciones
 
-Aplicación web para gestionar y mostrar una colección de coches Scalextric. Desarrollada con React y Bootstrap para una experiencia de usuario moderna y responsive.
+Una aplicación web completa para gestionar tu colección de coches Scalextric y organizar competiciones de manera profesional.
 
-## Características Implementadas
+## ✨ Características Principales
 
-- 👤 Sistema de autenticación de usuarios:
-  - Registro de usuarios
-  - Inicio de sesión
-  - Gestión de sesiones
-  - Protección de rutas
-- 📊 Dashboard principal:
-  - Total de vehículos en la colección
-  - Porcentaje de vehículos modificados
-  - Inversión total en componentes
-  - Promedio de incremento de precio
-  - Vehículo con mayor incremento porcentual
-  - Vehículo con mejor tiempo absoluto
-- 🤖 Insights con IA:
-  - Análisis automático de la colección
-  - Generación de insights personalizados
-  - Actualización semanal de recomendaciones
-  - Sugerencias de mejora basadas en datos
-- 🚗 Gestión completa de vehículos (crear, leer, actualizar, eliminar)
-- 🖼️ Soporte para imágenes de vehículos
-- 🔍 Sistema de filtrado avanzado:
-  - Por fabricante
-  - Por tipo de vehículo
-  - Por estado de modificación
-  - Por compatibilidad digital
-- 📤 Exportación de datos:
-  - Exportación a CSV de la colección completa
-  - Incluye especificaciones técnicas y modificaciones
-  - Descarga de fichas técnicas en PDF
-- 🎨 Interfaz moderna y responsive usando Bootstrap
-- 📱 Diseño adaptable a diferentes dispositivos
-- 🧭 Navegación intuitiva con barra de navegación
-- 💰 Gestión de modificaciones y precios:
-  - Registro de componentes modificados
-  - Cálculo automático del precio total
-  - Visualización del incremento porcentual respecto al precio base
-- 🎯 Interfaz mejorada:
-  - Efectos hover en las tarjetas de vehículos
-  - Visualización clara de precios originales y modificados
-  - Indicadores visuales de estado de modificación
-- ⏱️ Sistema de registro de tiempos:
-  - Registro de vueltas y tiempos por vehículo
-  - Cálculo automático de tiempos promedio
-  - Filtrado por circuito, carril y fecha
-  - Visualización de especificaciones técnicas en el momento del registro
-- 📊 Tabla de tiempos general:
-  - Ordenación por mejor tiempo
-  - Cálculo de diferencias entre tiempos
-  - Visualización de especificaciones técnicas históricas
-- ✅ Insights con IA:
-  - Análisis automático de la colección
-  - Generación de insights personalizados
-  - Actualización semanal de recomendaciones
-  - Sugerencias de mejora basadas en datos
+### 🚗 Gestión de Vehículos
+- **Catálogo completo**: Registra todos tus coches Scalextric con detalles técnicos
+- **Fotos múltiples**: Añade varias imágenes por vehículo
+- **Categorización**: Organiza por fabricante, tipo y tracción
+- **Búsqueda avanzada**: Encuentra rápidamente cualquier vehículo
+- **Estadísticas visuales**: Gráficos de distribución por marca y tipo
 
-## Tecnologías Utilizadas
+### 🏆 Sistema de Competiciones
+- **Creación de competiciones**: Configura eventos con múltiples rondas
+- **Inscripciones públicas**: Enlaces públicos para que cualquiera se inscriba
+- **Gestión de participantes**: Añade pilotos y asigna vehículos
+- **Registro de tiempos**: Sistema completo de cronometraje por ronda
+- **Clasificaciones automáticas**: Rankings en tiempo real
+- **Exportación de datos**: Descarga resultados en CSV
 
-- React.js
-- Bootstrap 5
-- React Router DOM
-- Axios para peticiones HTTP
-- React Icons
-- Supabase (Backend y Base de datos)
+### 📊 Análisis y Estadísticas
+- **Dashboard interactivo**: Vista general de tu colección
+- **Gráficos dinámicos**: Distribución de marcas, inversiones, modificaciones
+- **Tendencias temporales**: Evolución de tu colección
+- **Métricas de rendimiento**: Análisis de competiciones
 
-## Requisitos Previos
+### 🌐 Vista Pública de Competiciones
+- **Estado en tiempo real**: Seguimiento público del progreso de competiciones
+- **Clasificación general**: Ranking actualizado automáticamente
+- **Estadísticas detalladas**: Mejores vueltas, tiempos totales, progreso
+- **Diseño responsive**: Accesible desde cualquier dispositivo
+- **URLs públicas**: Enlaces directos para compartir con espectadores
 
-- Node.js (versión 14 o superior)
-- npm (incluido con Node.js)
-- Cuenta en Supabase (para el backend)
+## 🚀 Tecnologías Utilizadas
 
-## Instalación
+### Frontend
+- **React 18** - Biblioteca de interfaz de usuario
+- **React Bootstrap** - Componentes UI responsivos
+- **React Router** - Navegación entre páginas
+- **Chart.js** - Gráficos interactivos
+- **Axios** - Cliente HTTP
 
-1. Clonar el repositorio:
+### Backend
+- **Node.js** - Runtime de JavaScript
+- **Express.js** - Framework web
+- **Supabase** - Base de datos PostgreSQL y autenticación
+- **Multer** - Manejo de archivos
+- **JWT** - Autenticación de tokens
+
+### Base de Datos
+- **PostgreSQL** - Base de datos relacional
+- **Supabase Auth** - Sistema de autenticación
+- **Storage** - Almacenamiento de imágenes
+
+## 📱 Características de la Vista Pública
+
+### Estado "En Curso"
+- **Indicador de progreso**: Porcentaje de completitud de la competición
+- **Información general**: Nombre, circuito, número de participantes y rondas
+- **Tabla de participantes**: 
+  - Piloto y vehículo
+  - Vueltas registradas por ronda
+  - Tiempo acumulado (si disponible)
+  - Estado de progreso individual
+
+### Estado "Finalizada"
+- **Clasificación general**: Ranking final con posiciones
+- **Mejor vuelta global**: Tiempo más rápido de toda la competición
+- **Estadísticas completas**: Tiempos totales, diferencias, vueltas
+- **Opción de exportación**: Descarga de resultados en PDF (en desarrollo)
+
+### Características Técnicas
+- **URLs amigables**: Enlaces tipo `/competitions/status/nombre-competicion`
+- **Actualización en tiempo real**: Datos siempre actualizados
+- **Diseño responsive**: Optimizado para móviles y tablets
+- **Sin autenticación requerida**: Acceso público directo
+
+## 🛠️ Instalación y Configuración
+
+### Prerrequisitos
+- Node.js (v16 o superior)
+- npm o yarn
+- Cuenta en Supabase
+
+### 1. Clonar el repositorio
 ```bash
-git clone [URL_DEL_REPOSITORIO]
+git clone https://github.com/tu-usuario/scalextric-collection.git
+cd scalextric-collection
 ```
 
-2. Instalar dependencias:
+### 2. Configurar variables de entorno
+Crear archivo `.env` en la raíz del proyecto:
+```env
+SUPABASE_URL=tu_url_de_supabase
+SUPABASE_KEY=tu_clave_anonima_de_supabase
+JWT_SECRET=tu_secreto_jwt
+```
+
+### 3. Instalar dependencias
 ```bash
-cd frontend
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
 npm install
 ```
 
-3. Configurar variables de entorno:
-Crear un archivo `.env` en el directorio `frontend` con las siguientes variables:
-```
-REACT_APP_SUPABASE_URL=tu_url_de_supabase
-REACT_APP_SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
+### 4. Configurar la base de datos
+Ejecutar los scripts SQL en Supabase:
+- `add-slug-column.sql`
+- `add-public-slug-column.sql`
+
+### 5. Ejecutar migraciones
+```bash
+cd backend
+node scripts/migrate-add-slug.js
 ```
 
-4. Iniciar la aplicación en modo desarrollo:
+### 6. Iniciar la aplicación
 ```bash
+# Backend (puerto 3001)
+cd backend
+npm start
+
+# Frontend (puerto 3000)
+cd frontend
 npm start
 ```
 
-La aplicación estará disponible en [http://localhost:3000](http://localhost:3000)
+## 📖 Uso de la Vista Pública
 
-## Manejo Seguro de Variables de Entorno
+### Acceso a la Vista Pública
+1. **Obtener el enlace**: Desde la página de competición, copia el enlace público
+2. **Compartir**: Envía el enlace a participantes y espectadores
+3. **Acceso directo**: URL tipo: `http://localhost:3000/competitions/status/nombre-competicion`
 
-Es crucial mantener seguras las claves API y otras credenciales. Sigue estas prácticas:
+### Información Mostrada
+- **Header**: Nombre de la competición, estado, circuito
+- **Estadísticas**: Participantes, rondas, tiempos registrados, progreso
+- **Mejor vuelta**: Tiempo más rápido de toda la competición
+- **Clasificación**: Tabla ordenada por posición y tiempo total
+- **Detalles**: Información individual de cada participante
 
-1. **Nunca subas archivos `.env` al repositorio**
-   - Los archivos `.env` están incluidos en `.gitignore`
-   - Si accidentalmente subiste un archivo `.env`, sigue estos pasos:
-     ```bash
-     git filter-branch --force --index-filter "git rm --cached --ignore-unmatch backend/.env" --prune-empty --tag-name-filter cat -- --all
-     git push origin --force --all
-     ```
+### Estados de la Competición
+- **En Curso**: Muestra progreso y tiempos parciales
+- **Finalizada**: Muestra clasificación final y estadísticas completas
 
-2. **Usa archivos `.env.example` como plantilla**
-   - Crea un archivo `.env.example` con la estructura pero sin valores reales
-   - Comparte este archivo con el equipo
-   - Los nuevos desarrolladores pueden copiarlo como `.env` y añadir sus valores
+## 🔧 API Endpoints
 
-3. **Variables de entorno requeridas**
-   ```
-   # Supabase
-   REACT_APP_SUPABASE_URL=tu_url_de_supabase
-   REACT_APP_SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
-   
-   # OpenAI (para insights)
-   OPENAI_API_KEY=tu_clave_de_openai
-   ```
+### Rutas Públicas
+- `GET /api/public/:slug` - Información de competición para inscripción
+- `GET /api/public/:slug/signup` - Inscripción pública
+- `GET /api/public/:slug/status` - Estado público de la competición
 
-4. **Rotación de claves**
-   - Si una clave se expone, rótala inmediatamente
-   - Notifica al equipo para que actualicen sus archivos `.env`
-   - Considera usar un gestor de secretos para entornos de producción
+### Rutas Protegidas
+- `GET /api/competitions/my-competitions` - Mis competiciones
+- `POST /api/competitions` - Crear competición
+- `GET /api/competitions/:id` - Detalles de competición
+- `GET /api/competitions/:id/participants` - Participantes
+- `GET /api/competitions/:id/timings` - Tiempos registrados
+- `POST /api/competitions/:id/timings` - Registrar tiempo
 
-## Manejo de Archivos Grandes
+## Endpoints públicos añadidos
 
-Este proyecto utiliza Git para el control de versiones y tiene algunas consideraciones importantes:
+### Obtener reglas de puntuación de una competición pública
 
-- La carpeta `node_modules` está excluida del control de versiones (ver `.gitignore`)
-- Los archivos de caché de desarrollo también están excluidos
-- Si necesitas subir archivos grandes (>100MB), se recomienda usar Git LFS (Large File Storage)
+- `GET /api/public-signup/:slug/rules`
+  - Devuelve las reglas de puntuación asociadas a la competición identificada por el `public_slug`.
+  - No requiere autenticación.
+  - Respuesta: array de objetos con la estructura de las reglas (`rule_type`, `description`, `points_structure`, etc).
 
-Para evitar problemas con archivos grandes:
-1. Nunca subas la carpeta `node_modules` al repositorio
-2. Si necesitas subir archivos grandes, instala Git LFS:
-   ```bash
-   git lfs install
-   git lfs track "*.pack"  # Para archivos específicos
-   git add .gitattributes
-   ```
+## 🎨 Personalización
 
-## Scripts Disponibles
+### Estilos CSS
+Los estilos están organizados en:
+- `frontend/src/styles/competitions.css` - Estilos de competiciones
+- `frontend/src/App.css` - Estilos generales
 
-- `npm start`: Inicia la aplicación en modo desarrollo
-- `npm test`: Ejecuta las pruebas
-- `npm run build`: Construye la aplicación para producción
-- `npm run eject`: Expulsa la configuración de Create React App
+### Temas y Colores
+- **Primario**: Gradiente azul-morado (#667eea → #764ba2)
+- **Secundario**: Amarillo dorado (#ffd700)
+- **Éxito**: Verde (#28a745)
+- **Advertencia**: Naranja (#ffc107)
 
-## Estado Actual del Proyecto
+## 🤝 Contribución
 
-El proyecto se encuentra en desarrollo activo con las siguientes características implementadas:
-
-- ✅ Sistema de autenticación de usuarios:
-  - Registro e inicio de sesión
-  - Protección de rutas
-  - Gestión de sesiones
-- ✅ Dashboard principal:
-  - Métricas generales de la colección
-  - Visualización de estadísticas clave
-  - Indicadores de rendimiento
-- ✅ Sistema de navegación con navbar
-- ✅ Listado de vehículos con filtros
-- ✅ Formulario de edición de vehículos
-- ✅ Gestión de imágenes
-- ✅ Interfaz responsive
-- ✅ Sistema de modificaciones de vehículos:
-  - Registro de componentes modificados
-  - Especificaciones técnicas detalladas
-  - Precios de componentes
-- ✅ Gestión de precios:
-  - Precio base del vehículo
-  - Precio total con modificaciones
-  - Visualización del incremento porcentual
-- ✅ Mejoras en la interfaz:
-  - Efectos visuales en las tarjetas
-  - Indicadores de estado
-  - Diseño mejorado de precios y modificaciones
-- ✅ Sistema de registro de tiempos:
-  - Registro de vueltas y tiempos
-  - Cálculo automático de promedios
-  - Validación de tiempos coherentes
-  - Filtrado por circuito y carril
-- ✅ Tabla de tiempos general:
-  - Ordenación por mejor tiempo
-  - Cálculo de diferencias
-  - Visualización de especificaciones técnicas históricas
-- ✅ Insights con IA:
-  - Análisis automático de la colección
-  - Generación de insights personalizados
-  - Actualización semanal de recomendaciones
-  - Sugerencias de mejora basadas en datos
-
-## Próximas Características
-
-- [ ] Gestión de colecciones personalizadas
-- [ ] Estadísticas avanzadas de la colección:
-  - [ ] Análisis de tiempos por circuito
-  - [ ] Evolución de tiempos por vehículo
-  - [ ] Gráficos de evolución de precios
-  - [ ] Comparativa de rendimiento por tipo de vehículo
-- [ ] Búsqueda avanzada
-- [ ] Comparativa de precios entre vehículos similares
-- [ ] Gráficos de evolución de tiempos
-- [ ] Sistema de competiciones y rankings
-
-## Contribución
-
-Las contribuciones son bienvenidas. Por favor, asegúrate de:
-
-1. Hacer fork del proyecto
-2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit de tus cambios (`git commit -m 'Add some AmazingFeature'`)
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
 4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir un Pull Request
+5. Abre un Pull Request
 
-## Licencia
+## 📝 Licencia
 
-Este proyecto está bajo la Licencia MIT - ver el archivo LICENSE para más detalles.
+Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
 
-## Dashboard
+## 🆘 Soporte
 
-El dashboard proporciona una visión general de la colección con métricas clave y visualizaciones interactivas.
+Si tienes problemas o preguntas:
+1. Revisa la documentación en `COMPETITIONS_GUIDE.md`
+2. Abre un issue en GitHub
+3. Contacta al equipo de desarrollo
 
-#### Métricas Principales (Fase 1)
-- Total de vehículos en la colección
-- Número de vehículos modificados
-- Inversión total en componentes
-- Promedio de incremento por vehículo
-- Mayor incremento de precio
-- Mejor tiempo de vuelta
+## 🚀 Roadmap
 
-#### Visualizaciones (Fase 2)
-- **Gráfico de Barras Horizontales**: Distribución de vehículos por marca
-  - Muestra la proporción de cada marca en la colección
-  - Ordenado por cantidad de vehículos
-  - Etiquetas con cantidad y porcentaje
-  - Tooltips detallados
-- **Gráfico de Barras Horizontales**: Distribución de vehículos por tienda de compra
-  - Visualización de las tiendas donde se han adquirido los vehículos
-  - Ordenado por cantidad de vehículos
-  - Etiquetas con cantidad y porcentaje
-  - Tooltips interactivos
-- **Gráfico de Barras Apiladas**: Distribución de vehículos por tipo, mostrando la proporción de vehículos modificados vs. serie para cada tipo.
-  - Barras apiladas para mejor comparación visual
-  - Tooltips detallados al pasar el ratón
-  - Ordenación por total de vehículos
-  - Leyenda interactiva
-- **Gráfico de Donut**: Proporción de vehículos modificados vs. serie en la colección
-  - Visualización clara de la distribución
-  - Etiquetas con porcentajes
-  - Tooltips interactivos
-- **Gráfico de Barras**: Rendimiento por tipo de vehículo
-  - Comparativa de tiempos medios por tipo
-  - Tooltips con detalles de los mejores tiempos
-  - Etiquetas de tiempo formateadas
-- **Gráfico de Línea**: Evolución de la inversión en la colección
-  - Seguimiento trimestral del valor total
-  - Tooltips con detalles de vehículos por trimestre
-  - Etiquetas de valor formateadas en euros
+### Próximas Funcionalidades
+- [ ] Exportación PDF de resultados
+- [ ] Notificaciones en tiempo real
+- [ ] Sistema de puntuación personalizable
+- [ ] Integración con redes sociales
+- [ ] App móvil nativa
+- [ ] Sistema de torneos
+- [ ] Análisis avanzado de rendimiento
 
-#### Insights con IA (Fase 2)
-- **Análisis Automático**: Generación de insights personalizados usando GPT-4
-  - Análisis de distribución de la colección
-  - Recomendaciones de crecimiento
-  - Identificación de oportunidades de mejora
-  - Actualización semanal automática
-  - Cacheo de insights para optimizar costes
-  - Integración con métricas existentes
+## Documentación Swagger de la API
 
-## Gestión de Archivos
+La documentación interactiva de la API está disponible en:
 
-### Archivos Excluidos del Control de Versiones
+    http://localhost:5001/api-docs
 
-Los siguientes archivos y directorios están excluidos del control de versiones por razones de tamaño y optimización:
+Puedes explorar y probar los endpoints desde esa interfaz.
 
-- `node_modules/`: Directorio de dependencias de Node.js
-- `.cache/`: Archivos de caché de desarrollo
-- Archivos de caché específicos:
-  - `frontend/node_modules/.cache/`
-  - `frontend/.cache/`
-  - `**/node_modules/.cache/`
-  - `**/.cache/`
+Si necesitas agregar o actualizar la documentación, añade anotaciones Swagger en los archivos de rutas dentro de `backend/routes/` siguiendo el formato OpenAPI 3.0.
 
-Estos archivos son generados automáticamente durante el desarrollo y no deben ser versionados. Para instalar las dependencias necesarias, ejecuta:
+### Endpoint de login para Swagger
 
-```bash
-npm install
-```
+Para facilitar las pruebas en Swagger, existe el endpoint:
 
-## Tipos de Vehículos
+    POST /api/auth/login
 
-La aplicación soporta los siguientes tipos de vehículos:
-- Rally
-- GT
-- LMP
-- Clásico
-- DTM
-- F1
-- Camiones
-- Raid
+Este endpoint permite obtener un token JWT usando email y contraseña de un usuario registrado en Supabase. **No debe usarse en producción ni en el frontend, solo para pruebas en Swagger.**
 
-## Tests
+## Cambios recientes
 
-### Frontend
+## Nueva regla: Puntos por mejor tiempo por ronda
 
-Los tests unitarios del frontend se encuentran en la carpeta `frontend/src/__tests__/`. Para ejecutar los tests del frontend:
+Ahora es posible añadir una regla de puntuación que otorga puntos adicionales al participante que consiga el mejor tiempo global de cada ronda. Esta regla se puede activar desde la gestión de reglas de la competición, seleccionando el tipo "Mejor tiempo por ronda" y definiendo cuántos puntos extra se otorgan por ronda.
 
-```bash
-cd frontend
-npm test
-```
+- El sistema sumará estos puntos automáticamente al ranking de la competición.
+- Se puede combinar con las reglas de puntuación estándar por ronda y final.
 
-#### Estructura de Tests del Frontend
+Para más detalles, consulta la sección de reglas en la gestión de competiciones.
 
-- `pages/Dashboard.test.jsx`: Tests del componente Dashboard
-  - Verifica el renderizado correcto del componente
-  - Prueba el manejo de estados de carga
-  - Verifica el manejo de errores de API
-  - Comprueba el formateo correcto de valores monetarios y porcentajes
-  - Verifica la actualización de datos
+---
 
-### Backend
-
-Los tests unitarios del backend se encuentran en la carpeta `backend/__tests__/`. Para ejecutar los tests del backend:
-
-```bash
-cd backend
-npm test
-```
-
-#### Estructura de Tests del Backend
-
-- `routes/dashboard.test.js`: Tests de las rutas del Dashboard
-  - Prueba el endpoint `/dashboard/metrics`
-    - Verifica la obtención correcta de métricas
-    - Prueba el manejo de errores de base de datos
-  - Prueba el endpoint `/dashboard/charts`
-    - Verifica la obtención correcta de datos para gráficos
-    - Prueba el manejo de errores de base de datos
-
-### Mocks
-
-Los mocks necesarios para los tests se encuentran en:
-- Frontend: Los mocks se definen directamente en los archivos de test
-- Backend: `backend/__tests__/mocks/supabase.js`
+**¡Disfruta organizando tus competiciones de Scalextric! 🏁**
