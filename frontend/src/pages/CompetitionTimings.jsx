@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Container, Row, Col, Card, Button, Badge, Modal, Form, Alert, 
@@ -45,6 +45,91 @@ const CompetitionTimings = () => {
   const [penaltyValue, setPenaltyValue] = useState(0);
   const [penaltyLoading, setPenaltyLoading] = useState(false);
 
+  // Memo: Mapa de participantes por ID
+  const participantsMap = useMemo(() => {
+    const map = {};
+    participants.forEach(p => { map[p.id] = p; });
+    return map;
+  }, [participants]);
+
+  // Memo: Timings agrupados por participante
+  const timingsByParticipant = useMemo(() => {
+    const map = {};
+    timings.forEach(t => {
+      if (!map[t.participant_id]) map[t.participant_id] = [];
+      map[t.participant_id].push(t);
+    });
+    return map;
+  }, [timings]);
+
+  // Memo: Timings agrupados por ronda
+  const timingsByRound = useMemo(() => {
+    const map = {};
+    timings.forEach(t => {
+      if (!map[t.round_number]) map[t.round_number] = [];
+      map[t.round_number].push(t);
+    });
+    return map;
+  }, [timings]);
+
+  // Función para calcular tiempos agregados por participante
+  const getAggregatedTimes = () => {
+    const aggregatedData = {};
+    timings.forEach(timing => {
+      const key = String(timing.participant_id);
+      if (!aggregatedData[key]) {
+        aggregatedData[key] = {
+          id: key,
+          participant_id: key,
+          total_time_seconds: 0,
+          penalty_seconds: 0,
+          best_lap_time: null,
+          rounds_completed: 0,
+          total_laps: 0
+        };
+      }
+      // Convertir tiempo total a segundos y sumar penalización
+      const timeInSeconds = timeStringToSeconds(timing.total_time);
+      const penalty = Number(timing.penalty_seconds) || 0;
+      aggregatedData[key].total_time_seconds += timeInSeconds + penalty;
+      aggregatedData[key].penalty_seconds += penalty;
+      // Actualizar mejor vuelta
+      const lapTimeParts = timing.best_lap_time.split(':');
+      const lapTimeInSeconds = parseFloat(lapTimeParts[0]) * 60 + parseFloat(lapTimeParts[1]);
+      if (!aggregatedData[key].best_lap_time || 
+          lapTimeInSeconds < (() => {
+            const bestParts = aggregatedData[key].best_lap_time.split(':');
+            return parseFloat(bestParts[0]) * 60 + parseFloat(bestParts[1]);
+          })()) {
+        aggregatedData[key].best_lap_time = timing.best_lap_time;
+      }
+      aggregatedData[key].rounds_completed += 1;
+      aggregatedData[key].total_laps += timing.laps;
+    });
+    return Object.values(aggregatedData)
+      .sort((a, b) => {
+        const aCompleted = a.rounds_completed >= (competition?.rounds || 0);
+        const bCompleted = b.rounds_completed >= (competition?.rounds || 0);
+        if (aCompleted && !bCompleted) return -1;
+        if (!aCompleted && bCompleted) return 1;
+        return a.total_time_seconds - b.total_time_seconds;
+      })
+      .map((data, index) => {
+        const totalMinutes = Math.floor(data.total_time_seconds / 60);
+        const totalSeconds = (data.total_time_seconds % 60).toFixed(3);
+        const totalTimeFormatted = `${String(totalMinutes).padStart(2, '0')}:${totalSeconds.padStart(6, '0')}`;
+        return {
+          ...data,
+          position: index + 1,
+          total_time_formatted: totalTimeFormatted,
+          has_completed_all_rounds: data.rounds_completed >= (competition?.rounds || 0)
+        };
+      });
+  };
+
+  // Memo: getAggregatedTimes
+  const aggregatedTimes = useMemo(() => getAggregatedTimes(), [timings, competition]);
+
   // Cargar datos de la competición
   useEffect(() => {
     loadCompetitionData();
@@ -53,27 +138,25 @@ const CompetitionTimings = () => {
   const loadCompetitionData = async () => {
     try {
       setLoading(true);
-      
-      // Cargar competición
-      const compResponse = await axios.get(`/competitions/${id}`);
+      // Llamadas en paralelo
+      const [
+        compResponse,
+        partResponse,
+        timingsResponse,
+        progressResponse,
+        rulesResponse
+      ] = await Promise.all([
+        axios.get(`/competitions/${id}`),
+        axios.get(`/competitions/${id}/participants`),
+        axios.get(`/competitions/${id}/timings`),
+        axios.get(`/competitions/${id}/progress`),
+        axios.get(`/competitions/${id}/rules`)
+      ]);
       setCompetition(compResponse.data);
-      
-      // Cargar participantes
-      const partResponse = await axios.get(`/competitions/${id}/participants`);
       setParticipants(partResponse.data);
-      
-      // Cargar tiempos
-      const timingsResponse = await axios.get(`/competitions/${id}/timings`);
       setTimings(timingsResponse.data);
-      
-      // Cargar progreso
-      const progressResponse = await axios.get(`/competitions/${id}/progress`);
       setProgress(progressResponse.data);
-      
-      // Cargar reglas
-      const rulesResponse = await axios.get(`/competitions/${id}/rules`);
       setRules(rulesResponse.data);
-      
       // Obtener puntos calculados del backend usando el endpoint de progreso
       const pointsByParticipant = {};
       if (progressResponse.data.participant_stats) {
@@ -82,7 +165,6 @@ const CompetitionTimings = () => {
         });
       }
       setPointsByParticipant(pointsByParticipant);
-      
     } catch (error) {
       console.error('Error al cargar datos:', error);
       setError(error.response?.data?.error || 'Error al cargar los datos');
@@ -172,15 +254,14 @@ const CompetitionTimings = () => {
     }
   };
 
+  // Usar los mapas en vez de buscar en cada render
   const getParticipantName = (participantId) => {
-    const participant = participants.find(p => p.id === participantId);
-    return participant ? participant.driver_name : 'Desconocido';
+    return participantsMap[participantId]?.driver_name || 'Desconocido';
   };
 
   const getVehicleInfo = (participantId) => {
-    const participant = participants.find(p => p.id === participantId);
+    const participant = participantsMap[participantId];
     if (!participant) return 'Desconocido';
-    
     if (participant.vehicles) {
       return `${participant.vehicles.manufacturer} ${participant.vehicles.model}`;
     } else if (participant.vehicle_model) {
@@ -251,68 +332,13 @@ const CompetitionTimings = () => {
     return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
   }
 
-  // Función para calcular tiempos agregados por participante
-  const getAggregatedTimes = () => {
-    const aggregatedData = {};
-    timings.forEach(timing => {
-      const key = String(timing.participant_id);
-      if (!aggregatedData[key]) {
-        aggregatedData[key] = {
-          id: key,
-          participant_id: key,
-          total_time_seconds: 0,
-          penalty_seconds: 0,
-          best_lap_time: null,
-          rounds_completed: 0,
-          total_laps: 0
-        };
-      }
-      // Convertir tiempo total a segundos y sumar penalización
-      const timeInSeconds = timeStringToSeconds(timing.total_time);
-      const penalty = Number(timing.penalty_seconds) || 0;
-      aggregatedData[key].total_time_seconds += timeInSeconds + penalty;
-      aggregatedData[key].penalty_seconds += penalty;
-      // Actualizar mejor vuelta
-      const lapTimeParts = timing.best_lap_time.split(':');
-      const lapTimeInSeconds = parseFloat(lapTimeParts[0]) * 60 + parseFloat(lapTimeParts[1]);
-      if (!aggregatedData[key].best_lap_time || 
-          lapTimeInSeconds < (() => {
-            const bestParts = aggregatedData[key].best_lap_time.split(':');
-            return parseFloat(bestParts[0]) * 60 + parseFloat(bestParts[1]);
-          })()) {
-        aggregatedData[key].best_lap_time = timing.best_lap_time;
-      }
-      aggregatedData[key].rounds_completed += 1;
-      aggregatedData[key].total_laps += timing.laps;
-    });
-    return Object.values(aggregatedData)
-      .sort((a, b) => {
-        const aCompleted = a.rounds_completed >= (competition?.rounds || 0);
-        const bCompleted = b.rounds_completed >= (competition?.rounds || 0);
-        if (aCompleted && !bCompleted) return -1;
-        if (!aCompleted && bCompleted) return 1;
-        return a.total_time_seconds - b.total_time_seconds;
-      })
-      .map((data, index) => {
-        const totalMinutes = Math.floor(data.total_time_seconds / 60);
-        const totalSeconds = (data.total_time_seconds % 60).toFixed(3);
-        const totalTimeFormatted = `${String(totalMinutes).padStart(2, '0')}:${totalSeconds.padStart(6, '0')}`;
-        return {
-          ...data,
-          position: index + 1,
-          total_time_formatted: totalTimeFormatted,
-          has_completed_all_rounds: data.rounds_completed >= (competition?.rounds || 0)
-        };
-      });
-  };
-
   const formatTime = (time) => {
     if (!time) return '-';
     return time;
   };
 
   const getRoundStatus = (roundNumber) => {
-    const roundTimings = timings.filter(t => t.round_number === roundNumber);
+    const roundTimings = timingsByRound[roundNumber] || [];
     const totalParticipants = participants.length;
     
     if (roundTimings.length === 0) {
@@ -589,11 +615,10 @@ const CompetitionTimings = () => {
         <Tab eventKey="rounds" title="Vista por Rondas">
           <Row>
             {Array.from({ length: competition?.rounds || 0 }, (_, i) => i + 1).map(roundNumber => {
-              const roundTimings = timings.filter(t => t.round_number === roundNumber);
               const roundStatus = getRoundStatus(roundNumber);
               
               // Ordenar por tiempo ajustado
-              const sortedTimings = [...roundTimings].sort((a, b) => {
+              const sortedTimings = [...timingsByRound[roundNumber] || []].sort((a, b) => {
                 const aAdjusted = (Number(a.total_time_timestamp) || 0) + (Number(a.penalty_seconds) || 0);
                 const bAdjusted = (Number(b.total_time_timestamp) || 0) + (Number(b.penalty_seconds) || 0);
                 return aAdjusted - bAdjusted;
@@ -795,8 +820,7 @@ const CompetitionTimings = () => {
         <Tab eventKey="participants" title="Vista por Participantes">
           <Row>
             {participants.map(participant => {
-              const participantTimings = timings.filter(t => t.participant_id === participant.id);
-              const completedRounds = participantTimings.length;
+              const completedRounds = timingsByParticipant[participant.id]?.length || 0;
               const totalRounds = competition?.rounds || 0;
               
               return (
@@ -816,7 +840,7 @@ const CompetitionTimings = () => {
                         <small className="text-muted">{completedRounds}/{totalRounds}</small>
                       </div>
 
-                      {participantTimings.length > 0 ? (
+                      {timingsByParticipant[participant.id]?.length > 0 ? (
                         <Table size="sm" className="mb-0 timing-table">
                           <thead>
                             <tr>
@@ -828,7 +852,7 @@ const CompetitionTimings = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {participantTimings.map((timing) => (
+                            {timingsByParticipant[participant.id].map((timing) => (
                               <tr key={timing.id}>
                                 <td>{timing.round_number}</td>
                                 <td>{formatTime(timing.best_lap_time)}</td>
@@ -855,7 +879,6 @@ const CompetitionTimings = () => {
             <Card.Body>
               <h6 className="card-title mb-3">🏆 Clasificación General</h6>
               {(() => {
-                const aggregatedTimes = getAggregatedTimes();
                 return aggregatedTimes.length > 0 ? (
                   <Table responsive className="timing-table">
                     <thead>
