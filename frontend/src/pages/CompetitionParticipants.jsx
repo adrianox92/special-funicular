@@ -459,7 +459,7 @@ const CompetitionParticipants = () => {
               <div className="d-flex justify-content-between align-items-center">
                 <h5>Participantes Confirmados</h5>
                 <Button
-                  variant="primary"
+                  variant="primary" 
                   className="mb-3"
                   onClick={() => setShowAddModal(true)}
                   disabled={timesRegistered > 0}
@@ -507,22 +507,22 @@ const CompetitionParticipants = () => {
                     <td>{getVehicleInfo(participant).manufacturer} {getVehicleInfo(participant).model}</td>
                     {competition && competition.rules && competition.rules.length > 0 && <td>{participant.points || 0}</td>}
                     <td>
-                      <div className="d-flex gap-1">
-                        <Button 
-                          variant="outline-primary" 
-                          size="sm"
-                          onClick={() => openEditModal(participant)}
-                        >
-                          <FaEdit />
-                        </Button>
-                        <Button 
-                          variant="outline-danger" 
-                          size="sm"
-                          onClick={() => handleDeleteParticipant(participant.id)}
-                        >
-                          <FaTrash />
-                        </Button>
-                      </div>
+                          <div className="d-flex gap-1">
+                            <Button 
+                              variant="outline-primary" 
+                              size="sm"
+                              onClick={() => openEditModal(participant)}
+                            >
+                              <FaEdit />
+                            </Button>
+                            <Button 
+                              variant="outline-danger" 
+                              size="sm"
+                              onClick={() => handleDeleteParticipant(participant.id)}
+                            >
+                              <FaTrash />
+                            </Button>
+                          </div>
                     </td>
                   </tr>
                 ))}

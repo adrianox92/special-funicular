@@ -369,48 +369,48 @@ const CompetitionRules = ({ competitionId, onRuleChange }) => {
                 </Form.Text>
               </Form.Group>
             ) : (
-              <Form.Group className="mb-3">
-                <Form.Label>Estructura de puntos *</Form.Label>
-                <div className="border rounded p-3">
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <span className="text-muted">Define los puntos para cada posición</span>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={addPosition}
-                      className="d-flex align-items-center gap-1"
-                    >
-                      <FaPlus /> Añadir posición
-                    </Button>
-                  </div>
-                  
-                  <Row>
-                    {Object.entries(formData.points_structure)
-                      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                      .map(([position, points]) => (
-                        <Col key={position} md={4} className="mb-2">
-                          <InputGroup size="sm">
-                            <InputGroup.Text>{position}º</InputGroup.Text>
-                            <Form.Control
-                              type="number"
-                              value={points}
-                              onChange={(e) => updatePointsStructure(position, e.target.value)}
-                              min="0"
-                              placeholder="Puntos"
-                            />
-                            <Button
-                              variant="outline-danger"
-                              onClick={() => removePosition(position)}
-                              disabled={Object.keys(formData.points_structure).length === 1}
-                            >
-                              <FaTrash />
-                            </Button>
-                          </InputGroup>
-                        </Col>
-                      ))}
-                  </Row>
+            <Form.Group className="mb-3">
+              <Form.Label>Estructura de puntos *</Form.Label>
+              <div className="border rounded p-3">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <span className="text-muted">Define los puntos para cada posición</span>
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={addPosition}
+                    className="d-flex align-items-center gap-1"
+                  >
+                    <FaPlus /> Añadir posición
+                  </Button>
                 </div>
-              </Form.Group>
+                
+                <Row>
+                  {Object.entries(formData.points_structure)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .map(([position, points]) => (
+                      <Col key={position} md={4} className="mb-2">
+                        <InputGroup size="sm">
+                          <InputGroup.Text>{position}º</InputGroup.Text>
+                          <Form.Control
+                            type="number"
+                            value={points}
+                            onChange={(e) => updatePointsStructure(position, e.target.value)}
+                            min="0"
+                            placeholder="Puntos"
+                          />
+                          <Button
+                            variant="outline-danger"
+                            onClick={() => removePosition(position)}
+                            disabled={Object.keys(formData.points_structure).length === 1}
+                          >
+                            <FaTrash />
+                          </Button>
+                        </InputGroup>
+                      </Col>
+                    ))}
+                </Row>
+              </div>
+            </Form.Group>
             )}
           </Modal.Body>
           <Modal.Footer>
