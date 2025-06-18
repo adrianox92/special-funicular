@@ -8,6 +8,11 @@ import Dashboard from './pages/Dashboard';
 import AddVehicle from './components/AddVehicle';
 import EditVehicle from './components/EditVehicle';
 import TimingsList from './components/TimingsList';
+import Competitions from './pages/Competitions';
+import CompetitionParticipants from './pages/CompetitionParticipants';
+import CompetitionTimings from './pages/CompetitionTimings';
+import CompetitionSignup from './pages/CompetitionSignup';
+import CompetitionStatus from './pages/CompetitionStatus';
 import Login from './components/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -43,6 +48,9 @@ const ProtectedLayout = () => {
           <Route path="/vehicles/new" element={<AddVehicle />} />
           <Route path="/vehicles/:id" element={<EditVehicle />} />
           <Route path="/timings" element={<TimingsList />} />
+          <Route path="/competitions" element={<Competitions />} />
+          <Route path="/competitions/:id/participants" element={<CompetitionParticipants />} />
+          <Route path="/competitions/:id/timings" element={<CompetitionTimings />} />
         </Routes>
       </Container>
       <Footer />
@@ -56,6 +64,8 @@ const AppContent = () => {
     <div className="d-flex flex-column min-vh-100">
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
+        <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/*" element={<ProtectedLayout />} />
       </Routes>
     </div>

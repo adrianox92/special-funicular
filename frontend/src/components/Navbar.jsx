@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navbar as BootstrapNavbar, Nav, Container, Button } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
+import { FaTrophy } from 'react-icons/fa';
 
 const Navbar = () => {
   const { logout } = useAuth();
@@ -25,6 +26,9 @@ const Navbar = () => {
           <Nav className="me-auto">
             <Nav.Link as={Link} to="/vehicles">Vehículos</Nav.Link>
             <Nav.Link as={Link} to="/timings">Tabla de Tiempos</Nav.Link>
+            <Nav.Link as={Link} to="/competitions" className="d-flex align-items-center gap-1">
+              <FaTrophy /> Competiciones
+            </Nav.Link>
           </Nav>
           <Nav>
             <Button variant="outline-light" onClick={handleLogout}>

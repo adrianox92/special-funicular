@@ -110,6 +110,23 @@ Genera insights que sean:
 `;
 }
 
+/**
+ * @swagger
+ * /api/insights-ia:
+ *   get:
+ *     summary: Obtiene insights generados por IA sobre la colección del usuario
+ *     tags:
+ *       - Insights
+ *     responses:
+ *       200:
+ *         description: Insights generados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
 router.get('/insights-ia', async (req, res) => {
   try {
     const userId = req.user.id;
