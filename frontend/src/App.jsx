@@ -18,6 +18,8 @@ import Login from './components/Login';
 import LandingPage from './pages/LandingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import InstallPWAButton from './components/InstallPWAButton';
+
 
 // Componente para el layout protegido
 const ProtectedLayout = () => {
@@ -101,7 +103,10 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <AppContent />
+        <div>
+          <InstallPWAButton />
+          <AppContent />
+        </div>
       </Router>
     </AuthProvider>
   );
