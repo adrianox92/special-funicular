@@ -21,47 +21,6 @@ import PrivateRoute from './components/PrivateRoute';
 import InstallPWAButton from './components/InstallPWAButton';
 
 
-// Componente para el layout protegido
-const ProtectedLayout = () => {
-  const { user, loading } = useAuth();
-
-  // Si está cargando, mostrar un spinner
-  if (loading) {
-    return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <div className="spinner-border" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </Container>
-    );
-  }
-
-  // Si no hay usuario, redirigir a la página principal
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Si hay usuario, mostrar el layout protegido
-  return (
-    <>
-      <Navbar />
-      <Container className="flex-grow-1 pb-5">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/vehicles" element={<VehicleList />} />
-          <Route path="/vehicles/new" element={<AddVehicle />} />
-          <Route path="/vehicles/:id" element={<EditVehicle />} />
-          <Route path="/timings" element={<TimingsList />} />
-          <Route path="/competitions" element={<Competitions />} />
-          <Route path="/competitions/:id/participants" element={<CompetitionParticipants />} />
-          <Route path="/competitions/:id/timings" element={<CompetitionTimings />} />
-        </Routes>
-      </Container>
-      <Footer />
-    </>
-  );
-};
-
 // Componente principal de la aplicación
 const AppContent = () => {
   const { user, loading } = useAuth();
@@ -87,12 +46,86 @@ const AppContent = () => {
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
         
-        {/* Rutas protegidas */}
-        <Route path="/dashboard" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
-        <Route path="/vehicles/*" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
-        <Route path="/timings" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
-        <Route path="/competitions" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
-        <Route path="/competitions/:id/*" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
+        {/* Rutas protegidas con layout */}
+        <Route path="/dashboard" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <Dashboard />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+        
+        <Route path="/vehicles" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <VehicleList />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+        
+        <Route path="/vehicles/new" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <AddVehicle />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+        
+        <Route path="/vehicles/:id" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <EditVehicle />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+        
+        <Route path="/timings" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <TimingsList />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+        
+        <Route path="/competitions" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <Competitions />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+        
+        <Route path="/competitions/:id/participants" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <CompetitionParticipants />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+        
+        <Route path="/competitions/:id/timings" element={user ? (
+          <>
+            <Navbar />
+            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
+              <CompetitionTimings />
+            </Container>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
       </Routes>
     </div>
   );

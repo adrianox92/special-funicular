@@ -51,6 +51,34 @@ Si no ves el botón de instalación:
 4. **Revisa la consola**: Busca errores relacionados con el Service Worker
 5. **Reinstala**: Si ya está instalada, desinstala y vuelve a instalar
 
+### 🔧 Problema de Navegación Resuelto
+
+**Problema**: Los enlaces del menú no funcionaban después de implementar la PWA.
+
+**Causa**: El Service Worker estaba interceptando todas las peticiones, incluyendo las navegaciones de React Router.
+
+**Solución**: 
+- Simplificamos el Service Worker para que solo maneje archivos estáticos
+- Eliminamos la interceptación de peticiones de navegación
+- Permitimos que React Router maneje la navegación normalmente
+
+**Archivos modificados**:
+- `frontend/public/service-worker.js` - Service Worker simplificado
+- `frontend/src/App.jsx` - Estructura de rutas corregida
+- `frontend/src/components/InstallPWAButton.jsx` - Botones de debug añadidos
+
+### 🧪 Herramientas de Debug
+
+En modo desarrollo, se añaden botones de debug:
+- **🔍 Debug PWA**: Muestra diagnóstico completo de la PWA
+- **🧪 Test Nav**: Prueba la navegación programática
+
+Para usar las herramientas de debug:
+1. Abre la consola del navegador (F12)
+2. Busca los botones de debug en la esquina inferior izquierda
+3. Haz clic en "Debug PWA" para ver el estado completo
+4. Usa "Test Nav" para probar la navegación
+
 ### 📊 Estado de la PWA
 
 - ✅ Manifest.json configurado

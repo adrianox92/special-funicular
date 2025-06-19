@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { logPWADiagnostics, showPWADiagnostics } from '../utils/pwaDiagnostics';
+import { logPWADiagnostics } from '../utils/pwaDiagnostics';
 
 const InstallPWAButton = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     // Ejecutar diagnóstico al cargar
@@ -77,60 +76,31 @@ const InstallPWAButton = () => {
     setIsVisible(false);
   };
 
-  const handleDebugClick = () => {
-    showPWADiagnostics();
-  };
-
-  // Mostrar botón de debug en desarrollo
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
   // No mostrar el botón si ya está instalada
   if (isInstalled) return null;
 
-  return (
-    <>
-      {/* Botón de instalación */}
-      {isVisible && (
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          zIndex: 1000,
-          backgroundColor: '#007bff',
-          color: 'white',
-          padding: '10px 15px',
-          borderRadius: '25px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }} onClick={handleInstallClick}>
-          <span>📲</span>
-          <span>Instalar App</span>
-        </div>
-      )}
+  // No mostrar el botón si no es visible
+  if (!isVisible) return null;
 
-      {/* Botón de debug (solo en desarrollo) */}
-      {isDevelopment && (
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          left: '20px',
-          zIndex: 1000,
-          backgroundColor: '#6c757d',
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: '20px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          cursor: 'pointer',
-          fontSize: '12px',
-          fontFamily: 'monospace'
-        }} onClick={handleDebugClick}>
-          🔍 Debug PWA
-        </div>
-      )}
-    </>
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      zIndex: 1000,
+      backgroundColor: '#007bff',
+      color: 'white',
+      padding: '10px 15px',
+      borderRadius: '25px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }} onClick={handleInstallClick}>
+      <span>📲</span>
+      <span>Instalar App</span>
+    </div>
   );
 };
 

@@ -1,9 +1,7 @@
-// service-worker.js - Service Worker mejorado para PWA
+// service-worker.js - Service Worker simplificado para PWA
 /* eslint-disable no-restricted-globals */
 
 const CACHE_NAME = "scalextric-cache-v1";
-const STATIC_CACHE = "scalextric-static-v1";
-const DYNAMIC_CACHE = "scalextric-dynamic-v1";
 
 // Archivos estáticos que se cachean inmediatamente
 const STATIC_FILES = [
@@ -15,36 +13,12 @@ const STATIC_FILES = [
   '/favicon.ico'
 ];
 
-// Tipos de archivos que se cachean dinámicamente
-const CACHEABLE_EXTENSIONS = [
-  '.js',
-  '.css',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.svg',
-  '.ico',
-  '.woff',
-  '.woff2',
-  '.ttf',
-  '.eot'
-];
-
-// Rutas de la API que se cachean
-const API_CACHE_PATTERNS = [
-  '/api/public/',
-  '/api/competitions/',
-  '/api/vehicles/',
-  '/api/timings/'
-];
-
 // Instalación del Service Worker
 self.addEventListener("install", event => {
   console.log('Service Worker: Installing...');
   
   event.waitUntil(
-    caches.open(STATIC_CACHE)
+    caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Service Worker: Caching static files');
         return cache.addAll(STATIC_FILES);
@@ -68,7 +42,7 @@ self.addEventListener("activate", event => {
       .then(cacheNames => {
         return Promise.all(
           cacheNames.map(cacheName => {
-            if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+            if (cacheName !== CACHE_NAME) {
               console.log('Service Worker: Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
@@ -82,12 +56,12 @@ self.addEventListener("activate", event => {
   );
 });
 
-// Interceptación de peticiones
+// Interceptación de peticiones - SOLO archivos estáticos
 self.addEventListener("fetch", event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Estrategia para archivos estáticos
+  // Solo interceptar archivos estáticos específicos
   if (STATIC_FILES.includes(url.pathname)) {
     event.respondWith(
       caches.match(request)
@@ -95,76 +69,14 @@ self.addEventListener("fetch", event => {
           if (response) {
             return response;
           }
-          return fetch(request)
-            .then(response => {
-              if (response.status === 200) {
-                const responseClone = response.clone();
-                caches.open(STATIC_CACHE)
-                  .then(cache => cache.put(request, responseClone));
-              }
-              return response;
-            });
+          return fetch(request);
         })
     );
     return;
   }
 
-  // Estrategia para archivos de recursos (CSS, JS, imágenes)
-  if (CACHEABLE_EXTENSIONS.some(ext => url.pathname.endsWith(ext))) {
-    event.respondWith(
-      caches.match(request)
-        .then(response => {
-          if (response) {
-            return response;
-          }
-          return fetch(request)
-            .then(response => {
-              if (response.status === 200) {
-                const responseClone = response.clone();
-                caches.open(DYNAMIC_CACHE)
-                  .then(cache => cache.put(request, responseClone));
-              }
-              return response;
-            });
-        })
-    );
-    return;
-  }
-
-  // Estrategia para peticiones de API
-  if (API_CACHE_PATTERNS.some(pattern => url.pathname.startsWith(pattern))) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(DYNAMIC_CACHE)
-              .then(cache => cache.put(request, responseClone));
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request);
-        })
-    );
-    return;
-  }
-
-  // Estrategia por defecto: Network First
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(DYNAMIC_CACHE)
-            .then(cache => cache.put(request, responseClone));
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(request);
-      })
-  );
+  // Para todas las demás peticiones, NO interceptar
+  // Esto permite que React Router maneje la navegación normalmente
 });
 
 // Manejo de mensajes
