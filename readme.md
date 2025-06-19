@@ -2,6 +2,64 @@
 
 Una aplicación web completa para gestionar tu colección de coches Scalextric y organizar competiciones de manera profesional.
 
+## 📱 PWA (Progressive Web App)
+
+Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo que significa que puedes instalarla en tu dispositivo móvil o computadora como una aplicación nativa.
+
+### ✨ Características PWA
+
+- **Instalable**: Puedes instalar la app en tu dispositivo desde el navegador
+- **Funcionamiento offline**: La aplicación funciona sin conexión a internet
+- **Notificaciones push**: Recibe notificaciones de competiciones y actualizaciones
+- **Experiencia nativa**: Se comporta como una aplicación móvil nativa
+- **Actualizaciones automáticas**: Se actualiza automáticamente cuando hay nuevas versiones
+
+### 📲 Cómo Instalar la PWA
+
+#### En Android (Chrome):
+1. Abre la aplicación en Chrome
+2. Verás un banner "Instalar aplicación" en la parte inferior
+3. Toca "Instalar" y confirma
+4. La app aparecerá en tu pantalla de inicio
+
+#### En iOS (Safari):
+1. Abre la aplicación en Safari
+2. Toca el botón de compartir (cuadrado con flecha)
+3. Selecciona "Añadir a pantalla de inicio"
+4. Confirma la instalación
+
+#### En Desktop (Chrome/Edge):
+1. Abre la aplicación en el navegador
+2. Verás un icono de instalación en la barra de direcciones
+3. Haz clic en el icono y selecciona "Instalar"
+4. La app se abrirá en una ventana independiente
+
+### 🔧 Requisitos Técnicos PWA
+
+- **HTTPS obligatorio**: La PWA requiere conexión segura en producción
+- **Service Worker**: Para funcionamiento offline y cacheo
+- **Manifest.json**: Configuración de la aplicación instalable
+- **Iconos**: Múltiples tamaños para diferentes dispositivos
+
+### 🛠️ Solución de Problemas PWA
+
+Si no ves el botón de instalación:
+
+1. **Verifica HTTPS**: Asegúrate de que el sitio use HTTPS en producción
+2. **Limpia el cache**: Borra el cache del navegador y recarga
+3. **Verifica el Service Worker**: Abre las herramientas de desarrollador → Application → Service Workers
+4. **Revisa la consola**: Busca errores relacionados con el Service Worker
+5. **Reinstala**: Si ya está instalada, desinstala y vuelve a instalar
+
+### 📊 Estado de la PWA
+
+- ✅ Manifest.json configurado
+- ✅ Service Worker registrado
+- ✅ Iconos en múltiples tamaños
+- ✅ Botón de instalación implementado
+- ✅ Funcionamiento offline básico
+- ✅ Actualizaciones automáticas
+
 ## ✨ Características Principales
 
 ### 🎨 Interfaz de Usuario Profesional
