@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Alert, Card, Button } from 'react-bootstrap';
 import { 
-  FiTruck, 
-  FiTool, 
-  FiDollarSign, 
-  FiTrendingUp,
-  FiAward,
-  FiClock
-} from 'react-icons/fi';
-import { FaTrophy } from 'react-icons/fa';
+  FaTruck, 
+  FaTools, 
+  FaEuroSign, 
+  FaChartLine,
+  FaTrophy,
+  FaClock,
+  FaCar,
+  FaCog,
+  FaPlus,
+  FaList
+} from 'react-icons/fa';
 import MetricCard from '../components/MetricCard';
 import VehiclesByTypeChart from '../components/charts/VehiclesByTypeChart';
 import ModificationPieChart from '../components/charts/ModificationPieChart';
@@ -33,7 +36,9 @@ const Dashboard = () => {
     highestIncrementVehicle: null,
     bestTimeVehicle: null,
     investmentHistory: [],
-    performanceByType: {}
+    performanceByType: {},
+    trends: {},
+    activeCompetitions: 0
   });
 
   const [chartsData, setChartsData] = useState({
@@ -136,7 +141,7 @@ const Dashboard = () => {
 
   return (
     <Container fluid className="py-4">
-      <h2 className="mb-4">Dashboard</h2>
+      <h1 className="mb-2">Dashboard</h1>
       
       {error && (
         <Alert variant="danger" className="mb-4">
@@ -162,34 +167,40 @@ const Dashboard = () => {
           {/* Bloque de Acciones Rápidas */}
           <Row className="mb-4">
             <Col xs={12} lg={6}>
-              <Card>
-                <Card.Header>
+              <Card className="action-card">
+                <Card.Header className="action-card-header">
                   <h6 className="mb-0">
                     <FaTrophy className="me-2" />
                     Acciones Rápidas
                   </h6>
                 </Card.Header>
                 <Card.Body>
-                  <div className="d-grid gap-2">
+                  <div className="d-grid gap-3">
                     <Button 
                       variant="primary" 
+                      size="lg"
+                      className="action-button"
                       onClick={() => window.location.href = '/competitions'}
                     >
-                      <FaTrophy className="me-2" />
+                      <FaPlus className="me-2" />
                       Crear Nueva Competición
                     </Button>
                     <Button 
                       variant="outline-primary" 
+                      size="lg"
+                      className="action-button"
                       onClick={() => window.location.href = '/vehicles'}
                     >
-                      <FiTruck className="me-2" />
+                      <FaCar className="me-2" />
                       Gestionar Vehículos
                     </Button>
                     <Button 
                       variant="outline-primary" 
+                      size="lg"
+                      className="action-button"
                       onClick={() => window.location.href = '/timings'}
                     >
-                      <FiClock className="me-2" />
+                      <FaClock className="me-2" />
                       Ver Tiempos
                     </Button>
                   </div>
@@ -198,44 +209,87 @@ const Dashboard = () => {
             </Col>
           </Row>
 
-          <h4 className="mb-3">Métricas de Colección</h4>
-          <Row className="g-3 mb-4">
-            <Col xs={12} md={4}>
+          {/* Métricas Principales */}
+          <Row className="mb-4">
+            <Col xs={12} sm={6} lg={3} className="mb-3">
               <MetricCard
-                title="Total de Vehículos"
-                value={metrics.totalVehicles || 0}
-                subtitle={`${metrics.modifiedVehicles || 0} modificados`}
-                icon="bi-car-front"
-                details={{
-                  'Ultima actualización': metrics.lastUpdate,
-                  'Vehículos de serie': metrics.stockVehicles || 0
-                }}
+                title="Total Vehículos"
+                value={metrics.totalVehicles}
+                icon={<FaTruck />}
+                valueColor="primary"
+                trend={metrics.trends?.totalVehicles?.trend || 'stable'}
+                trendValue={metrics.trends?.totalVehicles?.value || 'Sin datos'}
               />
             </Col>
-            <Col xs={12} md={4}>
+            <Col xs={12} sm={6} lg={3} className="mb-3">
               <MetricCard
-                title="Inversión en Componentes"
-                value={metrics.totalInvestment || 0}
-                subtitle={`${metrics.averageInvestmentPerVehicle || 0} € por vehículo modificado`}
-                icon="bi-currency-euro"
-                details={{
-                  'Ultima actualización': metrics.lastUpdate,
-                  'Total de Vehículos modificados': metrics.modifiedVehicles || 0
-                }}
+                title="Vehículos Modificados"
+                value={metrics.modifiedVehicles}
+                subtitle={`${((metrics.modifiedVehicles / metrics.totalVehicles) * 100).toFixed(1)}% del total`}
+                icon={<FaTools />}
+                valueColor="success"
+                trend={metrics.trends?.modifiedVehicles?.trend || 'stable'}
+                trendValue={metrics.trends?.modifiedVehicles?.value || 'Sin datos'}
               />
             </Col>
-            <Col xs={12} md={4}>
+            <Col xs={12} sm={6} lg={3} className="mb-3">
               <MetricCard
-                title="Promedio de Incremento"
-                value={metrics.averagePriceIncrement || 0}
-                subtitle="Porcentaje medio de incremento"
-                icon="bi-graph-up"
-                details={{
-                  'Ultima actualización': metrics.lastUpdate,
-                  'Total de Vehículos modificados': metrics.modifiedVehicles || 0
-                }}
-                formatValue={formatPercentage}
+                title="Vehículos sin modificar"
+                value={metrics.stockVehicles}
+                subtitle={`${((metrics.stockVehicles / metrics.totalVehicles) * 100).toFixed(1)}% del total`}
+                icon={<FaCar />}
                 valueColor="info"
+                trend={metrics.trends?.stockVehicles?.trend || 'stable'}
+                trendValue={metrics.trends?.stockVehicles?.value || 'Sin datos'}
+              />
+            </Col>
+            <Col xs={12} sm={6} lg={3} className="mb-3">
+              <MetricCard
+                title="Inversión Total"
+                value={formatCurrency(metrics.totalInvestment)}
+                subtitle={`Promedio: ${formatCurrency(metrics.averageInvestmentPerVehicle)}`}
+                icon={<FaEuroSign />}
+                valueColor="warning"
+                trend={metrics.trends?.totalInvestment?.trend || 'stable'}
+                trendValue={metrics.trends?.totalInvestment?.value || 'Sin datos'}
+              />
+            </Col>
+          </Row>
+
+          {/* Métricas Secundarias */}
+          <Row className="mb-4">
+            
+            <Col xs={12} sm={6} lg={3} className="mb-3">
+              <MetricCard
+                title="Incremento Promedio"
+                value={formatPercentage(metrics.averagePriceIncrement)}
+                subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)}
+                icon={<FaChartLine />}
+                valueColor="success"
+                trend={metrics.trends?.averagePriceIncrement?.trend || 'stable'}
+                trendValue={metrics.trends?.averagePriceIncrement?.value || 'Sin datos'}
+              />
+            </Col>
+            <Col xs={12} sm={6} lg={3} className="mb-3">
+              <MetricCard
+                title="Última Actualización"
+                value={metrics.lastUpdate ? new Date(metrics.lastUpdate).toLocaleDateString('es-ES') : 'N/A'}
+                subtitle="Base de datos"
+                icon={<FaCog />}
+                valueColor="secondary"
+                trend={metrics.trends?.lastUpdate?.trend || 'stable'}
+                trendValue={metrics.trends?.lastUpdate?.value || 'Sistema activo'}
+              />
+            </Col>
+            <Col xs={12} sm={6} lg={3} className="mb-3">
+              <MetricCard
+                title="Competiciones Activas"
+                value={metrics.activeCompetitions || 0}
+                subtitle="En curso"
+                icon={<FaTrophy />}
+                valueColor="primary"
+                trend={metrics.trends?.activeCompetitions?.trend || 'stable'}
+                trendValue={metrics.trends?.activeCompetitions?.value || 'Sin datos'}
               />
             </Col>
           </Row>
@@ -265,7 +319,7 @@ const Dashboard = () => {
                 title="Mayor Incremento"
                 value={metrics.highestIncrementVehicle?.price_increment || 0}
                 subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)}
-                icon="bi-trophy"
+                icon={<FaTrophy />}
                 details={{
                   'Ultima actualización': metrics.highestIncrementVehicle?.purchase_date,
                   'Precio Base': metrics.highestIncrementVehicle?.price,
@@ -280,7 +334,7 @@ const Dashboard = () => {
                 title="Mejor Tiempo"
                 value={metrics.bestTimeVehicle?.best_lap_time}
                 subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)}
-                icon="bi-stopwatch"
+                icon={<FaClock />}
                 details={{
                   'Ultima actualización': metrics.bestTimeVehicle?.timing_date,
                   'Circuito': metrics.bestTimeVehicle?.circuit,

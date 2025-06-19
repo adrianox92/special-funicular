@@ -24,6 +24,187 @@ const timeToSeconds = (timeStr) => {
   return Number(minutes) * 60 + Number(seconds);
 };
 
+// Función para calcular tendencias basadas en datos históricos
+const calculateTrends = async (userId) => {
+  const now = new Date();
+  const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+  const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+
+  try {
+    // Obtener vehículos con fechas de compra
+    const { data: vehicles, error: vehiclesError } = await supabase
+      .from('vehicles')
+      .select('id, model, manufacturer, price, total_price, modified, purchase_date, created_at')
+      .eq('user_id', userId);
+
+    if (vehiclesError) throw vehiclesError;
+
+    // Calcular tendencias de vehículos
+    const currentTotal = vehicles.length;
+    const currentModified = vehicles.filter(v => v.modified).length;
+    const currentStock = currentTotal - currentModified;
+
+    // Vehículos añadidos en el último mes
+    const lastMonthVehicles = vehicles.filter(v => {
+      const purchaseDate = new Date(v.purchase_date || v.created_at);
+      return purchaseDate >= oneMonthAgo;
+    });
+
+    // Vehículos modificados en el último mes (aproximado por created_at)
+    const lastMonthModified = vehicles.filter(v => {
+      const createdDate = new Date(v.created_at);
+      return v.modified && createdDate >= oneMonthAgo;
+    });
+
+    // Calcular tendencia de inversión
+    const currentInvestment = vehicles
+      .filter(v => v.modified && v.total_price > v.price)
+      .reduce((sum, v) => sum + (v.total_price - v.price), 0);
+
+    const lastMonthInvestment = lastMonthVehicles
+      .filter(v => v.modified && v.total_price > v.price)
+      .reduce((sum, v) => sum + (v.total_price - v.price), 0);
+
+    // Calcular incremento promedio anual
+    const vehiclesWithIncrement = vehicles
+      .filter(v => v.modified && v.price > 0 && v.total_price > v.price)
+      .map(v => ({
+        ...v,
+        price_increment: ((v.total_price - v.price) / v.price * 100)
+      }));
+
+    const currentAvgIncrement = vehiclesWithIncrement.length > 0
+      ? vehiclesWithIncrement.reduce((sum, v) => sum + v.price_increment, 0) / vehiclesWithIncrement.length
+      : 0;
+
+    // Obtener datos de tiempos para tendencias de rendimiento
+    const { data: timings, error: timingsError } = await supabase
+      .from('vehicle_timings')
+      .select(`
+        best_lap_time,
+        timing_date,
+        vehicles!inner (
+          id,
+          user_id
+        )
+      `)
+      .eq('vehicles.user_id', userId)
+      .gte('timing_date', oneMonthAgo.toISOString().split('T')[0]);
+
+    if (timingsError) throw timingsError;
+
+    // Calcular mejor tiempo reciente
+    const recentBestTime = timings.length > 0 
+      ? Math.min(...timings.map(t => timeToSeconds(t.best_lap_time)).filter(t => t !== null))
+      : null;
+
+    // Obtener mejor tiempo histórico para comparar
+    const { data: historicalBestTime, error: historicalError } = await supabase
+      .from('vehicle_timings')
+      .select(`
+        best_lap_time,
+        timing_date,
+        vehicles!inner (
+          id,
+          user_id
+        )
+      `)
+      .eq('vehicles.user_id', userId)
+      .lt('timing_date', oneMonthAgo.toISOString().split('T')[0])
+      .order('best_lap_time', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (historicalError && historicalError.code !== 'PGRST116') throw historicalError;
+
+    const historicalBest = historicalBestTime ? timeToSeconds(historicalBestTime.best_lap_time) : null;
+
+    // Calcular tendencias
+    const trends = {
+      totalVehicles: {
+        trend: lastMonthVehicles.length > 0 ? 'up' : 'stable',
+        value: lastMonthVehicles.length > 0 ? `+${lastMonthVehicles.length} este mes` : 'Sin cambios'
+      },
+      modifiedVehicles: {
+        trend: lastMonthModified.length > 0 ? 'up' : 'stable',
+        value: lastMonthModified.length > 0 ? `+${lastMonthModified.length} esta semana` : 'Sin cambios'
+      },
+      stockVehicles: {
+        trend: currentStock < (currentTotal - currentModified) ? 'down' : 'stable',
+        value: currentStock < (currentTotal - currentModified) ? `-${(currentTotal - currentModified) - currentStock} este mes` : 'Sin cambios'
+      },
+      totalInvestment: {
+        trend: lastMonthInvestment > 0 ? 'up' : 'stable',
+        value: lastMonthInvestment > 0 ? `+${lastMonthInvestment.toFixed(0)}€ este mes` : 'Sin cambios'
+      },
+      averagePriceIncrement: {
+        trend: currentAvgIncrement > 0 ? 'up' : 'stable',
+        value: currentAvgIncrement > 0 ? `+${currentAvgIncrement.toFixed(1)}% este año` : 'Sin cambios'
+      },
+      bestTime: {
+        trend: recentBestTime && historicalBest ? 
+          (recentBestTime < historicalBest ? 'up' : recentBestTime > historicalBest ? 'down' : 'stable') : 'stable',
+        value: recentBestTime && historicalBest ? 
+          (recentBestTime < historicalBest ? 'Nuevo récord' : recentBestTime > historicalBest ? 'Más lento' : 'Récord estable') : 'Sin datos'
+      },
+      lastUpdate: {
+        trend: 'stable',
+        value: 'Sistema activo'
+      }
+    };
+
+    // Obtener datos de competiciones activas
+    try {
+      const { data: activeCompetitions, error: competitionsError } = await supabase
+        .from('competitions')
+        .select('id, name, status, created_at')
+        .eq('user_id', userId)
+        .in('status', ['en_curso', 'pendiente'])
+        .gte('created_at', oneWeekAgo.toISOString());
+
+      if (!competitionsError && activeCompetitions) {
+        const newCompetitions = activeCompetitions.filter(c => {
+          const createdDate = new Date(c.created_at);
+          return createdDate >= oneWeekAgo;
+        });
+
+        trends.activeCompetitions = {
+          trend: newCompetitions.length > 0 ? 'up' : 'stable',
+          value: newCompetitions.length > 0 ? `+${newCompetitions.length} esta semana` : `${activeCompetitions.length} activas`
+        };
+      } else {
+        trends.activeCompetitions = {
+          trend: 'stable',
+          value: 'Sin datos'
+        };
+      }
+    } catch (error) {
+      trends.activeCompetitions = {
+        trend: 'stable',
+        value: 'Sin datos'
+      };
+    }
+
+    return trends;
+
+  } catch (error) {
+    console.error('Error calculando tendencias:', error);
+    // Retornar tendencias por defecto en caso de error
+    return {
+      totalVehicles: { trend: 'stable', value: 'Sin datos' },
+      modifiedVehicles: { trend: 'stable', value: 'Sin datos' },
+      stockVehicles: { trend: 'stable', value: 'Sin datos' },
+      totalInvestment: { trend: 'stable', value: 'Sin datos' },
+      averagePriceIncrement: { trend: 'stable', value: 'Sin datos' },
+      bestTime: { trend: 'stable', value: 'Sin datos' },
+      lastUpdate: { trend: 'stable', value: 'Sistema activo' },
+      activeCompetitions: { trend: 'stable', value: 'Sin datos' }
+    };
+  }
+};
+
 router.get('/metrics', async (req, res) => {
   try {
     // Obtener total de vehículos y estadísticas básicas con todos los campos necesarios
@@ -281,6 +462,17 @@ router.get('/metrics', async (req, res) => {
       lane: bestTimeVehicle.lane || 'No especificado'
     } : null;
 
+    // Calcular tendencias reales
+    const trends = await calculateTrends(req.user.id);
+
+    // Obtener número de competiciones activas
+    const { data: activeCompetitions, error: competitionsError } = await supabase
+      .from('competitions')
+      .select('id')
+      .eq('user_id', req.user.id)
+      .in('status', ['en_curso', 'pendiente']);
+
+    const activeCompetitionsCount = competitionsError ? 0 : (activeCompetitions?.length || 0);
 
     res.json({
       totalVehicles,
@@ -296,7 +488,9 @@ router.get('/metrics', async (req, res) => {
       } : null,
       bestTimeVehicle: bestTimeResponse,
       performanceByType: typePerformance,
-      investmentHistory
+      investmentHistory,
+      trends,
+      activeCompetitions: activeCompetitionsCount
     });
   } catch (error) {
     console.error('Error al obtener métricas del dashboard:', error);

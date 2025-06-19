@@ -455,7 +455,7 @@ const CompetitionTimings = () => {
                 <FaArrowLeft /> Volver
               </Button>
               <div className="flex-grow-1">
-                <h1 className="mb-1">⏱️ Tiempos de Competición</h1>
+                <h1 className="mb-1">Tiempos de Competición</h1>
                 <p className="text-muted mb-0">{competition?.name}</p>
               </div>
             </div>
@@ -502,7 +502,7 @@ const CompetitionTimings = () => {
               <FaArrowLeft /> Volver
             </Button>
             <div className="flex-grow-1">
-              <h1 className="mb-1">⏱️ Tiempos de Competición</h1>
+              <h1 className="mb-1">Tiempos de Competición</h1>
               <p className="text-muted mb-0">{competition?.name}</p>
             </div>
             <div className="d-flex gap-2">
@@ -651,13 +651,12 @@ const CompetitionTimings = () => {
                             <Table size="sm" className="mb-0 timing-table" style={{ tableLayout: 'fixed', width: '100%' }}>
                               <thead>
                                 <tr>
-                                  <th className="text-center" style={{width: '36px'}}>Pos</th>
+                                  <th className="text-center" style={{width: '60px'}}>Pos</th>
                                   <th className="text-center" style={{width: '120x'}}>Piloto</th>
                                   <th className="text-center" style={{width: '80px'}}>Total</th>
                                   <th className="text-center" style={{width: '60px'}}>Dif</th>
                                   <th className="text-center" style={{width: '75px'}}>Vuelta</th>
-                                  <th className="text-center" style={{width: '50px'}}>Vueltas</th>
-                                  <th className="text-center" style={{width: '44px'}}>Penal.</th>
+                                  <th className="text-center" style={{width: '74px'}}>Penal.</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -707,7 +706,6 @@ const CompetitionTimings = () => {
                                         {formatTime(timing.best_lap_time)}
                                         {isBestLap && <Badge bg="warning" text="dark" className="ms-1" style={{fontSize: '0.85em'}}>🏆</Badge>}
                                       </td>
-                                      <td className="text-center align-middle p-1">{timing.laps}</td>
                                       <td className="text-center align-middle p-1">
                                         <Button
                                           variant="link"
@@ -824,7 +822,7 @@ const CompetitionTimings = () => {
               const totalRounds = competition?.rounds || 0;
               
               return (
-                <Col xs={12} md={6} lg={4} key={participant.id} className="mb-3">
+                <Col xs={12} md={6} lg={6} key={participant.id} className="mb-3">
                   <Card>
                     <Card.Body>
                       <h6 className="card-title">{participant.driver_name}</h6>

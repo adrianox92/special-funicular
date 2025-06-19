@@ -307,7 +307,7 @@ const CompetitionParticipants = () => {
               <FaArrowLeft /> Volver
             </Button>
             <div className="flex-grow-1">
-              <h1 className="mb-1">🏁 {competition.name}</h1>
+              <h1 className="mb-1">{competition.name}</h1>
               <p className="text-muted mb-0">Gestionar competición</p>
             </div>
             <div className="d-flex gap-2">

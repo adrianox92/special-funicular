@@ -98,8 +98,8 @@ const TimingsList = () => {
   }
 
   return (
-    <Container className="mt-4">
-      <h2>Tabla de Tiempos</h2>
+    <Container className="py-4">
+      <h1 className="mb-2">Tabla de Tiempos</h1>
       
       <div className="mb-4">
         <Row>

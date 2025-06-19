@@ -4,6 +4,25 @@ Una aplicación web completa para gestionar tu colección de coches Scalextric y
 
 ## ✨ Características Principales
 
+### 🎨 Interfaz de Usuario Profesional
+- **Navbar moderno**: Diseño profesional con logo animado y navegación intuitiva
+- **Indicadores visuales**: Página activa resaltada con animaciones suaves
+- **Menú de usuario**: Dropdown con perfil, configuración y cerrar sesión
+- **Notificaciones**: Badge de notificaciones con animación pulsante
+- **Responsive design**: Adaptable a todos los dispositivos móviles y desktop
+- **Efectos de scroll**: Navbar que cambia su apariencia al hacer scroll
+- **Iconos modernos**: Navegación con iconos descriptivos de React Icons
+- **Sistema de diseño completo**: Variables CSS, tipografía mejorada y componentes consistentes
+- **Tarjetas de métricas profesionales**: Diseño moderno con gradientes, animaciones y efectos hover
+- **Botones mejorados**: Efectos de brillo, sombras y transiciones suaves
+- **Formularios elegantes**: Campos con bordes redondeados y estados de focus mejorados
+- **Tablas modernas**: Headers con gradientes y filas con efectos hover
+- **Modales profesionales**: Diseño limpio con sombras y bordes redondeados
+- **Scrollbar personalizada**: Estilo moderno y coherente con el diseño
+- **Animaciones globales**: Efectos de entrada y transiciones suaves en toda la aplicación
+- **Paleta de colores profesional**: Gradientes y colores consistentes
+- **Tipografía mejorada**: Jerarquía visual clara con diferentes pesos y tamaños
+
 ### 🚗 Gestión de Vehículos
 - **Catálogo completo**: Registra todos tus coches Scalextric con detalles técnicos
 - **Fotos múltiples**: Añade varias imágenes por vehículo
@@ -33,6 +52,10 @@ Una aplicación web completa para gestionar tu colección de coches Scalextric y
 - **Gráficos dinámicos**: Distribución de marcas, inversiones, modificaciones
 - **Tendencias temporales**: Evolución de tu colección
 - **Métricas de rendimiento**: Análisis de competiciones
+- **Tendencias en tiempo real**: Cálculo automático de tendencias basado en datos históricos
+- **Indicadores de progreso**: Comparación mes a mes de métricas clave
+- **Análisis de rendimiento**: Evolución de tiempos y récords
+- **Métricas de inversión**: Seguimiento de costes y valor de la colección
 
 ### 🌐 Vista Pública de Competiciones
 - **Estado en tiempo real**: Seguimiento público del progreso de competiciones

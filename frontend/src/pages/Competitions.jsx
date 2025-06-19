@@ -119,12 +119,12 @@ const Competitions = () => {
   }
 
   return (
-    <Container>
+    <Container className="py-4">
       <Row className="mb-4">
         <Col>
           <div className="d-flex justify-content-between align-items-center">
             <div>
-              <h1 className="mb-2">🏁 Mis Competiciones</h1>
+              <h1 className="mb-2">Mis Competiciones</h1>
               <p className="text-muted">Gestiona tus competiciones y participantes</p>
             </div>
             <Button 

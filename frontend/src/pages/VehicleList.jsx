@@ -243,7 +243,7 @@ const VehicleList = () => {
   return (
     <Container className="py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2>Mi Colección</h2>
+        <h1 className="mb-2">Mi Colección</h1>
         <div className="d-flex gap-2">
           <Button variant="outline-primary" onClick={exportToCSV}>
             <FiDownload className="me-2" />

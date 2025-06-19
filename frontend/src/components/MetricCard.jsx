@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import './MetricCard.css';
 
 const MetricCard = ({ 
   title, 
@@ -10,7 +11,9 @@ const MetricCard = ({
   valueColor,
   threshold,
   formatValue,
-  formatSubtitle
+  formatSubtitle,
+  trend,
+  trendValue
 }) => {
   // Determinar el color del valor basado en el contexto
   const getValueColor = () => {
@@ -33,14 +36,43 @@ const MetricCard = ({
     return 'primary';
   };
 
+  const getTrendIcon = () => {
+    if (!trend) return null;
+    switch (trend) {
+      case 'up':
+        return '↗️';
+      case 'down':
+        return '↘️';
+      case 'stable':
+        return '→';
+      default:
+        return null;
+    }
+  };
+
+  const getTrendColor = () => {
+    if (!trend) return 'secondary';
+    switch (trend) {
+      case 'up':
+        return 'success';
+      case 'down':
+        return 'danger';
+      case 'stable':
+        return 'info';
+      default:
+        return 'secondary';
+    }
+  };
+
   const renderTooltip = (props) => (
-    <Tooltip {...props}>
-      <div>
+    <Tooltip {...props} className="metric-tooltip">
+      <div className="tooltip-content">
         {details && Object.entries(details).map(([key, value]) => {
           if (value === undefined || value === null) return null;
           return (
-            <div key={key} className="mb-1">
-              <strong>{key}:</strong> {value}
+            <div key={key} className="tooltip-item">
+              <span className="tooltip-label">{key}:</span>
+              <span className="tooltip-value">{value}</span>
             </div>
           );
         })}
@@ -80,28 +112,45 @@ const MetricCard = ({
   };
 
   const cardContent = (
-    <div className="d-flex flex-column h-100">
-      <div className="d-flex align-items-center mb-2">
-        <i className={`bi ${icon} fs-4 me-2`}></i>
-        <h5 className="mb-0">{title}</h5>
+    <div className="metric-card-content">
+      {/* Header con icono y título */}
+      <div className="metric-header">
+        <div className="metric-icon-container">
+          <div className="metric-icon">
+            {icon}
+          </div>
+        </div>
+        <div className="metric-title-container">
+          <h5 className="metric-title">{title}</h5>
+          {trend && (
+            <div className={`metric-trend metric-trend-${getTrendColor()}`}>
+              <span className="trend-icon">{getTrendIcon()}</span>
+              {trendValue && <span className="trend-value">{trendValue}</span>}
+            </div>
+          )}
+        </div>
       </div>
-      <div className="mt-auto">
-        <div className={`fs-4 fw-bold text-${getValueColor()}`}>
+
+      {/* Valor principal */}
+      <div className="metric-value-container">
+        <div className={`metric-value metric-value-${getValueColor()}`}>
           {renderValue()}
         </div>
         {renderSubtitle() && (
-          <div className="text-muted mt-1">
+          <div className="metric-subtitle">
             {renderSubtitle()}
           </div>
         )}
-        {renderDetails()}
       </div>
+
+      {/* Detalles adicionales */}
+      {renderDetails()}
     </div>
   );
 
   return (
-    <Card className="h-100">
-      <Card.Body>
+    <Card className="metric-card h-100">
+      <Card.Body className="metric-card-body">
         {details && Object.values(details).some(v => v !== undefined && v !== null) ? (
           <OverlayTrigger
             placement="top"

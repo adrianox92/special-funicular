@@ -1,0 +1,302 @@
+/* ===== VEHICLE CARD PROFESIONAL ===== */
+
+.vehicle-card {
+  border: none;
+  border-radius: var(--border-radius-lg);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+
+.vehicle-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  z-index: 2;
+}
+
+.vehicle-card:hover {
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-8px);
+}
+
+.vehicle-card:hover::before {
+  opacity: 1;
+}
+
+.vehicle-card .card-img-top {
+  height: 200px;
+  object-fit: cover;
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.vehicle-card:hover .card-img-top {
+  transform: scale(1.05);
+}
+
+.vehicle-card .card-body {
+  padding: var(--spacing-lg);
+  position: relative;
+}
+
+/* Badge de modificado */
+.vehicle-card .badge.bg-dark {
+  background: var(--gradient-primary) !important;
+  color: var(--text-light);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 3;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Botones de acción */
+.vehicle-card .btn {
+  border-radius: var(--border-radius-sm);
+  font-weight: var(--font-weight-medium);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  transition: all var(--transition-normal);
+  border: none;
+  box-shadow: var(--shadow-sm);
+  z-index: 3;
+}
+
+.vehicle-card .btn-primary {
+  background: var(--gradient-primary);
+  color: var(--text-light);
+}
+
+.vehicle-card .btn-primary:hover {
+  background: var(--gradient-primary);
+  transform: scale(1.1);
+  box-shadow: var(--shadow-md);
+}
+
+.vehicle-card .btn-danger {
+  background: var(--gradient-danger);
+  color: var(--text-light);
+}
+
+.vehicle-card .btn-danger:hover {
+  background: var(--gradient-danger);
+  transform: scale(1.1);
+  box-shadow: var(--shadow-md);
+}
+
+/* Título del vehículo */
+.vehicle-card .card-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.3;
+}
+
+/* Información del fabricante */
+.vehicle-card .manufacturer-info {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.vehicle-card .reference {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Badges de tipo y tracción */
+.vehicle-card .badge.bg-secondary {
+  background: var(--gradient-secondary) !important;
+  color: var(--text-light);
+  font-weight: var(--font-weight-medium);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  margin-right: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Información de precios */
+.vehicle-card .price-container {
+  margin-bottom: var(--spacing-md);
+}
+
+.vehicle-card .original-price {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  font-size: var(--font-size-sm);
+  margin-right: var(--spacing-sm);
+}
+
+.vehicle-card .total-price {
+  color: var(--danger-color);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+}
+
+.vehicle-card .price-increment {
+  color: var(--danger-color);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--spacing-sm);
+  background: rgba(220, 53, 69, 0.1);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+}
+
+.vehicle-card .single-price {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  color: var(--primary-color);
+}
+
+/* Información de compra */
+.vehicle-card .purchase-info {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.vehicle-card .purchase-date {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+}
+
+.vehicle-card .purchase-place {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Efectos de hover adicionales */
+.vehicle-card:hover .card-title {
+  color: var(--primary-color);
+}
+
+.vehicle-card:hover .badge.bg-secondary {
+  background: var(--gradient-primary) !important;
+}
+
+/* Animación de entrada */
+.vehicle-card {
+  animation: vehicleCardFadeIn 0.6s ease;
+}
+
+@keyframes vehicleCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Efecto de carga de imagen */
+.vehicle-card .card-img-top {
+  position: relative;
+  overflow: hidden;
+}
+
+.vehicle-card .card-img-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left var(--transition-slow);
+}
+
+.vehicle-card:hover .card-img-top::before {
+  left: 100%;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .vehicle-card .card-body {
+    padding: var(--spacing-md);
+  }
+  
+  .vehicle-card .card-title {
+    font-size: var(--font-size-base);
+  }
+  
+  .vehicle-card .total-price,
+  .vehicle-card .single-price {
+    font-size: var(--font-size-base);
+  }
+  
+  .vehicle-card .btn {
+    padding: var(--spacing-xs);
+    font-size: var(--font-size-xs);
+  }
+}
+
+@media (max-width: 576px) {
+  .vehicle-card {
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .vehicle-card .card-img-top {
+    height: 150px;
+  }
+  
+  .vehicle-card .badge.bg-secondary {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+}
+
+/* Variantes especiales */
+.vehicle-card.vehicle-card-premium {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.vehicle-card.vehicle-card-premium .card-title,
+.vehicle-card.vehicle-card-premium .manufacturer-info {
+  color: var(--text-light);
+}
+
+.vehicle-card.vehicle-card-premium .badge.bg-secondary {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: var(--text-light);
+}
+
+.vehicle-card.vehicle-card-premium .purchase-info {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Efecto de pulso para vehículos destacados */
+.vehicle-card.vehicle-card-featured {
+  animation: vehicleCardPulse 2s ease-in-out infinite;
+}
+
+@keyframes vehicleCardPulse {
+  0%, 100% {
+    box-shadow: var(--shadow-sm);
+  }
+  50% {
+    box-shadow: var(--shadow-lg), 0 0 20px rgba(0, 123, 255, 0.3);
+  }
+} 
