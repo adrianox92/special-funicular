@@ -80,6 +80,80 @@ const { calculatePoints } = require('../lib/pointsCalculator');
  *           application/json:
  *             schema:
  *               type: object
+ *
+ * /api/public-signup/{slug}/presentation:
+ *   get:
+ *     summary: Obtiene datos específicos para el modo presentación
+ *     tags:
+ *       - Competiciones Públicas
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Slug público de la competición
+ *     responses:
+ *       200:
+ *         description: Datos de presentación de la competición
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 competition:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     circuit_name:
+ *                       type: string
+ *                     rounds:
+ *                       type: integer
+ *                     status:
+ *                       type: string
+ *                     created_at:
+ *                       type: string
+ *                 participants:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       driver_name:
+ *                         type: string
+ *                       team_name:
+ *                         type: string
+ *                       vehicle_name:
+ *                         type: string
+ *                       vehicle_brand:
+ *                         type: string
+ *                       total_time_timestamp:
+ *                         type: number
+ *                       penalties:
+ *                         type: number
+ *                       best_lap:
+ *                         type: string
+ *                       position:
+ *                         type: integer
+ *                       rounds:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             round_number:
+ *                               type: integer
+ *                             time_timestamp:
+ *                               type: number
+ *                             penalty_seconds:
+ *                               type: number
+ *       404:
+ *         description: Competición no encontrada
+ *       500:
+ *         description: Error interno del servidor
  */
 
 // Ruta de prueba simple
@@ -424,6 +498,136 @@ router.get('/:slug/rules', async (req, res) => {
 
     res.json(rules || []);
   } catch (error) {
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Endpoint específico para el modo presentación
+router.get('/:slug/presentation', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    
+    // Obtener la competición por public_slug
+    const { data: competition, error: compError } = await supabase
+      .from('competitions')
+      .select(`
+        id,
+        name,
+        num_slots,
+        rounds,
+        circuit_name,
+        created_at
+      `)
+      .eq('public_slug', slug)
+      .single();
+
+    if (compError || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    // Obtener participantes oficiales
+    const { data: participants, error: partError } = await supabase
+      .from('competition_participants')
+      .select(`
+        id,
+        driver_name,
+        vehicle_model,
+        vehicles(model, manufacturer)
+      `)
+      .eq('competition_id', competition.id)
+      .order('created_at', { ascending: true });
+
+    if (partError) {
+      console.error('Error al obtener participantes:', partError);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
+    // Obtener todos los tiempos registrados
+    const { data: timings, error: timingsError } = await supabase
+      .from('competition_timings')
+      .select(`
+        id,
+        participant_id,
+        round_number,
+        best_lap_time,
+        total_time,
+        laps,
+        average_time,
+        lane,
+        timing_date,
+        penalty_seconds
+      `)
+      .in('participant_id', participants.map(p => p.id))
+      .order('round_number', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (timingsError) {
+      console.error('Error al obtener tiempos:', timingsError);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
+    // Obtener reglas de puntuación
+    const { data: rules, error: rulesError } = await supabase
+      .from('competition_rules')
+      .select('*')
+      .eq('competition_id', competition.id);
+    
+    if (rulesError) {
+      console.error('Error al obtener reglas:', rulesError);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
+    // Calcular puntos y stats usando la función centralizada
+    const { sortedParticipants } = calculatePoints({
+      competition,
+      participants,
+      timings,
+      rules
+    });
+
+    // Transformar datos para el modo presentación
+    const presentationParticipants = sortedParticipants.map(participant => {
+      // Agrupar tiempos por ronda
+      const rounds = [];
+      for (let i = 1; i <= competition.rounds; i++) {
+        const roundTiming = participant.timings.find(t => t.round_number === i);
+        rounds.push({
+          round_number: i,
+          time_timestamp: roundTiming ? 
+            (parseFloat(roundTiming.total_time.split(':')[0]) * 60 + parseFloat(roundTiming.total_time.split(':')[1])) : null,
+          penalty_seconds: roundTiming ? Number(roundTiming.penalty_seconds) || 0 : 0
+        });
+      }
+
+      return {
+        id: participant.participant_id,
+        driver_name: participant.driver_name,
+        vehicle_name: participant.vehicle_info.split(' ').slice(1).join(' '), // Modelo
+        vehicle_brand: participant.vehicle_info.split(' ')[0], // Fabricante
+        total_time_timestamp: participant.total_time_seconds,
+        penalties: participant.penalty_seconds,
+        best_lap: participant.best_lap_time ? 
+          (parseFloat(participant.best_lap_time.split(':')[0]) * 60 + parseFloat(participant.best_lap_time.split(':')[1])) : null,
+        position: participant.position,
+        rounds: rounds
+      };
+    });
+
+    // Preparar respuesta
+    const response = {
+      competition: {
+        id: competition.id,
+        name: competition.name,
+        circuit_name: competition.circuit_name,
+        rounds: competition.rounds,
+        created_at: competition.created_at
+      },
+      participants: presentationParticipants
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error en GET /public-signup/:slug/presentation:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

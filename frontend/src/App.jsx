@@ -13,6 +13,7 @@ import CompetitionParticipants from './pages/CompetitionParticipants';
 import CompetitionTimings from './pages/CompetitionTimings';
 import CompetitionSignup from './pages/CompetitionSignup';
 import CompetitionStatus from './pages/CompetitionStatus';
+import CompetitionPresentation from './pages/CompetitionPresentation';
 import Login from './components/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -66,6 +67,7 @@ const AppContent = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
+        <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
         <Route path="/*" element={<ProtectedLayout />} />
       </Routes>
     </div>

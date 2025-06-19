@@ -19,6 +19,15 @@ Una aplicación web completa para gestionar tu colección de coches Scalextric y
 - **Clasificaciones automáticas**: Rankings en tiempo real
 - **Exportación de datos**: Descarga resultados en CSV
 
+### 🖥️ Modo Presentación (Live TV View)
+- **Vista fullscreen**: Diseño optimizado para proyectores y pantallas grandes
+- **Ranking en vivo**: Clasificación actualizada automáticamente cada 10 segundos
+- **Mejor vuelta destacada**: Visualización prominente del tiempo más rápido
+- **Progreso por rondas**: Grid visual del estado de cada participante por ronda
+- **Sin controles de usuario**: Interfaz limpia para presentaciones públicas
+- **URL dedicada**: Acceso directo via `/competitions/presentation/:slug`
+- **Diseño responsive**: Adaptable a diferentes tamaños de pantalla
+
 ### 📊 Análisis y Estadísticas
 - **Dashboard interactivo**: Vista general de tu colección
 - **Gráficos dinámicos**: Distribución de marcas, inversiones, modificaciones
@@ -31,6 +40,7 @@ Una aplicación web completa para gestionar tu colección de coches Scalextric y
 - **Estadísticas detalladas**: Mejores vueltas, tiempos totales, progreso
 - **Diseño responsive**: Accesible desde cualquier dispositivo
 - **URLs públicas**: Enlaces directos para compartir con espectadores
+- **Modo presentación**: Vista especial para proyectores y pantallas grandes
 
 ## 🚀 Tecnologías Utilizadas
 
@@ -149,12 +159,90 @@ npm start
 - **En Curso**: Muestra progreso y tiempos parciales
 - **Finalizada**: Muestra clasificación final y estadísticas completas
 
+## 🖥️ Modo Presentación (Live TV View)
+
+### Características del Modo Presentación
+El Modo Presentación es una vista especial diseñada para proyectar competiciones en tiempo real en pantallas grandes, proyectores o televisores.
+
+### Acceso al Modo Presentación
+1. **Desde la vista pública**: Haz clic en el botón "Modo Presentación" en la página de estado
+2. **URL directa**: `http://localhost:3000/competitions/presentation/nombre-competicion`
+3. **Sin autenticación**: Acceso público directo
+
+### Elementos de la Interfaz
+
+#### Header de Competición
+- **Nombre de la competición**: Título grande y prominente
+- **Información de rondas**: Número total de rondas
+- **Categoría**: Si aplica
+- **Estado**: Badge con estado actual (En Curso/Finalizada/Pendiente)
+- **Circuito**: Nombre del circuito si está configurado
+
+#### Ranking en Vivo
+- **Tabla de clasificación**: Ordenada por tiempo total + penalizaciones
+- **Columnas**: Posición, Piloto, Vehículo, Tiempo Total, Penalización, Mejor Vuelta
+- **Posiciones destacadas**: Oro, plata y bronce con colores especiales
+- **Actualización automática**: Cada 10 segundos
+
+#### Mejor Vuelta Destacada
+- **Tiempo más rápido**: Visualización prominente del mejor tiempo
+- **Información del piloto**: Nombre y equipo
+- **Información del vehículo**: Modelo y marca
+- **Badge especial**: Indicador visual de "Mejor Vuelta"
+
+#### Grid de Progreso por Rondas
+- **Vista de progreso**: Estado de cada participante por ronda
+- **Iconos de estado**: 
+  - ✅ Completada (verde)
+  - ⏳ En progreso (naranja con animación)
+  - ⏸️ Pendiente (gris)
+- **Tiempos por ronda**: Muestra el tiempo registrado en cada ronda
+- **Leyenda**: Explicación de los iconos de estado
+
+### Características Técnicas
+
+#### Diseño Fullscreen
+- **100vh x 100vw**: Ocupa toda la pantalla
+- **Sin scroll**: Todo el contenido visible sin desplazamiento
+- **Texto grande**: Optimizado para lectura desde lejos
+- **Contraste alto**: Fondo oscuro con texto claro
+
+#### Auto-actualización
+- **Polling cada 10 segundos**: Actualización automática de datos
+- **Sin interacción requerida**: Funciona de forma autónoma
+- **Indicadores visuales**: Estados de carga y error
+
+#### Responsive Design
+- **Adaptable**: Se ajusta a diferentes tamaños de pantalla
+- **Layout flexible**: Cambia de horizontal a vertical según el espacio
+- **Optimizado para TV**: Texto y elementos escalables
+
+### Casos de Uso
+
+#### Competiciones en Vivo
+- **Proyección en eventos**: Mostrar progreso en tiempo real
+- **Pantallas de información**: En salas de espera o áreas públicas
+- **Streaming**: Para transmisiones en vivo
+
+#### Análisis Post-competición
+- **Revisión de resultados**: Visualización clara de clasificaciones
+- **Presentaciones**: Para mostrar resultados a patrocinadores o público
+- **Archivo**: Guardar capturas de pantalla para documentación
+
+### Personalización
+- **Paleta de colores**: Fondo degradado azul-morado
+- **Acentos dorados**: Para elementos destacados
+- **Animaciones**: Efectos sutiles para mejor experiencia visual
+- **Tipografía**: Fuente optimizada para legibilidad
+
 ## 🔧 API Endpoints
 
 ### Rutas Públicas
 - `GET /api/public/:slug` - Información de competición para inscripción
 - `GET /api/public/:slug/signup` - Inscripción pública
 - `GET /api/public/:slug/status` - Estado público de la competición
+- `GET /api/public-signup/:slug/presentation` - Datos específicos para modo presentación
+- `GET /competitions/presentation/:slug` - Modo presentación (Live TV View)
 
 ### Rutas Protegidas
 - `GET /api/competitions/my-competitions` - Mis competiciones
@@ -302,6 +390,41 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 
 ## 🔄 Actualizaciones Recientes
 
+### v1.7.0 - Modo Presentación (Live TV View)
+- ✅ **Nueva Vista Fullscreen**: Diseño optimizado para proyectores y pantallas grandes
+- ✅ **Ranking en Vivo**: Clasificación actualizada automáticamente cada 10 segundos
+- ✅ **Mejor Vuelta Destacada**: Visualización prominente del tiempo más rápido
+- ✅ **Grid de Progreso por Rondas**: Vista visual del estado de cada participante
+- ✅ **URL Dedicada**: Acceso directo via `/competitions/presentation/:slug`
+- ✅ **Sin Controles de Usuario**: Interfaz limpia para presentaciones públicas
+- ✅ **Diseño Responsive**: Adaptable a diferentes tamaños de pantalla
+- ✅ **Auto-actualización**: Polling automático sin interacción requerida
+- ✅ **Endpoint Backend Específico**: `/api/public-signup/:slug/presentation` optimizado para presentación
+
+**Archivos Creados:**
+- `frontend/src/pages/CompetitionPresentation.jsx` - Página principal del modo presentación
+- `frontend/src/components/presentation/CompetitionHeader.jsx` - Header de competición
+- `frontend/src/components/presentation/LiveRankingTable.jsx` - Tabla de ranking en vivo
+- `frontend/src/components/presentation/RoundProgressGrid.jsx` - Grid de progreso por rondas
+- `frontend/src/components/presentation/BestLapHighlight.jsx` - Destacado de mejor vuelta
+- `frontend/src/pages/CompetitionPresentation.css` - Estilos fullscreen para presentación
+
+**Archivos Modificados:**
+- `frontend/src/App.jsx` - Nueva ruta para modo presentación
+- `frontend/src/pages/CompetitionStatus.jsx` - Botón para acceder al modo presentación
+- `backend/routes/publicCompetitions.js` - Nuevo endpoint `/presentation` con datos optimizados
+- `readme.md` - Documentación completa del nuevo modo
+
+**Características Técnicas:**
+1. **Diseño Fullscreen**: 100vh x 100vw sin scroll
+2. **Auto-actualización**: Polling cada 10 segundos
+3. **Paleta Oscura**: Fondo degradado azul-morado con acentos dorados
+4. **Posiciones Destacadas**: Oro, plata y bronce con colores especiales
+5. **Estados Visuales**: Iconos para completado, en progreso y pendiente
+6. **Responsive Design**: Layout adaptable a diferentes pantallas
+7. **Endpoint Optimizado**: Datos transformados específicamente para presentación
+8. **Documentación Swagger**: API documentada para el nuevo endpoint
+
 ### v1.4.0 - Corrección de Bug: Campo category_id en Participantes
 - ✅ **Problema Resuelto**: El campo `category_id` ahora se guarda correctamente en la base de datos
 - ✅ **Validación Mejorada**: Verificación de que la categoría existe antes de asignar participantes
@@ -362,22 +485,3 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 3. **Cálculo Unificado**: Ambos componentes usan la misma lógica de cálculo del backend
 4. **Penalizaciones**: Los puntos ahora consideran las penalizaciones aplicadas a los tiempos
 5. **Bonus**: El bonus por mejor vuelta se aplica correctamente usando `use_bonus_best_lap`
-
-## 🎯 Sistema de Puntuación
-
-El sistema de puntuación calcula automáticamente los puntos basándose en las reglas configuradas:
-
-### Tipos de Reglas
-- **Por Ronda**: Puntos por posición en cada ronda individual
-- **Final**: Puntos por posición en la clasificación final
-- **Bonus por Mejor Vuelta**: 1 punto adicional al piloto con la mejor vuelta de cada ronda
-
-### Cálculo de Puntos
-- **Puntos por Ronda**: Se asignan según la posición en cada ronda (considerando penalizaciones)
-- **Puntos Finales**: Se asignan según la posición en la clasificación general (considerando penalizaciones)
-- **Bonus**: 1 punto adicional por mejor vuelta de ronda (sin empates)
-
-### Consideraciones Importantes
-- Las penalizaciones se consideran tanto en el cálculo de puntos por ronda como en la clasificación final
-- Los puntos se calculan automáticamente en el backend y se muestran en tiempo real
-- El cálculo es consistente entre las vistas de tiempos y estado de competición

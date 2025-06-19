@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Container, Row, Col, Card, Badge, ProgressBar, Table, Alert, 
   Spinner, Button, Modal
 } from 'react-bootstrap';
 import { 
   FaTrophy, FaUsers, FaFlag, FaClock, FaCheck, FaExclamationTriangle,
-  FaDownload, FaFilePdf, FaMedal, FaStar, FaRoute
+  FaDownload, FaFilePdf, FaMedal, FaStar, FaRoute, FaTv
 } from 'react-icons/fa';
 import axios from '../lib/axios';
 
 const CompetitionStatus = () => {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [competitionData, setCompetitionData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -69,6 +70,10 @@ const CompetitionStatus = () => {
   const handleExportPdf = () => {
     setShowPdfModal(true);
     // Aquí se implementaría la lógica de exportación PDF
+  };
+
+  const handlePresentationMode = () => {
+    navigate(`/competitions/presentation/${slug}`);
   };
 
   // Función para convertir mm:ss.mmm a segundos
@@ -256,16 +261,26 @@ const CompetitionStatus = () => {
             <FaTrophy className="me-2" />
             Clasificación General
           </h5>
-          {status.is_completed && (
+          <div className="d-flex gap-2">
             <Button 
-              variant="outline-primary" 
+              variant="outline-success" 
               size="sm"
-              onClick={handleExportPdf}
+              onClick={handlePresentationMode}
             >
-              <FaDownload className="me-1" />
-              Exportar PDF
+              <FaTv className="me-1" />
+              Modo Presentación
             </Button>
-          )}
+            {status.is_completed && (
+              <Button 
+                variant="outline-primary" 
+                size="sm"
+                onClick={handleExportPdf}
+              >
+                <FaDownload className="me-1" />
+                Exportar PDF
+              </Button>
+            )}
+          </div>
         </Card.Header>
         <Card.Body>
           {participants.length > 0 ? (
