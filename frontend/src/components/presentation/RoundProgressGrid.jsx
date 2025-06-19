@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaCheckCircle, FaClock, FaPause, FaListOl } from 'react-icons/fa';
 
 const RoundProgressGrid = ({ competition, participants }) => {
   const formatTime = (timestamp) => {
@@ -26,12 +27,12 @@ const RoundProgressGrid = ({ competition, participants }) => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
-        return '✅';
+        return <FaCheckCircle />;
       case 'in-progress':
-        return '⏳';
+        return <FaClock />;
       case 'pending':
       default:
-        return '⏸️';
+        return <FaPause />;
     }
   };
 
@@ -49,7 +50,10 @@ const RoundProgressGrid = ({ competition, participants }) => {
 
   return (
     <div className="round-progress-grid">
-      <h2 className="grid-title">Progreso por Rondas</h2>
+      <h2 className="grid-title">
+        <FaListOl className="grid-icon" />
+        Progreso por Rondas
+      </h2>
       
       <div className="grid-container">
         <div className="grid-header">
@@ -66,7 +70,7 @@ const RoundProgressGrid = ({ competition, participants }) => {
             <div key={participant.id} className="participant-row">
               <div className="participant-cell">
                 <div className="participant-info">
-                  <span className="participant-name">{participant.driver_name} </span>
+                  <span className="participant-name">{participant.driver_name}</span>
                   <span className="participant-vehicle">{participant.vehicle_name}</span>
                 </div>
               </div>
@@ -96,15 +100,15 @@ const RoundProgressGrid = ({ competition, participants }) => {
       
       <div className="grid-legend">
         <div className="legend-item">
-          <span className="legend-icon">✅</span>
+          <FaCheckCircle className="legend-icon" />
           <span className="legend-text">Completada</span>
         </div>
         <div className="legend-item">
-          <span className="legend-icon">⏳</span>
+          <FaClock className="legend-icon" />
           <span className="legend-text">En progreso</span>
         </div>
         <div className="legend-item">
-          <span className="legend-icon">⏸️</span>
+          <FaPause className="legend-icon" />
           <span className="legend-text">Pendiente</span>
         </div>
       </div>

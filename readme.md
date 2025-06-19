@@ -5,6 +5,7 @@ Una aplicación web completa para gestionar tu colección de coches Scalextric y
 ## ✨ Características Principales
 
 ### 🎨 Interfaz de Usuario Profesional
+- **Página principal atractiva**: Landing page minimalista y profesional para usuarios no logueados
 - **Navbar moderno**: Diseño profesional con logo animado y navegación intuitiva
 - **Indicadores visuales**: Página activa resaltada con animaciones suaves
 - **Menú de usuario**: Dropdown con perfil, configuración y cerrar sesión
@@ -23,6 +24,18 @@ Una aplicación web completa para gestionar tu colección de coches Scalextric y
 - **Paleta de colores profesional**: Gradientes y colores consistentes
 - **Tipografía mejorada**: Jerarquía visual clara con diferentes pesos y tamaños
 
+### 🏠 Página Principal (Landing Page)
+- **Diseño minimalista**: Interfaz limpia y profesional para usuarios no logueados
+- **Hero section atractivo**: Título con gradiente, descripción clara y botones de acción
+- **Elementos visuales**: Tarjetas flotantes con iconos representativos de las funcionalidades
+- **Sección de características**: Grid de 6 funcionalidades principales con iconos y descripciones
+- **Call-to-action**: Sección destacada para motivar el registro
+- **Footer informativo**: Enlaces útiles y información de la plataforma
+- **Navegación intuitiva**: Botones que llevan directamente al login/registro
+- **Responsive design**: Adaptable a todos los tamaños de pantalla
+- **Efectos visuales**: Animaciones suaves y efectos hover elegantes
+- **Colores coherentes**: Paleta de colores consistente con el resto de la aplicación
+
 ### 🚗 Gestión de Vehículos
 - **Catálogo completo**: Registra todos tus coches Scalextric con detalles técnicos
 - **Fotos múltiples**: Añade varias imágenes por vehículo
@@ -39,153 +52,9 @@ Una aplicación web completa para gestionar tu colección de coches Scalextric y
 - **Exportación de datos**: Descarga resultados en CSV
 
 ### 🖥️ Modo Presentación (Live TV View)
-- **Vista fullscreen**: Diseño optimizado para proyectores y pantallas grandes
-- **Ranking en vivo**: Clasificación actualizada automáticamente cada 10 segundos
-- **Mejor vuelta destacada**: Visualización prominente del tiempo más rápido
-- **Progreso por rondas**: Grid visual del estado de cada participante por ronda
-- **Sin controles de usuario**: Interfaz limpia para presentaciones públicas
-- **URL dedicada**: Acceso directo via `/competitions/presentation/:slug`
-- **Diseño responsive**: Adaptable a diferentes tamaños de pantalla
-
-### 📊 Análisis y Estadísticas
-- **Dashboard interactivo**: Vista general de tu colección
-- **Gráficos dinámicos**: Distribución de marcas, inversiones, modificaciones
-- **Tendencias temporales**: Evolución de tu colección
-- **Métricas de rendimiento**: Análisis de competiciones
-- **Tendencias en tiempo real**: Cálculo automático de tendencias basado en datos históricos
-- **Indicadores de progreso**: Comparación mes a mes de métricas clave
-- **Análisis de rendimiento**: Evolución de tiempos y récords
-- **Métricas de inversión**: Seguimiento de costes y valor de la colección
-
-### 🌐 Vista Pública de Competiciones
-- **Estado en tiempo real**: Seguimiento público del progreso de competiciones
-- **Clasificación general**: Ranking actualizado automáticamente
-- **Estadísticas detalladas**: Mejores vueltas, tiempos totales, progreso
-- **Diseño responsive**: Accesible desde cualquier dispositivo
-- **URLs públicas**: Enlaces directos para compartir con espectadores
-- **Modo presentación**: Vista especial para proyectores y pantallas grandes
-
-## 🚀 Tecnologías Utilizadas
-
-### Frontend
-- **React 18** - Biblioteca de interfaz de usuario
-- **React Bootstrap** - Componentes UI responsivos
-- **React Router** - Navegación entre páginas
-- **Chart.js** - Gráficos interactivos
-- **Axios** - Cliente HTTP
-
-### Backend
-- **Node.js** - Runtime de JavaScript
-- **Express.js** - Framework web
-- **Supabase** - Base de datos PostgreSQL y autenticación
-- **Multer** - Manejo de archivos
-- **JWT** - Autenticación de tokens
-
-### Base de Datos
-- **PostgreSQL** - Base de datos relacional
-- **Supabase Auth** - Sistema de autenticación
-- **Storage** - Almacenamiento de imágenes
-
-## 📱 Características de la Vista Pública
-
-### Estado "En Curso"
-- **Indicador de progreso**: Porcentaje de completitud de la competición
-- **Información general**: Nombre, circuito, número de participantes y rondas
-- **Tabla de participantes**: 
-  - Piloto y vehículo
-  - Vueltas registradas por ronda
-  - Tiempo acumulado (si disponible)
-  - Estado de progreso individual
-
-### Estado "Finalizada"
-- **Clasificación general**: Ranking final con posiciones
-- **Mejor vuelta global**: Tiempo más rápido de toda la competición
-- **Estadísticas completas**: Tiempos totales, diferencias, vueltas
-- **Opción de exportación**: Descarga de resultados en PDF (en desarrollo)
-
-### Características Técnicas
-- **URLs amigables**: Enlaces tipo `/competitions/status/nombre-competicion`
-- **Actualización en tiempo real**: Datos siempre actualizados
-- **Diseño responsive**: Optimizado para móviles y tablets
-- **Sin autenticación requerida**: Acceso público directo
-
-## 🛠️ Instalación y Configuración
-
-### Prerrequisitos
-- Node.js (v16 o superior)
-- npm o yarn
-- Cuenta en Supabase
-
-### 1. Clonar el repositorio
-```bash
-git clone https://github.com/tu-usuario/scalextric-collection.git
-cd scalextric-collection
-```
-
-### 2. Configurar variables de entorno
-Crear archivo `.env` en la raíz del proyecto:
-```env
-SUPABASE_URL=tu_url_de_supabase
-SUPABASE_KEY=tu_clave_anonima_de_supabase
-JWT_SECRET=tu_secreto_jwt
-```
-
-### 3. Instalar dependencias
-```bash
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
-```
-
-### 4. Configurar la base de datos
-Ejecutar los scripts SQL en Supabase:
-- `add-slug-column.sql`
-- `add-public-slug-column.sql`
-
-### 5. Ejecutar migraciones
-```bash
-cd backend
-node scripts/migrate-add-slug.js
-node scripts/migrate-insert-templates.js
-```
-
-### 6. Iniciar la aplicación
-```bash
-# Backend (puerto 3001)
-cd backend
-npm start
-
-# Frontend (puerto 3000)
-cd frontend
-npm start
-```
-
-## 📖 Uso de la Vista Pública
-
-### Acceso a la Vista Pública
-1. **Obtener el enlace**: Desde la página de competición, copia el enlace público
-2. **Compartir**: Envía el enlace a participantes y espectadores
-3. **Acceso directo**: URL tipo: `http://localhost:3000/competitions/status/nombre-competicion`
-
-### Información Mostrada
-- **Header**: Nombre de la competición, estado, circuito
-- **Estadísticas**: Participantes, rondas, tiempos registrados, progreso
-- **Mejor vuelta**: Tiempo más rápido de toda la competición
-- **Clasificación**: Tabla ordenada por posición y tiempo total
-- **Detalles**: Información individual de cada participante
-
-### Estados de la Competición
-- **En Curso**: Muestra progreso y tiempos parciales
-- **Finalizada**: Muestra clasificación final y estadísticas completas
-
-## 🖥️ Modo Presentación (Live TV View)
 
 ### Características del Modo Presentación
-El Modo Presentación es una vista especial diseñada para proyectar competiciones en tiempo real en pantallas grandes, proyectores o televisores.
+El Modo Presentación es una vista especial diseñada para proyectar competiciones en tiempo real en pantallas grandes, proyectores o televisores. **Actualizado con el nuevo sistema de diseño profesional**.
 
 ### Acceso al Modo Presentación
 1. **Desde la vista pública**: Haz clic en el botón "Modo Presentación" en la página de estado
@@ -195,32 +64,55 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
 ### Elementos de la Interfaz
 
 #### Header de Competición
-- **Nombre de la competición**: Título grande y prominente
-- **Información de rondas**: Número total de rondas
-- **Categoría**: Si aplica
-- **Estado**: Badge con estado actual (En Curso/Finalizada/Pendiente)
-- **Circuito**: Nombre del circuito si está configurado
+- **Nombre de la competición**: Título grande con icono de trofeo y gradiente profesional
+- **Información de rondas**: Badge con icono de bandera y número de rondas
+- **Categoría**: Badge con icono de usuarios si aplica
+- **Estado de competición**: Badge con colores distintivos (En Curso, Finalizada, Pendiente)
+- **Circuito**: Información del circuito con icono de bandera a cuadros
+- **Diseño moderno**: Tarjeta con efectos de glassmorphism y sombras profesionales
 
 #### Ranking en Vivo
-- **Tabla de clasificación**: Ordenada por tiempo total + penalizaciones
-- **Columnas**: Posición, Piloto, Vehículo, Tiempo Total, Penalización, Mejor Vuelta
-- **Posiciones destacadas**: Oro, plata y bronce con colores especiales
-- **Actualización automática**: Cada 10 segundos
+- **Tabla profesional**: Diseño moderno con headers sticky y efectos hover
+- **Posiciones destacadas**: Colores especiales para oro, plata y bronce
+- **Información completa**: Piloto, equipo, vehículo, tiempo total, penalizaciones
+- **Mejor vuelta**: Tiempo más rápido con color destacado
+- **Diferencias**: Gap con líder y anterior en formato profesional
+- **Tipografía monospace**: Tiempos con fuente Courier New para mejor legibilidad
+- **Animaciones**: Efectos de hover y transiciones suaves
 
-#### Mejor Vuelta Destacada
-- **Tiempo más rápido**: Visualización prominente del mejor tiempo
-- **Información del piloto**: Nombre y equipo
-- **Información del vehículo**: Modelo y marca
-- **Badge especial**: Indicador visual de "Mejor Vuelta"
+#### Mejor Vuelta Highlight
+- **Diseño prominente**: Tarjeta con gradiente verde y efectos de sombra
+- **Iconos descriptivos**: Iconos de React Icons para tiempo, piloto y vehículo
+- **Información detallada**: Tiempo, piloto, equipo y vehículo del mejor tiempo
+- **Badge especial**: Indicador "Mejor Vuelta" con icono de trofeo
+- **Estados vacíos**: Mensaje elegante cuando no hay tiempos registrados
 
-#### Grid de Progreso por Rondas
-- **Vista de progreso**: Estado de cada participante por ronda
+#### Progreso por Rondas
+- **Grid visual**: Tabla con estado de cada participante por ronda
 - **Iconos de estado**: 
-  - ✅ Completada (verde)
-  - ⏳ En progreso (naranja con animación)
+  - ✅ Completada (verde con efecto de sombra)
+  - ⏳ En progreso (amarillo con animación pulsante)
   - ⏸️ Pendiente (gris)
-- **Tiempos por ronda**: Muestra el tiempo registrado en cada ronda
-- **Leyenda**: Explicación de los iconos de estado
+- **Tiempos por ronda**: Visualización de tiempos cuando están disponibles
+- **Leyenda interactiva**: Explicación de iconos con efectos hover
+- **Diseño responsive**: Adaptable a diferentes tamaños de pantalla
+
+### Características del Nuevo Diseño
+- **Sistema de variables CSS**: Colores, espaciados y tipografía consistentes
+- **Efectos de glassmorphism**: Fondos con blur y transparencias
+- **Gradientes profesionales**: Colores modernos y atractivos
+- **Animaciones suaves**: Transiciones y efectos hover elegantes
+- **Iconografía moderna**: React Icons en lugar de emojis
+- **Tipografía mejorada**: Jerarquía visual clara y legible
+- **Responsive design**: Adaptable a todos los tamaños de pantalla
+- **Efectos de profundidad**: Sombras y bordes que crean sensación de capas
+- **Paleta de colores coherente**: Uso consistente de colores en toda la aplicación
+
+### Estados de Carga y Error
+- **Loading profesional**: Spinner con colores del tema y mensaje descriptivo
+- **Manejo de errores**: Alertas elegantes con información clara
+- **Estados vacíos**: Mensajes informativos cuando no hay datos
+- **Fondos dinámicos**: Gradientes y efectos visuales en todos los estados
 
 ### Características Técnicas
 

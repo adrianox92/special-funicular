@@ -70,7 +70,7 @@ const Navbar = () => {
         <BootstrapNavbar.Brand as={Link} to="/" className="brand-container">
           <div className="logo-container">
             <FaTrophy className="logo-icon" />
-            <span className="logo-text">Scalextric</span>
+            <span className="logo-text">Slot Database</span>
             <Badge bg="primary" className="logo-badge">Pro</Badge>
           </div>
         </BootstrapNavbar.Brand>

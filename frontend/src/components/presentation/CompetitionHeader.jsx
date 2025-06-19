@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaTrophy, FaFlag, FaCalendarAlt, FaUsers } from 'react-icons/fa';
 
 const CompetitionHeader = ({ competition }) => {
   const getStatusText = (status) => {
@@ -31,17 +32,24 @@ const CompetitionHeader = ({ competition }) => {
     <div className="competition-header">
       <div className="header-content">
         <div className="header-main">
-          <h1 className="competition-title">Competición: {competition.name}</h1>
+          <h1 className="competition-title">
+            <FaTrophy className="title-icon" />
+            {competition.name}
+          </h1>
           <div className="competition-meta">
             <span className="rounds-info">
+              <FaFlag className="meta-icon" />
               {competition.rounds} {competition.rounds === 1 ? 'Ronda' : 'Rondas'}
             </span>
             {competition.category && (
               <span className="category-info">
+                <FaUsers className="meta-icon" />
                 {competition.category}
               </span>
             )}
-            
+            <span className={`status-badge ${getStatusClass(competition.status)}`}>
+              {getStatusText(competition.status)}
+            </span>
           </div>
         </div>
         

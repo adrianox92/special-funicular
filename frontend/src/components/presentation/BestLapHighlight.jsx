@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaTrophy, FaClock, FaUser, FaCar, FaTimes } from 'react-icons/fa';
 
 const BestLapHighlight = ({ bestLap, participant }) => {
   // Formatea mejor vuelta (float o string) a mm:ss.mmm
@@ -16,10 +17,13 @@ const BestLapHighlight = ({ bestLap, participant }) => {
   if (!bestLap || !participant) {
     return (
       <div className="best-lap-highlight">
-        <h2 className="highlight-title">Mejor Vuelta</h2>
+        <h2 className="highlight-title">
+          <FaTrophy className="highlight-icon" />
+          Mejor Vuelta
+        </h2>
         <div className="highlight-content">
           <div className="no-best-lap">
-            <span className="no-lap-icon">⏱️</span>
+            <FaTimes className="no-lap-icon" />
             <p className="no-lap-text">Sin tiempos registrados</p>
           </div>
         </div>
@@ -29,33 +33,38 @@ const BestLapHighlight = ({ bestLap, participant }) => {
 
   return (
     <div className="best-lap-highlight">
-      <h2 className="highlight-title">🏆 Mejor Vuelta</h2>
+      <h2 className="highlight-title">
+        <FaTrophy className="highlight-icon" />
+        Mejor Vuelta
+      </h2>
       
       <div className="highlight-content">
         <div className="best-lap-info">
           <div className="best-lap-time">
-            <span className="time-label">Tiempo</span>
-            <span className="time-value">{formatBestLap(bestLap)}</span>
+            <p className="time-label">
+              <FaClock className="label-icon" />
+              Tiempo <span className="time-value">{formatBestLap(bestLap)}</span>
+            </p>
+            
           </div>
           
           <div className="best-lap-pilot">
-            <span className="pilot-label">Piloto</span>
-            <span className="pilot-name">{participant.driver_name}</span>
+            <p className="pilot-label">
+              <FaUser className="label-icon" />
+              Piloto <span className="pilot-name">{participant.driver_name}</span>
+            </p>
+            
             {participant.team_name && (
               <span className="team-name">{participant.team_name}</span>
             )}
           </div>
           
-          <div className="best-lap-vehicle">
-            <span className="vehicle-label">Vehículo</span>
-            <span className="vehicle-name">{participant.vehicle_name}</span>
-            <span className="vehicle-brand">{participant.vehicle_brand}</span>
+          <div className="best-lap-vehicle pb-2">
+            <p className="vehicle-label">
+              <FaCar className="label-icon" />
+              Vehículo <span className="vehicle-brand">{participant.vehicle_brand}</span> <span className="vehicle-name">{participant.vehicle_name} </span>
+            </p>            
           </div>
-        </div>
-        
-        <div className="best-lap-badge">
-          <span className="badge-icon">🏆</span>
-          <span className="badge-text">Mejor Vuelta</span>
         </div>
       </div>
     </div>

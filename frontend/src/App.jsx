@@ -15,6 +15,7 @@ import CompetitionSignup from './pages/CompetitionSignup';
 import CompetitionStatus from './pages/CompetitionStatus';
 import CompetitionPresentation from './pages/CompetitionPresentation';
 import Login from './components/Login';
+import LandingPage from './pages/LandingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 
@@ -33,9 +34,9 @@ const ProtectedLayout = () => {
     );
   }
 
-  // Si no hay usuario, redirigir al login
+  // Si no hay usuario, redirigir a la página principal
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // Si hay usuario, mostrar el layout protegido
@@ -61,14 +62,35 @@ const ProtectedLayout = () => {
 
 // Componente principal de la aplicación
 const AppContent = () => {
+  const { user, loading } = useAuth();
+
+  // Si está cargando, mostrar un spinner
+  if (loading) {
+    return (
+      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Cargando...</span>
+        </div>
+      </Container>
+    );
+  }
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <Routes>
-        <Route path="/login" element={<Login />} />
+        {/* Rutas públicas */}
+        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
-        <Route path="/*" element={<ProtectedLayout />} />
+        
+        {/* Rutas protegidas */}
+        <Route path="/dashboard" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
+        <Route path="/vehicles/*" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
+        <Route path="/timings" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
+        <Route path="/competitions" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
+        <Route path="/competitions/:id/*" element={user ? <ProtectedLayout /> : <Navigate to="/" replace />} />
       </Routes>
     </div>
   );
