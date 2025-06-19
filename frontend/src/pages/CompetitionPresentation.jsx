@@ -5,7 +5,7 @@ import CompetitionHeader from '../components/presentation/CompetitionHeader';
 import LiveRankingTable from '../components/presentation/LiveRankingTable';
 import RoundProgressGrid from '../components/presentation/RoundProgressGrid';
 import BestLapHighlight from '../components/presentation/BestLapHighlight';
-import './CompetitionPresentation.css';
+import '../styles/CompetitionPresentation.css';
 
 const CompetitionPresentation = () => {
   const { slug } = useParams();

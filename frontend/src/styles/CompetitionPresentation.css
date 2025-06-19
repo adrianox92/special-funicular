@@ -226,6 +226,7 @@
 .vehicle-name {
   font-weight: 600;
   font-size: 1.1rem;
+  color: #0f3460;
 }
 
 .team-name,
@@ -314,7 +315,7 @@
 .vehicle-name {
   font-size: 1.3rem;
   font-weight: 600;
-  color: white;
+  color: #0f3460;
 }
 
 .team-name,
