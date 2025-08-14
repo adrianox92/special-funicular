@@ -11,6 +11,7 @@ const TimingsList = () => {
   const [error, setError] = useState(null);
   const [selectedTiming, setSelectedTiming] = useState(null);
   const [showSpecsModal, setShowSpecsModal] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [filter, setFilter] = useState({
     vehicle: '',
     dateFrom: '',
@@ -56,22 +57,194 @@ const TimingsList = () => {
     }));
   };
 
-  const filteredTimings = timings.filter(timing => {
-    const matchesVehicle = !filter.vehicle || timing.vehicle_id === filter.vehicle;
-    const matchesDateFrom = !filter.dateFrom || new Date(timing.timing_date) >= new Date(filter.dateFrom);
-    const matchesDateTo = !filter.dateTo || new Date(timing.timing_date) <= new Date(filter.dateTo);
-    const matchesCircuit = !filter.circuit || (timing.circuit && timing.circuit.toLowerCase().includes(filter.circuit.toLowerCase()));
-    const matchesLane = !filter.lane || (timing.lane && timing.lane.toLowerCase().includes(filter.lane.toLowerCase()));
-    return matchesVehicle && matchesDateFrom && matchesDateTo && matchesCircuit && matchesLane;
-  }).sort((a, b) => {
-    // Convertir los tiempos a segundos para comparar
-    const getSeconds = (timeStr) => {
-      const [minutes, seconds] = timeStr.split(':');
-      const [secs, ms] = seconds.split('.');
-      return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
-    };
-    return getSeconds(a.best_lap_time) - getSeconds(b.best_lap_time);
+  // Función para convertir tiempo a segundos
+  const getSeconds = (timeStr) => {
+    const [minutes, seconds] = timeStr.split(':');
+    const [secs, ms] = seconds.split('.');
+    return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+  };
+
+  // Función para agrupar tiempos por vehículo + circuito + carril
+  const groupTimings = (timings) => {
+    const groups = {};
+    
+    timings.forEach(timing => {
+      const key = `${timing.vehicle_id}-${timing.circuit || 'sin-circuito'}-${timing.lane || 'sin-carril'}`;
+      
+      if (!groups[key]) {
+        groups[key] = {
+          key,
+          vehicle_id: timing.vehicle_id,
+          vehicle_manufacturer: timing.vehicle_manufacturer,
+          vehicle_model: timing.vehicle_model,
+          circuit: timing.circuit || 'Sin circuito',
+          lane: timing.lane || 'Sin carril',
+          sessions: [],
+          best_time: null,
+          total_sessions: 0,
+          improvement: null
+        };
+      }
+      
+      groups[key].sessions.push(timing);
+      groups[key].total_sessions++;
+      
+      // Calcular el mejor tiempo de vuelta
+      const currentLapTime = getSeconds(timing.best_lap_time);
+      if (!groups[key].best_time || currentLapTime < groups[key].best_time.seconds) {
+        groups[key].best_time = {
+          ...timing,
+          seconds: currentLapTime
+        };
+      }
+    });
+    
+    // Calcular mejoras para cada grupo (tanto en vuelta como en tiempo total)
+    Object.values(groups).forEach(group => {
+      if (group.sessions.length > 1) {
+        // Ordenar por mejor tiempo de vuelta
+        const sortedByLapTime = group.sessions
+          .map(s => ({ ...s, lapSeconds: getSeconds(s.best_lap_time) }))
+          .sort((a, b) => a.lapSeconds - b.lapSeconds);
+        
+        // Ordenar por tiempo total
+        const sortedByTotalTime = group.sessions
+          .map(s => ({ ...s, totalSeconds: getSeconds(s.total_time) }))
+          .sort((a, b) => a.totalSeconds - b.totalSeconds);
+        
+        const bestLap = sortedByLapTime[0];
+        const previousLap = sortedByLapTime[1];
+        const bestTotal = sortedByTotalTime[0];
+        const previousTotal = sortedByTotalTime[1];
+        
+        group.improvement = {
+          // Mejora en tiempo de vuelta
+          lap_time_diff: previousLap ? (previousLap.lapSeconds - bestLap.lapSeconds).toFixed(3) : null,
+          lap_percentage: previousLap ? ((previousLap.lapSeconds - bestLap.lapSeconds) / previousLap.lapSeconds * 100).toFixed(1) : null,
+          lap_sessions_ago: previousLap ? group.total_sessions - 1 : null,
+          
+          // Mejora en tiempo total
+          total_time_diff: previousTotal ? (previousTotal.totalSeconds - bestTotal.totalSeconds).toFixed(3) : null,
+          total_percentage: previousTotal ? ((previousTotal.totalSeconds - bestTotal.totalSeconds) / previousTotal.totalSeconds * 100).toFixed(1) : null,
+          total_sessions_ago: previousTotal ? group.total_sessions - 1 : null,
+          
+          // Información de las mejores marcas
+          best_lap_session: bestLap,
+          best_total_session: bestTotal
+        };
+      }
+    });
+    
+    return groups;
+  };
+
+  // Función para calcular el ranking del circuito
+  const calculateCircuitRanking = (groupedTimings) => {
+    const circuitRankings = {};
+    
+    // Agrupar por circuito
+    Object.values(groupedTimings).forEach(group => {
+      const circuit = group.circuit;
+      if (!circuitRankings[circuit]) {
+        circuitRankings[circuit] = [];
+      }
+      circuitRankings[circuit].push({
+        ...group,
+        best_lap_seconds: getSeconds(group.best_time.best_lap_time),
+        best_total_seconds: getTotalSeconds(group.best_time.total_time)
+      });
+    });
+    
+    // Ordenar cada circuito por mejor tiempo de vuelta
+    Object.keys(circuitRankings).forEach(circuit => {
+      circuitRankings[circuit].sort((a, b) => a.best_lap_seconds - b.best_lap_seconds);
+      
+      // Añadir posición y diferencias
+      circuitRankings[circuit].forEach((entry, index) => {
+        entry.circuit_position = index + 1;
+        
+        if (index === 0) {
+          // Primero del circuito
+          entry.circuit_gap_to_leader = 0;
+          entry.circuit_gap_to_previous = 0;
+        } else {
+          // Diferencia con el líder del circuito
+          entry.circuit_gap_to_leader = (entry.best_lap_seconds - circuitRankings[circuit][0].best_lap_seconds).toFixed(3);
+          
+          // Diferencia con el anterior clasificado
+          const previous = circuitRankings[circuit][index - 1];
+          entry.circuit_gap_to_previous = (entry.best_lap_seconds - previous.best_lap_seconds).toFixed(3);
+        }
+        
+        // Diferencia con el mejor tiempo total del circuito
+        const bestTotalInCircuit = Math.min(...circuitRankings[circuit].map(e => e.best_total_seconds));
+        entry.circuit_gap_to_best_total = (entry.best_total_seconds - bestTotalInCircuit).toFixed(3);
+      });
+    });
+    
+    return circuitRankings;
+  };
+
+  // Función para convertir tiempo total a segundos
+  const getTotalSeconds = (timeStr) => {
+    if (!timeStr) return 0;
+    const [minutes, seconds] = timeStr.split(':');
+    const [secs, ms] = seconds.split('.');
+    return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+  };
+
+  // Función para obtener el color del badge según el carril
+  const getLaneBadgeColor = (lane) => {
+    if (lane === '1') return 'bg-primary';
+    if (lane === '2') return 'bg-success';
+    if (lane === '3') return 'bg-info';
+    if (lane === '4') return 'bg-warning';
+    if (lane === '5') return 'bg-danger';
+    if (lane === '6') return 'bg-secondary';
+    if (lane === '7') return 'bg-dark';
+    if (lane === '8') return 'bg-light';
+    return 'bg-secondary'; // Default color para carriles sin especificar
+  };
+
+  const toggleGroup = (key) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  const groupedTimings = groupTimings(timings);
+  const circuitRankings = calculateCircuitRanking(groupedTimings);
+  
+  // Añadir información del ranking a cada grupo
+  Object.values(groupedTimings).forEach(group => {
+    const circuitRanking = circuitRankings[group.circuit];
+    if (circuitRanking) {
+      const rankingEntry = circuitRanking.find(entry => entry.key === group.key);
+      if (rankingEntry) {
+        group.circuit_ranking = {
+          position: rankingEntry.circuit_position,
+          gap_to_leader: rankingEntry.circuit_gap_to_leader,
+          gap_to_previous: rankingEntry.circuit_gap_to_previous,
+          gap_to_best_total: rankingEntry.circuit_gap_to_best_total
+        };
+      }
+    }
   });
+  
+  const filteredGroups = Object.values(groupedTimings).filter(group => {
+    const matchesVehicle = !filter.vehicle || group.vehicle_id === filter.vehicle;
+    const matchesDateFrom = !filter.dateFrom || new Date(group.best_time.timing_date) >= new Date(filter.dateFrom);
+    const matchesDateTo = !filter.dateTo || new Date(group.best_time.timing_date) <= new Date(filter.dateTo);
+    const matchesCircuit = !filter.circuit || group.circuit.toLowerCase().includes(filter.circuit.toLowerCase());
+    const matchesLane = !filter.lane || group.lane.toLowerCase().includes(filter.lane.toLowerCase());
+    return matchesVehicle && matchesDateFrom && matchesDateTo && matchesCircuit && matchesLane;
+  }).sort((a, b) => a.best_time.seconds - b.best_time.seconds);
 
   if (loading) {
     return (
@@ -169,61 +342,229 @@ const TimingsList = () => {
         </Row>
       </div>
 
+      {/* Información de especificaciones disponibles */}
+      {timings.length > 0 && (
+        <div className="mb-3 p-3 bg-light rounded">
+          <div className="row align-items-center">
+            <div className="col-md-3">
+              <strong>Total de registros:</strong> {timings.length}
+            </div>
+            <div className="col-md-3">
+              <strong>Combinaciones únicas:</strong> {Object.keys(groupedTimings).length}
+            </div>
+            <div className="col-md-3">
+              <strong>Circuitos únicos:</strong> {Object.keys(circuitRankings).length}
+            </div>
+            <div className="col-md-3 text-end">
+              <strong>Con configuración técnica:</strong> {timings.filter(t => t.setup_snapshot).length} 
+              <span className="text-muted ms-2">
+                ({((timings.filter(t => t.setup_snapshot).length / timings.length) * 100).toFixed(1)}%)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="table-responsive">
         <Table striped bordered hover>
           <thead>
             <tr>
-              <th>Fecha</th>
               <th>Vehículo</th>
-              <th>Mejor Vuelta</th>
-              <th>Diferencia</th>
-              <th>Tiempo Total</th>
-              <th>Vueltas</th>
-              <th>Tiempo Promedio</th>
-              <th>Carril</th>
               <th>Circuito</th>
-              <th>Especificaciones</th>
+              <th>Carril</th>
+              <th>Mejor Vuelta</th>
+              <th>Tiempo Total</th>
+              <th>Sesiones</th>
+              <th>Mejora</th>
+              <th>Última Sesión</th>
+              <th className="text-center">Configuración</th>
             </tr>
           </thead>
           <tbody>
-            {filteredTimings.length === 0 ? (
+            {filteredGroups.length === 0 ? (
               <tr>
-                <td colSpan="10" className="text-center">
+                <td colSpan="9" className="text-center">
                   No hay registros de tiempo
                 </td>
               </tr>
             ) : (
-              filteredTimings.map(timing => (
-                <tr key={`${timing.vehicle_id}-${timing.id}`}>
-                  <td>{new Date(timing.timing_date).toLocaleDateString()}</td>
-                  <td>
-                    <Link to={`/vehicles/${timing.vehicle_id}`}>
-                      {timing.vehicle_manufacturer} {timing.vehicle_model}
-                    </Link>
-                  </td>
-                  <td className="font-monospace">{timing.best_lap_time}</td>
-                  <td className="font-monospace">{timing.time_diff}</td>
-                  <td className="font-monospace">{timing.total_time}</td>
-                  <td>{timing.laps}</td>
-                  <td className="font-monospace">{timing.average_time}</td>
-                  <td>{timing.lane || '-'}</td>
-                  <td>{timing.circuit || '-'}</td>
-                  <td>
-                    {timing.setup_snapshot && (
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedTiming(timing);
-                          setShowSpecsModal(true);
-                        }}
-                        title="Ver especificaciones técnicas"
-                      >
-                        🔧
-                      </Button>
-                    )}
-                  </td>
-                </tr>
+              filteredGroups.map(group => (
+                <React.Fragment key={group.key}>
+                  {/* Fila principal con el mejor tiempo */}
+                  <tr className="group-header" style={{ backgroundColor: '#f8f9fa', fontWeight: '600' }}>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        {group.sessions.length > 1 && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => toggleGroup(group.key)}
+                            className="p-0 me-2 text-decoration-none"
+                            style={{ minWidth: 'auto', color: '#6c757d' }}
+                            title={expandedGroups.has(group.key) ? 'Ocultar historial' : 'Ver historial completo'}
+                          >
+                            {expandedGroups.has(group.key) ? '🔽' : '▶️'}
+                          </Button>
+                        )}
+                        <Link to={`/vehicles/${group.vehicle_id}`}>
+                          {group.vehicle_manufacturer} {group.vehicle_model}
+                        </Link>
+                      </div>
+                    </td>
+                    <td>{group.circuit}</td>
+                    <td>
+                      <span className={`badge ${getLaneBadgeColor(group.lane)}`}>
+                        {group.lane}
+                      </span>
+                    </td>
+                    <td className="font-monospace fw-bold">
+                      {group.best_time.best_lap_time}
+                      {group.circuit_ranking && (
+                        <div className="mt-1">
+                          <small className="text-muted">
+                            <span className={`badge ${group.circuit_ranking.position === 1 ? 'bg-warning' : 'bg-secondary'} me-2`}>
+                              P{group.circuit_ranking.position}
+                            </span>
+                            {group.circuit_ranking.position > 1 && (
+                              <>
+                                <span className="text-danger" style={{ fontSize: '0.9em' }}>
+                                  +{group.circuit_ranking.gap_to_leader}s al líder
+                                </span>
+                                <br />
+                                <span className="text-warning" style={{ fontSize: '0.9em' }}>
+                                  +{group.circuit_ranking.gap_to_previous}s al anterior
+                                </span>
+                              </>
+                            )}
+                            <br />
+                          </small>
+                        </div>
+                      )}
+                    </td>
+                    <td className="font-monospace fw-bold">
+                      {group.best_time.total_time}
+                    </td>
+                    <td>
+                      <span className="badge bg-primary">{group.total_sessions}</span>
+                    </td>
+                    <td>
+                      {group.improvement ? (
+                        <div className="improvement-indicator">
+                          {/* Mejora en tiempo de vuelta */}
+                          <div className="mb-2">
+                            <strong className="text-primary">Mejor Vuelta:</strong>
+                            <br />
+                            <span className="text-success fw-bold">
+                              -{group.improvement.lap_time_diff}s
+                            </span>
+                            <br />
+                            <small className="text-muted">
+                              {group.improvement.lap_percentage}% mejor
+                            </small>
+                          </div>
+                          
+                          {/* Mejora en tiempo total */}
+                          <div>
+                            <strong className="text-primary">Mejor Total:</strong>
+                            <br />
+                            <span className="text-success fw-bold">
+                              -{group.improvement.total_time_diff}s
+                            </span>
+                            <br />
+                            <small className="text-muted">
+                              {group.improvement.total_percentage}% mejor
+                            </small>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted">Primera sesión</span>
+                      )}
+                    </td>
+                    <td>{new Date(group.best_time.timing_date).toLocaleDateString()}</td>
+                    <td className="text-center">
+                      {group.best_time.setup_snapshot ? (
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedTiming(group.best_time);
+                            setShowSpecsModal(true);
+                          }}
+                          title="Ver especificaciones técnicas del mejor tiempo"
+                          className="d-flex align-items-center justify-content-center mx-auto"
+                          style={{ minWidth: '40px' }}
+                        >
+                          🔧
+                        </Button>
+                      ) : (
+                        <span className="text-muted small">-</span>
+                      )}
+                    </td>
+                  </tr>
+                  
+                  {/* Filas expandibles con historial */}
+                  {expandedGroups.has(group.key) && group.sessions.length > 1 && (
+                    group.sessions
+                      .map(session => ({
+                        ...session,
+                        lapSeconds: getSeconds(session.best_lap_time),
+                        totalSeconds: getTotalSeconds(session.total_time)
+                      }))
+                      .sort((a, b) => {
+                        // Ordenar primero por tiempo de vuelta, luego por tiempo total
+                        if (a.lapSeconds !== b.lapSeconds) {
+                          return a.lapSeconds - b.lapSeconds;
+                        }
+                        return a.totalSeconds - b.totalSeconds;
+                      })
+                      .map((session, index) => (
+                        <tr key={`${session.id}-${index}`} className="group-detail" style={{ backgroundColor: '#ffffff', fontSize: '0.9em' }}>
+                          <td colSpan="2" className="ps-4">
+                            <small className="text-muted">
+                              {new Date(session.timing_date).toLocaleDateString()}
+                            </small>
+                          </td>
+                          <td>
+                            <span className={`badge ${getLaneBadgeColor(session.lane)}`}>
+                              {session.lane}
+                            </span>
+                          </td>
+                          <td className="font-monospace">
+                            {session.best_lap_time}
+                            {index === 0 && <span className="badge bg-success ms-2">Mejor Vuelta</span>}
+                          </td>
+                          <td className="font-monospace">
+                            {session.total_time}
+                            {session.totalSeconds === group.improvement?.best_total_session?.totalSeconds && (
+                              <span className="badge bg-info ms-2">Mejor Total</span>
+                            )}
+                          </td>
+                          <td></td>
+                          <td></td>
+                          <td></td>
+                          <td className="text-center">
+                            {session.setup_snapshot && (
+                              <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedTiming(session);
+                                  setShowSpecsModal(true);
+                                }}
+                                title="Ver especificaciones técnicas de esta sesión"
+                                className="d-flex align-items-center justify-content-center mx-auto"
+                                style={{ minWidth: '40px' }}
+                              >
+                                🔧
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                  
+                  {/* Eliminar la fila del botón expandir/contraer */}
+                </React.Fragment>
               ))
             )}
           </tbody>
@@ -234,6 +575,7 @@ const TimingsList = () => {
         show={showSpecsModal}
         onHide={() => setShowSpecsModal(false)}
         setupSnapshot={selectedTiming?.setup_snapshot}
+        timing={selectedTiming}
       />
     </Container>
   );

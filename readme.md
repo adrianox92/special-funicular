@@ -51,8 +51,9 @@ Si no ves el botón de instalación:
 4. **Revisa la consola**: Busca errores relacionados con el Service Worker
 5. **Reinstala**: Si ya está instalada, desinstala y vuelve a instalar
 
-### 🔧 Problema de Navegación Resuelto
+### 🔧 Problemas Resueltos
 
+#### Problema de Navegación PWA
 **Problema**: Los enlaces del menú no funcionaban después de implementar la PWA.
 
 **Causa**: El Service Worker estaba interceptando todas las peticiones, incluyendo las navegaciones de React Router.
@@ -66,6 +67,21 @@ Si no ves el botón de instalación:
 - `frontend/public/service-worker.js` - Service Worker simplificado
 - `frontend/src/App.jsx` - Estructura de rutas corregida
 - `frontend/src/components/InstallPWAButton.jsx` - Botones de debug añadidos
+
+#### Problema del Menú Móvil
+**Problema**: El menú desplegable en dispositivos móviles no se podía cerrar haciendo clic en el botón toggle.
+
+**Causa**: Conflicto entre el estado local de React y el comportamiento nativo de Bootstrap para el colapso del menú.
+
+**Solución**:
+- Implementamos un estado local sincronizado con Bootstrap
+- Añadimos lógica para cerrar el menú al cambiar de ruta
+- Implementamos detección de clics fuera del menú para cerrarlo automáticamente
+- Mejoramos las transiciones CSS para una experiencia más fluida
+
+**Archivos modificados**:
+- `frontend/src/components/Navbar.jsx` - Lógica del menú móvil corregida
+- `frontend/src/components/Navbar.css` - Estilos mejorados para móvil
 
 ### 🧪 Herramientas de Debug
 
@@ -128,6 +144,9 @@ Para usar las herramientas de debug:
 - **Categorización**: Organiza por fabricante, tipo y tracción
 - **Búsqueda avanzada**: Encuentra rápidamente cualquier vehículo
 - **Estadísticas visuales**: Gráficos de distribución por marca y tipo
+- **Gráficas de evolución de tiempos**: Visualiza la mejora de rendimiento de cada vehículo por circuito y carril
+- **Análisis de rendimiento**: Compara tiempos de mejor vuelta y promedio a lo largo del tiempo
+- **Seguimiento de progreso**: Identifica tendencias de mejora en diferentes circuitos
 
 ### 🏆 Sistema de Competiciones
 - **Creación de competiciones**: Configura eventos con múltiples rondas

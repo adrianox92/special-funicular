@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Navbar as BootstrapNavbar, Nav, Container, Button, Dropdown, Badge } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +21,7 @@ const Navbar = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const navbarRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -32,6 +33,30 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Cerrar menú cuando cambie la ruta
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
+
+  // Cerrar menú cuando se haga clic fuera del navbar
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (navbarRef.current && !navbarRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -39,6 +64,14 @@ const Navbar = () => {
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
+  };
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
   };
 
   const isActive = (path) => {
@@ -59,6 +92,7 @@ const Navbar = () => {
 
   return (
     <BootstrapNavbar 
+      ref={navbarRef}
       bg="white" 
       variant="light" 
       expand="lg" 
@@ -79,12 +113,17 @@ const Navbar = () => {
         <BootstrapNavbar.Toggle 
           aria-controls="basic-navbar-nav" 
           className="custom-toggle"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          onClick={toggleMenu}
+          aria-expanded={isMenuOpen}
         >
           {isMenuOpen ? <FaTimes /> : <FaBars />}
         </BootstrapNavbar.Toggle>
 
-        <BootstrapNavbar.Collapse id="basic-navbar-nav" className={isMenuOpen ? 'show' : ''}>
+        <BootstrapNavbar.Collapse 
+          id="basic-navbar-nav" 
+          className={isMenuOpen ? 'show' : ''}
+          in={isMenuOpen}
+        >
           {/* Navigation Links */}
           <Nav className="me-auto nav-links">
             {navItems.map((item) => (
@@ -93,7 +132,7 @@ const Navbar = () => {
                 as={Link} 
                 to={item.path} 
                 className={`nav-link-custom ${isActive(item.path) ? 'active' : ''}`}
-                onClick={() => setIsMenuOpen(false)}
+                onClick={closeMenu}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>
@@ -138,12 +177,12 @@ const Navbar = () => {
                     
                     <Dropdown.Divider />
                     
-                    <Dropdown.Item as={Link} to="/profile" className="dropdown-item">
+                    <Dropdown.Item as={Link} to="/profile" className="dropdown-item" onClick={closeMenu}>
                       <FaUser className="dropdown-icon" />
                       <span>Mi Perfil</span>
                     </Dropdown.Item>
                     
-                    <Dropdown.Item as={Link} to="/settings" className="dropdown-item">
+                    <Dropdown.Item as={Link} to="/settings" className="dropdown-item" onClick={closeMenu}>
                       <FaCog className="dropdown-icon" />
                       <span>Configuración</span>
                     </Dropdown.Item>

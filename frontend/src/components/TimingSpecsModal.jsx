@@ -1,8 +1,8 @@
 import React from 'react';
 import { Modal, Button, Table } from 'react-bootstrap';
 
-const TimingSpecsModal = ({ show, onHide, setupSnapshot }) => {
-  if (!setupSnapshot) return null;
+const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
+  if (!setupSnapshot || !timing) return null;
 
   const specs = JSON.parse(setupSnapshot);
 
@@ -80,9 +80,41 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot }) => {
   return (
     <Modal show={show} onHide={onHide} size="lg">
       <Modal.Header closeButton>
-        <Modal.Title>Especificaciones Técnicas</Modal.Title>
+        <Modal.Title>
+          <div>
+            <div>Especificaciones Técnicas</div>
+            <small className="text-muted">
+              {timing.vehicle_manufacturer} {timing.vehicle_model} - {new Date(timing.timing_date).toLocaleDateString()}
+            </small>
+          </div>
+        </Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {/* Resumen de la sesión */}
+        <div className="mb-4 p-3 bg-light rounded">
+          <h6>Resumen de la Sesión</h6>
+          <div className="row">
+            <div className="col-md-3">
+              <strong>Mejor Vuelta:</strong><br />
+              <span className="font-monospace">{timing.best_lap_time}</span>
+            </div>
+            <div className="col-md-3">
+              <strong>Tiempo Total:</strong><br />
+              <span className="font-monospace">{timing.total_time}</span>
+            </div>
+            <div className="col-md-3">
+              <strong>Vueltas:</strong><br />
+              {timing.laps}
+            </div>
+            <div className="col-md-3">
+              <strong>Circuito:</strong><br />
+              {timing.circuit || '-'} (Carril {timing.lane || '-'})
+            </div>
+          </div>
+        </div>
+
+        {/* Especificaciones técnicas */}
+        <h6 className="mb-3">Componentes del Vehículo</h6>
         {Object.entries(groupedSpecs).map(([type, components]) => (
           <div key={type} className="mb-4">
             <h5>{componentTypeLabels[type] || type}</h5>

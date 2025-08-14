@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Form, Button, Alert, Row, Col, Spinner, Container, Nav, Tab } from 'react-bootstrap';
+import { Form, Button, Alert, Row, Col, Spinner, Nav, Tab } from 'react-bootstrap';
 import api from '../lib/axios';
 import { FiExternalLink } from 'react-icons/fi';
+import TimingEvolutionChart from './charts/TimingEvolutionChart';
+import TimingSpecsModal from './TimingSpecsModal';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -97,6 +99,8 @@ const EditVehicle = () => {
   });
   const [loadingTimings, setLoadingTimings] = useState(false);
   const [timingWarning, setTimingWarning] = useState(null);
+  const [showSpecsModal, setShowSpecsModal] = useState(false);
+  const [selectedTiming, setSelectedTiming] = useState(null);
 
   useEffect(() => {
     api.get(`/vehicles/${id}`)
@@ -357,10 +361,9 @@ const EditVehicle = () => {
         ]
       };
 
-      const targetSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
-
       if (editingSpec) {
-        await api.put(`/vehicles/${id}/technical-specs/${targetSpec.id}/components/${editingSpec.component_id}`, specData);
+        const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
+        await api.put(`/vehicles/${id}/technical-specs/${currentSpec.id}/components/${editingSpec.component_id}`, specData);
       } else {
         await api.post(`/vehicles/${id}/technical-specs`, specData);
       }
@@ -602,6 +605,28 @@ const EditVehicle = () => {
       console.error('Error al eliminar tiempo:', error);
       setError('Error al eliminar el registro de tiempo');
     }
+  };
+
+  // Función para agrupar tiempos por circuito y carril
+  const getTimingsByCircuitAndLane = () => {
+    const grouped = {};
+    
+    timings.forEach(timing => {
+      if (timing.circuit && timing.lane) {
+        const key = `${timing.circuit}-${timing.lane}`;
+        if (!grouped[key]) {
+          grouped[key] = {
+            circuit: timing.circuit,
+            lane: timing.lane,
+            timings: []
+          };
+        }
+        grouped[key].timings.push(timing);
+      }
+    });
+
+    // Solo incluir grupos con más de un tiempo para mostrar evolución
+    return Object.values(grouped).filter(group => group.timings.length >= 2);
   };
 
   const renderSpecsForm = (isModificationTab = false) => {
@@ -1011,58 +1036,109 @@ const EditVehicle = () => {
           {loadingTimings ? (
             <Spinner animation="border" />
           ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Mejor Vuelta</th>
-                    <th>Tiempo Total</th>
-                    <th>Vueltas</th>
-                    <th>Tiempo Promedio</th>
-                    <th>Carril</th>
-                    <th>Circuito</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {timings.length === 0 && (
-                    <tr><td colSpan="8" className="text-center">No hay registros de tiempo</td></tr>
-                  )}
-                  {timings.map((timing) => (
-                    <tr key={timing.id}>
-                      <td>{new Date(timing.timing_date).toLocaleDateString()}</td>
-                      <td className="font-monospace">{timing.best_lap_time}</td>
-                      <td className="font-monospace">{timing.total_time}</td>
-                      <td>{timing.laps}</td>
-                      <td className="font-monospace">{timing.average_time}</td>
-                      <td>{timing.lane || '-'}</td>
-                      <td>{timing.circuit || '-'}</td>
-                      <td>
-                        <div className="d-flex gap-1">
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleEditTiming(timing)}
-                            title="Editar"
-                          >
-                            ✏️
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteTiming(timing.id)}
-                            title="Eliminar"
-                          >
-                            🗑️
-                          </Button>
-                        </div>
-                      </td>
+            <>
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Mejor Vuelta</th>
+                      <th>Tiempo Total</th>
+                      <th>Vueltas</th>
+                      <th>Tiempo Promedio</th>
+                      <th>Carril</th>
+                      <th>Circuito</th>
+                      <th className="text-center">Configuración</th>
+                      <th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {timings.length === 0 && (
+                      <tr><td colSpan="8" className="text-center">No hay registros de tiempo</td></tr>
+                    )}
+                    {timings.map((timing) => (
+                      <tr key={timing.id}>
+                        <td>{new Date(timing.timing_date).toLocaleDateString()}</td>
+                        <td className="font-monospace">{timing.best_lap_time}</td>
+                        <td className="font-monospace">{timing.total_time}</td>
+                        <td>{timing.laps}</td>
+                        <td className="font-monospace">{timing.average_time}</td>
+                        <td>{timing.lane || '-'}</td>
+                        <td>{timing.circuit || '-'}</td>
+                        <td className="text-center">
+                          {timing.setup_snapshot ? (
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTiming(timing);
+                                setShowSpecsModal(true);
+                              }}
+                              title="Ver especificaciones técnicas"
+                            >
+                              🔧 Ver Config
+                            </Button>
+                          ) : (
+                            <span className="text-muted small">Sin config</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="d-flex gap-1">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleEditTiming(timing)}
+                              title="Editar"
+                            >
+                              ✏️
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleDeleteTiming(timing.id)}
+                              title="Eliminar"
+                            >
+                              🗑️
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Gráficas de evolución de tiempos */}
+              {timings.length > 0 && (
+                <div className="mt-5">
+                  <h4>Evolución de Tiempos por Circuito y Carril</h4>
+                  <p className="text-muted mb-4">
+                    Se muestran gráficas de evolución para circuitos y carriles con múltiples registros de tiempo.
+                  </p>
+                  
+                  {(() => {
+                    const groupedTimings = getTimingsByCircuitAndLane();
+                    if (groupedTimings.length === 0) {
+                      return (
+                        <div className="text-center text-muted py-4">
+                          <p>No hay suficientes registros de tiempo para mostrar evolución.</p>
+                          <p className="small">Se necesitan al menos 2 registros del mismo circuito y carril.</p>
+                        </div>
+                      );
+                    }
+                    
+                    return groupedTimings.map((group, index) => (
+                      <TimingEvolutionChart
+                        key={`${group.circuit}-${group.lane}`}
+                        timings={group.timings}
+                        circuit={group.circuit}
+                        lane={group.lane}
+                      />
+                    ));
+                  })()}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1226,6 +1302,14 @@ const EditVehicle = () => {
           </Tab.Pane>
         </Tab.Content>
       </Tab.Container>
+
+      {/* Modal de especificaciones técnicas */}
+      <TimingSpecsModal
+        show={showSpecsModal}
+        onHide={() => setShowSpecsModal(false)}
+        setupSnapshot={selectedTiming?.setup_snapshot}
+        timing={selectedTiming}
+      />
     </div>
   );
 };
