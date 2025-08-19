@@ -19,11 +19,39 @@ import LandingPage from './pages/LandingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import InstallPWAButton from './components/InstallPWAButton';
+import { logPWADiagnostics } from './utils/pwaDiagnostics';
 
 
 // Componente principal de la aplicación
 const AppContent = () => {
   const { user, loading } = useAuth();
+  
+  // Detectar si viene de PWA y logging para debug
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const source = urlParams.get('source');
+    
+    if (source === 'pwa') {
+      console.log('Aplicación abierta desde PWA icon');
+      // Limpiar el parámetro de la URL sin recargar la página
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+    
+    // Debug info para ayudar con el problema
+    console.log('AppContent mounted:', {
+      user: !!user,
+      loading,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      isStandalone: window.matchMedia('(display-mode: standalone)').matches
+    });
+    
+    // Ejecutar diagnóstico PWA en desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      logPWADiagnostics();
+    }
+  }, [user, loading]);
 
   // Si está cargando, mostrar un spinner
   if (loading) {

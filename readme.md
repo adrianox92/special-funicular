@@ -98,6 +98,120 @@ Para usar las herramientas de debug:
 ### 📊 Estado de la PWA
 
 - ✅ Manifest.json configurado
+
+## 🏆 Sistema de Seguimiento de Posiciones
+
+### ✨ Nueva Funcionalidad
+
+La aplicación ahora incluye un **sistema avanzado de seguimiento de posiciones** que permite:
+
+- **Posición en tiempo real**: Muestra la posición actual de cada vehículo en cada circuito
+- **Cambios de posición**: Indica si un vehículo subió o bajó de posición
+- **Historial de posiciones**: Rastrea la evolución de las posiciones a lo largo del tiempo
+- **Rankings por circuito**: Clasificaciones separadas para cada circuito
+
+### 🔧 Características Técnicas
+
+#### Base de Datos
+- **Nuevos campos añadidos**:
+  - `current_position`: Posición actual del vehículo en el circuito
+  - `previous_position`: Posición anterior del vehículo en el circuito
+  - `position_updated_at`: Fecha de la última actualización de posición
+  - `position_change`: Diferencia de posición (positivo = subió, negativo = bajó)
+
+#### Backend
+- **Módulo de seguimiento**: `backend/lib/positionTracker.js`
+- **Actualización automática**: Las posiciones se actualizan automáticamente al registrar nuevos tiempos
+- **API enriquecida**: Los endpoints devuelven información completa de posiciones y cambios
+
+#### Frontend
+- **Nueva columna**: Columna dedicada a mostrar la posición y cambios
+- **Indicadores visuales**: 
+  - ⬆️ Verde para subidas de posición
+  - ⬇️ Rojo para bajadas de posición
+  - Badges de posición con colores diferenciados
+- **Estilos responsivos**: Adaptado para dispositivos móviles y desktop
+
+### 📊 Cómo Funciona
+
+1. **Registro de tiempo**: Al registrar un nuevo tiempo en un circuito
+2. **Cálculo automático**: El sistema recalcula todas las posiciones del circuito
+3. **Detección de cambios**: Identifica qué vehículos cambiaron de posición
+4. **Actualización en tiempo real**: La interfaz muestra inmediatamente los cambios
+5. **Historial preservado**: Se mantiene un registro de todas las posiciones anteriores
+
+### 🚀 Implementación
+
+#### Migración de Base de Datos
+```bash
+# Ejecutar el script de migración
+cd backend
+node scripts/migrate-add-position-tracking.js
+```
+
+#### Archivos Modificados
+- `backend/scripts/add-position-tracking.sql` - Script SQL para añadir campos
+- `backend/scripts/migrate-add-position-tracking.js` - Migración en JavaScript
+- `backend/lib/positionTracker.js` - Lógica de seguimiento de posiciones
+- `backend/routes/timings.js` - API enriquecida con información de posiciones
+- `backend/routes/vehicles.js` - Actualización automática de posiciones
+- `frontend/src/components/TimingsList.jsx` - Nueva columna de posición
+- `frontend/src/components/TimingsList.css` - Estilos para la nueva funcionalidad
+
+### 🎯 Casos de Uso
+
+#### Ejemplo 1: Subida de Posición
+- **Antes**: Vehículo A en posición 5
+- **Nuevo tiempo**: Mejor tiempo que mejora la posición
+- **Resultado**: Vehículo A sube a posición 4, se muestra ⬆️ +1
+
+#### Ejemplo 2: Bajada de Posición
+- **Antes**: Vehículo B en posición 2
+- **Nuevo tiempo**: Otro vehículo mejora y le adelanta
+- **Resultado**: Vehículo B baja a posición 3, se muestra ⬇️ -1
+
+#### Ejemplo 3: Sin Cambios
+- **Antes**: Vehículo C en posición 1
+- **Nuevo tiempo**: Mantiene el mejor tiempo
+- **Resultado**: Vehículo C mantiene posición 1, sin indicador de cambio
+
+### 🔍 Monitoreo y Debug
+
+#### Logs del Backend
+```bash
+# Ver actualizaciones de posiciones en tiempo real
+tail -f backend/logs/app.log | grep "Actualizando posiciones"
+```
+
+#### Verificación de Datos
+```sql
+-- Verificar campos de posición en la base de datos
+SELECT 
+  vehicle_id, 
+  circuit, 
+  previous_position, 
+  position_change, 
+  position_updated_at
+FROM vehicle_timings 
+WHERE circuit IS NOT NULL 
+ORDER BY position_updated_at DESC;
+```
+
+### 📈 Beneficios
+
+1. **Transparencia**: Los usuarios pueden ver exactamente cómo evolucionan las posiciones
+2. **Motivación**: Los cambios de posición proporcionan feedback inmediato
+3. **Competitividad**: Fomenta la mejora continua de tiempos
+4. **Análisis**: Permite analizar tendencias de rendimiento por circuito
+5. **Experiencia**: Interfaz más rica y atractiva para los usuarios
+
+### 🔮 Futuras Mejoras
+
+- **Notificaciones**: Alertas cuando un vehículo cambie de posición
+- **Gráficos**: Visualización de la evolución de posiciones a lo largo del tiempo
+- **Estadísticas**: Análisis de frecuencia de cambios de posición
+- **Exportación**: Incluir información de posiciones en reportes PDF/CSV
+- **Comparativas**: Comparar rendimiento entre diferentes períodos
 - ✅ Service Worker registrado
 - ✅ Iconos en múltiples tamaños
 - ✅ Botón de instalación implementado
@@ -487,6 +601,38 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 3. **Base de Datos**: Limpieza de reglas existentes con tipo `best_time_per_round`
 4. **Plantillas**: Actualizadas para usar el nuevo sistema de bonus
 5. **Documentación**: Todas las guías actualizadas para reflejar los cambios
+
+### v1.8.0 - Corrección de Navegación PWA en Mobile
+- ✅ **Problema Resuelto**: El icono de la PWA en móviles ahora navega correctamente al dashboard (si estás logueado) o al login (si no lo estás)
+- ✅ **Service Worker Mejorado**: Corregida la interceptación de peticiones que interferían con React Router
+- ✅ **Navegación del Logo**: El logo ahora funciona correctamente tanto en navegadores como en PWA
+- ✅ **Start URL Actualizada**: Manifest.json configurado con parámetro de tracking PWA
+- ✅ **Herramientas de Debug**: Agregadas utilidades de diagnóstico PWA para desarrollo
+
+**Problema Identificado:**
+- Cuando se abría la PWA desde el icono del móvil, quedaba en una página en blanco
+- El Service Worker interceptaba todas las peticiones de navegación, interfiriendo con React Router
+- El logo no navegaba correctamente según el estado de autenticación
+
+**Solución Implementada:**
+1. **Service Worker Corregido**: Ahora solo intercepta archivos estáticos y permite que React Router maneje la navegación
+2. **Navegación Inteligente del Logo**: Redirige a `/dashboard` si el usuario está logueado, o a `/` si no lo está
+3. **Detección PWA**: Parámetro `?source=pwa` en start_url para identificar aberturas desde icono PWA
+4. **Debug Mejorado**: Logging en consola para identificar problemas de navegación en desarrollo
+
+**Archivos Modificados:**
+- `frontend/public/service-worker.js` - Lógica de interceptación corregida para no interferir con navegación
+- `frontend/public/manifest.json` - start_url actualizada con parámetro de tracking
+- `frontend/src/App.jsx` - Detección PWA y logging de debug agregado
+- `frontend/src/components/Navbar.jsx` - Navegación del logo mejorada con lógica de autenticación
+- `frontend/src/utils/pwaDiagnostics.js` - Herramientas de diagnóstico PWA para desarrollo
+
+**Cambios Técnicos:**
+1. **Service Worker**: Solo intercepta peticiones con `request.mode === 'navigate'` para servir index.html
+2. **Cache Strategy**: Archivos estáticos cacheados, navegación delegada a React Router
+3. **Logo Navigation**: onClick handler que previene default y usa `navigate()` programáticamente
+4. **PWA Detection**: URL params para detectar cuando se abre desde icono instalado
+5. **Debug Tools**: Diagnóstico completo de PWA en modo desarrollo
 
 ### v1.6.0 - Corrección del Cálculo de Puntos en Tiempos Agregados
 - ✅ **Problema Resuelto**: Los puntos en la pestaña "Tiempos Agregados" ahora se calculan correctamente

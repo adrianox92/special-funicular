@@ -2,7 +2,7 @@ import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, Row, Col } from 'react-bootstrap';
 
-const TimingEvolutionChart = ({ timings, circuit, lane }) => {
+const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
   // Filtrar tiempos por circuito y carril
   const filteredTimings = timings.filter(timing => 
     timing.circuit === circuit && timing.lane === lane
@@ -102,7 +102,7 @@ const TimingEvolutionChart = ({ timings, circuit, lane }) => {
     <Card className="mb-4 shadow-sm">
       <Card.Body>
         <Card.Title className="mb-3">
-          Evolución de Tiempos - {circuit} (Carril {lane})
+          Evolución de Tiempos - {circuit} (Carril {lane}) - {laps} vueltas
         </Card.Title>
         
         <Row>
@@ -183,7 +183,7 @@ const TimingEvolutionChart = ({ timings, circuit, lane }) => {
 
         <div className="mt-4">
           <small className="text-muted">
-            Se muestran {filteredTimings.length} registros de tiempo para este circuito y carril.
+            Se muestran {filteredTimings.length} registros de tiempo para {circuit}, carril {lane}, con {laps} vueltas.
             {filteredTimings.length >= 3 && ' Cada gráfica muestra la evolución independiente de cada métrica con su propia escala.'}
             <br />
             <span className="text-primary">🔽</span> Mejoró, <span className="text-danger">🔼</span> Empeoró, <span className="text-muted">➡️</span> Sin cambios

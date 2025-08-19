@@ -101,7 +101,17 @@ const Navbar = () => {
     >
       <Container fluid className="px-4">
         {/* Logo y Brand */}
-        <BootstrapNavbar.Brand as={Link} to="/" className="brand-container">
+        <BootstrapNavbar.Brand 
+          as={Link} 
+          to={user ? "/dashboard" : "/"} 
+          className="brand-container"
+          onClick={(e) => {
+            // Asegurar navegación correcta del logo
+            e.preventDefault();
+            const targetPath = user ? "/dashboard" : "/";
+            navigate(targetPath);
+          }}
+        >
           <div className="logo-container">
             <FaTrophy className="logo-icon" />
             <span className="logo-text">Slot</span>

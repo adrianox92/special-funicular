@@ -3,6 +3,7 @@ import { Table, Spinner, Alert, Container, Form, Row, Col, Button } from 'react-
 import { Link } from 'react-router-dom';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
+import './TimingsList.css';
 
 const TimingsList = () => {
   const [timings, setTimings] = useState([]);
@@ -64,12 +65,12 @@ const TimingsList = () => {
     return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
   };
 
-  // Función para agrupar tiempos por vehículo + circuito + carril
+  // Función para agrupar tiempos por vehículo + circuito + carril + vueltas
   const groupTimings = (timings) => {
     const groups = {};
     
     timings.forEach(timing => {
-      const key = `${timing.vehicle_id}-${timing.circuit || 'sin-circuito'}-${timing.lane || 'sin-carril'}`;
+      const key = `${timing.vehicle_id}-${timing.circuit || 'sin-circuito'}-${timing.lane || 'sin-carril'}-${timing.laps || 'sin-vueltas'}`;
       
       if (!groups[key]) {
         groups[key] = {
@@ -81,6 +82,7 @@ const TimingsList = () => {
           lane: timing.lane || 'Sin carril',
           sessions: [],
           best_time: null,
+          last_session: null,
           total_sessions: 0,
           improvement: null
         };
@@ -96,6 +98,12 @@ const TimingsList = () => {
           ...timing,
           seconds: currentLapTime
         };
+      }
+      
+      // Calcular la sesión más reciente por fecha
+      const currentDate = new Date(timing.timing_date);
+      if (!groups[key].last_session || currentDate > new Date(groups[key].last_session.timing_date)) {
+        groups[key].last_session = timing;
       }
     });
     
@@ -372,6 +380,8 @@ const TimingsList = () => {
               <th>Vehículo</th>
               <th>Circuito</th>
               <th>Carril</th>
+              <th>Vueltas</th>
+              <th>Posición</th>
               <th>Mejor Vuelta</th>
               <th>Tiempo Total</th>
               <th>Sesiones</th>
@@ -383,7 +393,7 @@ const TimingsList = () => {
           <tbody>
             {filteredGroups.length === 0 ? (
               <tr>
-                <td colSpan="9" className="text-center">
+                <td colSpan="11" className="text-center">
                   No hay registros de tiempo
                 </td>
               </tr>
@@ -417,26 +427,49 @@ const TimingsList = () => {
                         {group.lane}
                       </span>
                     </td>
-                    <td className="font-monospace fw-bold">
-                      {group.best_time.best_lap_time}
-                      {group.circuit_ranking && (
-                        <div className="mt-1">
-                          <small className="text-muted">
-                            <span className={`badge ${group.circuit_ranking.position === 1 ? 'bg-warning' : 'bg-secondary'} me-2`}>
+                    <td>
+                      <span className="badge bg-info">
+                        {group.best_time.laps || 'N/A'}
+                      </span>
+                    </td>
+                    <td>
+                      {group.circuit_ranking ? (
+                        <div className="text-center">
+                          <div className="position-badge mb-1">
+                            <span className={`badge ${group.circuit_ranking.position === 1 ? 'bg-warning' : 'bg-secondary'} fs-6`}>
                               P{group.circuit_ranking.position}
                             </span>
-                            {group.circuit_ranking.position > 1 && (
-                              <>
-                                <span className="text-danger" style={{ fontSize: '0.9em' }}>
-                                  +{group.circuit_ranking.gap_to_leader}s al líder
+                          </div>
+                          {group.circuit_ranking.position_change !== 0 && (
+                            <div className="position-change">
+                              {group.circuit_ranking.position_change > 0 ? (
+                                <span className="text-success fw-bold">
+                                  ⬆️ +{group.circuit_ranking.position_change}
                                 </span>
-                                <br />
-                                <span className="text-warning" style={{ fontSize: '0.9em' }}>
-                                  +{group.circuit_ranking.gap_to_previous}s al anterior
+                              ) : (
+                                <span className="text-danger fw-bold">
+                                  ⬇️ {group.circuit_ranking.position_change}
                                 </span>
-                              </>
-                            )}
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="font-monospace fw-bold">
+                      {group.best_time.best_lap_time}
+                      {group.circuit_ranking && group.circuit_ranking.position > 1 && (
+                        <div className="mt-1">
+                          <small className="text-muted">
+                            <span className="text-danger" style={{ fontSize: '0.9em' }}>
+                              +{group.circuit_ranking.gap_to_leader}s al líder
+                            </span>
                             <br />
+                            <span className="text-warning" style={{ fontSize: '0.9em' }}>
+                              +{group.circuit_ranking.gap_to_previous}s al anterior
+                            </span>
                           </small>
                         </div>
                       )}
@@ -480,7 +513,7 @@ const TimingsList = () => {
                         <span className="text-muted">Primera sesión</span>
                       )}
                     </td>
-                    <td>{new Date(group.best_time.timing_date).toLocaleDateString()}</td>
+                    <td>{new Date(group.last_session.timing_date).toLocaleDateString()}</td>
                     <td className="text-center">
                       {group.best_time.setup_snapshot ? (
                         <Button
@@ -527,6 +560,11 @@ const TimingsList = () => {
                           <td>
                             <span className={`badge ${getLaneBadgeColor(session.lane)}`}>
                               {session.lane}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="badge bg-info">
+                              {session.laps || 'N/A'}
                             </span>
                           </td>
                           <td className="font-monospace">

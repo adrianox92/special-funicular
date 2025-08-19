@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
+const { getCircuitRanking } = require('../lib/positionTracker');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -61,7 +62,12 @@ router.get('/', async (req, res) => {
     // Obtenemos todos los tiempos de los vehículos del usuario
     let timingsQuery = supabase
       .from('vehicle_timings')
-      .select('*')
+      .select(`
+        *,
+        previous_position,
+        position_change,
+        position_updated_at
+      `)
       .in('vehicle_id', vehicleIds)
       .order('timing_date', { ascending: false });
     if (circuit) {
@@ -73,12 +79,50 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Error al obtener los tiempos' });
     }
 
-    // Enriquecer los tiempos con la información del vehículo
+    // Enriquecer los tiempos con la información del vehículo y posiciones
     let enrichedTimings = timings.map(timing => ({
       ...timing,
       vehicle_model: vehiclesMap[timing.vehicle_id]?.model,
       vehicle_manufacturer: vehiclesMap[timing.vehicle_id]?.manufacturer
     }));
+
+    // Obtener información de posiciones por circuito
+    const circuitPositions = {};
+    const uniqueCircuits = [...new Set(timings.filter(t => t.circuit).map(t => t.circuit))];
+    
+    for (const circuitName of uniqueCircuits) {
+      try {
+        const ranking = await getCircuitRanking(circuitName);
+        circuitPositions[circuitName] = ranking;
+      } catch (error) {
+        console.warn(`⚠️  Error al obtener ranking del circuito ${circuitName}:`, error.message);
+        circuitPositions[circuitName] = [];
+      }
+    }
+
+    // Enriquecer con información de posiciones
+    enrichedTimings = enrichedTimings.map(timing => {
+      if (timing.circuit && circuitPositions[timing.circuit]) {
+        const circuitRanking = circuitPositions[timing.circuit];
+        const rankingEntry = circuitRanking.find(entry => entry.vehicle_id === timing.vehicle_id);
+        
+        if (rankingEntry) {
+          return {
+            ...timing,
+            circuit_ranking: {
+              position: rankingEntry.current_position,
+              previous_position: rankingEntry.previous_position,
+              position_change: rankingEntry.position_change,
+              position_status: rankingEntry.position_status,
+              gap_to_leader: rankingEntry.gap_to_leader,
+              gap_to_previous: rankingEntry.gap_to_previous
+            }
+          };
+        }
+      }
+      
+      return timing;
+    });
 
     // Calcular diferencias
     // Ordenar por best_lap_time ascendente (mejor primero)

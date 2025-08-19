@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
 const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
+const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -996,7 +997,33 @@ router.post('/:id/timings', async (req, res) => {
       return res.status(500).json({ error: timingError.message });
     }
 
-    res.status(201).json(timing);
+    // Actualizar posiciones del circuito si se especificó uno
+    if (circuit) {
+      try {
+        console.log(`🔄 Actualizando posiciones para el circuito: ${circuit}`);
+        const positionUpdate = await updatePositionsAfterNewTiming(circuit, timing.id);
+        
+        if (positionUpdate.success) {
+          console.log(`✅ Posiciones actualizadas para el circuito: ${circuit}`);
+          // Enriquecer la respuesta con información de posiciones
+          const enrichedTiming = {
+            ...timing,
+            position_updated: true,
+            circuit_ranking: positionUpdate.ranking.find(r => r.vehicle_id === id)
+          };
+          res.status(201).json(enrichedTiming);
+        } else {
+          console.warn(`⚠️  No se pudieron actualizar las posiciones para el circuito: ${circuit}`);
+          res.status(201).json(timing);
+        }
+      } catch (positionError) {
+        console.error(`❌ Error al actualizar posiciones para el circuito ${circuit}:`, positionError);
+        // Aún devolvemos el timing creado, pero sin información de posiciones
+        res.status(201).json(timing);
+      }
+    } else {
+      res.status(201).json(timing);
+    }
   } catch (err) {
     console.error('Error al crear tiempo:', err);
     res.status(500).json({ error: err.message });

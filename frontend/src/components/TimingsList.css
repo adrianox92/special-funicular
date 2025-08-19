@@ -1,0 +1,70 @@
+/* Estilos para la tabla de tiempos */
+.position-badge {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.position-badge .badge {
+  min-width: 3rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.position-change {
+  font-size: 0.8rem;
+  text-align: center;
+  margin-top: 0.25rem;
+}
+
+.position-change .text-success {
+  color: #198754 !important;
+}
+
+.position-change .text-danger {
+  color: #dc3545 !important;
+}
+
+/* Animación para cambios de posición */
+@keyframes positionChange {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.position-change span {
+  animation: positionChange 0.5s ease-in-out;
+}
+
+/* Estilos para la columna de posición */
+.table th:nth-child(4),
+.table td:nth-child(4) {
+  text-align: center;
+  vertical-align: middle;
+  min-width: 100px;
+}
+
+/* Estilos para el badge de posición */
+.position-badge .badge.bg-warning {
+  background-color: #ffc107 !important;
+  color: #000 !important;
+}
+
+.position-badge .badge.bg-secondary {
+  background-color: #6c757d !important;
+  color: #fff !important;
+}
+
+/* Responsive para dispositivos móviles */
+@media (max-width: 768px) {
+  .position-change {
+    font-size: 0.7rem;
+  }
+  
+  .position-badge .badge {
+    min-width: 2.5rem;
+    font-size: 0.8rem;
+  }
+}
+
+

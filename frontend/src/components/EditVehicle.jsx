@@ -576,7 +576,13 @@ const EditVehicle = () => {
       if (editingTiming) {
         await api.put(`/vehicles/${id}/timings/${editingTiming.id}`, editingTiming);
       } else {
-        await api.post(`/vehicles/${id}/timings`, newTiming);
+        const response = await api.post(`/vehicles/${id}/timings`, newTiming);
+        console.log('Tiempo añadido:', response.data);
+        
+        // Si el tiempo tiene información de posición actualizada, mostrarla
+        if (response.data.position_updated) {
+          console.log('✅ Posiciones actualizadas automáticamente');
+        }
       }
 
       // Recargar tiempos
@@ -607,17 +613,18 @@ const EditVehicle = () => {
     }
   };
 
-  // Función para agrupar tiempos por circuito y carril
+  // Función para agrupar tiempos por circuito, carril y vueltas
   const getTimingsByCircuitAndLane = () => {
     const grouped = {};
     
     timings.forEach(timing => {
       if (timing.circuit && timing.lane) {
-        const key = `${timing.circuit}-${timing.lane}`;
+        const key = `${timing.circuit}-${timing.lane}-${timing.laps || 'sin-vueltas'}`;
         if (!grouped[key]) {
           grouped[key] = {
             circuit: timing.circuit,
             lane: timing.lane,
+            laps: timing.laps || 'N/A',
             timings: []
           };
         }
@@ -1129,10 +1136,11 @@ const EditVehicle = () => {
                     
                     return groupedTimings.map((group, index) => (
                       <TimingEvolutionChart
-                        key={`${group.circuit}-${group.lane}`}
+                        key={`${group.circuit}-${group.lane}-${group.laps}`}
                         timings={group.timings}
                         circuit={group.circuit}
                         lane={group.lane}
+                        laps={group.laps}
                       />
                     ));
                   })()}
