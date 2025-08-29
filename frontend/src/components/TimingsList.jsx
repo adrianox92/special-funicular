@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Spinner, Alert, Container, Form, Row, Col, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import { FaArrowUp, FaArrowDown, FaMinus, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
 import './TimingsList.css';
@@ -37,6 +38,14 @@ const TimingsList = () => {
       console.log('Cargando tiempos...');
       const timingsResponse = await api.get('/timings');
       console.log('Tiempos cargados:', timingsResponse.data);
+      
+      // Debug: Verificar qué position_change vienen del backend (comentado para limpiar logs)
+      // timingsResponse.data.forEach(timing => {
+      //   if (timing.position_change !== null && timing.position_change !== undefined && timing.position_change !== 0) {
+      //     console.log(`🔍 Backend timing con position_change:`, timing);
+      //   }
+      // });
+      
       setTimings(timingsResponse.data);
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -146,11 +155,11 @@ const TimingsList = () => {
     return groups;
   };
 
-  // Función para calcular el ranking del circuito
+  // Función para calcular el ranking del circuito (posiciones globales)
   const calculateCircuitRanking = (groupedTimings) => {
     const circuitRankings = {};
     
-    // Agrupar por circuito
+    // Agrupar por circuito - TODAS las entradas (vehículo+carril+vueltas) en ranking global
     Object.values(groupedTimings).forEach(group => {
       const circuit = group.circuit;
       if (!circuitRankings[circuit]) {
@@ -163,11 +172,11 @@ const TimingsList = () => {
       });
     });
     
-    // Ordenar cada circuito por mejor tiempo de vuelta
+    // Ordenar cada circuito por mejor tiempo de vuelta GLOBALMENTE (todas las entradas juntas)
     Object.keys(circuitRankings).forEach(circuit => {
       circuitRankings[circuit].sort((a, b) => a.best_lap_seconds - b.best_lap_seconds);
       
-      // Añadir posición y diferencias
+      // Añadir posición GLOBAL y diferencias
       circuitRankings[circuit].forEach((entry, index) => {
         entry.circuit_position = index + 1;
         
@@ -229,18 +238,66 @@ const TimingsList = () => {
   const groupedTimings = groupTimings(timings);
   const circuitRankings = calculateCircuitRanking(groupedTimings);
   
-  // Añadir información del ranking a cada grupo
+  // Añadir información del ranking a cada grupo usando datos del backend
   Object.values(groupedTimings).forEach(group => {
-    const circuitRanking = circuitRankings[group.circuit];
-    if (circuitRanking) {
-      const rankingEntry = circuitRanking.find(entry => entry.key === group.key);
-      if (rankingEntry) {
+    // Buscar la información de ranking desde el timing del backend que ya tiene los datos correctos
+    // Priorizar: 1) circuit_ranking, 2) current_position directamente, 3) position_change
+    let timingWithRanking = group.sessions.find(session => session.circuit_ranking);
+    
+    if (!timingWithRanking) {
+      // Si no hay circuit_ranking, buscar el que tenga current_position directamente del backend
+      timingWithRanking = group.sessions.find(session => 
+        session.current_position !== null && session.current_position !== undefined
+      );
+    }
+    
+    if (!timingWithRanking) {
+      // Como último recurso, buscar el que tenga position_change del backend
+      timingWithRanking = group.sessions.find(session => 
+        session.position_change !== null && session.position_change !== undefined
+      );
+    }
+    
+    if (timingWithRanking) {
+      if (timingWithRanking.circuit_ranking) {
+        // Usar datos de circuit_ranking
         group.circuit_ranking = {
-          position: rankingEntry.circuit_position,
-          gap_to_leader: rankingEntry.circuit_gap_to_leader,
-          gap_to_previous: rankingEntry.circuit_gap_to_previous,
-          gap_to_best_total: rankingEntry.circuit_gap_to_best_total
+          position: timingWithRanking.circuit_ranking.position,
+          previous_position: timingWithRanking.circuit_ranking.previous_position,
+          position_change: timingWithRanking.circuit_ranking.position_change,
+          gap_to_leader: timingWithRanking.circuit_ranking.gap_to_leader,
+          gap_to_previous: timingWithRanking.circuit_ranking.gap_to_previous
         };
+        
+        // console.log(`🔍 Ranking (circuit_ranking) para ${group.vehicle_manufacturer} ${group.vehicle_model}:`, group.circuit_ranking);
+      } else {
+        // Usar datos directos de la tabla vehicle_timings
+        group.circuit_ranking = {
+          position: timingWithRanking.current_position,
+          previous_position: timingWithRanking.previous_position,
+          position_change: timingWithRanking.position_change,
+          gap_to_leader: null,
+          gap_to_previous: null
+        };
+        
+        // console.log(`🔍 Ranking (directo) para ${group.vehicle_manufacturer} ${group.vehicle_model}:`, group.circuit_ranking);
+      }
+    } else {
+      // Si no hay información del backend, usar el cálculo local como fallback
+      const circuitRanking = circuitRankings[group.circuit];
+      if (circuitRanking) {
+        const rankingEntry = circuitRanking.find(entry => entry.key === group.key);
+        if (rankingEntry) {
+          group.circuit_ranking = {
+            position: rankingEntry.circuit_position,
+            gap_to_leader: rankingEntry.circuit_gap_to_leader,
+            gap_to_previous: rankingEntry.circuit_gap_to_previous,
+            gap_to_best_total: rankingEntry.circuit_gap_to_best_total,
+            position_change: 0 // Sin información de cambio desde cálculo local
+          };
+          
+          // console.log(`⚠️ Usando cálculo local para ${group.vehicle_manufacturer} ${group.vehicle_model}:`, group.circuit_ranking);
+        }
       }
     }
   });
@@ -252,7 +309,18 @@ const TimingsList = () => {
     const matchesCircuit = !filter.circuit || group.circuit.toLowerCase().includes(filter.circuit.toLowerCase());
     const matchesLane = !filter.lane || group.lane.toLowerCase().includes(filter.lane.toLowerCase());
     return matchesVehicle && matchesDateFrom && matchesDateTo && matchesCircuit && matchesLane;
-  }).sort((a, b) => a.best_time.seconds - b.best_time.seconds);
+  }).sort((a, b) => {
+    // Ordenar por posición del backend si está disponible, sino por tiempo
+    const aPosition = a.circuit_ranking?.position || 999;
+    const bPosition = b.circuit_ranking?.position || 999;
+    
+    if (aPosition !== bPosition) {
+      return aPosition - bPosition;
+    }
+    
+    // Si las posiciones son iguales o no hay datos, ordenar por tiempo como fallback
+    return a.best_time.seconds - b.best_time.seconds;
+  });
 
   if (loading) {
     return (
@@ -413,7 +481,7 @@ const TimingsList = () => {
                             style={{ minWidth: 'auto', color: '#6c757d' }}
                             title={expandedGroups.has(group.key) ? 'Ocultar historial' : 'Ver historial completo'}
                           >
-                            {expandedGroups.has(group.key) ? '🔽' : '▶️'}
+                            {expandedGroups.has(group.key) ? <FaChevronDown /> : <FaChevronRight />}
                           </Button>
                         )}
                         <Link to={`/vehicles/${group.vehicle_id}`}>
@@ -440,15 +508,22 @@ const TimingsList = () => {
                               P{group.circuit_ranking.position}
                             </span>
                           </div>
-                          {group.circuit_ranking.position_change !== 0 && (
+                          {group.circuit_ranking.position_change !== undefined && group.circuit_ranking.position_change !== null && group.circuit_ranking.position_change !== 0 && (
                             <div className="position-change">
                               {group.circuit_ranking.position_change > 0 ? (
-                                <span className="text-success fw-bold">
-                                  ⬆️ +{group.circuit_ranking.position_change}
+                                <span className="text-success fw-bold d-flex align-items-center justify-content-center" style={{ fontSize: '0.8em' }}>
+                                  <FaArrowUp className="me-1" />
+                                  +{group.circuit_ranking.position_change}
+                                </span>
+                              ) : group.circuit_ranking.position_change < 0 ? (
+                                <span className="text-danger fw-bold d-flex align-items-center justify-content-center" style={{ fontSize: '0.8em' }}>
+                                  <FaArrowDown className="me-1" />
+                                  {group.circuit_ranking.position_change}
                                 </span>
                               ) : (
-                                <span className="text-danger fw-bold">
-                                  ⬇️ {group.circuit_ranking.position_change}
+                                <span className="text-muted fw-bold d-flex align-items-center justify-content-center" style={{ fontSize: '0.8em' }}>
+                                  <FaMinus className="me-1" />
+                                  =
                                 </span>
                               )}
                             </div>

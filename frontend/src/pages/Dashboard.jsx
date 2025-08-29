@@ -22,6 +22,7 @@ import TopComponentsTable from '../components/tables/TopComponentsTable';
 import PerformanceByTypeChart from '../components/charts/PerformanceByTypeChart';
 import InvestmentTimelineChart from '../components/charts/InvestmentTimelineChart';
 import InsightsCarousel from '../components/InsightsCarousel';
+import LaneComparisonChart from '../components/LaneComparisonChart';
 import api from '../lib/axios';
 
 const Dashboard = () => {
@@ -357,6 +358,8 @@ const Dashboard = () => {
             </Col>
           </Row>
 
+          
+
           <Row className="g-3 mb-4">
             <Col xs={12}>
               <TopCostTable data={chartsData.topCostVehicles || []} />
@@ -366,6 +369,13 @@ const Dashboard = () => {
           <Row className="g-3">
             <Col xs={12}>
               <TopComponentsTable data={chartsData.topComponents || []} />
+            </Col>
+          </Row>
+          {/* Nueva Sección: Comparativa de Carriles */}
+          <h4 className="mb-3 mt-4">Análisis de Tiempos por Carril</h4>
+          <Row className="g-3 mb-4">
+            <Col xs={12}>
+              <LaneComparisonChart />
             </Col>
           </Row>
         </>

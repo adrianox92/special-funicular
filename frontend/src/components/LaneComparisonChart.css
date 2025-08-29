@@ -1,0 +1,233 @@
+/* Estilos para el componente LaneComparisonChart */
+
+.lane-comparison-card {
+  transition: all 0.3s ease;
+  border: 1px solid #dee2e6;
+}
+
+.lane-comparison-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.lane-summary-card {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.lane-summary-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.lane-badge {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+}
+
+.lane-badge.carril-1 { background-color: #007bff; }
+.lane-badge.carril-2 { background-color: #28a745; }
+.lane-badge.carril-3 { background-color: #17a2b8; }
+.lane-badge.carril-4 { background-color: #ffc107; }
+.lane-badge.carril-5 { background-color: #dc3545; }
+.lane-badge.carril-6 { background-color: #6c757d; }
+.lane-badge.carril-7 { background-color: #343a40; }
+.lane-badge.carril-8 { background-color: #f8f9fa; color: #212529; }
+
+.comparison-table {
+  font-size: 0.9rem;
+}
+
+.comparison-table th {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+}
+
+.comparison-table td {
+  vertical-align: middle;
+}
+
+.fastest-vehicle-card {
+  background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+  border: 2px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.fastest-vehicle-card:hover {
+  border-color: #007bff;
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
+}
+
+.ranking-table {
+  font-size: 0.85rem;
+}
+
+.ranking-table th {
+  background-color: #e9ecef;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.position-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.position-badge.first {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #212529;
+  box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+}
+
+.position-badge.second {
+  background: linear-gradient(135deg, #c0c0c0 0%, #e5e5e5 100%);
+  color: #212529;
+  box-shadow: 0 2px 4px rgba(192, 192, 192, 0.3);
+}
+
+.position-badge.third {
+  background: linear-gradient(135deg, #cd7f32 0%, #daa520 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(205, 127, 50, 0.3);
+}
+
+.position-badge.other {
+  background: linear-gradient(135deg, #6c757d 0%, #868e96 100%);
+  color: white;
+}
+
+.time-display {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #28a745;
+}
+
+.average-time {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.difference-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.difference-indicator.faster {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.difference-indicator.slower {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.circuit-selector {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.circuit-selector select {
+  border: 2px solid #007bff;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.circuit-selector select:focus {
+  border-color: #0056b3;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.section-header {
+  color: #495057;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.section-header i {
+  color: #007bff;
+  margin-right: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .lane-summary-card {
+    margin-bottom: 1rem;
+  }
+  
+  .comparison-table {
+    font-size: 0.8rem;
+  }
+  
+  .fastest-vehicle-card {
+    margin-bottom: 1rem;
+  }
+  
+  .position-badge {
+    min-width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Loading states */
+.loading-overlay {
+  position: relative;
+  min-height: 200px;
+}
+
+.loading-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Error states */
+.error-alert {
+  border-left: 4px solid #dc3545;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+/* Success states */
+.success-indicator {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.warning-indicator {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.danger-indicator {
+  color: #dc3545;
+  font-weight: 600;
+}
+

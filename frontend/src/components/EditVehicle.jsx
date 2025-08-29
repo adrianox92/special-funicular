@@ -573,21 +573,54 @@ const EditVehicle = () => {
   const handleAddTiming = async (e) => {
     e.preventDefault();
     try {
+      let response;
       if (editingTiming) {
-        await api.put(`/vehicles/${id}/timings/${editingTiming.id}`, editingTiming);
+        response = await api.put(`/vehicles/${id}/timings/${editingTiming.id}`, editingTiming);
+        console.log('Tiempo actualizado:', response.data);
+        
+        // Si el tiempo actualizado cambió posiciones, mostrar información
+        if (response.data.position_updated) {
+          const positionUpdates = response.data.position_updates || [];
+          const successfulUpdates = positionUpdates.filter(u => u.success);
+          
+          if (successfulUpdates.length > 0) {
+            console.log('✅ Posiciones actualizadas en cascada para circuitos:', successfulUpdates.map(u => u.circuit).join(', '));
+            
+            // Mostrar alerta de éxito temporal
+            const originalError = error;
+            setError(null);
+            
+            // Crear mensaje de éxito
+            const circuitNames = successfulUpdates.map(u => u.circuit).join(', ');
+            const successMessage = `✅ Posiciones actualizadas automáticamente en: ${circuitNames}`;
+            
+            // Mostrar mensaje temporal
+            setTimingWarning(successMessage);
+            setTimeout(() => {
+              setTimingWarning(null);
+              setError(originalError);
+            }, 5000);
+          }
+        }
       } else {
-        const response = await api.post(`/vehicles/${id}/timings`, newTiming);
+        response = await api.post(`/vehicles/${id}/timings`, newTiming);
         console.log('Tiempo añadido:', response.data);
         
         // Si el tiempo tiene información de posición actualizada, mostrarla
         if (response.data.position_updated) {
           console.log('✅ Posiciones actualizadas automáticamente');
+          
+          // Mostrar mensaje de éxito temporal
+          setTimingWarning('✅ Nuevo tiempo registrado y posiciones actualizadas automáticamente');
+          setTimeout(() => {
+            setTimingWarning(null);
+          }, 5000);
         }
       }
 
       // Recargar tiempos
-      const response = await api.get(`/vehicles/${id}/timings`);
-      setTimings(response.data);
+      const reloadResponse = await api.get(`/vehicles/${id}/timings`);
+      setTimings(reloadResponse.data);
       
       // Limpiar el formulario
       handleCancelEditTiming();
@@ -603,10 +636,23 @@ const EditVehicle = () => {
     }
 
     try {
-      await api.delete(`/vehicles/${id}/timings/${timingId}`);
+      const response = await api.delete(`/vehicles/${id}/timings/${timingId}`);
+      console.log('Tiempo eliminado:', response.data);
+      
+      // Si se eliminó un tiempo que afectó posiciones, mostrar información
+      if (response.data.position_updated) {
+        console.log('✅ Posiciones recalculadas después de eliminar tiempo');
+        
+        // Mostrar mensaje de éxito temporal
+        setTimingWarning(`✅ Tiempo eliminado y posiciones recalculadas en: ${response.data.circuit}`);
+        setTimeout(() => {
+          setTimingWarning(null);
+        }, 5000);
+      }
+      
       // Recargar tiempos
-      const response = await api.get(`/vehicles/${id}/timings`);
-      setTimings(response.data);
+      const reloadResponse = await api.get(`/vehicles/${id}/timings`);
+      setTimings(reloadResponse.data);
     } catch (error) {
       console.error('Error al eliminar tiempo:', error);
       setError('Error al eliminar el registro de tiempo');
@@ -922,7 +968,10 @@ const EditVehicle = () => {
       <div className="mt-4">
         <h4>{editingTiming ? 'Editar' : 'Añadir'} Registro de Tiempo</h4>
         {timingWarning && (
-          <Alert variant="warning" className="mb-3">
+          <Alert 
+            variant={timingWarning.includes('✅') ? 'success' : 'warning'} 
+            className="mb-3"
+          >
             {timingWarning}
           </Alert>
         )}

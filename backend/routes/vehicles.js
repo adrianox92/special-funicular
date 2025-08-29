@@ -1069,6 +1069,36 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       return res.status(404).json({ error: 'Registro de tiempo no encontrado' });
     }
 
+    // Detectar si hubo cambios que requieren recálculo de posiciones
+    const previousCircuit = existingTiming.circuit;
+    const newCircuit = circuit;
+    const previousBestLap = existingTiming.best_lap_time;
+    const newBestLap = best_lap_time;
+    const previousLane = existingTiming.lane;
+    const newLane = lane;
+    const previousLaps = existingTiming.laps;
+    const newLaps = laps;
+
+    // Determinar si necesitamos recalcular posiciones
+    const needsPositionUpdate = (
+      previousBestLap !== newBestLap ||  // Cambió el mejor tiempo de vuelta
+      previousLane !== newLane ||        // Cambió el carril
+      previousLaps !== newLaps ||        // Cambió el número de vueltas
+      previousCircuit !== newCircuit     // Cambió el circuito
+    );
+
+    console.log(`🔄 Actualizando tiempo ${timingId}:`, {
+      previousBestLap,
+      newBestLap,
+      previousCircuit,
+      newCircuit,
+      previousLane,
+      newLane,
+      previousLaps,
+      newLaps,
+      needsPositionUpdate
+    });
+
     // Actualizar el registro
     const { data: updatedTiming, error: updateError } = await supabase
       .from('vehicle_timings')
@@ -1092,7 +1122,61 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       return res.status(500).json({ error: updateError.message });
     }
 
-    res.json(updatedTiming);
+    // Recalcular posiciones si es necesario
+    if (needsPositionUpdate) {
+      console.log(`🔄 Recalculando posiciones debido a cambios en el tiempo...`);
+      
+      // Si cambió de circuito, actualizar ambos circuitos
+      const circuitsToUpdate = new Set();
+      if (previousCircuit) circuitsToUpdate.add(previousCircuit);
+      if (newCircuit) circuitsToUpdate.add(newCircuit);
+
+      let positionUpdates = [];
+      
+      for (const circuitToUpdate of circuitsToUpdate) {
+        try {
+          console.log(`🔄 Actualizando posiciones para el circuito: ${circuitToUpdate}`);
+          const positionUpdate = await updatePositionsAfterNewTiming(circuitToUpdate, timingId);
+          
+          if (positionUpdate.success) {
+            console.log(`✅ Posiciones actualizadas para el circuito: ${circuitToUpdate}`);
+            positionUpdates.push({
+              circuit: circuitToUpdate,
+              success: true,
+              ranking: positionUpdate.ranking
+            });
+          } else {
+            console.warn(`⚠️ No se pudieron actualizar las posiciones para el circuito: ${circuitToUpdate}`);
+            positionUpdates.push({
+              circuit: circuitToUpdate,
+              success: false,
+              error: positionUpdate.error
+            });
+          }
+        } catch (positionError) {
+          console.error(`❌ Error al actualizar posiciones para el circuito ${circuitToUpdate}:`, positionError);
+          positionUpdates.push({
+            circuit: circuitToUpdate,
+            success: false,
+            error: positionError.message
+          });
+        }
+      }
+
+      // Enriquecer la respuesta con información de posiciones
+      const enrichedTiming = {
+        ...updatedTiming,
+        position_updated: positionUpdates.some(u => u.success),
+        position_updates: positionUpdates,
+        circuit_ranking: positionUpdates.find(u => u.circuit === newCircuit && u.success)?.ranking?.find(r => r.vehicle_id === id)
+      };
+      
+      res.json(enrichedTiming);
+    } else {
+      console.log(`ℹ️ No se requiere recálculo de posiciones para el tiempo ${timingId}`);
+      res.json(updatedTiming);
+    }
+
   } catch (err) {
     console.error('Error al actualizar tiempo:', err);
     res.status(500).json({ error: err.message });
@@ -1126,6 +1210,9 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
       return res.status(404).json({ error: 'Registro de tiempo no encontrado' });
     }
 
+    // Guardar información del circuito antes de eliminar
+    const deletedCircuit = existingTiming.circuit;
+
     // Eliminar el registro
     const { error: deleteError } = await supabase
       .from('vehicle_timings')
@@ -1136,7 +1223,32 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
       return res.status(500).json({ error: deleteError.message });
     }
 
-    res.json({ message: 'Registro de tiempo eliminado correctamente' });
+    // Recalcular posiciones si el tiempo eliminado tenía circuito
+    if (deletedCircuit) {
+      try {
+        console.log(`🔄 Recalculando posiciones después de eliminar tiempo en circuito: ${deletedCircuit}`);
+        const positionUpdate = await updatePositionsAfterNewTiming(deletedCircuit, null);
+        
+        if (positionUpdate.success) {
+          console.log(`✅ Posiciones recalculadas para el circuito: ${deletedCircuit}`);
+          res.json({ 
+            message: 'Registro de tiempo eliminado correctamente',
+            position_updated: true,
+            circuit: deletedCircuit
+          });
+        } else {
+          console.warn(`⚠️ No se pudieron recalcular las posiciones para el circuito: ${deletedCircuit}`);
+          res.json({ message: 'Registro de tiempo eliminado correctamente' });
+        }
+      } catch (positionError) {
+        console.error(`❌ Error al recalcular posiciones para el circuito ${deletedCircuit}:`, positionError);
+        // Aún devolvemos éxito en la eliminación, pero sin actualización de posiciones
+        res.json({ message: 'Registro de tiempo eliminado correctamente' });
+      }
+    } else {
+      res.json({ message: 'Registro de tiempo eliminado correctamente' });
+    }
+
   } catch (err) {
     console.error('Error al eliminar tiempo:', err);
     res.status(500).json({ error: err.message });

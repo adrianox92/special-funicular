@@ -28,7 +28,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
     // Obtener todos los tiempos del circuito
     const { data: allTimings, error: timingsError } = await supabase
       .from('vehicle_timings')
-      .select('id, vehicle_id, best_lap_time, timing_date, current_position, lane')
+      .select('id, vehicle_id, best_lap_time, timing_date, current_position, lane, laps')
       .eq('circuit', circuit)
       .not('best_lap_time', 'is', null)
       .order('best_lap_time', { ascending: true });
@@ -42,15 +42,16 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
       return { success: true, message: 'No hay tiempos para actualizar' };
     }
 
-    // Agrupar por vehículo + carril y obtener solo el mejor tiempo de cada combinación
-    const bestTimingsByVehicleLane = {};
+    // Agrupar por vehículo + carril + vueltas y obtener solo el mejor tiempo de cada combinación
+    // El ranking es global por circuito, donde cada coche puede tener hasta 2 entradas (carril 1 y carril 2)
+    const bestTimingsByVehicleLaneVueltas = {};
     
     allTimings.forEach(timing => {
-      const key = `${timing.vehicle_id}-${timing.lane || 'sin-carril'}`;
+      const key = `${timing.vehicle_id}-${timing.lane || 'sin-carril'}-${timing.laps || 'sin-vueltas'}`;
       const lapTime = timeToSeconds(timing.best_lap_time);
       
-      if (!bestTimingsByVehicleLane[key] || lapTime < bestTimingsByVehicleLane[key].lapTime) {
-        bestTimingsByVehicleLane[key] = {
+      if (!bestTimingsByVehicleLaneVueltas[key] || lapTime < bestTimingsByVehicleLaneVueltas[key].lapTime) {
+        bestTimingsByVehicleLaneVueltas[key] = {
           ...timing,
           lapTime
         };
@@ -58,26 +59,46 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
     });
 
     // Convertir a array y ordenar por mejor tiempo
-    const timings = Object.values(bestTimingsByVehicleLane).sort((a, b) => a.lapTime - b.lapTime);
+    const timings = Object.values(bestTimingsByVehicleLaneVueltas).sort((a, b) => a.lapTime - b.lapTime);
 
     console.log(`📊 Procesando ${timings.length} mejores tiempos únicos para el circuito ${circuit} (de ${allTimings.length} tiempos totales)`);
 
-    // Actualizar posiciones y calcular cambios
-    const updatePromises = timings.map(async (timing, index) => {
-      const currentPosition = index + 1;
-      const previousPosition = timing.current_position || currentPosition;
-      const positionChange = previousPosition - currentPosition; // Positivo = subió, negativo = bajó
-
-      // Actualizar TODOS los tiempos de este vehículo+carril+circuito con la misma posición
-      const vehicleLaneKey = `${timing.vehicle_id}-${timing.lane || 'sin-carril'}`;
+    // PRIMERO: Obtener las posiciones actuales de todos los vehículos ANTES de hacer cambios
+    const currentPositions = {};
+    for (const timing of timings) {
+      const { data: currentTimingData, error: currentTimingError } = await supabase
+        .from('vehicle_timings')
+        .select('current_position')
+        .eq('id', timing.id)
+        .single();
       
-      // Obtener todos los tiempos de este vehículo en este carril y circuito
+      if (currentTimingError) {
+        console.error(`❌ Error al obtener posición actual del timing ${timing.id}:`, currentTimingError.message);
+        currentPositions[timing.id] = 999; // Posición muy alta como fallback
+      } else {
+        currentPositions[timing.id] = currentTimingData.current_position || 999;
+      }
+    }
+
+    // SEGUNDO: Calcular las nuevas posiciones y cambios
+    const updatePromises = timings.map(async (timing, index) => {
+      const newPosition = index + 1;
+      const previousPosition = currentPositions[timing.id];
+      const positionChange = previousPosition - newPosition; // Positivo = subió, negativo = bajó
+
+      console.log(`   🔍 Vehículo ${timing.vehicle_id}: P${previousPosition} → P${newPosition} (cambio: ${positionChange > 0 ? '+' : ''}${positionChange})`);
+
+      // Actualizar TODOS los tiempos de este vehículo+circuito+carril+vueltas con la misma posición
+      // Cada combinación vehículo+carril+vueltas tiene su propia posición en el ranking global
+      
+      // Obtener todos los tiempos de este vehículo en este circuito, carril y número de vueltas
       const { data: vehicleTimings, error: vehicleTimingsError } = await supabase
         .from('vehicle_timings')
         .select('id')
         .eq('vehicle_id', timing.vehicle_id)
         .eq('circuit', circuit)
-        .eq('lane', timing.lane || null);
+        .eq('lane', timing.lane)
+        .eq('laps', timing.laps || null);
 
       if (vehicleTimingsError) {
         console.error(`❌ Error al obtener tiempos del vehículo ${timing.vehicle_id}:`, vehicleTimingsError.message);
@@ -86,35 +107,58 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
 
       // Solo actualizar si hay cambios o si es un nuevo tiempo
       if (positionChange !== 0 || timing.id === newTimingId || vehicleTimings.some(vt => vt.id === newTimingId)) {
-        const updateData = {
-          current_position: currentPosition,
+        
+        // 1. Actualizar el mejor tiempo (timing.id) con la posición
+        const updateBestData = {
+          current_position: newPosition,
           previous_position: previousPosition,
           position_updated_at: new Date().toISOString(),
           position_change: positionChange
         };
 
-        // Actualizar todos los tiempos de este vehículo+carril
-        const timingIds = vehicleTimings.map(vt => vt.id);
-        const { error: updateError } = await supabase
+        const { error: updateBestError } = await supabase
           .from('vehicle_timings')
-          .update(updateData)
-          .in('id', timingIds);
+          .update(updateBestData)
+          .eq('id', timing.id);
 
-        if (updateError) {
-          console.error(`❌ Error al actualizar posiciones para vehículo ${timing.vehicle_id}:`, updateError.message);
-          return { success: false, error: updateError.message };
+        if (updateBestError) {
+          console.error(`❌ Error al actualizar mejor tiempo ${timing.id}:`, updateBestError.message);
+          return { success: false, error: updateBestError.message };
+        }
+
+        // 2. Actualizar los otros tiempos del mismo grupo para quitar su posición
+        const otherTimingIds = vehicleTimings.map(vt => vt.id).filter(id => id !== timing.id);
+        
+        if (otherTimingIds.length > 0) {
+          const updateOthersData = {
+            current_position: null,
+            previous_position: null,
+            position_updated_at: new Date().toISOString(),
+            position_change: 0
+          };
+
+          const { error: updateOthersError } = await supabase
+            .from('vehicle_timings')
+            .update(updateOthersData)
+            .in('id', otherTimingIds);
+
+          if (updateOthersError) {
+            console.error(`❌ Error al actualizar otros tiempos:`, updateOthersError.message);
+          } else {
+            console.log(`   📝 Otros ${otherTimingIds.length} registros actualizados a position = null`);
+          }
         }
 
         // Log del cambio de posición si es significativo
         if (positionChange !== 0) {
           const changeText = positionChange > 0 ? `subió ${positionChange} puesto(s)` : `bajó ${Math.abs(positionChange)} puesto(s)`;
-          console.log(`📈 Vehículo ${timing.vehicle_id} ${changeText} en ${circuit}: P${previousPosition} → P${currentPosition} (${timingIds.length} tiempos actualizados)`);
+          console.log(`📈 Vehículo ${timing.vehicle_id} ${changeText} en ${circuit}: P${previousPosition} → P${newPosition} (1 mejor tiempo + ${otherTimingIds.length} otros actualizados)`);
         }
 
-        return { success: true, positionChange, previousPosition, currentPosition, timingsUpdated: timingIds.length };
+        return { success: true, positionChange, previousPosition, currentPosition: newPosition, timingsUpdated: 1 + otherTimingIds.length };
       }
 
-      return { success: true, positionChange: 0, previousPosition, currentPosition, timingsUpdated: 0 };
+      return { success: true, positionChange: 0, previousPosition, currentPosition: newPosition, timingsUpdated: 0 };
     });
 
     // Esperar a que se completen todas las actualizaciones
@@ -166,6 +210,7 @@ async function getCircuitRanking(circuit) {
         position_updated_at,
         current_position,
         lane,
+        laps,
         vehicles!inner (
           id,
           model,
@@ -184,15 +229,16 @@ async function getCircuitRanking(circuit) {
       return [];
     }
 
-    // Agrupar por vehículo + carril y obtener solo el mejor tiempo de cada combinación
-    const bestTimingsByVehicleLane = {};
+    // Agrupar por vehículo + carril + vueltas y obtener solo el mejor tiempo de cada combinación
+    // El ranking es global por circuito, donde cada coche puede tener hasta 2 entradas (carril 1 y carril 2)
+    const bestTimingsByVehicleLaneVueltas = {};
     
     allTimings.forEach(timing => {
-      const key = `${timing.vehicle_id}-${timing.lane || 'sin-carril'}`;
+      const key = `${timing.vehicle_id}-${timing.lane || 'sin-carril'}-${timing.laps || 'sin-vueltas'}`;
       const lapTime = timeToSeconds(timing.best_lap_time);
       
-      if (!bestTimingsByVehicleLane[key] || lapTime < bestTimingsByVehicleLane[key].lapTime) {
-        bestTimingsByVehicleLane[key] = {
+      if (!bestTimingsByVehicleLaneVueltas[key] || lapTime < bestTimingsByVehicleLaneVueltas[key].lapTime) {
+        bestTimingsByVehicleLaneVueltas[key] = {
           ...timing,
           lapTime
         };
@@ -200,11 +246,12 @@ async function getCircuitRanking(circuit) {
     });
 
     // Convertir a array y ordenar por mejor tiempo
-    const timings = Object.values(bestTimingsByVehicleLane).sort((a, b) => a.lapTime - b.lapTime);
+    const timings = Object.values(bestTimingsByVehicleLaneVueltas).sort((a, b) => a.lapTime - b.lapTime);
 
     // Enriquecer con información de posición y cambios
     return timings.map((timing, index) => {
       const currentPosition = index + 1;
+      // Usar el previous_position almacenado en la base de datos, no calcularlo
       const previousPosition = timing.previous_position || currentPosition;
       const positionChange = timing.position_change || 0;
 

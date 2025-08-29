@@ -1,42 +1,15 @@
+const { updateCircuitPositions } = require('../lib/positionTracker');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
-const { updateCircuitPositions } = require('../lib/positionTracker');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Error: SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY deben estar definidos en .env');
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 async function recalculateAllPositions() {
-  console.log('🔄 Iniciando recálculo de todas las posiciones...');
-  
+  console.log('🔄 Iniciando recálculo completo de posiciones...\n');
+
   try {
-    // 1. Resetear todas las posiciones actuales
-    console.log('\n🗑️  Reseteando posiciones actuales...');
-    const { error: resetError } = await supabase
-      .from('vehicle_timings')
-      .update({
-        current_position: null,
-        previous_position: null,
-        position_change: 0,
-        position_updated_at: new Date().toISOString()
-      })
-      .not('circuit', 'is', null);
-
-    if (resetError) {
-      console.error('❌ Error al resetear posiciones:', resetError.message);
-      return;
-    }
-
-    console.log('✅ Posiciones reseteadas correctamente');
-
-    // 2. Obtener todos los circuitos únicos
-    console.log('\n🔍 Obteniendo circuitos únicos...');
+    // 1. Obtener todos los circuitos únicos
+    console.log('📋 Obteniendo lista de circuitos...');
     const { data: circuits, error: circuitsError } = await supabase
       .from('vehicle_timings')
       .select('circuit')
@@ -45,92 +18,109 @@ async function recalculateAllPositions() {
       .order('circuit');
 
     if (circuitsError) {
-      console.error('❌ Error al obtener circuitos:', circuitsError.message);
-      return;
+      throw new Error(`Error al obtener circuitos: ${circuitsError.message}`);
     }
 
     const uniqueCircuits = [...new Set(circuits.map(c => c.circuit))];
-    console.log(`📊 Encontrados ${uniqueCircuits.length} circuitos únicos:`, uniqueCircuits);
+    console.log(`✅ Encontrados ${uniqueCircuits.length} circuitos únicos`);
 
     if (uniqueCircuits.length === 0) {
-      console.log('⚠️  No hay circuitos para recalcular');
+      console.log('⚠️  No hay circuitos para procesar');
       return;
     }
 
-    // 3. Recalcular posiciones para cada circuito
-    let totalUpdates = 0;
-    let totalFailures = 0;
-
+    // 2. Procesar cada circuito
+    console.log('\n🏁 Procesando circuitos...');
+    const results = [];
+    
     for (const circuit of uniqueCircuits) {
-      console.log(`\n🏁 Recalculando posiciones para: ${circuit}`);
+      console.log(`\n🔄 Procesando circuito: ${circuit}`);
       
       try {
         const result = await updateCircuitPositions(circuit);
-        
+        results.push({
+          circuit,
+          success: result.success,
+          totalTimings: result.totalTimings,
+          successfulUpdates: result.successfulUpdates,
+          failedUpdates: result.failedUpdates
+        });
+
         if (result.success) {
-          console.log(`✅ ${circuit}: ${result.successfulUpdates} actualizaciones exitosas`);
-          totalUpdates += result.successfulUpdates;
-          if (result.failedUpdates > 0) {
-            console.warn(`⚠️  ${circuit}: ${result.failedUpdates} actualizaciones fallidas`);
-            totalFailures += result.failedUpdates;
-          }
+          console.log(`   ✅ ${circuit}: ${result.successfulUpdates} actualizaciones exitosas`);
         } else {
-          console.error(`❌ Error en circuito ${circuit}:`, result.error);
-          totalFailures++;
+          console.log(`   ❌ ${circuit}: ${result.error}`);
         }
       } catch (error) {
-        console.error(`❌ Error al procesar circuito ${circuit}:`, error.message);
-        totalFailures++;
+        console.error(`   ❌ Error procesando ${circuit}:`, error.message);
+        results.push({
+          circuit,
+          success: false,
+          error: error.message
+        });
       }
     }
 
-    // 4. Resumen final
-    console.log('\n📋 Resumen del recálculo:');
-    console.log(`   Circuitos procesados: ${uniqueCircuits.length}`);
-    console.log(`   Actualizaciones exitosas: ${totalUpdates}`);
-    console.log(`   Fallos: ${totalFailures}`);
-
-    if (totalFailures === 0) {
-      console.log('\n🎉 Recálculo completado exitosamente!');
-    } else {
-      console.log('\n⚠️  Recálculo completado con algunos errores');
+    // 3. Resumen final
+    console.log('\n📊 Resumen del recálculo:');
+    const successfulCircuits = results.filter(r => r.success);
+    const failedCircuits = results.filter(r => !r.success);
+    
+    console.log(`   ✅ Circuitos procesados exitosamente: ${successfulCircuits.length}/${uniqueCircuits.length}`);
+    console.log(`   ❌ Circuitos con errores: ${failedCircuits.length}`);
+    
+    if (successfulCircuits.length > 0) {
+      const totalUpdates = successfulCircuits.reduce((sum, r) => sum + (r.successfulUpdates || 0), 0);
+      const totalTimings = successfulCircuits.reduce((sum, r) => sum + (r.totalTimings || 0), 0);
+      console.log(`   📝 Total de tiempos procesados: ${totalTimings}`);
+      console.log(`   📝 Total de actualizaciones: ${totalUpdates}`);
     }
 
-    // 5. Verificar algunas posiciones como muestra
-    console.log('\n🔍 Verificando posiciones recalculadas...');
-    for (const circuit of uniqueCircuits.slice(0, 2)) { // Solo los primeros 2 circuitos
-      const { data: sampleTimings, error: sampleError } = await supabase
-        .from('vehicle_timings')
-        .select(`
-          vehicle_id,
-          best_lap_time,
-          current_position,
-          position_change,
-          lane,
-          vehicles!inner (
-            manufacturer,
-            model
-          )
-        `)
-        .eq('circuit', circuit)
-        .not('best_lap_time', 'is', null)
-        .order('current_position', { ascending: true })
-        .limit(5);
+    if (failedCircuits.length > 0) {
+      console.log('\n⚠️  Circuitos con errores:');
+      failedCircuits.forEach(r => {
+        console.log(`   - ${r.circuit}: ${r.error}`);
+      });
+    }
 
-      if (!sampleError && sampleTimings) {
-        console.log(`\n🏆 Top 5 en ${circuit}:`);
-        sampleTimings.forEach((timing, index) => {
-          const changeIcon = timing.position_change > 0 ? '⬆️' : timing.position_change < 0 ? '⬇️' : '➡️';
-          console.log(`   P${timing.current_position}: ${timing.vehicles.manufacturer} ${timing.vehicles.model} - ${timing.best_lap_time} ${changeIcon}`);
-        });
+    console.log('\n✅ Recálculo de posiciones completado!');
+    
+    // 4. Verificar que las posiciones se calcularon correctamente
+    console.log('\n🔍 Verificando resultados...');
+    for (const circuit of uniqueCircuits.slice(0, 3)) { // Solo verificar los primeros 3
+      try {
+        const { data: timings, error } = await supabase
+          .from('vehicle_timings')
+          .select('current_position, previous_position, position_change')
+          .eq('circuit', circuit)
+          .not('current_position', 'is', null)
+          .order('current_position')
+          .limit(5);
+
+        if (!error && timings.length > 0) {
+          console.log(`   ${circuit}: ${timings.length} posiciones verificadas`);
+          timings.forEach(t => {
+            if (t.position_change !== 0) {
+              const changeText = t.position_change > 0 ? `+${t.position_change}` : `${t.position_change}`;
+              console.log(`     P${t.current_position} (cambio: ${changeText})`);
+            }
+          });
+        }
+      } catch (error) {
+        console.log(`   ⚠️  No se pudo verificar ${circuit}: ${error.message}`);
       }
     }
 
   } catch (error) {
     console.error('❌ Error durante el recálculo:', error);
+    process.exit(1);
   }
 }
 
-// Ejecutar el recálculo
-recalculateAllPositions();
+// Ejecutar si se llama directamente
+if (require.main === module) {
+  recalculateAllPositions();
+}
+
+module.exports = { recalculateAllPositions };
 

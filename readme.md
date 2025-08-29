@@ -14,6 +14,15 @@ Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo qu
 - **Experiencia nativa**: Se comporta como una aplicación móvil nativa
 - **Actualizaciones automáticas**: Se actualiza automáticamente cuando hay nuevas versiones
 
+### 🏁 Funcionalidades de Tiempos y Carriles
+
+- **Comparativa de Carriles**: Análisis detallado de rendimiento por carril en cada circuito
+- **Filtrado por Circuito**: Selecciona cualquier circuito para analizar sus carriles
+- **Análisis de Diferencias**: Compara tiempos entre carriles con métricas de diferencia y porcentaje
+- **Ranking por Carril**: Clasificación detallada de vehículos en cada carril
+- **Identificación de Rápidos**: Descubre qué vehículos son más rápidos en cada carril específico
+- **Métricas de Rendimiento**: Estadísticas completas incluyendo tiempos promedio y mejores marcas
+
 ### 📲 Cómo Instalar la PWA
 
 #### En Android (Chrome):
@@ -51,7 +60,45 @@ Si no ves el botón de instalación:
 4. **Revisa la consola**: Busca errores relacionados con el Service Worker
 5. **Reinstala**: Si ya está instalada, desinstala y vuelve a instalar
 
+### 🆕 Nuevas Funcionalidades
+
+#### Comparativa de Carriles en Dashboard
+**Descripción**: Nueva sección dedicada al análisis de rendimiento por carriles en el dashboard principal.
+
+**Características**:
+- **Selector de Circuito**: Filtra por cualquier circuito disponible en la base de datos
+- **Resumen de Carriles**: Muestra estadísticas generales de cada carril (número de vehículos, mejor tiempo)
+- **Comparativa de Tiempos**: Calcula diferencias entre carriles con métricas de porcentaje
+- **Vehículos Más Rápidos**: Identifica el vehículo más rápido de cada carril
+- **Ranking Detallado**: Tabla completa de posiciones por carril con todos los vehículos
+
+**Uso**:
+1. Ve al Dashboard principal
+2. En la sección "Análisis de Tiempos por Carril"
+3. Selecciona un circuito del dropdown
+4. Analiza las comparativas y rankings por carril
+
+**Archivos añadidos**:
+- `frontend/src/components/LaneComparisonChart.jsx` - Componente principal de comparativa
+- Integración en `frontend/src/pages/Dashboard.jsx`
+
 ### 🔧 Problemas Resueltos
+
+#### Problema de Tracking de Posiciones
+**Problema**: Cuando se añadía un nuevo tiempo que mejoraba la posición de un vehículo, solo se mostraba el `position_change` como -1 (bajada de posición) pero no se registraba correctamente la mejora de posiciones para otros vehículos.
+
+**Causa**: La lógica del backend no preservaba correctamente el `previous_position` antes de actualizar `current_position`, causando que el cálculo del `position_change` fuera incorrecto.
+
+**Solución**: 
+- Corregimos la función `updateCircuitPositions` para obtener la posición actual desde la base de datos antes de modificarla
+- Preservamos correctamente el `previous_position` antes de calcular el `position_change`
+- Mejoramos la lógica de `getCircuitRanking` para usar los valores almacenados correctamente
+- Creamos scripts de prueba y recálculo para verificar la funcionalidad
+
+**Archivos modificados**:
+- `backend/lib/positionTracker.js` - Lógica de cálculo de posiciones corregida
+- `backend/test-position-tracking.js` - Script de prueba del sistema
+- `backend/scripts/recalculate-positions.js` - Script para recalcular posiciones existentes
 
 #### Problema de Navegación PWA
 **Problema**: Los enlaces del menú no funcionaban después de implementar la PWA.
@@ -106,9 +153,12 @@ Para usar las herramientas de debug:
 La aplicación ahora incluye un **sistema avanzado de seguimiento de posiciones** que permite:
 
 - **Posición en tiempo real**: Muestra la posición actual de cada vehículo en cada circuito
+- **Actualización en cascada**: Cuando un vehículo mejora su tiempo, **todas las posiciones afectadas se recalculan automáticamente**
+- **Detección inteligente de cambios**: El sistema detecta automáticamente si los cambios requieren recálculo (mejor tiempo, circuito, carril, vueltas)
 - **Cambios de posición**: Indica si un vehículo subió o bajó de posición
 - **Historial de posiciones**: Rastrea la evolución de las posiciones a lo largo del tiempo
 - **Rankings por circuito**: Clasificaciones separadas para cada circuito
+- **Feedback visual**: El usuario recibe notificaciones cuando las posiciones se actualizan automáticamente
 
 ### 🔧 Características Técnicas
 

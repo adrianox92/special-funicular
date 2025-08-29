@@ -1,7 +1,7 @@
 // service-worker.js - Service Worker simplificado para PWA
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = "scalextric-cache-v2";
+const CACHE_NAME = "scalextric-cache-v1";
 
 // Archivos estáticos que se cachean inmediatamente
 const STATIC_FILES = [
@@ -56,17 +56,12 @@ self.addEventListener("activate", event => {
   );
 });
 
-// Interceptación de peticiones
+// Interceptación de peticiones - SOLO archivos estáticos
 self.addEventListener("fetch", event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Solo interceptar si es del mismo origen
-  if (url.origin !== location.origin) {
-    return;
-  }
-
-  // Archivos estáticos específicos
+  // Solo interceptar archivos estáticos específicos
   if (STATIC_FILES.includes(url.pathname)) {
     event.respondWith(
       caches.match(request)
@@ -80,48 +75,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Para navegación (HTML requests), siempre servir index.html
-  // Esto permite que React Router maneje las rutas del lado del cliente
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('/index.html')
-        .then(response => {
-          if (response) {
-            return response;
-          }
-          return fetch('/index.html');
-        })
-    );
-    return;
-  }
-
-  // Para todas las demás peticiones (JS, CSS, imágenes), intentar cache primero
-  if (request.destination === 'script' || 
-      request.destination === 'style' || 
-      request.destination === 'image' ||
-      request.destination === 'font') {
-    event.respondWith(
-      caches.match(request)
-        .then(response => {
-          if (response) {
-            return response;
-          }
-          return fetch(request)
-            .then(fetchResponse => {
-              // Cachear la respuesta si es exitosa
-              if (fetchResponse.status === 200) {
-                const responseToCache = fetchResponse.clone();
-                caches.open(CACHE_NAME)
-                  .then(cache => {
-                    cache.put(request, responseToCache);
-                  });
-              }
-              return fetchResponse;
-            });
-        })
-    );
-    return;
-  }
+  // Para todas las demás peticiones, NO interceptar
+  // Esto permite que React Router maneje la navegación normalmente
 });
 
 // Manejo de mensajes
