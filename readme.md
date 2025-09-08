@@ -84,6 +84,19 @@ Si no ves el botón de instalación:
 
 ### 🔧 Problemas Resueltos
 
+#### Simplificación de Tabla de Tiempos
+**Problema**: La tabla de tiempos tenía lógica compleja de cambio de posiciones que podía causar confusión y problemas de rendimiento.
+
+**Solución**: 
+- Eliminada la lógica compleja de tracking de cambios de posición del backend
+- Simplificado el ordenamiento para que sea únicamente por mejor tiempo de vuelta (de menor a mayor)
+- Mantenida la funcionalidad de cálculo local de diferencias de tiempo entre posiciones
+- Conservada la columna de posición con información de diferencias al líder y al anterior clasificado
+- Removidos los imports innecesarios de iconos de flechas de cambio de posición
+
+**Archivos modificados**:
+- `frontend/src/components/TimingsList.jsx` - Simplificación de la lógica manteniendo diferencias de tiempo
+
 #### Problema de Tracking de Posiciones
 **Problema**: Cuando se añadía un nuevo tiempo que mejoraba la posición de un vehículo, solo se mostraba el `position_change` como -1 (bajada de posición) pero no se registraba correctamente la mejora de posiciones para otros vehículos.
 
