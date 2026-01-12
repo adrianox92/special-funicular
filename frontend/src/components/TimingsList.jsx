@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Spinner, Alert, Container, Form, Row, Col, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { FaArrowUp, FaArrowDown, FaMinus, FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
 import './TimingsList.css';
@@ -71,7 +71,13 @@ const TimingsList = () => {
   const getSeconds = (timeStr) => {
     const [minutes, seconds] = timeStr.split(':');
     const [secs, ms] = seconds.split('.');
-    return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+    const parsed = parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+    // #region agent log
+    if (Number.isNaN(parsed)) {
+      fetch('http://127.0.0.1:7242/ingest/7cb16915-a7a1-47f6-b806-7fb95e244063',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-pre',hypothesisId:'H2',location:'TimingsList.jsx:getSeconds',message:'Parsed lap time is NaN',data:{timeStr},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
+    return parsed;
   };
 
   // Función para agrupar tiempos por vehículo + circuito + carril + vueltas
@@ -107,6 +113,9 @@ const TimingsList = () => {
           ...timing,
           seconds: currentLapTime
         };
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7cb16915-a7a1-47f6-b806-7fb95e244063',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'TimingsList.jsx:best_time',message:'Best time updated for group',data:{groupKey:key,lapSeconds:currentLapTime,totalSeconds:getTotalSeconds(timing.total_time),timingId:timing.id},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       }
       
       // Calcular la sesión más reciente por fecha
@@ -123,10 +132,13 @@ const TimingsList = () => {
         const sortedByLapTime = group.sessions
           .map(s => ({ ...s, lapSeconds: getSeconds(s.best_lap_time) }))
           .sort((a, b) => a.lapSeconds - b.lapSeconds);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7cb16915-a7a1-47f6-b806-7fb95e244063',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-pre',hypothesisId:'H3',location:'TimingsList.jsx:group_sort',message:'Group sorted by lap time',data:{groupKey:group.key,orderedSessions:sortedByLapTime.map(s=>({id:s.id,lapSeconds:s.lapSeconds,bestLap:s.best_lap_time,timingDate:s.timing_date}))},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         
         // Ordenar por tiempo total
         const sortedByTotalTime = group.sessions
-          .map(s => ({ ...s, totalSeconds: getSeconds(s.total_time) }))
+          .map(s => ({ ...s, totalSeconds: getTotalSeconds(s.total_time) }))
           .sort((a, b) => a.totalSeconds - b.totalSeconds);
         
         const bestLap = sortedByLapTime[0];
@@ -196,6 +208,10 @@ const TimingsList = () => {
         // Diferencia con el mejor tiempo total del circuito
         const bestTotalInCircuit = Math.min(...circuitRankings[circuit].map(e => e.best_total_seconds));
         entry.circuit_gap_to_best_total = (entry.best_total_seconds - bestTotalInCircuit).toFixed(3);
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7cb16915-a7a1-47f6-b806-7fb95e244063',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'TimingsList.jsx:circuit_ranking',message:'Circuit ranking entry',data:{circuit,position:entry.circuit_position,bestLapSeconds:entry.best_lap_seconds,gapToLeader:entry.circuit_gap_to_leader,gapToPrev:entry.circuit_gap_to_previous,groupKey:entry.key},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       });
     });
     
@@ -238,68 +254,48 @@ const TimingsList = () => {
   const groupedTimings = groupTimings(timings);
   const circuitRankings = calculateCircuitRanking(groupedTimings);
   
-  // Añadir información del ranking a cada grupo usando datos del backend
+  // Añadir información del ranking a cada grupo - SIEMPRE usar cálculo local para posición y gaps
+  // El backend puede tener datos desactualizados, así que priorizamos el cálculo local basado en tiempos
   Object.values(groupedTimings).forEach(group => {
-    // Buscar la información de ranking desde el timing del backend que ya tiene los datos correctos
-    // Priorizar: 1) circuit_ranking, 2) current_position directamente, 3) position_change
-    let timingWithRanking = group.sessions.find(session => session.circuit_ranking);
+    const localRankingEntry = circuitRankings[group.circuit]?.find(entry => entry.key === group.key);
     
-    if (!timingWithRanking) {
-      // Si no hay circuit_ranking, buscar el que tenga current_position directamente del backend
-      timingWithRanking = group.sessions.find(session => 
-        session.current_position !== null && session.current_position !== undefined
-      );
-    }
-    
-    if (!timingWithRanking) {
-      // Como último recurso, buscar el que tenga position_change del backend
-      timingWithRanking = group.sessions.find(session => 
-        session.position_change !== null && session.position_change !== undefined
-      );
-    }
-    
-    if (timingWithRanking) {
-      if (timingWithRanking.circuit_ranking) {
-        // Usar datos de circuit_ranking
-        group.circuit_ranking = {
-          position: timingWithRanking.circuit_ranking.position,
-          previous_position: timingWithRanking.circuit_ranking.previous_position,
-          position_change: timingWithRanking.circuit_ranking.position_change,
-          gap_to_leader: timingWithRanking.circuit_ranking.gap_to_leader,
-          gap_to_previous: timingWithRanking.circuit_ranking.gap_to_previous
-        };
-        
-        // console.log(`🔍 Ranking (circuit_ranking) para ${group.vehicle_manufacturer} ${group.vehicle_model}:`, group.circuit_ranking);
-      } else {
-        // Usar datos directos de la tabla vehicle_timings
-        group.circuit_ranking = {
-          position: timingWithRanking.current_position,
-          previous_position: timingWithRanking.previous_position,
-          position_change: timingWithRanking.position_change,
-          gap_to_leader: null,
-          gap_to_previous: null
-        };
-        
-        // console.log(`🔍 Ranking (directo) para ${group.vehicle_manufacturer} ${group.vehicle_model}:`, group.circuit_ranking);
+    if (localRankingEntry) {
+      // SIEMPRE usar el cálculo local para posición y gaps (basado en tiempos reales)
+      group.circuit_ranking = {
+        position: localRankingEntry.circuit_position,
+        gap_to_leader: localRankingEntry.circuit_gap_to_leader,
+        gap_to_previous: localRankingEntry.circuit_gap_to_previous,
+        gap_to_best_total: localRankingEntry.circuit_gap_to_best_total,
+        position_change: null // Se intentará obtener del backend si está disponible
+      };
+      
+      // Intentar obtener position_change del backend si está disponible (solo para mostrar cambio de posición)
+      let timingWithRanking = group.sessions.find(session => session.circuit_ranking);
+      if (!timingWithRanking) {
+        timingWithRanking = group.sessions.find(session => 
+          session.current_position !== null && session.current_position !== undefined
+        );
       }
-    } else {
-      // Si no hay información del backend, usar el cálculo local como fallback
-      const circuitRanking = circuitRankings[group.circuit];
-      if (circuitRanking) {
-        const rankingEntry = circuitRanking.find(entry => entry.key === group.key);
-        if (rankingEntry) {
-          group.circuit_ranking = {
-            position: rankingEntry.circuit_position,
-            gap_to_leader: rankingEntry.circuit_gap_to_leader,
-            gap_to_previous: rankingEntry.circuit_gap_to_previous,
-            gap_to_best_total: rankingEntry.circuit_gap_to_best_total,
-            position_change: 0 // Sin información de cambio desde cálculo local
-          };
-          
-          // console.log(`⚠️ Usando cálculo local para ${group.vehicle_manufacturer} ${group.vehicle_model}:`, group.circuit_ranking);
+      if (!timingWithRanking) {
+        timingWithRanking = group.sessions.find(session => 
+          session.position_change !== null && session.position_change !== undefined
+        );
+      }
+      
+      if (timingWithRanking) {
+        if (timingWithRanking.circuit_ranking) {
+          group.circuit_ranking.previous_position = timingWithRanking.circuit_ranking.previous_position;
+          group.circuit_ranking.position_change = timingWithRanking.circuit_ranking.position_change;
+        } else if (timingWithRanking.current_position !== null && timingWithRanking.current_position !== undefined) {
+          group.circuit_ranking.previous_position = timingWithRanking.previous_position;
+          group.circuit_ranking.position_change = timingWithRanking.position_change;
         }
       }
     }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7cb16915-a7a1-47f6-b806-7fb95e244063',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-post-fix',hypothesisId:'H1',location:'TimingsList.jsx:group_ranking',message:'Group ranking assigned (using local calculation)',data:{groupKey:group.key,position:group.circuit_ranking?.position,bestLapSeconds:group.best_time?.seconds,gapToLeader:group.circuit_ranking?.gap_to_leader,gapToPrev:group.circuit_ranking?.gap_to_previous,positionChange:group.circuit_ranking?.position_change},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   });
   
   const filteredGroups = Object.values(groupedTimings).filter(group => {
@@ -310,17 +306,26 @@ const TimingsList = () => {
     const matchesLane = !filter.lane || group.lane.toLowerCase().includes(filter.lane.toLowerCase());
     return matchesVehicle && matchesDateFrom && matchesDateTo && matchesCircuit && matchesLane;
   }).sort((a, b) => {
-    // Ordenar por posición del backend si está disponible, sino por tiempo
-    const aPosition = a.circuit_ranking?.position || 999;
-    const bPosition = b.circuit_ranking?.position || 999;
-    
-    if (aPosition !== bPosition) {
-      return aPosition - bPosition;
+    // Ordenar SIEMPRE por tiempo de vuelta (el cálculo local ya ordenó correctamente)
+    // Si están en el mismo circuito, usar posición del cálculo local
+    // Si están en circuitos diferentes, ordenar por tiempo directamente
+    if (a.circuit === b.circuit) {
+      // Mismo circuito: usar posición del cálculo local
+      const aPosition = a.circuit_ranking?.position || 999;
+      const bPosition = b.circuit_ranking?.position || 999;
+      
+      if (aPosition !== bPosition) {
+        return aPosition - bPosition;
+      }
     }
     
-    // Si las posiciones son iguales o no hay datos, ordenar por tiempo como fallback
+    // Si las posiciones son iguales, circuitos diferentes, o no hay datos, ordenar por tiempo de vuelta
     return a.best_time.seconds - b.best_time.seconds;
   });
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7cb16915-a7a1-47f6-b806-7fb95e244063',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H4',location:'TimingsList.jsx:filteredGroups',message:'Filtered groups order',data:filteredGroups.map(g=>({groupKey:g.key,position:g.circuit_ranking?.position || null,bestLapSeconds:g.best_time?.seconds})),timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   if (loading) {
     return (
@@ -508,26 +513,6 @@ const TimingsList = () => {
                               P{group.circuit_ranking.position}
                             </span>
                           </div>
-                          {group.circuit_ranking.position_change !== undefined && group.circuit_ranking.position_change !== null && group.circuit_ranking.position_change !== 0 && (
-                            <div className="position-change">
-                              {group.circuit_ranking.position_change > 0 ? (
-                                <span className="text-success fw-bold d-flex align-items-center justify-content-center" style={{ fontSize: '0.8em' }}>
-                                  <FaArrowUp className="me-1" />
-                                  +{group.circuit_ranking.position_change}
-                                </span>
-                              ) : group.circuit_ranking.position_change < 0 ? (
-                                <span className="text-danger fw-bold d-flex align-items-center justify-content-center" style={{ fontSize: '0.8em' }}>
-                                  <FaArrowDown className="me-1" />
-                                  {group.circuit_ranking.position_change}
-                                </span>
-                              ) : (
-                                <span className="text-muted fw-bold d-flex align-items-center justify-content-center" style={{ fontSize: '0.8em' }}>
-                                  <FaMinus className="me-1" />
-                                  =
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       ) : (
                         <span className="text-muted">—</span>
