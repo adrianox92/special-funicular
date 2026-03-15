@@ -9,6 +9,7 @@ const app = express();
 // Configuración de CORS
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:5173', 
   'https://special-funicular-bmy5.vercel.app',
   'https://special-funicular-bmy5-4tra1w9ef-adrians-projects-63dd797c.vercel.app'
 ];
@@ -27,13 +28,26 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
 
-// Aplicar CORS antes de otras rutas
-app.use(cors(corsOptions));
+// CORS permisivo para /api/sync: protegido por X-API-Key, cualquier origen permitido
+const corsSyncOptions = {
+  origin: true, // Refleja el origen de la petición (permite cualquier origen)
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+// CORS: permisivo para /api/sync (protegido por API key), restrictivo para el resto
+app.use((req, res, next) => {
+  const isSyncRoute = req.path.startsWith('/api/sync');
+  cors(isSyncRoute ? corsSyncOptions : corsOptions)(req, res, next);
+});
 
 // Middleware para logging de CORS (ayuda en debugging)
 app.use((req, res, next) => {
@@ -59,13 +73,19 @@ const dashboardRoute = require('./routes/dashboard');
 const insightsRoute = require('./routes/insights');
 const authRoute = require('./routes/auth');
 const competitionRulesRoute = require('./routes/competition-rules');
+const apiKeysRoute = require('./routes/api-keys');
+const syncRoute = require('./routes/sync');
+const circuitsRoute = require('./routes/circuits');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
+app.use('/api/sync', syncRoute);  // ANTES de /api (insights): sync usa X-API-Key, no JWT
 app.use('/api', insightsRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
+app.use('/api/api-keys', apiKeysRoute);
+app.use('/api/circuits', circuitsRoute);
 
 // Montar las rutas protegidas DESPUÉS
 const competitionsRoute = require('./routes/competitions');

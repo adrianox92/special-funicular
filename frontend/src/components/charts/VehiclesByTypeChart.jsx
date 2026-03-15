@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
   Label
 } from 'recharts';
-import { Card } from 'react-bootstrap';
+import { Card, CardContent, CardHeader } from '../ui/card';
 
 const COLORS = {
   modified: '#4e79a7',
@@ -26,31 +26,14 @@ const VehiclesByTypeChart = ({ data }) => {
     if (active && payload && payload.length) {
       const total = payload.reduce((sum, entry) => sum + entry.value, 0);
       return (
-        <div className="custom-tooltip" style={{
-          backgroundColor: 'white',
-          padding: '10px',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <p className="mb-2"><strong>{label}</strong></p>
+        <div className="rounded-md border bg-popover p-3 shadow-md">
+          <p className="font-semibold mb-2">{label}</p>
           {payload.map((entry, index) => {
             const percentage = ((entry.value / total) * 100).toFixed(1);
             return (
-              <p key={index} style={{ 
-                color: entry.color, 
-                margin: '2px 0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '10px'
-              }}>
-                <span>
-                  {entry.name === 'modified' ? 'Modificados' : 
-                   entry.name === 'stock' ? 'Serie' : 'Total'}:
-                </span>
-                <span>
-                  {entry.value} ({percentage}%)
-                </span>
+              <p key={index} className="flex justify-between gap-4 text-sm my-1">
+                <span>{entry.name === 'modified' ? 'Modificados' : entry.name === 'stock' ? 'Serie' : 'Total'}:</span>
+                <span>{entry.value} ({percentage}%)</span>
               </p>
             );
           })}
@@ -61,9 +44,9 @@ const VehiclesByTypeChart = ({ data }) => {
   };
 
   return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-4">Vehículos por Tipo</Card.Title>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Vehículos por Tipo</h5></CardHeader>
+      <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
             <BarChart
@@ -136,7 +119,7 @@ const VehiclesByTypeChart = ({ data }) => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

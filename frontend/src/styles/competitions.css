@@ -1,4 +1,4 @@
-/* Estilos para las competiciones */
+/* Estilos para las competiciones - Compatible con dark mode (variables CSS) */
 
 .competition-card {
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
@@ -6,7 +6,11 @@
 
 .competition-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dark .competition-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .competition-progress {
@@ -20,7 +24,11 @@
 
 .participant-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dark .participant-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .timing-table {
@@ -29,7 +37,7 @@
 
 .timing-table th {
   font-weight: 600;
-  background-color: #f8f9fa;
+  background-color: var(--muted);
 }
 
 .round-card {
@@ -38,19 +46,24 @@
 
 .round-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.dark .round-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Header con gradiente - usa primary para consistencia con tema */
 .competition-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklch, var(--primary) 85%, transparent) 100%);
+  color: var(--primary-foreground);
   padding: 2rem 0;
   margin-bottom: 2rem;
   border-radius: 0.5rem;
 }
 
 .competition-stats {
-  background-color: #f8f9fa;
+  background-color: var(--muted);
   border-radius: 0.5rem;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -91,21 +104,21 @@
 }
 
 .timing-form .form-control:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem color-mix(in oklch, var(--primary) 25%, transparent);
 }
 
 .btn-competition {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklch, var(--primary) 85%, transparent) 100%);
   border: none;
-  color: white;
+  color: var(--primary-foreground);
   transition: all 0.2s ease-in-out;
 }
 
 .btn-competition:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-  color: white;
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--primary) 30%, transparent);
+  color: var(--primary-foreground);
 }
 
 .btn-competition:active {
@@ -114,33 +127,33 @@
 
 .competition-tabs .nav-link {
   border: none;
-  color: #6c757d;
+  color: var(--muted-foreground);
   font-weight: 500;
   transition: all 0.2s ease-in-out;
 }
 
 .competition-tabs .nav-link:hover {
-  color: #667eea;
+  color: var(--primary);
   background-color: transparent;
 }
 
 .competition-tabs .nav-link.active {
-  color: #667eea;
+  color: var(--primary);
   background-color: transparent;
-  border-bottom: 2px solid #667eea;
+  border-bottom: 2px solid var(--primary);
 }
 
 .participant-type-tabs .nav-link {
   border: none;
-  color: #6c757d;
+  color: var(--muted-foreground);
   font-weight: 500;
 }
 
 .participant-type-tabs .nav-link.active {
-  color: #667eea;
-  background-color: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-bottom: 2px solid #667eea;
+  color: var(--primary);
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  border-bottom: 2px solid var(--primary);
 }
 
 /* Animaciones para modales */
@@ -154,25 +167,25 @@
 
 /* Estilos para el estado de las rondas */
 .round-status-pending {
-  background-color: #f8f9fa;
-  border-left: 4px solid #6c757d;
+  background-color: var(--muted);
+  border-left: 4px solid var(--muted-foreground);
 }
 
 .round-status-partial {
-  background-color: #fff3cd;
-  border-left: 4px solid #ffc107;
+  background-color: color-mix(in oklch, var(--chart-4) 20%, transparent);
+  border-left: 4px solid var(--chart-4);
 }
 
 .round-status-complete {
-  background-color: #d1edff;
-  border-left: 4px solid #0d6efd;
+  background-color: color-mix(in oklch, var(--chart-2) 20%, transparent);
+  border-left: 4px solid var(--chart-2);
 }
 
 /* Estilos para las tablas de tiempos */
 .timing-table th {
   font-weight: 600;
-  background-color: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
+  background-color: var(--muted);
+  border-bottom: 2px solid var(--border);
 }
 
 .timing-table td {
@@ -186,44 +199,44 @@
 
 /* Estilos para posiciones */
 .position-1 {
-  background-color: rgba(25, 135, 84, 0.1);
+  background-color: color-mix(in oklch, var(--chart-2) 15%, transparent);
 }
 
 .position-2 {
-  background-color: rgba(255, 193, 7, 0.1);
+  background-color: color-mix(in oklch, var(--chart-4) 15%, transparent);
 }
 
 .position-3 {
-  background-color: rgba(13, 110, 253, 0.1);
+  background-color: color-mix(in oklch, var(--chart-3) 15%, transparent);
 }
 
 /* Estilos para mejor vuelta */
 .best-lap-row {
-  background-color: rgba(255, 193, 7, 0.15) !important;
+  background-color: color-mix(in oklch, var(--chart-4) 20%, transparent) !important;
 }
 
 .best-lap-cell {
   font-weight: bold;
-  color: #ffc107;
+  color: var(--chart-4);
 }
 
 /* Estilos para diferencias de tiempo */
 .time-diff {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: var(--muted-foreground);
 }
 
 .time-diff.positive {
-  color: #dc3545;
+  color: var(--destructive);
 }
 
 .time-diff.negative {
-  color: #198754;
+  color: var(--chart-2);
 }
 
 /* Estilos para la clasificación general */
 .aggregated-table th {
-  background-color: #e9ecef;
+  background-color: var(--muted);
   font-weight: 600;
   text-align: center;
 }
@@ -239,7 +252,7 @@
 
 .aggregated-table .vehicle-info {
   text-align: left;
-  color: #6c757d;
+  color: var(--muted-foreground);
   font-size: 0.9rem;
 }
 
@@ -251,15 +264,15 @@
 }
 
 .difference-leader {
-  color: #dc3545;
+  color: hsl(var(--destructive));
 }
 
 .difference-previous {
-  color: #6c757d;
+  color: var(--muted-foreground);
 }
 
 .difference-zero {
-  color: #198754;
+  color: var(--chart-2);
   font-weight: 600;
 }
 
@@ -290,7 +303,7 @@
 /* Estilos para el dashboard de competiciones */
 .recent-competitions .list-group-item {
   border: none;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid var(--border);
   padding: 1rem;
 }
 
@@ -299,7 +312,7 @@
 }
 
 .recent-competitions .list-group-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--muted);
 }
 
 .quick-actions .btn {
@@ -314,8 +327,8 @@
 
 /* Estilos específicos para la vista pública del estado */
 .competition-status-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklch, var(--primary) 85%, transparent) 100%);
+  color: var(--primary-foreground);
   border-radius: 0.5rem;
   overflow: hidden;
   position: relative;
@@ -343,9 +356,17 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.dark .status-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 .status-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.dark .status-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .status-card .display-6 {
@@ -353,8 +374,8 @@
 }
 
 .global-best-lap {
-  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-  border: 2px solid #ffc107;
+  background: linear-gradient(135deg, hsl(var(--chart-4)) 0%, hsl(var(--chart-4) / 0.8) 100%);
+  border: 2px solid hsl(var(--chart-4));
   position: relative;
   overflow: hidden;
 }
@@ -386,18 +407,22 @@
 
 .participant-detail-card {
   transition: all 0.2s ease-in-out;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border);
 }
 
 .participant-detail-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: #667eea;
+  border-color: var(--primary);
+}
+
+.dark .participant-detail-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .round-timing-chip {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border: 1px solid #dee2e6;
+  background: linear-gradient(135deg, var(--muted) 0%, var(--secondary) 100%);
+  border: 1px solid var(--border);
   border-radius: 0.25rem;
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
@@ -405,7 +430,7 @@
 }
 
 .round-timing-chip:hover {
-  background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+  background: linear-gradient(135deg, var(--secondary) 0%, var(--accent) 100%);
   transform: scale(1.05);
 }
 
@@ -417,21 +442,21 @@
 }
 
 .position-badge.position-1 {
-  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-  color: #000;
-  border: 1px solid #ffc107;
+  background: linear-gradient(135deg, var(--chart-4) 0%, color-mix(in oklch, var(--chart-4) 80%, transparent) 100%);
+  color: var(--foreground);
+  border: 1px solid var(--chart-4);
 }
 
 .position-badge.position-2 {
-  background: linear-gradient(135deg, #c0c0c0 0%, #e9ecef 100%);
-  color: #000;
-  border: 1px solid #6c757d;
+  background: linear-gradient(135deg, var(--muted) 0%, var(--secondary) 100%);
+  color: var(--foreground);
+  border: 1px solid var(--border);
 }
 
 .position-badge.position-3 {
-  background: linear-gradient(135deg, #cd7f32 0%, #d4a574 100%);
-  color: #fff;
-  border: 1px solid #b8860b;
+  background: linear-gradient(135deg, var(--chart-5) 0%, color-mix(in oklch, var(--chart-5) 80%, transparent) 100%);
+  color: var(--foreground);
+  border: 1px solid var(--chart-5);
 }
 
 .status-indicator {
@@ -445,7 +470,7 @@
 .progress-bar-custom {
   height: 6px;
   border-radius: 3px;
-  background-color: #e9ecef;
+  background-color: var(--muted);
 }
 
 .progress-bar-custom .progress-bar {
@@ -497,4 +522,4 @@
   .participant-detail-card {
     margin-bottom: 1rem;
   }
-} 
+}

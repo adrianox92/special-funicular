@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Smartphone } from 'lucide-react';
+import { Button } from './ui/button';
 import { logPWADiagnostics } from '../utils/pwaDiagnostics';
 
 const InstallPWAButton = () => {
@@ -83,24 +85,13 @@ const InstallPWAButton = () => {
   if (!isVisible) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '20px',
-      right: '20px',
-      zIndex: 1000,
-      backgroundColor: '#007bff',
-      color: 'white',
-      padding: '10px 15px',
-      borderRadius: '25px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px'
-    }} onClick={handleInstallClick}>
-      <span>📲</span>
-      <span>Instalar App</span>
-    </div>
+    <Button
+      onClick={handleInstallClick}
+      className="fixed bottom-5 right-5 z-[1000] rounded-full shadow-lg gap-2"
+    >
+      <Smartphone className="size-4" />
+      Instalar App
+    </Button>
   );
 };
 

@@ -64,7 +64,7 @@
   pointer-events: none;
 }
 
-.presentation-loading .spinner-border {
+.presentation-loading [role="status"] {
   width: 4rem;
   height: 4rem;
   color: #7876c6;
@@ -80,7 +80,8 @@
   position: relative;
 }
 
-.presentation-error .alert {
+.presentation-error .alert,
+.presentation-error .presentation-error-box {
   max-width: 600px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -90,9 +91,11 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   z-index: 1;
   position: relative;
+  padding: 1.5rem;
 }
 
-.presentation-error .alert h4 {
+.presentation-error .alert h4,
+.presentation-error .presentation-error-box h4 {
   color: #ff6b6b;
   margin-bottom: 0.5rem;
 }

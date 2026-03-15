@@ -8,7 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
-import { Card } from 'react-bootstrap';
+import { Card, CardContent, CardHeader } from '../ui/card';
 
 const COLORS = {
   bar: '#4e79a7'
@@ -40,13 +40,13 @@ const CustomTooltip = ({ active, payload, label }) => {
 const BrandDistributionChart = ({ data }) => {
   if (!Array.isArray(data) || data.length === 0) {
     return (
-      <Card className="h-100 shadow-sm">
-        <Card.Body>
-          <Card.Title className="mb-4">Distribución por Marca</Card.Title>
-          <div className="text-center text-muted">
+      <Card className="h-full">
+        <CardHeader><h5 className="font-semibold">Distribución por Marca</h5></CardHeader>
+        <CardContent>
+          <div className="text-center text-muted-foreground py-8">
             No hay datos disponibles para mostrar la distribución de marcas
           </div>
-        </Card.Body>
+        </CardContent>
       </Card>
     );
   }
@@ -66,9 +66,9 @@ const BrandDistributionChart = ({ data }) => {
   };
 
   return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-4">Distribución por Marca</Card.Title>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Distribución por Marca</h5></CardHeader>
+      <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
             <BarChart
@@ -102,7 +102,7 @@ const BrandDistributionChart = ({ data }) => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

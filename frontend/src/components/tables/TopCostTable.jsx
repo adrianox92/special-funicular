@@ -1,7 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Table, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { Bar } from 'recharts';
 import { Link } from 'react-router-dom';
+import { Card, CardContent, CardHeader } from '../ui/card';
+import { Badge } from '../ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('es-ES', {
@@ -33,46 +47,29 @@ const IncrementBar = ({ value, maxValue, basePrice, totalPrice }) => {
 
   const color = getColor(value, maxValue / 2); // Usamos la mitad del máximo como promedio aproximado
   
-  const tooltipContent = (
-    <Tooltip id={`tooltip-${value}`}>
-      <div className="text-start">
-        <div>Coste original: {formatCurrency(basePrice)}</div>
-        <div>→ Total: {formatCurrency(totalPrice)}</div>
-        <div className="fw-bold">Incremento: {formatPercentage(value)}</div>
-      </div>
-    </Tooltip>
-  );
-
   return (
-    <OverlayTrigger
-      placement="top"
-      overlay={tooltipContent}
-      delay={{ show: 250, hide: 400 }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'help' }}>
-        <div style={{ 
-          width: '60px', 
-          height: '8px', 
-          backgroundColor: '#e9ecef',
-          borderRadius: '4px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            width: `${width}%`,
-            height: '100%',
-            backgroundColor: color,
-            transition: 'width 0.3s ease, background-color 0.3s ease'
-          }} />
-        </div>
-        <span style={{ 
-          color: color,
-          fontSize: '0.875rem',
-          fontWeight: value > 0 ? 'bold' : 'normal'
-        }}>
-          {formatPercentage(value)}
-        </span>
-      </div>
-    </OverlayTrigger>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-2 cursor-help">
+            <div className="w-[60px] h-2 bg-muted rounded overflow-hidden">
+              <div
+                className="h-full rounded transition-all"
+                style={{ width: `${width}%`, backgroundColor: color }}
+              />
+            </div>
+            <span className="text-sm" style={{ color, fontWeight: value > 0 ? 'bold' : 'normal' }}>
+              {formatPercentage(value)}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-left">
+          <div>Coste original: {formatCurrency(basePrice)}</div>
+          <div>→ Total: {formatCurrency(totalPrice)}</div>
+          <div className="font-semibold">Incremento: {formatPercentage(value)}</div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
@@ -81,13 +78,6 @@ const TopCostTable = ({ data }) => {
     key: 'incrementPercentage',
     direction: 'desc'
   });
-
-  // Calcular el promedio de incremento para colores contextuales
-  const averageIncrement = useMemo(() => {
-    if (!data.length) return 0;
-    const sum = data.reduce((acc, vehicle) => acc + vehicle.incrementPercentage, 0);
-    return sum / data.length;
-  }, [data]);
 
   const sortedData = useMemo(() => {
     const sorted = [...data];
@@ -119,66 +109,49 @@ const TopCostTable = ({ data }) => {
   };
 
   // Calcular el máximo incremento para escalar las barras
-  const maxIncrement = Math.max(...data.map(item => Math.abs(item.incrementPercentage)));
+  const maxIncrement = data.length ? Math.max(...data.map(item => Math.abs(item.incrementPercentage)), 1) : 1;
 
   return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-4">Top 5 Vehículos por Coste</Card.Title>
-        <div className="table-responsive">
-          <Table hover>
-            <thead>
-              <tr>
-                <th>Modelo</th>
-                <th 
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => requestSort('basePrice')}
-                >
-                  Precio Base {getSortIcon('basePrice')}
-                </th>
-                <th 
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => requestSort('totalPrice')}
-                >
-                  Precio Total {getSortIcon('totalPrice')}
-                </th>
-                <th 
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => requestSort('incrementPercentage')}
-                >
-                  Incremento {getSortIcon('incrementPercentage')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Top 5 Vehículos por Coste</h5></CardHeader>
+      <CardContent>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Modelo</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('basePrice')}>Precio Base {getSortIcon('basePrice')}</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('totalPrice')}>Precio Total {getSortIcon('totalPrice')}</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('incrementPercentage')}>Incremento {getSortIcon('incrementPercentage')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sortedData.map((vehicle) => (
-                <tr key={vehicle.id}>
-                  <td>
-                    <div className="d-flex align-items-center">
-                      <Link to={`/vehicles/${vehicle.id}`} className="text-decoration-none">
-                        <span className="me-2">{`${vehicle.manufacturer} ${vehicle.model}`}</span>
+                <TableRow key={vehicle.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Link to={`/vehicles/${vehicle.id}`} className="hover:underline">
+                        {`${vehicle.manufacturer} ${vehicle.model}`}
                       </Link>
-                      {vehicle.modified && (
-                        <Badge bg="primary" className="ms-2">Mod</Badge>
-                      )}
+                      {vehicle.modified && <Badge variant="default">Mod</Badge>}
                     </div>
-                  </td>
-                  <td>{formatCurrency(vehicle.basePrice)}</td>
-                  <td>{formatCurrency(vehicle.totalPrice)}</td>
-                  <td>
-                    <IncrementBar 
-                      value={vehicle.incrementPercentage} 
+                  </TableCell>
+                  <TableCell>{formatCurrency(vehicle.basePrice)}</TableCell>
+                  <TableCell>{formatCurrency(vehicle.totalPrice)}</TableCell>
+                  <TableCell>
+                    <IncrementBar
+                      value={vehicle.incrementPercentage}
                       maxValue={maxIncrement}
                       basePrice={vehicle.basePrice}
                       totalPrice={vehicle.totalPrice}
                     />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
+            </TableBody>
           </Table>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

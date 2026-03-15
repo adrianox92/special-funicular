@@ -1,28 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Offcanvas, Button, Card, Badge, Alert, ListGroup, ListGroupItem,
-  Spinner, Row, Col, Form, InputGroup
-} from 'react-bootstrap';
-import { 
-  FaMagic, FaCopy, FaTimes, FaSearch, FaTrophy, FaCog, FaCheck
-} from 'react-icons/fa';
+import { Wand2, Copy, X, Search, Trophy, Settings } from 'lucide-react';
 import axios from '../lib/axios';
+import { Button } from './ui/button';
+import { Card, CardContent } from './ui/card';
+import { Badge } from './ui/badge';
+import { Input } from './ui/input';
+import { Alert, AlertDescription } from './ui/alert';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from './ui/sheet';
+import { Spinner } from './ui/spinner';
 
-const TemplatesDrawer = ({ 
-  show, 
-  onHide, 
-  competitionId, 
-  onTemplateApplied, 
-  disabled = false 
-}) => {
+const TemplatesDrawer = ({ show, onHide, competitionId, onTemplateApplied, disabled = false }) => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [applying, setApplying] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
 
-  // Cargar plantillas
   const loadTemplates = async () => {
     try {
       setLoading(true);
@@ -38,22 +37,31 @@ const TemplatesDrawer = ({
   };
 
   useEffect(() => {
-    if (show) {
-      loadTemplates();
-    }
+    if (show) loadTemplates();
   }, [show]);
 
-  // Aplicar plantilla
+  const getRuleTypeDescription = (type) => {
+    switch (type) {
+      case 'per_round': return 'Por ronda';
+      case 'final': return 'Final';
+      default: return type;
+    }
+  };
+
+  const getRuleTypeVariant = (type) => {
+    switch (type) {
+      case 'per_round': return 'default';
+      case 'final': return 'secondary';
+      case 'best_time_per_round': return 'outline';
+      default: return 'secondary';
+    }
+  };
+
   const applyTemplate = async (templateId) => {
     try {
       setApplying(true);
-      await axios.post(`/competition-rules/apply-template/${templateId}`, {
-        competition_id: competitionId
-      });
-      
-      if (onTemplateApplied) {
-        onTemplateApplied();
-      }
+      await axios.post(`/competition-rules/apply-template/${templateId}`, { competition_id: competitionId });
+      onTemplateApplied?.();
       onHide();
     } catch (err) {
       console.error('Error al aplicar plantilla:', err);
@@ -63,169 +71,137 @@ const TemplatesDrawer = ({
     }
   };
 
-  // Obtener descripción del tipo de regla
-  const getRuleTypeDescription = (type) => {
-    switch (type) {
-      case 'per_round':
-        return 'Por ronda';
-      case 'final':
-        return 'Final';
-      default:
-        return type;
-    }
-  };
-
-  // Obtener color del badge según el tipo
-  const getRuleTypeColor = (type) => {
-    switch (type) {
-      case 'per_round':
-        return 'primary';
-      case 'final':
-        return 'success';
-      case 'best_time_per_round':
-        return 'warning';
-      default:
-        return 'secondary';
-    }
-  };
-
-  // Filtrar plantillas por búsqueda
-  const filteredTemplates = templates.filter(template =>
-    template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getRuleTypeDescription(template.rule_type).toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTemplates = templates.filter(t =>
+    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getRuleTypeDescription(t.rule_type).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <Offcanvas show={show} onHide={onHide} placement="end" size="lg">
-      <Offcanvas.Header closeButton>
-        <Offcanvas.Title>
-          <FaMagic className="me-2" />
-          Aplicar Plantilla de Reglas
-        </Offcanvas.Title>
-      </Offcanvas.Header>
-      <Offcanvas.Body>
-        {error && (
-          <Alert variant="danger" className="mb-3">
-            {error}
-          </Alert>
-        )}
+    <Sheet open={show} onOpenChange={(open) => !open && onHide()}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Wand2 className="size-5" />
+            Aplicar Plantilla de Reglas
+          </SheetTitle>
+          <SheetDescription>
+            Selecciona una plantilla predefinida para tu competición
+          </SheetDescription>
+        </SheetHeader>
 
-        {disabled && (
-          <Alert variant="warning" className="mb-3">
-            <FaTimes className="me-2" />
-            No se pueden aplicar plantillas porque ya hay tiempos registrados en la competición.
-          </Alert>
-        )}
+        <div className="mt-6 space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {disabled && (
+            <Alert variant="destructive">
+              <X className="size-4" />
+              <AlertDescription>
+                No se pueden aplicar plantillas porque ya hay tiempos registrados en la competición.
+              </AlertDescription>
+            </Alert>
+          )}
 
-        {/* Barra de búsqueda */}
-        <Form.Group className="mb-3">
-          <InputGroup>
-            <InputGroup.Text>
-              <FaSearch />
-            </InputGroup.Text>
-            <Form.Control
-              type="text"
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
               placeholder="Buscar plantillas..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
             />
-          </InputGroup>
-        </Form.Group>
+          </div>
 
-        {loading ? (
-          <div className="text-center py-4">
-            <Spinner animation="border" size="sm">
-              <span className="visually-hidden">Cargando...</span>
-            </Spinner>
-            <p className="mt-2 mb-0">Cargando plantillas...</p>
-          </div>
-        ) : filteredTemplates.length === 0 ? (
-          <div className="text-center py-4">
-            <FaMagic size={32} className="text-muted mb-3" />
-            <p className="text-muted mb-0">
-              {searchTerm ? 'No se encontraron plantillas que coincidan con la búsqueda' : 'No hay plantillas disponibles'}
-            </p>
-          </div>
-        ) : (
-          <ListGroup variant="flush">
-            {filteredTemplates.map((template) => (
-              <ListGroupItem key={template.id} className="px-0 mb-3">
-                <Card>
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-start mb-2">
-                      <div className="flex-grow-1">
-                        <h6 className="mb-1">{template.name}</h6>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <Badge bg={getRuleTypeColor(template.rule_type)}>
+          {loading ? (
+            <div className="text-center py-8">
+              <Spinner className="size-8 mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">Cargando plantillas...</p>
+            </div>
+          ) : filteredTemplates.length === 0 ? (
+            <div className="text-center py-8">
+              <Wand2 className="size-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">
+                {searchTerm ? 'No se encontraron plantillas que coincidan' : 'No hay plantillas disponibles'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredTemplates.map((template) => (
+                <Card key={template.id}>
+                  <CardContent className="pt-4">
+                    <div className="flex justify-between items-start gap-4 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h6 className="font-semibold mb-1">{template.name}</h6>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <Badge variant={getRuleTypeVariant(template.rule_type)}>
                             {getRuleTypeDescription(template.rule_type)}
                           </Badge>
                           {template.use_bonus_best_lap && (
-                            <Badge bg="info" className="d-flex align-items-center gap-1">
-                              <FaCog size={10} /> Bonus
+                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                              <Settings className="size-3" />
+                              Bonus
                             </Badge>
                           )}
                         </div>
                         {template.description && (
-                          <p className="text-muted mb-2 small">{template.description}</p>
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
                         )}
                       </div>
                       <Button
-                        variant="primary"
                         size="sm"
                         onClick={() => applyTemplate(template.id)}
                         disabled={disabled || applying}
-                        className="d-flex align-items-center gap-1"
+                        className="shrink-0 flex items-center gap-1"
                       >
                         {applying ? (
                           <>
-                            <Spinner animation="border" size="sm" />
+                            <Spinner className="size-4" />
                             Aplicando...
                           </>
                         ) : (
                           <>
-                            <FaCopy /> Aplicar
+                            <Copy className="size-4" />
+                            Aplicar
                           </>
                         )}
                       </Button>
                     </div>
-                    
-                    <div className="d-flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-2">
                       {template.rule_type === 'best_time_per_round' ? (
-                        <Badge bg="success" className="me-1">
-                          {template.points_structure.points} pts por mejor vuelta
+                        <Badge variant="secondary">
+                          {template.points_structure?.points} pts por mejor vuelta
                         </Badge>
                       ) : (
-                        Object.entries(template.points_structure)
+                        Object.entries(template.points_structure || {})
                           .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                          .map(([position, points]) => (
-                            <Badge key={position} bg="success" className="me-1">
-                              {position}º: {points} pts
-                            </Badge>
+                          .map(([pos, pts]) => (
+                            <Badge key={pos} variant="secondary">{pos}º: {pts} pts</Badge>
                           ))
                       )}
                     </div>
-                  </Card.Body>
+                  </CardContent>
                 </Card>
-              </ListGroupItem>
-            ))}
-          </ListGroup>
-        )}
+              ))}
+            </div>
+          )}
 
-        <div className="mt-3 p-3 bg-light rounded">
-          <h6 className="mb-2">
-            <FaTrophy className="me-2" />
-            ¿Qué son las plantillas?
-          </h6>
-          <p className="text-muted small mb-0">
-            Las plantillas son sistemas de puntuación predefinidos que puedes aplicar a tu competición. 
-            Una vez aplicada, la plantilla se convierte en una regla específica para tu competición y 
-            puedes modificarla según tus necesidades.
-          </p>
+          <div className="rounded-lg border p-4 bg-muted/50">
+            <h6 className="font-semibold flex items-center gap-2 mb-2">
+              <Trophy className="size-4" />
+              ¿Qué son las plantillas?
+            </h6>
+            <p className="text-sm text-muted-foreground">
+              Las plantillas son sistemas de puntuación predefinidos que puedes aplicar a tu competición.
+              Una vez aplicada, la plantilla se convierte en una regla específica y puedes modificarla.
+            </p>
+          </div>
         </div>
-      </Offcanvas.Body>
-    </Offcanvas>
+      </SheetContent>
+    </Sheet>
   );
 };
 
-export default TemplatesDrawer; 
+export default TemplatesDrawer;

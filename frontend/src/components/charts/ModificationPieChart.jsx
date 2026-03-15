@@ -7,7 +7,7 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
-import { Card } from 'react-bootstrap';
+import { Card, CardContent, CardHeader } from '../ui/card';
 
 const COLORS = ['#4e79a7', '#59a14f']; // Colores más suaves
 
@@ -93,9 +93,9 @@ const ModificationPieChart = ({ data }) => {
   }));
 
   return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-4">Proporción Modificados vs Serie</Card.Title>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Proporción Modificados vs Serie</h5></CardHeader>
+      <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
             <PieChart>
@@ -136,7 +136,7 @@ const ModificationPieChart = ({ data }) => {
             </PieChart>
           </ResponsiveContainer>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

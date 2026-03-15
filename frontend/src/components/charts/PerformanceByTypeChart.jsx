@@ -1,46 +1,31 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Card, OverlayTrigger, Tooltip as BSTooltip } from 'react-bootstrap';
+import { Card, CardContent, CardHeader } from '../ui/card';
 
 const PerformanceByTypeChart = ({ data = {} }) => {
-  console.log('PerformanceByTypeChart - Raw data:', data);
-  
-  // Validar que data sea un objeto y tenga datos válidos
-  const hasValidData = Object.entries(data).some(([type, stats]) => {
-    console.log(`Checking type ${type}:`, stats);
-    const isValid = stats.count > 0 && stats.vehicles?.length > 0 && 
-      stats.vehicles.some(v => v.best_time !== undefined && v.best_time !== null);
-    console.log(`Type ${type} is valid:`, isValid);
-    return isValid;
-  });
-
-  console.log('Has valid data:', hasValidData);
+  const hasValidData = Object.entries(data).some(([type, stats]) =>
+    stats.count > 0 && stats.vehicles?.length > 0 &&
+    stats.vehicles.some(v => v.best_time !== undefined && v.best_time !== null)
+  );
 
   if (!hasValidData) {
     return (
-      <Card className="h-100 shadow-sm">
-        <Card.Body>
-          <Card.Title className="mb-4">Rendimiento por Tipo</Card.Title>
-          <div className="text-center text-muted">
-            No hay vehículos con tiempos registrados<br />
-            para mostrar el rendimiento por tipo
+      <Card className="h-full">
+        <CardHeader><h5 className="font-semibold">Rendimiento por Tipo</h5></CardHeader>
+        <CardContent>
+          <div className="text-center text-muted-foreground py-8">
+            No hay vehículos con tiempos registrados para mostrar el rendimiento por tipo
           </div>
-        </Card.Body>
+        </CardContent>
       </Card>
     );
   }
 
-  // Convertir el objeto de datos en un array para el gráfico
   const chartData = Object.entries(data)
-    .filter(([_, stats]) => {
-      console.log('Filtering stats:', stats);
-      return stats.count > 0 && stats.vehicles?.length > 0;
-    })
+    .filter(([_, stats]) => stats.count > 0 && stats.vehicles?.length > 0)
     .map(([type, stats]) => {
-      console.log(`Processing type ${type}:`, stats);
       // Calcular el tiempo promedio solo con los vehículos que tienen tiempo
       const validVehicles = stats.vehicles.filter(v => v.best_time !== undefined && v.best_time !== null);
-      console.log(`Valid vehicles for ${type}:`, validVehicles);
       const averageTime = validVehicles.length > 0
         ? validVehicles.reduce((sum, v) => sum + v.best_time, 0) / validVehicles.length
         : 0;
@@ -54,8 +39,6 @@ const PerformanceByTypeChart = ({ data = {} }) => {
     })
     .sort((a, b) => a.averageTime - b.averageTime);
 
-  console.log('Final chart data:', chartData);
-
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = (seconds % 60).toFixed(2);
@@ -66,14 +49,14 @@ const PerformanceByTypeChart = ({ data = {} }) => {
     if (active && payload && payload.length) {
       const typeData = data[label];
       return (
-        <div className="custom-tooltip p-2 bg-white border rounded shadow-sm">
-          <p className="mb-1 fw-bold">{label}</p>
-          <p className="mb-1">Tiempo promedio: {formatTime(payload[0].value)}</p>
-          <p className="mb-1">Vehículos analizados: {typeData.count}</p>
+        <div className="rounded-md border bg-popover p-3 shadow-md">
+          <p className="font-semibold mb-1">{label}</p>
+          <p className="mb-1 text-sm">Tiempo promedio: {formatTime(payload[0].value)}</p>
+          <p className="mb-1 text-sm">Vehículos analizados: {typeData.count}</p>
           <div className="mt-2">
-            <p className="mb-1 fw-bold">Mejores tiempos:</p>
+            <p className="font-semibold mb-1 text-sm">Mejores tiempos:</p>
             {typeData.vehicles.slice(0, 3).map((vehicle, index) => (
-              <p key={index} className="mb-1 small">
+              <p key={index} className="mb-1 text-xs">
                 {vehicle.manufacturer} {vehicle.model}: {formatTime(vehicle.best_time)}
               </p>
             ))}
@@ -85,9 +68,9 @@ const PerformanceByTypeChart = ({ data = {} }) => {
   };
 
   return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-4">Rendimiento por Tipo</Card.Title>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Rendimiento por Tipo</h5></CardHeader>
+      <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
             <BarChart
@@ -122,7 +105,7 @@ const PerformanceByTypeChart = ({ data = {} }) => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

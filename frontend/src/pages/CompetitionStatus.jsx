@@ -1,14 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Container, Row, Col, Card, Badge, ProgressBar, Table, Alert, 
-  Spinner, Button, Modal
-} from 'react-bootstrap';
-import { 
-  FaTrophy, FaUsers, FaFlag, FaClock, FaCheck, FaExclamationTriangle,
-  FaDownload, FaFilePdf, FaMedal, FaStar, FaRoute, FaTv
-} from 'react-icons/fa';
+import { Trophy, Users, Flag, Clock, Check, AlertTriangle, Download, Tv, Medal, Star, Route } from 'lucide-react';
 import axios from '../lib/axios';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import { Spinner } from '../components/ui/spinner';
 
 const CompetitionStatus = () => {
   const { slug } = useParams();
@@ -27,476 +41,359 @@ const CompetitionStatus = () => {
     try {
       setLoading(true);
       setError(null);
-      
       const response = await axios.get(`/public-signup/${slug}/status`);
       setCompetitionData(response.data);
-      // Cargar reglas públicas
       const rulesResponse = await axios.get(`/public-signup/${slug}/rules`);
       setRules(rulesResponse.data);
-    } catch (error) {
-      console.error('Error al cargar el estado de la competición:', error);
-      setError(error.response?.data?.error || 'Error al cargar los datos de la competición');
+    } catch (err) {
+      console.error('Error al cargar el estado:', err);
+      setError(err.response?.data?.error || 'Error al cargar los datos de la competición');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatTime = (time) => {
-    if (!time) return '-';
-    return time;
-  };
+  const formatTime = (time) => time || '-';
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getPositionBadge = (position) => {
-    if (position === 1) return { bg: 'warning', icon: <FaTrophy /> };
-    if (position === 2) return { bg: 'secondary', icon: <FaMedal /> };
-    if (position === 3) return { bg: 'danger', icon: <FaMedal /> };
-    return { bg: 'light', icon: null };
-  };
-
-  const getStatusBadge = (isCompleted) => {
-    return isCompleted ? 
-      { bg: 'success', text: 'Finalizada', icon: <FaCheck /> } :
-      { bg: 'primary', text: 'En Curso', icon: <FaClock /> };
-  };
-
-  const handleExportPdf = () => {
-    setShowPdfModal(true);
-    // Aquí se implementaría la lógica de exportación PDF
-  };
-
-  const handlePresentationMode = () => {
-    navigate(`/competitions/presentation/${slug}`);
-  };
-
-  // Función para convertir mm:ss.mmm a segundos
-  function timeStringToSeconds(str) {
+  const timeStringToSeconds = (str) => {
     if (!str) return 0;
     const match = str.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
     if (!match) return 0;
     const [, min, sec, ms] = match.map(Number);
     return min * 60 + sec + ms / 1000;
-  }
+  };
 
-  // Función para convertir segundos a mm:ss.mmm
-  function secondsToTimeString(seconds) {
+  const secondsToTimeString = (seconds) => {
     if (typeof seconds !== 'number' || isNaN(seconds)) return '00:00.000';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = (seconds % 60).toFixed(3);
     return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
-  }
+  };
+
+  const getPositionVariant = (position) => {
+    if (position === 1) return 'default';
+    if (position === 2) return 'secondary';
+    if (position === 3) return 'outline';
+    return 'secondary';
+  };
+
+  const handlePresentationMode = () => navigate(`/competitions/presentation/${slug}`);
 
   if (loading) {
     return (
-      <Container className="py-5">
-        <div className="text-center">
-          <Spinner animation="border" role="status" className="mb-3">
-            <span className="visually-hidden">Cargando...</span>
-          </Spinner>
-          <p>Cargando estado de la competición...</p>
-        </div>
-      </Container>
+      <div className="flex flex-col justify-center items-center min-h-[50vh] py-12">
+        <Spinner className="size-8 mb-4" />
+        <p className="text-muted-foreground">Cargando estado de la competición...</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container className="py-5">
-        <Alert variant="danger">
-          <Alert.Heading>Error</Alert.Heading>
-          <p>{error}</p>
-        </Alert>
-      </Container>
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     );
   }
 
   if (!competitionData) {
     return (
-      <Container className="py-5">
-        <Alert variant="warning">
-          <Alert.Heading>Competición no encontrada</Alert.Heading>
-          <p>No se pudo encontrar la competición solicitada.</p>
-        </Alert>
-      </Container>
+      <Alert variant="destructive">
+        <AlertDescription>Competición no encontrada</AlertDescription>
+      </Alert>
     );
   }
 
   const { competition, status, participants, global_best_lap } = competitionData;
-  const statusBadge = getStatusBadge(status.is_completed);
+  const isCompleted = status.is_completed;
 
   return (
-    <Container className="py-4">
-      {/* Header de la competición */}
-      <Card className="mb-4 competition-status-header">
-        <Card.Body className="text-center">
-          <Row>
-            <Col md={8}>
-              <h1 className="mb-3">{competition.name}</h1>
-              <div className="d-flex justify-content-center align-items-center gap-3 mb-3">
-                <Badge bg={statusBadge.bg} className="fs-6 px-3 py-2">
-                  {statusBadge.icon} {statusBadge.text}
+    <div className="space-y-6 py-6">
+      {/* Header */}
+      <Card className="competition-status-header overflow-hidden">
+        <CardContent className="pt-6 pb-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="text-center md:text-left">
+              <h1 className="text-2xl md:text-3xl font-bold mb-3">{competition.name}</h1>
+              <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-3">
+                <Badge variant={isCompleted ? 'secondary' : 'default'} className="text-sm px-3 py-1">
+                  {isCompleted ? <><Check className="size-4 mr-1" /> Finalizada</> : <><Clock className="size-4 mr-1" /> En Curso</>}
                 </Badge>
                 {competition.circuit_name && (
-                  <Badge bg="info" className="fs-6 px-3 py-2">
-                    <FaRoute /> {competition.circuit_name}
+                  <Badge variant="secondary" className="text-sm px-3 py-1">
+                    <Route className="size-4 mr-1" />
+                    {competition.circuit_name}
                   </Badge>
                 )}
               </div>
-              <p className="text-light mb-0">
-                Creada el {formatDate(competition.created_at)}
-              </p>
-            </Col>
-            <Col md={4} className="d-flex align-items-center justify-content-center">
+              <p className="text-muted-foreground text-sm">Creada el {formatDate(competition.created_at)}</p>
+            </div>
+            <div className="flex justify-center">
               <div className="text-center">
-                <div className="display-4 text-warning mb-2">
-                  <FaTrophy />
-                </div>
-                <h5 className="text-light">Competición Pública</h5>
+                <Trophy className="size-12 text-primary mb-2" />
+                <p className="text-sm font-medium">Competición Pública</p>
               </div>
-            </Col>
-          </Row>
-        </Card.Body>
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
-      {/* Estadísticas generales */}
-      <Row className="mb-4">
-        <Col md={3}>
-          <Card className="text-center h-100 status-card">
-            <Card.Body>
-              <div className="display-6 text-primary mb-2">
-                <FaUsers />
-              </div>
-              <h4>{status.participants_count}</h4>
-              <p className="text-muted mb-0">Participantes</p>
-            </Card.Body>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { icon: Users, label: 'Participantes', value: status.participants_count },
+          { icon: Flag, label: 'Rondas', value: competition.rounds },
+          { icon: Clock, label: 'Tiempos', value: status.times_registered },
+          { icon: Star, label: 'Progreso', value: `${status.progress_percentage}%` }
+        ].map(({ icon: Icon, label, value }) => (
+          <Card key={label} className="text-center">
+            <CardContent className="pt-6">
+              <Icon className="size-8 mx-auto mb-2 text-primary" />
+              <h4 className="text-2xl font-bold">{value}</h4>
+              <p className="text-sm text-muted-foreground">{label}</p>
+            </CardContent>
           </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="text-center h-100 status-card">
-            <Card.Body>
-              <div className="display-6 text-success mb-2">
-                <FaFlag />
-              </div>
-              <h4>{competition.rounds}</h4>
-              <p className="text-muted mb-0">Rondas</p>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="text-center h-100 status-card">
-            <Card.Body>
-              <div className="display-6 text-info mb-2">
-                <FaClock />
-              </div>
-              <h4>{status.times_registered}</h4>
-              <p className="text-muted mb-0">Tiempos Registrados</p>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="text-center h-100 status-card">
-            <Card.Body>
-              <div className="display-6 text-warning mb-2">
-                <FaStar />
-              </div>
-              <h4>{status.progress_percentage}%</h4>
-              <p className="text-muted mb-0">Progreso</p>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+        ))}
+      </div>
 
-      {/* Barra de progreso */}
-      <Card className="mb-4">
-        <Card.Body>
-          <div className="d-flex justify-content-between align-items-center mb-2">
-            <h5 className="mb-0">Progreso de la Competición</h5>
-            <span className="text-muted">
+      {/* Progress bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex justify-between items-center mb-2">
+            <h5 className="font-semibold">Progreso de la Competición</h5>
+            <span className="text-muted-foreground text-sm">
               {status.times_registered} de {status.total_required_times} tiempos
             </span>
           </div>
-          <ProgressBar 
-            now={status.progress_percentage} 
-            variant={status.is_completed ? 'success' : 'primary'}
-            className="competition-progress"
-          />
-          <div className="mt-2 text-muted small">
-            {status.is_completed ? 
-              '¡Competición completada!' : 
-              `${status.times_remaining} tiempos restantes`
-            }
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${isCompleted ? 'bg-green-500' : 'bg-primary'}`}
+              style={{ width: `${status.progress_percentage}%` }}
+            />
           </div>
-        </Card.Body>
+          <p className="text-sm text-muted-foreground mt-2">
+            {isCompleted ? '¡Competición completada!' : `${status.times_remaining} tiempos restantes`}
+          </p>
+        </CardContent>
       </Card>
 
-      {/* Mejor vuelta global */}
+      {/* Global best lap */}
       {global_best_lap && (
-        <Card className="mb-4 global-best-lap">
-          <Card.Body className="text-center">
-            <div className="display-6 text-warning mb-2">
-              <FaTrophy />
-            </div>
-            <h4>Mejor Vuelta Global</h4>
-            <div className="display-5 text-warning fw-bold mb-2">
-              {formatTime(global_best_lap.time)}
-            </div>
-            <p className="text-muted mb-0">
-              Por <strong>{global_best_lap.driver}</strong>
-            </p>
-          </Card.Body>
+        <Card className="global-best-lap">
+          <CardContent className="pt-6 text-center">
+            <Trophy className="size-10 mx-auto mb-2 text-primary" />
+            <h4 className="font-semibold mb-2">Mejor Vuelta Global</h4>
+            <div className="text-2xl font-bold text-primary mb-2">{formatTime(global_best_lap.time)}</div>
+            <p className="text-muted-foreground">Por <strong>{global_best_lap.driver}</strong></p>
+          </CardContent>
         </Card>
       )}
 
-      {/* Clasificación */}
-      <Card className="mb-4">
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">
-            <FaTrophy className="me-2" />
+      {/* Ranking */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <h5 className="font-semibold flex items-center gap-2">
+            <Trophy className="size-5" />
             Clasificación General
           </h5>
-          <div className="d-flex gap-2">
-            <Button 
-              variant="outline-success" 
-              size="sm"
-              onClick={handlePresentationMode}
-            >
-              <FaTv className="me-1" />
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handlePresentationMode}>
+              <Tv className="size-4 mr-1" />
               Modo Presentación
             </Button>
-            {status.is_completed && (
-              <Button 
-                variant="outline-primary" 
-                size="sm"
-                onClick={handleExportPdf}
-              >
-                <FaDownload className="me-1" />
+            {isCompleted && (
+              <Button variant="outline" size="sm" onClick={() => setShowPdfModal(true)}>
+                <Download className="size-4 mr-1" />
                 Exportar PDF
               </Button>
             )}
           </div>
-        </Card.Header>
-        <Card.Body>
+        </CardHeader>
+        <CardContent>
           {participants.length > 0 ? (
-            <Table responsive bordered hover className="mb-4">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Piloto</th>
-                  <th>Vehículo</th>
-                  <th>Rondas completadas</th>
-                  <th>Mejor vuelta</th>
-                  <th>Tiempo total</th>
-                  <th>Dif. Líder</th>
-                  <th>Dif. Anterior</th>
-                  {rules.length > 0 && <th>Puntos</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {participants.map((participant, idx) => {
-                  // El tiempo total que viene del backend ya incluye la penalización
-                  const totalTimeSeconds = timeStringToSeconds(participant.total_time);
-                  const penalty = Number(participant.penalty_seconds) || 0;
-                  
-                  // Calcular diferencia con el líder y anterior usando el tiempo total del backend
-                  let leaderDiff = '-';
-                  let previousDiff = '-';
-                  if (idx > 0 && participants[0].total_time) {
-                    const leaderTimeSeconds = timeStringToSeconds(participants[0].total_time);
-                    const diff = totalTimeSeconds - leaderTimeSeconds;
-                    const diffMinutes = Math.floor(diff / 60);
-                    const diffSeconds = (diff % 60).toFixed(3);
-                    leaderDiff = diffMinutes > 0 ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}` : `+${diffSeconds}`;
-                  }
-                  if (idx > 0 && participants[idx - 1].total_time) {
-                    const prevTimeSeconds = timeStringToSeconds(participants[idx - 1].total_time);
-                    const diff = totalTimeSeconds - prevTimeSeconds;
-                    const diffMinutes = Math.floor(diff / 60);
-                    const diffSeconds = (diff % 60).toFixed(3);
-                    previousDiff = diffMinutes > 0 ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}` : `+${diffSeconds}`;
-                  }
-                  return (
-                    <tr key={participant.participant_id}>
-                      <td>{participant.position}</td>
-                      <td>{participant.driver_name}</td>
-                      <td>{participant.vehicle_info}</td>
-                      <td>{participant.rounds_completed}</td>
-                      <td>{formatTime(participant.best_lap_time)}</td>
-                      <td>
-                        {penalty > 0 ? (
-                          <span
-                            data-bs-toggle="tooltip"
-                            title={`Original: ${secondsToTimeString(totalTimeSeconds)}`}
-                            style={{cursor: 'pointer'}}
-                          >
-                            {participant.total_time} <span style={{color: '#b8860b'}}>⚠️</span>
-                          </span>
-                        ) : (
-                          <span>{participant.total_time}</span>
-                        )}
-                      </td>
-                      <td>{leaderDiff}</td>
-                      <td>{previousDiff}</td>
-                      {rules.length > 0 && <td>{participant.points || 0}</td>}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Piloto</TableHead>
+                    <TableHead>Vehículo</TableHead>
+                    <TableHead>Rondas</TableHead>
+                    <TableHead>Mejor vuelta</TableHead>
+                    <TableHead>Tiempo total</TableHead>
+                    <TableHead>Dif. Líder</TableHead>
+                    <TableHead>Dif. Anterior</TableHead>
+                    {rules.length > 0 && <TableHead>Puntos</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {participants.map((participant, idx) => {
+                    const totalTimeSeconds = timeStringToSeconds(participant.total_time);
+                    const penalty = Number(participant.penalty_seconds) || 0;
+                    let leaderDiff = '-';
+                    let previousDiff = '-';
+                    if (idx > 0 && participants[0].total_time) {
+                      const diff = totalTimeSeconds - timeStringToSeconds(participants[0].total_time);
+                      const m = Math.floor(diff / 60);
+                      const s = (diff % 60).toFixed(3);
+                      leaderDiff = m > 0 ? `+${m}:${s.padStart(6, '0')}` : `+${s}`;
+                    }
+                    if (idx > 0 && participants[idx - 1].total_time) {
+                      const diff = totalTimeSeconds - timeStringToSeconds(participants[idx - 1].total_time);
+                      const m = Math.floor(diff / 60);
+                      const s = (diff % 60).toFixed(3);
+                      previousDiff = m > 0 ? `+${m}:${s.padStart(6, '0')}` : `+${s}`;
+                    }
+                    return (
+                      <TableRow key={participant.participant_id}>
+                        <TableCell><Badge variant={getPositionVariant(participant.position)}>{participant.position}</Badge></TableCell>
+                        <TableCell>{participant.driver_name}</TableCell>
+                        <TableCell>{participant.vehicle_info}</TableCell>
+                        <TableCell>{participant.rounds_completed}</TableCell>
+                        <TableCell className="font-medium">{formatTime(participant.best_lap_time)}</TableCell>
+                        <TableCell>
+                          {penalty > 0 ? (
+                            <span title={`Original: ${secondsToTimeString(totalTimeSeconds)}`} className="cursor-help">
+                              {participant.total_time} <span className="text-amber-600">⚠️</span>
+                            </span>
+                          ) : (
+                            participant.total_time
+                          )}
+                        </TableCell>
+                        <TableCell>{leaderDiff}</TableCell>
+                        <TableCell>{previousDiff}</TableCell>
+                        {rules.length > 0 && <TableCell>{participant.points || 0}</TableCell>}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
-            <div className="text-center py-4">
-              <p className="text-muted">No hay participantes registrados</p>
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No hay participantes registrados</p>
             </div>
           )}
-        </Card.Body>
+        </CardContent>
       </Card>
 
-      {/* Detalles por participante */}
+      {/* Participant details */}
       {participants.length > 0 && (
         <Card>
-          <Card.Header>
-            <h5 className="mb-0">
-              <FaUsers className="me-2" />
+          <CardHeader>
+            <h5 className="font-semibold flex items-center gap-2">
+              <Users className="size-5" />
               Detalles por Participante
             </h5>
-          </Card.Header>
-          <Card.Body>
-            <Row>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {participants.map((participant) => {
                 const totalTimeSeconds = timeStringToSeconds(participant.total_time);
                 const penalty = Number(participant.penalty_seconds) || 0;
+                const progress = (participant.rounds_completed / competition.rounds) * 100;
                 return (
-                <Col key={participant.participant_id} lg={6} xl={4} className="mb-3">
-                  <Card className="h-100 participant-detail-card">
-                    <Card.Body>
-                      <div className="d-flex justify-content-between align-items-start mb-3">
+                  <Card key={participant.participant_id} className="participant-detail-card">
+                    <CardContent className="pt-4">
+                      <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h6 className="mb-1 fw-bold">{participant.driver_name}</h6>
-                          <small className="text-muted">{participant.vehicle_info}</small>
+                          <h6 className="font-semibold">{participant.driver_name}</h6>
+                          <p className="text-sm text-muted-foreground">{participant.vehicle_info}</p>
                         </div>
-                        <Badge bg={getPositionBadge(participant.position).bg} className="badge-custom">
-                          {participant.position}º
-                        </Badge>
+                        <Badge variant={getPositionVariant(participant.position)}>{participant.position}º</Badge>
                       </div>
-                      
                       <div className="mb-3">
-                        <div className="d-flex justify-content-between mb-1">
-                          <small className="text-muted">Progreso:</small>
-                          <small className="text-muted">
-                            {participant.rounds_completed}/{competition.rounds}
-                          </small>
+                        <div className="flex justify-between text-sm text-muted-foreground mb-1">
+                          <span>Progreso:</span>
+                          <span>{participant.rounds_completed}/{competition.rounds}</span>
                         </div>
-                        <ProgressBar 
-                          now={(participant.rounds_completed / competition.rounds) * 100}
-                          variant={participant.rounds_completed >= competition.rounds ? 'success' : 'primary'}
-                          size="sm"
-                          className="progress-bar-custom"
-                        />
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${participant.rounds_completed >= competition.rounds ? 'bg-green-500' : 'bg-primary'}`}
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
                       </div>
-
-                      <div className="row text-center">
-                        <div className="col-6">
-                          <div className="text-primary fw-bold">
-                            {formatTime(participant.best_lap_time)}
-                          </div>
-                          <small className="text-muted">Mejor Vuelta</small>
+                      <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                          <div className="font-semibold text-primary">{formatTime(participant.best_lap_time)}</div>
+                          <small className="text-muted-foreground">Mejor Vuelta</small>
                         </div>
-                        <div className="col-6">
-                          <div className="text-success fw-bold">
+                        <div>
+                          <div className="font-semibold">
                             {penalty > 0 ? (
-                              <span
-                                data-bs-toggle="tooltip"
-                                title={`Original: ${secondsToTimeString(totalTimeSeconds)}`}
-                                style={{cursor: 'pointer'}}
-                              >
-                                {participant.total_time} <span style={{color: '#b8860b'}}>⚠️</span>
+                              <span title={`Original: ${secondsToTimeString(totalTimeSeconds)}`} className="cursor-help">
+                                {participant.total_time} <span className="text-amber-600">⚠️</span>
                               </span>
                             ) : (
-                              <span>{participant.total_time}</span>
+                              participant.total_time
                             )}
                           </div>
-                          <small className="text-muted">Total</small>
+                          <small className="text-muted-foreground">Total</small>
                         </div>
                       </div>
-
-                      {participant.timings.length > 0 && (
+                      {participant.timings?.length > 0 && (
                         <div className="mt-3">
-                          <small className="text-muted d-block mb-2">Tiempos por ronda:</small>
-                          <div className="row g-1">
-                            {participant.timings.map((timing) => {
-                              const totalTimeSeconds = timeStringToSeconds(timing.total_time);
-                              const penalty = Number(timing.penalty_seconds) || 0;
-                              return (
-                                <div key={timing.id} className="col-6">
-                                  <div className="round-timing-chip">
-                                    <small className="fw-bold">R{timing.round_number}</small>
-                                    <div className="text-muted small">
-                                      {penalty > 0 ? (
-                                        <span
-                                          data-bs-toggle="tooltip"
-                                          title={`Original: ${secondsToTimeString(totalTimeSeconds)}`}
-                                          style={{cursor: 'pointer'}}
-                                        >
-                                          {timing.total_time} <span style={{color: '#b8860b'}}>⚠️</span>
-                                        </span>
-                                      ) : (
-                                        <span>{timing.total_time}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                          <small className="text-muted-foreground block mb-2">Tiempos por ronda:</small>
+                          <div className="grid grid-cols-2 gap-2">
+                            {participant.timings.map((timing) => (
+                              <div key={timing.id} className="round-timing-chip rounded p-2 text-center">
+                                <small className="font-semibold block">R{timing.round_number}</small>
+                                <small className="text-muted-foreground">
+                                  {Number(timing.penalty_seconds) > 0 ? (
+                                    <span title={`Original: ${secondsToTimeString(timeStringToSeconds(timing.total_time))}`} className="cursor-help">
+                                      {timing.total_time} <span className="text-amber-600">⚠️</span>
+                                    </span>
+                                  ) : (
+                                    timing.total_time
+                                  )}
+                                </small>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
-                    </Card.Body>
+                    </CardContent>
                   </Card>
-                </Col>
                 );
               })}
-            </Row>
-          </Card.Body>
+            </div>
+          </CardContent>
         </Card>
       )}
 
-      {/* Aviso de empate en mejor vuelta */}
       {competitionData.best_time_ties_message && (
-        <Alert variant="warning" className="mb-3">
-          {competitionData.best_time_ties_message}
-          {competitionData.best_time_ties && competitionData.best_time_ties.length > 0 && (
-            <ul className="mb-0 mt-2">
-              {competitionData.best_time_ties.map(tie => (
-                <li key={tie.round}>Ronda {tie.round}: tiempo {tie.time}</li>
-              ))}
-            </ul>
-          )}
+        <Alert variant="destructive">
+          <AlertDescription>
+            {competitionData.best_time_ties_message}
+            {competitionData.best_time_ties?.length > 0 && (
+              <ul className="mt-2 list-disc list-inside">
+                {competitionData.best_time_ties.map(tie => (
+                  <li key={tie.round}>Ronda {tie.round}: tiempo {tie.time}</li>
+                ))}
+              </ul>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 
-      {/* Modal para exportación PDF */}
-      <Modal show={showPdfModal} onHide={() => setShowPdfModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Exportar Resultados</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Funcionalidad de exportación PDF en desarrollo.</p>
-          <p>Esta función permitirá descargar un reporte completo de la competición en formato PDF.</p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowPdfModal(false)}>
-            Cerrar
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </Container>
+      <Dialog open={showPdfModal} onOpenChange={setShowPdfModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Exportar Resultados</DialogTitle>
+            <DialogDescription>
+              Funcionalidad de exportación PDF en desarrollo. Permitirá descargar un reporte completo de la competición.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPdfModal(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
-export default CompetitionStatus; 
+export default CompetitionStatus;

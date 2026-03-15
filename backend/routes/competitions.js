@@ -129,7 +129,7 @@ function generateSlug(name) {
 // Crear una nueva competición
 router.post('/', async (req, res) => {
   try {
-    const { name, num_slots, rounds, circuit_name } = req.body;
+    const { name, num_slots, rounds, circuit_name, circuit_id } = req.body;
 
     // Validaciones
     if (!name || !name.trim()) {
@@ -144,19 +144,36 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'El número de rondas debe ser mayor a 0' });
     }
 
+    // Si circuit_id se proporciona, verificar que existe y pertenece al usuario
+    let circuitNameToStore = circuit_name ? circuit_name.trim() : null;
+    if (circuit_id) {
+      const { data: circuit, error: circuitError } = await supabase
+        .from('circuits')
+        .select('name')
+        .eq('id', circuit_id)
+        .eq('user_id', req.user.id)
+        .single();
+      if (!circuitError && circuit) {
+        circuitNameToStore = circuit.name;
+      }
+    }
+
     // Generar public_slug único
     const public_slug = generateSlug(name.trim());
 
+    const insertData = {
+      name: name.trim(),
+      public_slug: public_slug,
+      organizer: req.user.id,
+      num_slots: num_slots,
+      rounds: rounds,
+      circuit_name: circuitNameToStore,
+      circuit_id: circuit_id || null
+    };
+
     const { data, error } = await supabase
       .from('competitions')
-      .insert([{
-        name: name.trim(),
-        public_slug: public_slug,
-        organizer: req.user.id,
-        num_slots: num_slots,
-        rounds: rounds,
-        circuit_name: circuit_name ? circuit_name.trim() : null
-      }])
+      .insert([insertData])
       .select()
       .single();
 
@@ -196,7 +213,8 @@ router.get('/my-competitions', async (req, res) => {
       .from('competitions')
       .select(`
         *,
-        competition_participants(count)
+        competition_participants(count),
+        circuits(id, name, num_lanes, lane_lengths)
       `)
       .eq('organizer', req.user.id)
       .order('created_at', { ascending: false });
@@ -246,10 +264,13 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Obtener la competición
+    // Obtener la competición con datos del circuito
     const { data: competition, error: compError } = await supabase
       .from('competitions')
-      .select('*')
+      .select(`
+        *,
+        circuits(id, name, num_lanes, lane_lengths)
+      `)
       .eq('id', id)
       .eq('organizer', req.user.id)
       .single();
@@ -310,7 +331,7 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, num_slots, rounds, circuit_name } = req.body;
+    const { name, num_slots, rounds, circuit_name, circuit_id } = req.body;
 
     // Verificar que la competición existe y pertenece al usuario
     const { data: existingComp, error: checkError } = await supabase
@@ -373,6 +394,26 @@ router.put('/:id', async (req, res) => {
     if (num_slots) updateData.num_slots = num_slots;
     if (rounds) updateData.rounds = rounds;
     if (circuit_name !== undefined) updateData.circuit_name = circuit_name ? circuit_name.trim() : null;
+    if (circuit_id !== undefined) {
+      if (circuit_id) {
+        const { data: circuit, error: circuitError } = await supabase
+          .from('circuits')
+          .select('name')
+          .eq('id', circuit_id)
+          .eq('user_id', req.user.id)
+          .single();
+        if (!circuitError && circuit) {
+          updateData.circuit_id = circuit_id;
+          updateData.circuit_name = circuit.name;
+        } else {
+          updateData.circuit_id = null;
+          updateData.circuit_name = null;
+        }
+      } else {
+        updateData.circuit_id = null;
+        updateData.circuit_name = null;
+      }
+    }
 
     const { data, error } = await supabase
       .from('competitions')
@@ -876,6 +917,7 @@ router.post('/:id/timings', async (req, res) => {
       average_time_timestamp,
       setup_snapshot,
       circuit,
+      circuit_id,
       round_number 
     } = req.body;
 
@@ -946,7 +988,20 @@ router.post('/:id/timings', async (req, res) => {
     if (total_time_timestamp) timingData.total_time_timestamp = total_time_timestamp;
     if (average_time_timestamp) timingData.average_time_timestamp = average_time_timestamp;
     if (setup_snapshot) timingData.setup_snapshot = setup_snapshot;
-    if (circuit) timingData.circuit = circuit;
+    if (circuit_id) {
+      const { data: circuit, error: circuitError } = await supabase
+        .from('circuits')
+        .select('name')
+        .eq('id', circuit_id)
+        .eq('user_id', req.user.id)
+        .single();
+      if (!circuitError && circuit) {
+        timingData.circuit_id = circuit_id;
+        timingData.circuit = circuit.name;
+      }
+    } else if (circuit) {
+      timingData.circuit = circuit;
+    }
 
     const { data, error } = await supabase
       .from('competition_timings')
@@ -1056,7 +1111,8 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       total_time_timestamp,
       average_time_timestamp,
       setup_snapshot,
-      circuit
+      circuit,
+      circuit_id
     } = req.body;
 
     // Verificar que la competición existe y pertenece al usuario
@@ -1115,7 +1171,25 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     if (total_time_timestamp !== undefined) updateData.total_time_timestamp = total_time_timestamp;
     if (average_time_timestamp !== undefined) updateData.average_time_timestamp = average_time_timestamp;
     if (setup_snapshot !== undefined) updateData.setup_snapshot = setup_snapshot;
-    if (circuit !== undefined) updateData.circuit = circuit;
+    if (circuit_id !== undefined) {
+      if (circuit_id) {
+        const { data: circuit, error: circuitError } = await supabase
+          .from('circuits')
+          .select('name')
+          .eq('id', circuit_id)
+          .eq('user_id', req.user.id)
+          .single();
+        if (!circuitError && circuit) {
+          updateData.circuit_id = circuit_id;
+          updateData.circuit = circuit.name;
+        }
+      } else {
+        updateData.circuit_id = null;
+        updateData.circuit = null;
+      }
+    } else if (circuit !== undefined) {
+      updateData.circuit = circuit;
+    }
 
     const { data, error } = await supabase
       .from('competition_timings')

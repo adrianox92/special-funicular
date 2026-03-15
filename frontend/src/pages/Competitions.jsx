@@ -1,26 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Modal, Form, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import { FaPlus, FaUsers, FaCalendar, FaTrophy, FaFlag, FaClock } from 'react-icons/fa';
+import { Plus, Users, Calendar, Trophy, Flag, Clock } from 'lucide-react';
 import axios from '../lib/axios';
+import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../components/ui/dialog';
+import { Spinner } from '../components/ui/spinner';
 
 const Competitions = () => {
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [circuits, setCircuits] = useState([]);
   const [createForm, setCreateForm] = useState({
     name: '',
     num_slots: '',
     rounds: '1',
-    circuit_name: ''
+    circuit_id: ''
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
 
   const navigate = useNavigate();
 
-  // Cargar competiciones
   const loadCompetitions = async () => {
     try {
       setLoading(true);
@@ -35,14 +57,23 @@ const Competitions = () => {
     }
   };
 
+  const loadCircuits = async () => {
+    try {
+      const response = await axios.get('/circuits');
+      setCircuits(response.data);
+    } catch (err) {
+      console.error('Error al cargar circuitos:', err);
+    }
+  };
+
   useEffect(() => {
     loadCompetitions();
+    loadCircuits();
   }, []);
 
-  // Manejar creación de competición
   const handleCreateCompetition = async (e) => {
     e.preventDefault();
-    
+
     if (!createForm.name.trim() || !createForm.num_slots || !createForm.rounds) {
       setCreateError('Por favor, completa todos los campos');
       return;
@@ -61,18 +92,17 @@ const Competitions = () => {
     try {
       setCreating(true);
       setCreateError(null);
-      
+
       const response = await axios.post('/competitions', {
         name: createForm.name.trim(),
         num_slots: parseInt(createForm.num_slots),
         rounds: parseInt(createForm.rounds),
-        circuit_name: createForm.circuit_name.trim() || null
+        circuit_id: createForm.circuit_id || null
       });
 
       setShowCreateModal(false);
-      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_name: '' });
-      
-      // Redirigir al paso 2 (añadir participantes)
+      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '' });
+
       navigate(`/competitions/${response.data.id}/participants`);
     } catch (err) {
       console.error('Error al crear competición:', err);
@@ -82,7 +112,6 @@ const Competitions = () => {
     }
   };
 
-  // Manejar eliminación de competición
   const handleDeleteCompetition = async (competitionId) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar esta competición? Esta acción no se puede deshacer.')) {
       return;
@@ -90,14 +119,13 @@ const Competitions = () => {
 
     try {
       await axios.delete(`/competitions/${competitionId}`);
-      loadCompetitions(); // Recargar la lista
+      loadCompetitions();
     } catch (err) {
       console.error('Error al eliminar competición:', err);
       alert('Error al eliminar la competición');
     }
   };
 
-  // Formatear fecha
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
@@ -110,239 +138,223 @@ const Competitions = () => {
 
   if (loading) {
     return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
-        <div className="spinner-border" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </Container>
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <Spinner className="size-8" />
+      </div>
     );
   }
 
   return (
-    <Container className="py-4">
-      <Row className="mb-4">
-        <Col>
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <h1 className="mb-2">Mis Competiciones</h1>
-              <p className="text-muted">Gestiona tus competiciones y participantes</p>
-            </div>
-            <Button 
-              variant="primary" 
-              onClick={() => setShowCreateModal(true)}
-              className="d-flex align-items-center gap-2 btn-competition"
-            >
-              <FaPlus /> Nueva Competición
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Mis Competiciones</h1>
+          <p className="text-muted-foreground">Gestiona tus competiciones y participantes</p>
+        </div>
+        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Plus className="size-4" />
+              Nueva Competición
             </Button>
-          </div>
-        </Col>
-      </Row>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nueva Competición</DialogTitle>
+              <DialogDescription>Crea una nueva competición para gestionar participantes y tiempos</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateCompetition}>
+              <div className="space-y-4 py-4">
+                {createError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{createError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nombre de la Competición</Label>
+                  <Input
+                    id="name"
+                    placeholder="Ej: Copa de Invierno 2024"
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="num_slots">Número de Plazas</Label>
+                  <Input
+                    id="num_slots"
+                    type="number"
+                    min="1"
+                    max="50"
+                    placeholder="Ej: 8"
+                    value={createForm.num_slots}
+                    onChange={(e) => setCreateForm({ ...createForm, num_slots: e.target.value })}
+                    required
+                  />
+                  <p className="text-sm text-muted-foreground">Número máximo de participantes permitidos</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="rounds">Número de Rondas</Label>
+                  <Input
+                    id="rounds"
+                    type="number"
+                    min="1"
+                    max="10"
+                    placeholder="Ej: 3"
+                    value={createForm.rounds}
+                    onChange={(e) => setCreateForm({ ...createForm, rounds: e.target.value })}
+                    required
+                  />
+                  <p className="text-sm text-muted-foreground">Número máximo de rondas permitidas</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="circuit_id">Circuito</Label>
+                  <Select
+                    value={createForm.circuit_id || 'none'}
+                    onValueChange={(v) => setCreateForm({ ...createForm, circuit_id: v === 'none' ? '' : v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar circuito (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Ninguno</SelectItem>
+                      {circuits.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">Opcional. Crea circuitos en el apartado Circuitos</p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={creating}>
+                  {creating ? (
+                    <>
+                      <Spinner className="size-4 mr-2" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="size-4 mr-2" />
+                      Crear Competición
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       {error && (
-        <Alert variant="danger" className="mb-4">
-          {error}
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {competitions.length === 0 ? (
-        <Card className="text-center py-5">
-          <Card.Body>
-            <FaTrophy size={48} className="text-muted mb-3" />
-            <h4>No tienes competiciones</h4>
-            <p className="text-muted mb-4">
+        <Card className="text-center py-12">
+          <CardContent>
+            <Trophy className="size-12 mx-auto text-muted-foreground mb-4" />
+            <h4 className="mb-2">No tienes competiciones</h4>
+            <p className="text-muted-foreground mb-6">
               Crea tu primera competición para empezar a gestionar participantes
             </p>
-            <Button 
-              variant="primary" 
-              onClick={() => setShowCreateModal(true)}
-              className="d-flex align-items-center gap-2 mx-auto"
-            >
-              <FaPlus /> Crear Primera Competición
+            <Button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 mx-auto">
+              <Plus className="size-4" />
+              Crear Primera Competición
             </Button>
-          </Card.Body>
+          </CardContent>
         </Card>
       ) : (
-        <Row>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {competitions.map((competition) => (
-            <Col key={competition.id} lg={4} md={6} className="mb-4">
-              <Card className="h-100 shadow-sm competition-card">
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-start mb-3">
-                    <h5 className="card-title mb-0">{competition.name}</h5>
-                    <Badge 
-                      bg={competition.participants_count >= competition.num_slots ? 'success' : 'primary'}
-                      className="ms-2 badge-custom"
-                    >
-                      {competition.participants_count}/{competition.num_slots}
-                    </Badge>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <div className="d-flex align-items-center text-muted mb-1">
-                      <FaUsers className="me-2" />
-                      <small>Participantes</small>
-                    </div>
-                    <div className="d-flex align-items-center text-muted mb-1">
-                      <FaCalendar className="me-2" />
-                      <small>Creada: {formatDate(competition.created_at)}</small>
-                    </div>
-                    <div className="d-flex align-items-center text-muted mb-1">
-                      <FaTrophy className="me-2" />
-                      <small>Rondas: {competition.rounds}</small>
-                    </div>
-                    {competition.circuit_name && (
-                      <div className="d-flex align-items-center text-muted mb-1">
-                        <FaFlag className="me-2" />
-                        <small>Circuito: {competition.circuit_name}</small>
-                      </div>
-                    )}
-                  </div>
+            <Card key={competition.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5">
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start mb-4">
+                  <h5 className="font-semibold text-lg">{competition.name}</h5>
+                  <Badge variant={competition.participants_count >= competition.num_slots ? 'default' : 'secondary'}>
+                    {competition.participants_count}/{competition.num_slots}
+                  </Badge>
+                </div>
 
-                  <div className="progress mb-3 competition-progress" style={{ height: '8px' }}>
-                    <div 
-                      className="progress-bar" 
-                      style={{ 
-                        width: `${(competition.participants_count / competition.num_slots) * 100}%` 
-                      }}
-                    />
+                <div className="space-y-2 mb-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Users className="size-4" />
+                    Participantes
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="size-4" />
+                    Creada: {formatDate(competition.created_at)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="size-4" />
+                    Rondas: {competition.rounds}
+                  </div>
+                  {(competition.circuit_name || competition.circuits?.name) && (
+                    <div className="flex items-center gap-2">
+                      <Flag className="size-4" />
+                      Circuito: {competition.circuit_name || competition.circuits?.name}
+                    </div>
+                  )}
+                </div>
 
-                  <div className="d-flex gap-2">
-                    <Button 
-                      variant="outline-primary" 
+                <div className="h-2 rounded-full bg-muted overflow-hidden mb-4">
+                  <div
+                    className="h-full bg-primary transition-all rounded-full"
+                    style={{ width: `${(competition.participants_count / competition.num_slots) * 100}%` }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => navigate(`/competitions/${competition.id}/participants`)}
+                  >
+                    Gestionar Participantes
+                  </Button>
+                  {competition.participants_count > 0 && (
+                    <Button
+                      variant="outline"
                       size="sm"
-                      onClick={() => navigate(`/competitions/${competition.id}/participants`)}
-                      className="flex-fill"
+                      className="flex-1"
+                      onClick={() => navigate(`/competitions/${competition.id}/timings`)}
                     >
-                      Gestionar Participantes
+                      <Clock className="size-4 mr-1" />
+                      Tiempos
+                      {competition.participants_count < competition.num_slots && (
+                        <Badge variant="secondary" className="ml-1 text-xs">
+                          {competition.participants_count}
+                        </Badge>
+                      )}
                     </Button>
-                    {competition.participants_count > 0 && (
-                      <Button 
-                        variant="outline-success" 
-                        size="sm"
-                        onClick={() => navigate(`/competitions/${competition.id}/timings`)}
-                        className="flex-fill"
-                      >
-                        <FaClock /> Tiempos
-                        {competition.participants_count < competition.num_slots && (
-                          <Badge bg="info" text="dark" className="ms-1">
-                            {competition.participants_count}
-                          </Badge>
-                        )}
-                      </Button>
-                    )}
-                    <Button 
-                      variant="outline-danger" 
-                      size="sm"
-                      onClick={() => handleDeleteCompetition(competition.id)}
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteCompetition(competition.id)}
+                  >
+                    Eliminar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
-        </Row>
+        </div>
       )}
-
-      {/* Modal para crear competición */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>🏁 Nueva Competición</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleCreateCompetition}>
-          <Modal.Body>
-            {createError && (
-              <Alert variant="danger" className="mb-3">
-                {createError}
-              </Alert>
-            )}
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Nombre de la Competición</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Ej: Copa de Invierno 2024"
-                value={createForm.name}
-                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                required
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Número de Plazas</Form.Label>
-              <Form.Control
-                type="number"
-                min="1"
-                max="50"
-                placeholder="Ej: 8"
-                value={createForm.num_slots}
-                onChange={(e) => setCreateForm({ ...createForm, num_slots: e.target.value })}
-                required
-              />
-              <Form.Text className="text-muted">
-                Número máximo de participantes permitidos
-              </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Número de Rondas</Form.Label>
-              <Form.Control
-                type="number"
-                min="1"
-                max="10"
-                placeholder="Ej: 3"
-                value={createForm.rounds}
-                onChange={(e) => setCreateForm({ ...createForm, rounds: e.target.value })}
-                required
-              />
-              <Form.Text className="text-muted">
-                Número máximo de rondas permitidas
-              </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Nombre del Circuito</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Ej: Circuito de Barcelona"
-                value={createForm.circuit_name}
-                onChange={(e) => setCreateForm({ ...createForm, circuit_name: e.target.value })}
-              />
-              <Form.Text className="text-muted">
-                Opcional: Nombre del circuito donde se realizará la competición
-              </Form.Text>
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              variant="primary" 
-              type="submit" 
-              disabled={creating}
-              className="d-flex align-items-center gap-2"
-            >
-              {creating ? (
-                <>
-                  <div className="spinner-border spinner-border-sm" role="status">
-                    <span className="visually-hidden">Creando...</span>
-                  </div>
-                  Creando...
-                </>
-              ) : (
-                <>
-                  <FaPlus /> Crear Competición
-                </>
-              )}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-    </Container>
+    </div>
   );
 };
 
-export default Competitions; 
+export default Competitions;

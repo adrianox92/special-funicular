@@ -1,6 +1,6 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { Card, Row, Col } from 'react-bootstrap';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Card, CardContent, CardHeader } from '../ui/card';
 
 const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
   // Filtrar tiempos por circuito y carril
@@ -78,20 +78,15 @@ const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       const isBestLap = type === 'bestLap';
-      
       return (
-        <div className="custom-tooltip p-3 bg-white border rounded shadow-sm">
-          <p className="mb-2 fw-bold">Fecha: {label}</p>
-          <p className="mb-1">
-            {isBestLap ? 'Mejor vuelta' : 'Tiempo total'}: {formatTime(payload[0].value)}
-          </p>
-          <p className="mb-1">Vueltas: {data.laps}</p>
-          <p className={`mb-1 ${isBestLap ? 'text-primary' : 'text-success'}`}>
+        <div className="rounded-md border bg-popover p-3 shadow-md">
+          <p className="font-semibold mb-2">Fecha: {label}</p>
+          <p className="mb-1 text-sm">{isBestLap ? 'Mejor vuelta' : 'Tiempo total'}: {formatTime(payload[0].value)}</p>
+          <p className="mb-1 text-sm">Vueltas: {data.laps}</p>
+          <p className={`mb-1 text-sm ${isBestLap ? 'text-primary' : 'text-green-600'}`}>
             <strong>Evolución:</strong> {isBestLap ? data.bestLapDifference : data.totalTimeDifference}
           </p>
-          <p className="mb-0 small text-muted">
-            {data.originalData.circuit} - Carril {data.originalData.lane}
-          </p>
+          <p className="mb-0 text-xs text-muted-foreground">{data.originalData.circuit} - Carril {data.originalData.lane}</p>
         </div>
       );
     }
@@ -99,16 +94,14 @@ const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
   };
 
   return (
-    <Card className="mb-4 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-3">
-          Evolución de Tiempos - {circuit} (Carril {lane}) - {laps} vueltas
-        </Card.Title>
-        
-        <Row>
-          {/* Gráfica de Mejor Vuelta */}
-          <Col md={6}>
-            <h6 className="text-center mb-3">Evolución de Mejor Vuelta</h6>
+    <Card className="mb-6">
+      <CardHeader>
+        <h5 className="font-semibold">Evolución de Tiempos - {circuit} (Carril {lane}) - {laps} vueltas</h5>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h6 className="text-center font-medium mb-3">Evolución de Mejor Vuelta</h6>
             <div style={{ width: '100%', height: 250 }}>
               <ResponsiveContainer>
                 <LineChart
@@ -141,11 +134,9 @@ const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </Col>
-
-          {/* Gráfica de Tiempo Total */}
-          <Col md={6}>
-            <h6 className="text-center mb-3">Evolución de Tiempo Total</h6>
+          </div>
+          <div>
+            <h6 className="text-center font-medium mb-3">Evolución de Tiempo Total</h6>
             <div style={{ width: '100%', height: 250 }}>
               <ResponsiveContainer>
                 <LineChart
@@ -178,18 +169,18 @@ const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </Col>
-        </Row>
+          </div>
+        </div>
 
         <div className="mt-4">
-          <small className="text-muted">
+          <small className="text-muted-foreground text-sm">
             Se muestran {filteredTimings.length} registros de tiempo para {circuit}, carril {lane}, con {laps} vueltas.
             {filteredTimings.length >= 3 && ' Cada gráfica muestra la evolución independiente de cada métrica con su propia escala.'}
             <br />
-            <span className="text-primary">🔽</span> Mejoró, <span className="text-danger">🔼</span> Empeoró, <span className="text-muted">➡️</span> Sin cambios
+            <span className="text-primary">🔽</span> Mejoró, <span className="text-destructive">🔼</span> Empeoró, <span className="text-muted">➡️</span> Sin cambios
           </small>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

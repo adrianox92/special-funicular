@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, ListGroup, ListGroupItem, Badge, Button } from 'react-bootstrap';
-import { FaTrophy, FaUsers, FaCalendar, FaFlag, FaArrowRight, FaClock } from 'react-icons/fa';
+import { Trophy, Users, Calendar, Flag, ArrowRight, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../lib/axios';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader } from './ui/card';
+import { Badge } from './ui/badge';
+import { Spinner } from './ui/spinner';
 
 const RecentCompetitions = () => {
   const [competitions, setCompetitions] = useState([]);
@@ -14,7 +17,6 @@ const RecentCompetitions = () => {
     const loadRecentCompetitions = async () => {
       try {
         const response = await axios.get('/api/competitions/my-competitions');
-        // Tomar solo las 5 más recientes
         setCompetitions(response.data.slice(0, 5));
         setError(null);
       } catch (err) {
@@ -24,7 +26,6 @@ const RecentCompetitions = () => {
         setLoading(false);
       }
     };
-
     loadRecentCompetitions();
   }, []);
 
@@ -39,17 +40,15 @@ const RecentCompetitions = () => {
   if (loading) {
     return (
       <Card>
-        <Card.Header>
-          <h6 className="mb-0">
-            <FaTrophy className="me-2" />
+        <CardHeader>
+          <h6 className="font-semibold flex items-center gap-2">
+            <Trophy className="size-4" />
             Competiciones Recientes
           </h6>
-        </Card.Header>
-        <Card.Body className="text-center">
-          <div className="spinner-border spinner-border-sm" role="status">
-            <span className="visually-hidden">Cargando...</span>
-          </div>
-        </Card.Body>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <Spinner className="size-6 mx-auto" />
+        </CardContent>
       </Card>
     );
   }
@@ -57,15 +56,15 @@ const RecentCompetitions = () => {
   if (error) {
     return (
       <Card>
-        <Card.Header>
-          <h6 className="mb-0">
-            <FaTrophy className="me-2" />
+        <CardHeader>
+          <h6 className="font-semibold flex items-center gap-2">
+            <Trophy className="size-4" />
             Competiciones Recientes
           </h6>
-        </Card.Header>
-        <Card.Body>
-          <p className="text-muted mb-0">{error}</p>
-        </Card.Body>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">{error}</p>
+        </CardContent>
       </Card>
     );
   }
@@ -73,94 +72,88 @@ const RecentCompetitions = () => {
   if (competitions.length === 0) {
     return (
       <Card>
-        <Card.Header>
-          <h6 className="mb-0">
-            <FaTrophy className="me-2" />
+        <CardHeader>
+          <h6 className="font-semibold flex items-center gap-2">
+            <Trophy className="size-4" />
             Competiciones Recientes
           </h6>
-        </Card.Header>
-        <Card.Body>
-          <p className="text-muted mb-3">No tienes competiciones creadas</p>
-          <div className="small text-muted mb-3">
-            <p className="mb-1">💡 <strong>Flujo recomendado:</strong></p>
-            <ol className="mb-0">
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-4">No tienes competiciones creadas</p>
+          <div className="text-sm text-muted-foreground mb-4">
+            <p className="mb-2">💡 <strong>Flujo recomendado:</strong></p>
+            <ol className="list-decimal list-inside space-y-1">
               <li>Crea una competición</li>
               <li>Añade todos los participantes</li>
               <li>Gestiona los tiempos por ronda</li>
             </ol>
           </div>
-          <Button 
-            variant="primary" 
-            size="sm"
-            onClick={() => navigate('/competitions')}
-          >
+          <Button size="sm" onClick={() => navigate('/competitions')}>
             Crear Primera Competición
           </Button>
-        </Card.Body>
+        </CardContent>
       </Card>
     );
   }
 
   return (
     <Card>
-      <Card.Header className="d-flex justify-content-between align-items-center">
-        <h6 className="mb-0">
-          <FaTrophy className="me-2" />
+      <CardHeader className="flex flex-row items-center justify-between">
+        <h6 className="font-semibold flex items-center gap-2">
+          <Trophy className="size-4" />
           Competiciones Recientes
         </h6>
-        <Button 
-          variant="outline-primary" 
-          size="sm"
-          onClick={() => navigate('/competitions')}
-        >
+        <Button variant="outline" size="sm" onClick={() => navigate('/competitions')}>
           Ver Todas
         </Button>
-      </Card.Header>
-      <ListGroup variant="flush">
-        {competitions.map((competition) => (
-          <ListGroupItem 
-            key={competition.id} 
-            className="d-flex justify-content-between align-items-center cursor-pointer"
-            style={{ cursor: 'pointer' }}
-            onClick={() => navigate(`/competitions/${competition.id}/participants`)}
-          >
-            <div className="flex-grow-1">
-              <div className="d-flex justify-content-between align-items-start mb-1">
-                <h6 className="mb-0">{competition.name}</h6>
-                <div className="d-flex gap-1">
-                  <Badge 
-                    bg={competition.participants_count >= competition.num_slots ? 'success' : 'primary'}
-                    className="ms-2"
-                  >
-                    {competition.participants_count}/{competition.num_slots}
-                  </Badge>
-                  {competition.participants_count >= competition.num_slots && (
-                    <Badge bg="success" className="ms-1">
-                      <FaClock className="me-1" />
-                      Tiempos
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y">
+          {competitions.map((competition) => (
+            <div
+              key={competition.id}
+              className="flex justify-between items-center p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+              onClick={() => navigate(`/competitions/${competition.id}/participants`)}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start gap-2 mb-1">
+                  <h6 className="font-medium truncate">{competition.name}</h6>
+                  <div className="flex gap-1 shrink-0">
+                    <Badge variant={competition.participants_count >= competition.num_slots ? 'default' : 'secondary'}>
+                      {competition.participants_count}/{competition.num_slots}
                     </Badge>
+                    {competition.participants_count >= competition.num_slots && (
+                      <Badge variant="secondary" className="flex items-center gap-1">
+                        <Clock className="size-3" />
+                        Tiempos
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="size-3" />
+                    {formatDate(competition.created_at)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users className="size-3" />
+                    {competition.rounds} rondas
+                  </span>
+                  {competition.circuit_name && (
+                    <span className="flex items-center gap-1">
+                      <Flag className="size-3" />
+                      {competition.circuit_name}
+                    </span>
                   )}
                 </div>
               </div>
-              <div className="d-flex align-items-center text-muted small">
-                <FaCalendar className="me-1" />
-                <span className="me-3">{formatDate(competition.created_at)}</span>
-                <FaUsers className="me-1" />
-                <span className="me-3">{competition.rounds} rondas</span>
-                {competition.circuit_name && (
-                  <>
-                    <FaFlag className="me-1" />
-                    <span>{competition.circuit_name}</span>
-                  </>
-                )}
-              </div>
+              <ArrowRight className="size-4 text-muted-foreground shrink-0 ml-2" />
             </div>
-            <FaArrowRight className="text-muted" />
-          </ListGroupItem>
-        ))}
-      </ListGroup>
+          ))}
+        </div>
+      </CardContent>
     </Card>
   );
 };
 
-export default RecentCompetitions; 
+export default RecentCompetitions;

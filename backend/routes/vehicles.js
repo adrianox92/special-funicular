@@ -938,7 +938,8 @@ router.post('/:id/timings', async (req, res) => {
       best_lap_timestamp,
       total_time_timestamp,
       average_time_timestamp,
-      circuit
+      circuit,
+      circuit_id
     } = req.body;
 
     // Verificar que el vehículo pertenece al usuario
@@ -972,6 +973,22 @@ router.post('/:id/timings', async (req, res) => {
       }
     }
 
+    // Resolver circuito: circuit_id tiene prioridad
+    let circuitToStore = circuit;
+    let circuitIdToStore = null;
+    if (circuit_id) {
+      const { data: circuitRow, error: circuitError } = await supabase
+        .from('circuits')
+        .select('name')
+        .eq('id', circuit_id)
+        .eq('user_id', req.user.id)
+        .single();
+      if (!circuitError && circuitRow) {
+        circuitIdToStore = circuit_id;
+        circuitToStore = circuitRow.name;
+      }
+    }
+
     // Crear el nuevo registro de tiempo con el snapshot
     const { data: timing, error: timingError } = await supabase
       .from('vehicle_timings')
@@ -986,7 +1003,8 @@ router.post('/:id/timings', async (req, res) => {
         best_lap_timestamp,
         total_time_timestamp,
         average_time_timestamp,
-        circuit,
+        circuit: circuitToStore,
+        circuit_id: circuitIdToStore,
         setup_snapshot: JSON.stringify(componentsSnapshot),
         created_at: new Date().toISOString()
       }])
@@ -998,13 +1016,13 @@ router.post('/:id/timings', async (req, res) => {
     }
 
     // Actualizar posiciones del circuito si se especificó uno
-    if (circuit) {
+    if (circuitToStore) {
       try {
-        console.log(`🔄 Actualizando posiciones para el circuito: ${circuit}`);
-        const positionUpdate = await updatePositionsAfterNewTiming(circuit, timing.id);
+        console.log(`🔄 Actualizando posiciones para el circuito: ${circuitToStore}`);
+        const positionUpdate = await updatePositionsAfterNewTiming(circuitToStore, timing.id);
         
         if (positionUpdate.success) {
-          console.log(`✅ Posiciones actualizadas para el circuito: ${circuit}`);
+          console.log(`✅ Posiciones actualizadas para el circuito: ${circuitToStore}`);
           // Enriquecer la respuesta con información de posiciones
           const enrichedTiming = {
             ...timing,
@@ -1013,11 +1031,11 @@ router.post('/:id/timings', async (req, res) => {
           };
           res.status(201).json(enrichedTiming);
         } else {
-          console.warn(`⚠️  No se pudieron actualizar las posiciones para el circuito: ${circuit}`);
+          console.warn(`⚠️  No se pudieron actualizar las posiciones para el circuito: ${circuitToStore}`);
           res.status(201).json(timing);
         }
       } catch (positionError) {
-        console.error(`❌ Error al actualizar posiciones para el circuito ${circuit}:`, positionError);
+        console.error(`❌ Error al actualizar posiciones para el circuito ${circuitToStore}:`, positionError);
         // Aún devolvemos el timing creado, pero sin información de posiciones
         res.status(201).json(timing);
       }
@@ -1044,7 +1062,8 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       best_lap_timestamp,
       total_time_timestamp,
       average_time_timestamp,
-      circuit
+      circuit,
+      circuit_id
     } = req.body;
 
     // Verificar que el vehículo pertenece al usuario
@@ -1069,9 +1088,36 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       return res.status(404).json({ error: 'Registro de tiempo no encontrado' });
     }
 
+    // Resolver circuito: circuit_id tiene prioridad
+    let circuitToStore = circuit;
+    let circuitIdToStore = existingTiming.circuit_id;
+    if (circuit_id !== undefined) {
+      if (circuit_id) {
+        const { data: circuitRow, error: circuitError } = await supabase
+          .from('circuits')
+          .select('name')
+          .eq('id', circuit_id)
+          .eq('user_id', req.user.id)
+          .single();
+        if (!circuitError && circuitRow) {
+          circuitIdToStore = circuit_id;
+          circuitToStore = circuitRow.name;
+        }
+      } else {
+        circuitIdToStore = null;
+        circuitToStore = null;
+      }
+    } else if (circuit !== undefined) {
+      circuitToStore = circuit;
+      circuitIdToStore = null;
+    } else {
+      circuitToStore = existingTiming.circuit;
+      circuitIdToStore = existingTiming.circuit_id;
+    }
+
     // Detectar si hubo cambios que requieren recálculo de posiciones
     const previousCircuit = existingTiming.circuit;
-    const newCircuit = circuit;
+    const newCircuit = circuitToStore;
     const previousBestLap = existingTiming.best_lap_time;
     const newBestLap = best_lap_time;
     const previousLane = existingTiming.lane;
@@ -1100,20 +1146,22 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     });
 
     // Actualizar el registro
+    const updatePayload = {
+      best_lap_time,
+      total_time,
+      laps,
+      average_time,
+      lane,
+      timing_date,
+      best_lap_timestamp,
+      total_time_timestamp,
+      average_time_timestamp,
+      circuit: circuitToStore,
+      circuit_id: circuitIdToStore
+    };
     const { data: updatedTiming, error: updateError } = await supabase
       .from('vehicle_timings')
-      .update({
-        best_lap_time,
-        total_time,
-        laps,
-        average_time,
-        lane,
-        timing_date,
-        best_lap_timestamp,
-        total_time_timestamp,
-        average_time_timestamp,
-        circuit
-      })
+      .update(updatePayload)
       .eq('id', timingId)
       .select()
       .single();

@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Alert, Container, Card, Row, Col, Tabs, Tab } from 'react-bootstrap';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Button } from './ui/button';
+import { Alert, AlertDescription } from './ui/alert';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -17,20 +22,15 @@ const Login = () => {
     confirmPassword: ''
   });
 
-  // Verificar si hay parámetro de registro en la URL
   useEffect(() => {
-    const registerParam = searchParams.get('register');
-    if (registerParam === 'true') {
+    if (searchParams.get('register') === 'true') {
       setActiveTab('register');
     }
   }, [searchParams]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -46,9 +46,9 @@ const Login = () => {
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Las contraseñas no coinciden');
         }
-        const { data, error } = await supabase.auth.signUp({ 
-          email: formData.email, 
-          password: formData.password 
+        const { data, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password
         });
         if (error) throw error;
         if (data?.user) {
@@ -56,7 +56,6 @@ const Login = () => {
         }
       }
     } catch (err) {
-      console.error('Error completo:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -64,95 +63,99 @@ const Login = () => {
   };
 
   return (
-    <Container className="py-5">
-      <Row className="justify-content-center">
-        <Col md={6}>
-          <Card>
-            <Card.Body>
-              <Tabs
-                activeKey={activeTab}
-                onSelect={k => {
-                  setActiveTab(k);
-                  setError(null);
-                }}
-                className="mb-4"
-              >
-                <Tab eventKey="login" title="Iniciar Sesión">
-                  <Form onSubmit={handleSubmit}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Email</Form.Label>
-                      <Form.Control
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                      />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Contraseña</Form.Label>
-                      <Form.Control
-                        type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                      />
-                    </Form.Group>
-                    <Button type="submit" className="w-100" disabled={loading}>
-                      {loading ? 'Cargando...' : 'Iniciar Sesión'}
-                    </Button>
-                  </Form>
-                </Tab>
-                <Tab eventKey="register" title="Registrarse">
-                  <Form onSubmit={handleSubmit}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Email</Form.Label>
-                      <Form.Control
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                      />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Contraseña</Form.Label>
-                      <Form.Control
-                        type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                      />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Confirmar Contraseña</Form.Label>
-                      <Form.Control
-                        type="password"
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        required
-                      />
-                    </Form.Group>
-                    <Button type="submit" className="w-100" disabled={loading}>
-                      {loading ? 'Cargando...' : 'Registrarse'}
-                    </Button>
-                  </Form>
-                </Tab>
-              </Tabs>
-              {error && (
-                <Alert variant="danger" onClose={() => setError(null)} dismissible>
-                  {error}
-                </Alert>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Container>
+    <div className="flex justify-center items-center min-h-screen py-12 px-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-center">Slot Collection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setError(null); }} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
+              <TabsTrigger value="register">Registrarse</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Cargando...' : 'Iniciar Sesión'}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="register">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reg-email">Email</Label>
+                  <Input
+                    id="reg-email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-password">Contraseña</Label>
+                  <Input
+                    id="reg-password"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Cargando...' : 'Registrarse'}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
-export default Login; 
+export default Login;

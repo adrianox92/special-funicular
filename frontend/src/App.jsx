@@ -1,6 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Container } from 'react-bootstrap';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import VehicleList from './pages/VehicleList';
@@ -9,148 +8,145 @@ import AddVehicle from './components/AddVehicle';
 import EditVehicle from './components/EditVehicle';
 import TimingsList from './components/TimingsList';
 import Competitions from './pages/Competitions';
+import Circuits from './pages/Circuits';
 import CompetitionParticipants from './pages/CompetitionParticipants';
 import CompetitionTimings from './pages/CompetitionTimings';
 import CompetitionSignup from './pages/CompetitionSignup';
 import CompetitionStatus from './pages/CompetitionStatus';
 import CompetitionPresentation from './pages/CompetitionPresentation';
+import Profile from './pages/Profile';
 import Login from './components/Login';
 import LandingPage from './pages/LandingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import PrivateRoute from './components/PrivateRoute';
 import InstallPWAButton from './components/InstallPWAButton';
 import { logPWADiagnostics } from './utils/pwaDiagnostics';
+import { Spinner } from './components/ui/spinner';
 
+const PageLayout = ({ children }) => (
+  <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
+    {children}
+  </div>
+);
 
-// Componente principal de la aplicación
 const AppContent = () => {
   const { user, loading } = useAuth();
-  
-  // Detectar si viene de PWA y logging para debug
+  const location = useLocation();
+  const noNavbarRoutes = ['/', '/login', '/competitions/signup', '/competitions/status', '/competitions/presentation'];
+  const hasNavbar = user && !noNavbarRoutes.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
+
+  React.useEffect(() => {
+    document.body.style.paddingTop = hasNavbar ? '4rem' : '0';
+    return () => { document.body.style.paddingTop = '4rem'; };
+  }, [hasNavbar]);
+
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const source = urlParams.get('source');
-    
+
     if (source === 'pwa') {
-      console.log('Aplicación abierta desde PWA icon');
-      // Limpiar el parámetro de la URL sin recargar la página
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     }
-    
-    // Debug info para ayudar con el problema
-    console.log('AppContent mounted:', {
-      user: !!user,
-      loading,
-      pathname: window.location.pathname,
-      search: window.location.search,
-      isStandalone: window.matchMedia('(display-mode: standalone)').matches
-    });
-    
-    // Ejecutar diagnóstico PWA en desarrollo
+
     if (process.env.NODE_ENV === 'development') {
       logPWADiagnostics();
     }
   }, [user, loading]);
 
-  // Si está cargando, mostrar un spinner
   if (loading) {
     return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <div className="spinner-border" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </Container>
+      <div className="flex justify-center items-center min-h-screen">
+        <Spinner className="size-8" />
+        <span className="sr-only">Cargando...</span>
+      </div>
     );
   }
 
   return (
-    <div className="d-flex flex-column min-vh-100">
+    <div className="flex flex-col min-h-screen">
       <Routes>
-        {/* Rutas públicas */}
         <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
-        
-        {/* Rutas protegidas con layout */}
+
         <Route path="/dashboard" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <Dashboard />
-            </Container>
+            <PageLayout><Dashboard /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
-        
+
         <Route path="/vehicles" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <VehicleList />
-            </Container>
+            <PageLayout><VehicleList /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
-        
+
         <Route path="/vehicles/new" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <AddVehicle />
-            </Container>
+            <PageLayout><AddVehicle /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
-        
+
         <Route path="/vehicles/:id" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <EditVehicle />
-            </Container>
+            <PageLayout><EditVehicle /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
-        
+
         <Route path="/timings" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <TimingsList />
-            </Container>
+            <PageLayout><TimingsList /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
-        
+
+        <Route path="/circuits" element={user ? (
+          <>
+            <Navbar />
+            <PageLayout><Circuits /></PageLayout>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+
+        <Route path="/profile" element={user ? (
+          <>
+            <Navbar />
+            <PageLayout><Profile /></PageLayout>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+
         <Route path="/competitions" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <Competitions />
-            </Container>
+            <PageLayout><Competitions /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
-        
+
         <Route path="/competitions/:id/participants" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <CompetitionParticipants />
-            </Container>
+            <PageLayout><CompetitionParticipants /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
-        
+
         <Route path="/competitions/:id/timings" element={user ? (
           <>
             <Navbar />
-            <Container className="flex-grow-1 pb-5" style={{ paddingTop: '80px' }}>
-              <CompetitionTimings />
-            </Container>
+            <PageLayout><CompetitionTimings /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />
@@ -159,7 +155,6 @@ const AppContent = () => {
   );
 };
 
-// Componente raíz que envuelve todo
 function App() {
   return (
     <AuthProvider>
@@ -173,4 +168,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

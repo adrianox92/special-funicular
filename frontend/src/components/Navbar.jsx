@@ -1,22 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Navbar as BootstrapNavbar, Nav, Container, Button, Dropdown, Badge } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import { 
-  FaTrophy, 
-  FaCar, 
-  FaClock, 
-  FaUser, 
-  FaSignOutAlt, 
-  FaCog, 
-  FaHome,
-  FaBars,
-  FaTimes
-} from 'react-icons/fa';
-import './Navbar.css';
+import { useTheme } from '../context/ThemeContext';
+import {
+  Trophy,
+  Car,
+  Clock,
+  Flag,
+  User,
+  LogOut,
+  Settings,
+  Home,
+  Menu,
+  Sun,
+  Moon,
+} from 'lucide-react';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from './ui/sheet';
+import { cn } from '../lib/utils';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -24,38 +45,14 @@ const Navbar = () => {
   const navbarRef = useRef(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      setIsScrolled(scrollTop > 50);
-    };
-
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Cerrar menú cuando cambie la ruta
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
-
-  // Cerrar menú cuando se haga clic fuera del navbar
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (navbarRef.current && !navbarRef.current.contains(event.target)) {
-        setIsMenuOpen(false);
-      }
-    };
-
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [isMenuOpen]);
 
   const handleLogout = async () => {
     try {
@@ -66,16 +63,9 @@ const Navbar = () => {
     }
   };
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-
-  const closeMenu = () => {
-    setIsMenuOpen(false);
-  };
-
   const isActive = (path) => {
-    return location.pathname === path;
+    if (path === '/dashboard') return location.pathname === '/' || location.pathname === '/dashboard';
+    return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
   const getUserInitials = () => {
@@ -84,134 +74,135 @@ const Navbar = () => {
   };
 
   const navItems = [
-    { path: '/', label: 'Inicio', icon: <FaHome /> },
-    { path: '/vehicles', label: 'Vehículos', icon: <FaCar /> },
-    { path: '/timings', label: 'Tiempos', icon: <FaClock /> },
-    { path: '/competitions', label: 'Competiciones', icon: <FaTrophy /> }
+    { path: '/dashboard', label: 'Inicio', icon: Home },
+    { path: '/vehicles', label: 'Vehículos', icon: Car },
+    { path: '/timings', label: 'Tiempos', icon: Clock },
+    { path: '/circuits', label: 'Circuitos', icon: Flag },
+    { path: '/competitions', label: 'Competiciones', icon: Trophy },
   ];
 
+  const NavLink = ({ item }) => {
+    const Icon = item.icon;
+    return (
+      <Link
+        to={item.path}
+        className={cn(
+          'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+          isActive(item.path)
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+        )}
+      >
+        <Icon className="size-4" />
+        {item.label}
+      </Link>
+    );
+  };
+
   return (
-    <BootstrapNavbar 
+    <header
       ref={navbarRef}
-      bg="white" 
-      variant="light" 
-      expand="lg" 
-      className={`custom-navbar shadow-sm ${isScrolled ? 'scrolled' : ''}`}
-      fixed="top"
+      className={cn(
+        'fixed top-0 left-0 right-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-shadow',
+        isScrolled && 'shadow-sm'
+      )}
     >
-      <Container fluid className="px-4">
-        {/* Logo y Brand */}
-        <BootstrapNavbar.Brand 
-          as={Link} 
-          to={user ? "/dashboard" : "/"} 
-          className="brand-container"
+      <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Link
+          to={user ? '/dashboard' : '/'}
           onClick={(e) => {
-            // Asegurar navegación correcta del logo
             e.preventDefault();
-            const targetPath = user ? "/dashboard" : "/";
-            navigate(targetPath);
+            navigate(user ? '/dashboard' : '/');
           }}
+          className="flex items-center gap-2"
         >
-          <div className="logo-container">
-            <FaTrophy className="logo-icon" />
-            <span className="logo-text">Slot</span>
-            <Badge bg="primary" className="logo-badge">Pro</Badge>
-          </div>
-        </BootstrapNavbar.Brand>
+          <Trophy className="size-6 text-primary" />
+          <span className="font-bold text-lg">Slot</span>
+          <Badge variant="secondary" className="text-xs">Pro</Badge>
+        </Link>
 
-        {/* Toggle Button */}
-        <BootstrapNavbar.Toggle 
-          aria-controls="basic-navbar-nav" 
-          className="custom-toggle"
-          onClick={toggleMenu}
-          aria-expanded={isMenuOpen}
-        >
-          {isMenuOpen ? <FaTimes /> : <FaBars />}
-        </BootstrapNavbar.Toggle>
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navItems.map((item) => (
+            <NavLink key={item.path} item={item} />
+          ))}
+        </nav>
 
-        <BootstrapNavbar.Collapse 
-          id="basic-navbar-nav" 
-          className={isMenuOpen ? 'show' : ''}
-          in={isMenuOpen}
-        >
-          {/* Navigation Links */}
-          <Nav className="me-auto nav-links">
-            {navItems.map((item) => (
-              <Nav.Link 
-                key={item.path}
-                as={Link} 
-                to={item.path} 
-                className={`nav-link-custom ${isActive(item.path) ? 'active' : ''}`}
-                onClick={closeMenu}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                <span className="nav-label">{item.label}</span>
-                {isActive(item.path) && <div className="active-indicator" />}
-              </Nav.Link>
-            ))}
-          </Nav>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </Button>
 
-          {/* User Section */}
-          <Nav className="user-section">
-            {user && (
-              <>
-                {/* Notifications Badge */}
-                <div className="notification-badge">
-                  <Badge bg="danger" className="notification-dot">3</Badge>
-                </div>
+          {user && (
+            <>
+              <div className="relative">
+                <Badge variant="destructive" className="absolute -top-1 -right-1 size-5 flex items-center justify-center p-0 text-xs">
+                  3
+                </Badge>
+              </div>
 
-                {/* User Dropdown */}
-                <Dropdown align="end" className="user-dropdown">
-                  <Dropdown.Toggle variant="link" className="user-toggle" id="user-dropdown-toggle">
-                    <div className="user-avatar">
-                      <span className="user-initials">{getUserInitials()}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                    <Avatar className="size-9">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                        {getUserInitials()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">Usuario</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
-                    <div className="user-info">
-                      <span className="user-name">Usuario</span>
-                      <span className="user-email">{user.email}</span>
-                    </div>
-                  </Dropdown.Toggle>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
+                      <User className="size-4" />
+                      Mi Perfil
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
+                      <Settings className="size-4" />
+                      Configuración
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">
+                    <LogOut className="size-4" />
+                    Cerrar Sesión
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
 
-                  <Dropdown.Menu className="user-dropdown-menu" aria-labelledby="user-dropdown-toggle">
-                    <Dropdown.Header className="dropdown-header">
-                      <div className="dropdown-user-info">
-                        <div className="dropdown-avatar">
-                          <span className="dropdown-initials">{getUserInitials()}</span>
-                        </div>
-                        <div>
-                          <div className="dropdown-name">Usuario</div>
-                          <div className="dropdown-email">{user.email}</div>
-                        </div>
-                      </div>
-                    </Dropdown.Header>
-                    
-                    <Dropdown.Divider />
-                    
-                    <Dropdown.Item as={Link} to="/profile" className="dropdown-item" onClick={closeMenu}>
-                      <FaUser className="dropdown-icon" />
-                      <span>Mi Perfil</span>
-                    </Dropdown.Item>
-                    
-                    <Dropdown.Item as={Link} to="/settings" className="dropdown-item" onClick={closeMenu}>
-                      <FaCog className="dropdown-icon" />
-                      <span>Configuración</span>
-                    </Dropdown.Item>
-                    
-                    <Dropdown.Divider />
-                    
-                    <Dropdown.Item onClick={handleLogout} className="dropdown-item logout-item">
-                      <FaSignOutAlt className="dropdown-icon" />
-                      <span>Cerrar Sesión</span>
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-              </>
-            )}
-          </Nav>
-        </BootstrapNavbar.Collapse>
-      </Container>
-    </BootstrapNavbar>
+          {/* Mobile menu */}
+          <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="icon" aria-label="Abrir menú">
+                <Menu className="size-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[280px]">
+              <SheetHeader>
+                <SheetTitle>Menú</SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-2 mt-6">
+                {navItems.map((item) => (
+                  <NavLink key={item.path} item={item} />
+                ))}
+              </nav>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    </header>
   );
 };
 
-export default Navbar; 
+export default Navbar;

@@ -1,7 +1,28 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Table, Badge, OverlayTrigger, Tooltip, Dropdown } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
-import { FiExternalLink } from 'react-icons/fi';
+import { ExternalLink } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '../ui/card';
+import { Badge } from '../ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { Button } from '../ui/button';
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('es-ES', {
@@ -62,116 +83,86 @@ const TopComponentsTable = ({ data }) => {
     return sortConfig.direction === 'asc' ? '↑' : '↓';
   };
 
-  const renderVehiclesTooltip = (vehicles) => (
-    <Tooltip id={`tooltip-vehicles-${vehicles[0]?.id}`}>
-      <div className="text-start">
-        <strong>Vehículos que lo utilizan:</strong>
-        {vehicles.map((vehicle, index) => (
-          <div key={index} className="mt-1">
-            {vehicle.manufacturer} {vehicle.model}
-          </div>
-        ))}
-      </div>
-    </Tooltip>
-  );
-
   const renderComponentLinks = (component) => {
     if (!component.urls || component.urls.length === 0) {
       return component.name;
     }
-
     if (component.urls.length === 1) {
       return (
-        <a 
-          href={component.urls[0]} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="text-decoration-none"
-        >
+        <a href={component.urls[0]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:underline">
           {component.name}
-          <FiExternalLink className="ms-1" size={14} />
+          <ExternalLink className="size-3.5" />
         </a>
       );
     }
-
     return (
-      <Dropdown>
-        <Dropdown.Toggle 
-          variant="link" 
-          className="text-decoration-none p-0 border-0 text-dark"
-        >
-          {component.name}
-          <FiExternalLink className="ms-1" size={14} />
-        </Dropdown.Toggle>
-        <Dropdown.Menu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-auto p-0 font-normal inline-flex items-center gap-1 hover:underline">
+            {component.name}
+            <ExternalLink className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
           {component.urls.map((url, index) => (
-            <Dropdown.Item 
-              key={index} 
-              href={url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              Enlace {index + 1}
-              <FiExternalLink className="ms-1" size={14} />
-            </Dropdown.Item>
+            <DropdownMenuItem key={index} asChild>
+              <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                Enlace {index + 1}
+                <ExternalLink className="size-3.5" />
+              </a>
+            </DropdownMenuItem>
           ))}
-        </Dropdown.Menu>
-      </Dropdown>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 
   return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-4">Top 10 Componentes más Utilizados</Card.Title>
-        <div className="table-responsive">
-          <Table hover>
-            <thead>
-              <tr>
-                <th>Tipo</th>
-                <th>Componente</th>
-                <th>SKU</th>
-                <th 
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => requestSort('unitPrice')}
-                >
-                  Precio Unitario {getSortIcon('unitPrice')}
-                </th>
-                <th 
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => requestSort('totalInvestment')}
-                >
-                  Inversión Total {getSortIcon('totalInvestment')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Top 10 Componentes más Utilizados</h5></CardHeader>
+      <CardContent>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Componente</TableHead>
+                <TableHead>SKU</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('unitPrice')}>Precio Unitario {getSortIcon('unitPrice')}</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('totalInvestment')}>Inversión Total {getSortIcon('totalInvestment')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sortedData.map((component) => (
-                <tr key={component.id}>
-                  <td>{componentTypeLabels[component.component_type] || component.component_type}</td>
-                  <td>
-                    <div className="d-flex align-items-center">
+                <TableRow key={component.id}>
+                  <TableCell>{componentTypeLabels[component.component_type] || component.component_type}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
                       {renderComponentLinks(component)}
-                      <OverlayTrigger
-                        placement="top"
-                        delay={{ show: 250, hide: 400 }}
-                        overlay={renderVehiclesTooltip(component.vehicles)}
-                      >
-                        <Badge bg="info" className="ms-2" style={{ cursor: 'help' }}>
-                          {component.usageCount}
-                        </Badge>
-                      </OverlayTrigger>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="cursor-help">{component.usageCount}</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-left max-w-xs">
+                            <strong>Vehículos que lo utilizan:</strong>
+                            {component.vehicles?.map((vehicle, index) => (
+                              <div key={index} className="mt-1 text-sm">{vehicle.manufacturer} {vehicle.model}</div>
+                            ))}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
-                  </td>
-                  <td>{component.sku}</td>
-                  <td>{formatCurrency(component.unitPrice)}</td>
-                  <td>{formatCurrency(component.totalInvestment)}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell>{component.sku}</TableCell>
+                  <TableCell>{formatCurrency(component.unitPrice)}</TableCell>
+                  <TableCell>{formatCurrency(component.totalInvestment)}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
+            </TableBody>
           </Table>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

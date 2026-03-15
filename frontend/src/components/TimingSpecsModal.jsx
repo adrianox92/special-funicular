@@ -1,5 +1,20 @@
 import React from 'react';
-import { Modal, Button, Table } from 'react-bootstrap';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from './ui/dialog';
+import { Button } from './ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table';
 
 const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   if (!setupSnapshot || !timing) return null;
@@ -34,7 +49,6 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
 
   const getColumnsForType = (type) => {
     const baseColumns = ['Componente', 'Fabricante', 'Referencia', 'Material', 'Tamaño', 'Precio'];
-    
     switch (type) {
       case 'motor':
         return [...baseColumns.slice(0, 5), 'RPM', 'Gaus', ...baseColumns.slice(5)];
@@ -50,7 +64,7 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
     switch (column) {
       case 'Componente':
         return component.url ? (
-          <a href={component.url} target="_blank" rel="noopener noreferrer">
+          <a href={component.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             {component.element}
           </a>
         ) : component.element;
@@ -78,76 +92,78 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   const groupedSpecs = groupByComponentType(specs);
 
   return (
-    <Modal show={show} onHide={onHide} size="lg">
-      <Modal.Header closeButton>
-        <Modal.Title>
-          <div>
-            <div>Especificaciones Técnicas</div>
-            <small className="text-muted">
-              {timing.vehicle_manufacturer} {timing.vehicle_model} - {new Date(timing.timing_date).toLocaleDateString()}
-            </small>
+    <Dialog open={show} onOpenChange={(open) => !open && onHide()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            <div>
+              <div>Especificaciones Técnicas</div>
+              <small className="text-muted-foreground font-normal block mt-1">
+                {timing.vehicle_manufacturer} {timing.vehicle_model} - {new Date(timing.timing_date).toLocaleDateString()}
+              </small>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border p-4 bg-muted/50">
+            <h6 className="font-semibold mb-3">Resumen de la Sesión</h6>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <strong className="text-sm text-muted-foreground">Mejor Vuelta</strong>
+                <div className="font-mono font-medium">{timing.best_lap_time}</div>
+              </div>
+              <div>
+                <strong className="text-sm text-muted-foreground">Tiempo Total</strong>
+                <div className="font-mono font-medium">{timing.total_time}</div>
+              </div>
+              <div>
+                <strong className="text-sm text-muted-foreground">Vueltas</strong>
+                <div>{timing.laps}</div>
+              </div>
+              <div>
+                <strong className="text-sm text-muted-foreground">Circuito</strong>
+                <div>{timing.circuit || '-'} (Carril {timing.lane || '-'})</div>
+              </div>
+            </div>
           </div>
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        {/* Resumen de la sesión */}
-        <div className="mb-4 p-3 bg-light rounded">
-          <h6>Resumen de la Sesión</h6>
-          <div className="row">
-            <div className="col-md-3">
-              <strong>Mejor Vuelta:</strong><br />
-              <span className="font-monospace">{timing.best_lap_time}</span>
+
+          <h6 className="font-semibold">Componentes del Vehículo</h6>
+          {Object.entries(groupedSpecs).map(([type, components]) => (
+            <div key={type} className="space-y-2">
+              <h5 className="font-medium">{componentTypeLabels[type] || type}</h5>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {getColumnsForType(type).map(column => (
+                        <TableHead key={column}>{column}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {components.map(component => (
+                      <TableRow key={component.id}>
+                        {getColumnsForType(type).map(column => (
+                          <TableCell key={`${component.id}-${column}`}>
+                            {renderComponentCell(component, column)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-            <div className="col-md-3">
-              <strong>Tiempo Total:</strong><br />
-              <span className="font-monospace">{timing.total_time}</span>
-            </div>
-            <div className="col-md-3">
-              <strong>Vueltas:</strong><br />
-              {timing.laps}
-            </div>
-            <div className="col-md-3">
-              <strong>Circuito:</strong><br />
-              {timing.circuit || '-'} (Carril {timing.lane || '-'})
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Especificaciones técnicas */}
-        <h6 className="mb-3">Componentes del Vehículo</h6>
-        {Object.entries(groupedSpecs).map(([type, components]) => (
-          <div key={type} className="mb-4">
-            <h5>{componentTypeLabels[type] || type}</h5>
-            <Table striped bordered hover size="sm">
-              <thead>
-                <tr>
-                  {getColumnsForType(type).map(column => (
-                    <th key={column}>{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {components.map(component => (
-                  <tr key={component.id}>
-                    {getColumnsForType(type).map(column => (
-                      <td key={`${component.id}-${column}`}>
-                        {renderComponentCell(component, column)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
-        ))}
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onHide}>
-          Cerrar
-        </Button>
-      </Modal.Footer>
-    </Modal>
+        <DialogFooter>
+          <Button variant="outline" onClick={onHide}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-export default TimingSpecsModal; 
+export default TimingSpecsModal;

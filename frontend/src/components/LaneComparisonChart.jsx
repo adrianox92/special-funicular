@@ -1,7 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Row, Col, Table, Badge, Alert, Spinner } from 'react-bootstrap';
-import { FaTrophy, FaClock, FaCar, FaChartLine } from 'react-icons/fa';
+import { Trophy, Clock, Car, TrendingUp } from 'lucide-react';
 import api from '../lib/axios';
+import { Card, CardContent, CardHeader } from './ui/card';
+import { Label } from './ui/label';
+import { Badge } from './ui/badge';
+import { Alert, AlertDescription } from './ui/alert';
+import { Spinner } from './ui/spinner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table';
 import './LaneComparisonChart.css';
 
 const LaneComparisonChart = () => {
@@ -124,16 +143,9 @@ const LaneComparisonChart = () => {
     return timeStr;
   };
 
-  const getLaneBadgeColor = (lane) => {
-    if (lane === '1') return 'bg-primary';
-    if (lane === '2') return 'bg-success';
-    if (lane === '3') return 'bg-info';
-    if (lane === '4') return 'bg-warning';
-    if (lane === '5') return 'bg-danger';
-    if (lane === '6') return 'bg-secondary';
-    if (lane === '7') return 'bg-dark';
-    if (lane === '8') return 'bg-light';
-    return 'bg-secondary';
+  const getLaneBadgeVariant = (lane) => {
+    const map = { '1': 'default', '2': 'secondary', '3': 'outline', '4': 'outline', '5': 'destructive', '6': 'secondary', '7': 'secondary', '8': 'secondary' };
+    return map[lane] || 'secondary';
   };
 
   const calculateLaneDifferences = () => {
@@ -245,303 +257,216 @@ const LaneComparisonChart = () => {
   const fastestByLane = getFastestVehiclesByLane();
 
   return (
-    <Card className="h-100">
-      <Card.Header className="d-flex align-items-center">
-        <FaChartLine className="me-2" />
-        <h6 className="mb-0">Comparativa de Carriles</h6>
-      </Card.Header>
-      <Card.Body>
-        <div className="circuit-selector">
-          <Form.Group>
-            <Form.Label className="fw-bold">Seleccionar Circuito</Form.Label>
-            <Form.Select
-              value={selectedCircuit}
-              onChange={(e) => setSelectedCircuit(e.target.value)}
-              size="lg"
-            >
-              <option value="">Selecciona un circuito</option>
+    <Card className="h-full">
+      <CardHeader className="flex items-center">
+        <TrendingUp className="size-4 mr-2" />
+        <h6 className="font-semibold">Comparativa de Carriles</h6>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2 mb-4">
+          <Label className="font-bold">Seleccionar Circuito</Label>
+          <Select value={selectedCircuit || '__none__'} onValueChange={(v) => setSelectedCircuit(v === '__none__' ? '' : v)}>
+            <SelectTrigger className="h-11">
+              <SelectValue placeholder="Selecciona un circuito" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Selecciona un circuito</SelectItem>
               {circuits.map(circuit => (
-                <option key={circuit} value={circuit}>{circuit}</option>
+                <SelectItem key={circuit} value={circuit}>{circuit}</SelectItem>
               ))}
-            </Form.Select>
-          </Form.Group>
-                     <div className="mt-2">
-             <small className="text-muted">
-               <strong>Nota:</strong> Cada vehículo aparece solo en el carril donde hizo su mejor tiempo.
-               <br />
-               <strong>Comparativa:</strong> La diferencia muestra cuánto más rápido/lento es el mismo vehículo en este carril vs otro carril disponible. Si solo hay un carril, se muestra "Único carril disponible".
-             </small>
-           </div>
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">
+            <strong>Nota:</strong> Cada vehículo aparece solo en el carril donde hizo su mejor tiempo.
+            <br />
+            <strong>Comparativa:</strong> La diferencia muestra cuánto más rápido/lento es el mismo vehículo en este carril vs otro carril disponible.
+          </p>
         </div>
 
         {loading && (
-          <div className="loading-overlay">
-            <div className="loading-spinner">
-              <Spinner animation="border" role="status" size="lg">
-                <span className="visually-hidden">Cargando...</span>
-              </Spinner>
-            </div>
+          <div className="flex justify-center items-center py-12">
+            <Spinner className="size-8" />
           </div>
         )}
 
         {error && (
-          <Alert variant="danger" className="mb-3 error-alert">
-            <Alert.Heading>Error</Alert.Heading>
-            {error}
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription><strong>Error</strong><br />{error}</AlertDescription>
           </Alert>
         )}
 
         {selectedCircuit && !loading && Object.keys(laneData).length > 0 && (
           <>
-            {/* Resumen de carriles */}
-            <Row className="mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {Object.keys(laneData).map(lane => (
-                <Col key={lane} xs={12} sm={6} lg={3} className="mb-3">
-                  <Card className="text-center h-100 lane-summary-card">
-                    <Card.Body className="py-3">
-                      <Badge className={`${getLaneBadgeColor(lane)} fs-6 mb-3 lane-badge`}>
-                        Carril {lane}
-                      </Badge>
-                      <div className="h3 mb-1 text-primary fw-bold">
-                        {laneData[lane].totalVehicles}
-                      </div>
-                      <small className="text-muted d-block mb-3">Vehículos</small>
-                      <div className="mt-3">
-                        <div className="time-display mb-1">
-                          {formatTime(laneData[lane].bestTime)}
-                        </div>
-                        <small className="text-muted">Mejor tiempo</small>
-                        <div className="average-time mt-1">
-                          Promedio: {laneData[lane].averageTime}
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
+                <Card key={lane} className="text-center">
+                  <CardContent className="pt-6">
+                    <Badge variant={getLaneBadgeVariant(lane)} className="mb-3">Carril {lane}</Badge>
+                    <div className="text-2xl font-bold text-primary">{laneData[lane].totalVehicles}</div>
+                    <small className="text-muted-foreground block mb-3">Vehículos</small>
+                    <div className="font-mono font-medium">{formatTime(laneData[lane].bestTime)}</div>
+                    <small className="text-muted-foreground">Mejor tiempo</small>
+                    <div className="text-sm text-muted-foreground mt-1">Promedio: {laneData[lane].averageTime}</div>
+                  </CardContent>
+                </Card>
               ))}
-            </Row>
+            </div>
 
-                         {/* Comparativa de tiempos */}
-             <div className="mb-4">
-               <h6 className="section-header">
-                 <FaClock className="me-2" />
-                 Comparativa con Carril de Referencia
-               </h6>
-               <div className="mb-3">
-                 <small className="text-muted">
-                   <strong>Carril de Referencia:</strong> Se usa como base para comparar el rendimiento del mismo vehículo en diferentes carriles. El carril 1 es la referencia si existe, sino se usa el primero disponible.
-                 </small>
-               </div>
-               
-               {Object.keys(laneData).length < 2 ? (
-                 <Alert variant="info" className="text-center">
-                   <strong>Información:</strong> Solo hay un carril disponible en este circuito, por lo que no es posible realizar comparativas entre carriles.
-                 </Alert>
-               ) : laneDifferences && Object.keys(laneDifferences).length > 0 ? (
-                 <Table striped bordered hover size="sm" className="comparison-table">
-                   <thead>
-                     <tr>
-                       <th>Carril</th>
-                       <th>Diferencia</th>
-                       <th>Porcentaje</th>
-                       <th>Estado</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {Object.keys(laneDifferences).map(lane => {
-                       const diff = laneDifferences[lane];
-                       const lanes = Object.keys(laneData).sort();
-                       const referenceLane = lanes.find(l => l === '1') || lanes[0];
-                       
-                       return (
-                         <tr key={lane}>
-                           <td>
-                             <Badge className={`${getLaneBadgeColor(lane)} lane-badge`}>
-                               Carril {lane}
-                             </Badge>
-                           </td>
-                           <td className="font-monospace fw-bold">
-                             <span className={diff.isSlower ? 'danger-indicator' : 'success-indicator'}>
-                               {diff.isSlower ? '+' : ''}{diff.difference}s
-                             </span>
-                             <div className="mt-1">
-                               <small className="text-muted">
-                                 vs Carril {referenceLane}
-                               </small>
-                             </div>
-                           </td>
-                           <td>
-                             <span className={diff.isSlower ? 'warning-indicator' : 'success-indicator'}>
-                               {diff.isSlower ? '+' : ''}{diff.percentage}%
-                             </span>
-                           </td>
-                           <td>
-                             <Badge 
-                               variant={diff.isSlower ? 'warning' : 'success'}
-                               className="d-flex align-items-center difference-indicator"
-                             >
-                               {diff.isSlower ? (
-                                 <>
-                                   <FaClock className="me-1" />
-                                   Más lento
-                                 </>
-                               ) : (
-                                 <>
-                                   <FaTrophy className="me-1" />
-                                   Más rápido
-                                 </>
-                               )}
-                             </Badge>
-                           </td>
-                         </tr>
-                       );
-                     })}
-                   </tbody>
-                 </Table>
-               ) : (
-                 <Alert variant="warning" className="text-center">
-                   <strong>Atención:</strong> No se pueden calcular diferencias entre carriles con los datos disponibles.
-                 </Alert>
-               )}
-             </div>
+            <div className="mb-6">
+              <h6 className="font-semibold flex items-center gap-2 mb-2">
+                <Clock className="size-4" />
+                Comparativa con Carril de Referencia
+              </h6>
+              <p className="text-sm text-muted-foreground mb-3">
+                <strong>Carril de Referencia:</strong> Se usa como base para comparar. El carril 1 es la referencia si existe.
+              </p>
+              {Object.keys(laneData).length < 2 ? (
+                <Alert className="text-center">
+                  <AlertDescription><strong>Información:</strong> Solo hay un carril disponible, no es posible comparar.</AlertDescription>
+                </Alert>
+              ) : laneDifferences && Object.keys(laneDifferences).length > 0 ? (
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Carril</TableHead>
+                        <TableHead>Diferencia</TableHead>
+                        <TableHead>Porcentaje</TableHead>
+                        <TableHead>Estado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.keys(laneDifferences).map(lane => {
+                        const diff = laneDifferences[lane];
+                        const lanes = Object.keys(laneData).sort();
+                        const referenceLane = lanes.find(l => l === '1') || lanes[0];
+                        return (
+                          <TableRow key={lane}>
+                            <TableCell><Badge variant={getLaneBadgeVariant(lane)}>Carril {lane}</Badge></TableCell>
+                            <TableCell className="font-mono font-medium">
+                              <span className={diff.isSlower ? 'text-destructive' : 'text-green-600'}>{diff.isSlower ? '+' : ''}{diff.difference}s</span>
+                              <div className="text-xs text-muted-foreground">vs Carril {referenceLane}</div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={diff.isSlower ? 'text-amber-600' : 'text-green-600'}>{diff.isSlower ? '+' : ''}{diff.percentage}%</span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={diff.isSlower ? 'secondary' : 'default'} className="flex items-center gap-1 w-fit">
+                                {diff.isSlower ? <><Clock className="size-3" /> Más lento</> : <><Trophy className="size-3" /> Más rápido</>}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <Alert variant="destructive" className="text-center">
+                  <AlertDescription><strong>Atención:</strong> No se pueden calcular diferencias con los datos disponibles.</AlertDescription>
+                </Alert>
+              )}
+            </div>
 
-            {/* Vehículos más rápidos por carril */}
             {fastestByLane && (
-              <div className="mb-4">
-                <h6 className="section-header">
-                  <FaCar className="me-2" />
+              <div className="mb-6">
+                <h6 className="font-semibold flex items-center gap-2 mb-4">
+                  <Car className="size-4" />
                   Vehículos Más Rápidos por Carril
                 </h6>
-                <Row>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.keys(fastestByLane).map(lane => {
                     const fastest = fastestByLane[lane];
                     return (
-                      <Col key={lane} xs={12} sm={6} lg={4} className="mb-3">
-                        <Card className="h-100 fastest-vehicle-card">
-                          <Card.Body className="text-center">
-                            <Badge className={`${getLaneBadgeColor(lane)} fs-6 mb-3 lane-badge`}>
-                              Carril {lane}
-                            </Badge>
-                            <div className="h6 mb-2 text-primary fw-bold">
-                              {fastest.vehicle}
-                            </div>
-                            <div className="time-display mb-2">
-                              {fastest.time}
-                            </div>
-                            <small className="text-muted">Mejor tiempo</small>
-                          </Card.Body>
-                        </Card>
-                      </Col>
+                      <Card key={lane} className="text-center">
+                        <CardContent className="pt-6">
+                          <Badge variant={getLaneBadgeVariant(lane)} className="mb-3">Carril {lane}</Badge>
+                          <div className="font-semibold text-primary mb-2">{fastest.vehicle}</div>
+                          <div className="font-mono font-medium mb-2">{fastest.time}</div>
+                          <small className="text-muted-foreground">Mejor tiempo</small>
+                        </CardContent>
+                      </Card>
                     );
                   })}
-                </Row>
+                </div>
               </div>
             )}
 
-                         {/* Tabla detallada de todos los vehículos */}
-             <div>
-               <h6 className="section-header">
-                 <FaChartLine className="me-2" />
-                 Ranking Detallado por Carril
-               </h6>
-               {Object.keys(laneData).map(lane => (
-                 <div key={lane} className="mb-4">
-                   <h6 className="mb-3">
-                     <Badge className={`${getLaneBadgeColor(lane)} lane-badge`}>
-                       Carril {lane}
-                     </Badge>
-                     <span className="ms-3 fw-bold text-muted">
-                       ({laneData[lane].totalVehicles} vehículos)
-                     </span>
-                   </h6>
-                   <Table striped bordered hover size="sm" className="ranking-table">
-                     <thead>
-                       <tr>
-                         <th>Pos</th>
-                         <th>Vehículo</th>
-                         <th>Mejor Vuelta</th>
-                         <th>Diferencia</th>
-                         <th>Vueltas</th>
-                         <th>Fecha</th>
-                       </tr>
-                     </thead>
-                     <tbody>
-                                               {laneData[lane].vehicles.map((vehicle, index) => {
-                          // Calcular diferencia del mismo vehículo entre carriles
+            <div>
+              <h6 className="font-semibold flex items-center gap-2 mb-4">
+                <TrendingUp className="size-4" />
+                Ranking Detallado por Carril
+              </h6>
+              {Object.keys(laneData).map(lane => (
+                <div key={lane} className="mb-6">
+                  <h6 className="mb-3 flex items-center gap-2">
+                    <Badge variant={getLaneBadgeVariant(lane)}>Carril {lane}</Badge>
+                    <span className="font-medium text-muted-foreground">({laneData[lane].totalVehicles} vehículos)</span>
+                  </h6>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Pos</TableHead>
+                          <TableHead>Vehículo</TableHead>
+                          <TableHead>Mejor Vuelta</TableHead>
+                          <TableHead>Diferencia</TableHead>
+                          <TableHead>Vueltas</TableHead>
+                          <TableHead>Fecha</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {laneData[lane].vehicles.map((vehicle, index) => {
                           const timeDifference = getVehicleLaneDifference(vehicle, lane);
-
-                         return (
-                           <tr key={`${lane}-${vehicle.id}`}>
-                             <td>
-                               <Badge 
-                                 variant={index === 0 ? 'warning' : 'secondary'}
-                                 className={`d-flex align-items-center justify-content-center position-badge ${
-                                   index === 0 ? 'first' : 
-                                   index === 1 ? 'second' : 
-                                   index === 2 ? 'third' : 'other'
-                                 }`}
-                               >
-                                 {index === 0 ? <FaTrophy className="me-1" /> : ''}
-                                 {index + 1}
-                               </Badge>
-                             </td>
-                             <td className="fw-bold">
-                               {vehicle.vehicle_manufacturer} {vehicle.vehicle_model}
-                             </td>
-                             <td className="time-display">
-                               {vehicle.best_lap_time}
-                             </td>
-                             <td>
-                               {timeDifference ? (
-                                 <div className="d-flex align-items-center">
-                                   <span className={`fw-bold ${
-                                     timeDifference.isFaster ? 'success-indicator' : 
-                                     timeDifference.isSlower ? 'danger-indicator' : 'text-muted'
-                                   }`}>
-                                     {timeDifference.isFaster ? '-' : timeDifference.isSlower ? '+' : ''}
-                                     {Math.abs(timeDifference.seconds).toFixed(3)}s
-                                   </span>
-                                   <small className="text-muted ms-2">
-                                     vs Carril {timeDifference.referenceLane}
-                                   </small>
-                                 </div>
-                               ) : Object.keys(laneData).length < 2 ? (
-                                 <span className="text-muted fst-italic">Único carril disponible</span>
-                               ) : (
-                                 <span className="text-muted fst-italic">Sin comparativa disponible</span>
-                               )}
-                             </td>
-                             <td>
-                               <Badge variant="info">
-                                 {vehicle.laps || 'N/A'}
-                               </Badge>
-                             </td>
-                             <td>
-                               {new Date(vehicle.timing_date).toLocaleDateString()}
-                             </td>
-                           </tr>
-                         );
-                       })}
-                     </tbody>
-                   </Table>
-                 </div>
-               ))}
-             </div>
+                          return (
+                            <TableRow key={`${lane}-${vehicle.id}`}>
+                              <TableCell>
+                                <Badge variant={index === 0 ? 'default' : 'secondary'} className="flex items-center gap-1 w-fit">
+                                  {index === 0 && <Trophy className="size-3" />}
+                                  {index + 1}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-medium">{vehicle.vehicle_manufacturer} {vehicle.vehicle_model}</TableCell>
+                              <TableCell className="font-mono">{vehicle.best_lap_time}</TableCell>
+                              <TableCell>
+                                {timeDifference ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className={`font-medium ${timeDifference.isFaster ? 'text-green-600' : timeDifference.isSlower ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                      {timeDifference.isFaster ? '-' : timeDifference.isSlower ? '+' : ''}{Math.abs(timeDifference.seconds).toFixed(3)}s
+                                    </span>
+                                    <small className="text-muted-foreground">vs Carril {timeDifference.referenceLane}</small>
+                                  </div>
+                                ) : Object.keys(laneData).length < 2 ? (
+                                  <span className="text-muted-foreground italic">Único carril disponible</span>
+                                ) : (
+                                  <span className="text-muted-foreground italic">Sin comparativa</span>
+                                )}
+                              </TableCell>
+                              <TableCell><Badge variant="secondary">{vehicle.laps || 'N/A'}</Badge></TableCell>
+                              <TableCell>{new Date(vehicle.timing_date).toLocaleDateString()}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))}
+            </div>
           </>
         )}
 
         {selectedCircuit && !loading && Object.keys(laneData).length === 0 && (
-          <Alert variant="info" className="text-center">
-            <Alert.Heading>Sin Datos</Alert.Heading>
-            <p className="mb-0">
+          <Alert className="text-center">
+            <AlertDescription>
+              <strong>Sin Datos</strong><br />
               No hay datos de tiempos registrados para el circuito <strong>{selectedCircuit}</strong>.
-            </p>
-            <small className="text-muted">
-              Intenta seleccionar otro circuito o registra algunos tiempos primero.
-            </small>
+              <br />
+              <small className="text-muted-foreground">Intenta seleccionar otro circuito o registra algunos tiempos primero.</small>
+            </AlertDescription>
           </Alert>
         )}
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

@@ -1,19 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Container, Row, Col, Card, Form, Button, Alert, Badge,
-  Spinner, Modal, ProgressBar 
-} from 'react-bootstrap';
-import { 
-  FaTrophy, FaUsers, FaCalendar, FaFlag, FaCheckCircle,
-  FaExclamationTriangle, FaArrowLeft, FaCar
-} from 'react-icons/fa';
+import { Trophy, Users, Calendar, Flag, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import axios from '../lib/axios';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { Spinner } from '../components/ui/spinner';
 
 const CompetitionSignup = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  
+
   const [competition, setCompetition] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,7 +35,7 @@ const CompetitionSignup = () => {
   const [submitError, setSubmitError] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [status, setStatus] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -29,7 +43,6 @@ const CompetitionSignup = () => {
     vehicle: ''
   });
 
-  // Cargar información de la competición
   const loadCompetition = async () => {
     try {
       setLoading(true);
@@ -53,36 +66,28 @@ const CompetitionSignup = () => {
     axios.get(`/public-signup/${slug}/status`).then(res => setStatus(res.data.status)).catch(() => {});
   }, [slug]);
 
-  // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!formData.name.trim()) {
       setSubmitError('El nombre es requerido');
       return;
     }
-
     if (!formData.email.trim()) {
       setSubmitError('El email es requerido');
       return;
     }
-
     if (!formData.category_id) {
       setSubmitError('Debes seleccionar una categoría');
       return;
     }
-
     if (!formData.vehicle.trim()) {
       setSubmitError('El vehículo es requerido');
       return;
     }
-
     try {
       setSubmitting(true);
       setSubmitError(null);
-      
       await axios.post(`/public-signup/${slug}/signup`, formData);
-      
       setShowSuccessModal(true);
       setFormData({ name: '', email: '', category_id: '', vehicle: '' });
     } catch (err) {
@@ -93,7 +98,6 @@ const CompetitionSignup = () => {
     }
   };
 
-  // Formatear fecha
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
@@ -104,273 +108,246 @@ const CompetitionSignup = () => {
 
   if (loading) {
     return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
-        <div className="text-center">
-          <Spinner animation="border" role="status" className="mb-3">
-            <span className="visually-hidden">Cargando...</span>
-          </Spinner>
-          <p>Cargando información de la competición...</p>
-        </div>
-      </Container>
+      <div className="flex flex-col justify-center items-center min-h-[50vh]">
+        <Spinner className="size-8 mb-4" />
+        <p className="text-muted-foreground">Cargando información de la competición...</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container>
-        <Row className="justify-content-center">
-          <Col md={8}>
-            <Card className="text-center py-5">
-              <Card.Body>
-                <FaExclamationTriangle size={48} className="text-danger mb-3" />
-                <h4>Error</h4>
-                <p className="text-muted mb-4">{error}</p>
-                <Button 
-                  variant="outline-primary" 
-                  onClick={() => navigate('/')}
-                  className="d-flex align-items-center gap-2 mx-auto"
-                >
-                  <FaArrowLeft /> Volver al inicio
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+      <div className="max-w-2xl mx-auto">
+        <Card className="text-center py-12">
+          <CardContent>
+            <AlertTriangle className="size-12 mx-auto text-destructive mb-4" />
+            <h4 className="mb-4">Error</h4>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <Button variant="outline" onClick={() => navigate('/')} className="flex items-center gap-2 mx-auto">
+              <ArrowLeft className="size-4" />
+              Volver al inicio
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
+  const isFull = competition.signups_count >= competition.num_slots;
+  const progressPercent = (competition.signups_count / competition.num_slots) * 100;
+  const canSignup = !isFull && (!status || status.times_registered === 0);
+
   return (
-    <Container>
-      <Row className="justify-content-center">
-        <Col lg={10}>
-          {/* Header */}
-          <Row className="mb-4">
-            <Col>
-              <div className="d-flex align-items-center gap-3 mb-3">
-                <Button 
-                  variant="outline-secondary" 
-                  onClick={() => navigate('/')}
-                  size="sm"
-                  className="d-flex align-items-center gap-2"
-                >
-                  <FaArrowLeft /> Volver
-                </Button>
-                <h1 className="mb-0">🏁 Inscripción a Competición</h1>
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => navigate('/')} className="flex items-center gap-2">
+          <ArrowLeft className="size-4" />
+          Volver
+        </Button>
+        <h1 className="text-2xl font-bold">Inscripción a Competición</h1>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Info card */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
+            <h5 className="font-semibold flex items-center gap-2">
+              <Trophy className="size-4" />
+              {competition.name}
+            </h5>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="mb-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <Users className="size-4" />
+                <small>Plazas: {competition.signups_count}/{competition.num_slots}</small>
               </div>
-            </Col>
-          </Row>
+              <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
+                <div
+                  className={`h-full rounded-full transition-all ${isFull ? 'bg-destructive' : 'bg-primary'}`}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              {isFull && (
+                <span className="text-sm font-medium text-destructive">¡Completo!</span>
+              )}
+            </div>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Calendar className="size-4" />
+                Creada: {formatDate(competition.created_at)}
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Trophy className="size-4" />
+                Rondas: {competition.rounds}
+              </div>
+              {competition.circuit_name && (
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Flag className="size-4" />
+                  Circuito: {competition.circuit_name}
+                </div>
+              )}
+            </div>
+            {competition.categories?.length > 0 && (
+              <div>
+                <h6 className="font-medium mb-2">Categorías disponibles:</h6>
+                <div className="flex flex-wrap gap-2">
+                  {competition.categories.map((cat) => (
+                    <span
+                      key={cat.id}
+                      className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium"
+                    >
+                      {cat.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          <Row>
-            {/* Información de la competición */}
-            <Col lg={4} className="mb-4">
-              <Card className="h-100">
-                <Card.Header className="bg-primary text-white">
-                  <h5 className="mb-0 d-flex align-items-center gap-2">
-                    <FaTrophy /> {competition.name}
-                  </h5>
-                </Card.Header>
-                <Card.Body>
-                  <div className="mb-3">
-                    <div className="d-flex align-items-center text-muted mb-2">
-                      <FaUsers className="me-2" />
-                      <small>Plazas: {competition.signups_count}/{competition.num_slots}</small>
-                    </div>
-                    <ProgressBar 
-                      now={(competition.signups_count / competition.num_slots) * 100} 
-                      variant={competition.signups_count >= competition.num_slots ? 'danger' : 'success'}
-                      className="mb-2"
+        {/* Form */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <h5 className="font-semibold">Formulario de Inscripción</h5>
+          </CardHeader>
+          <CardContent>
+            {isFull ? (
+              <Alert variant="destructive">
+                <AlertTriangle className="size-4" />
+                <AlertDescription>
+                  <strong>¡Competición completa!</strong> No hay plazas disponibles en este momento.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {submitError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{submitError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nombre completo *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Tu nombre completo"
+                      required
                     />
-                    {competition.signups_count >= competition.num_slots && (
-                      <Badge bg="danger" className="w-100">¡Completo!</Badge>
-                    )}
                   </div>
-                  
-                  <div className="mb-3">
-                    <div className="d-flex align-items-center text-muted mb-1">
-                      <FaCalendar className="me-2" />
-                      <small>Creada: {formatDate(competition.created_at)}</small>
-                    </div>
-                    <div className="d-flex align-items-center text-muted mb-1">
-                      <FaTrophy className="me-2" />
-                      <small>Rondas: {competition.rounds}</small>
-                    </div>
-                    {competition.circuit_name && (
-                      <div className="d-flex align-items-center text-muted mb-1">
-                        <FaFlag className="me-2" />
-                        <small>Circuito: {competition.circuit_name}</small>
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="tu@email.com"
+                      required
+                    />
                   </div>
+                </div>
 
-                  {competition.categories && competition.categories.length > 0 && (
-                    <div>
-                      <h6 className="mb-2">Categorías disponibles:</h6>
-                      <div className="d-flex flex-wrap gap-1">
-                        {competition.categories.map((category) => (
-                          <Badge key={category.id} bg="info" className="me-1 mb-1">
-                            {category.name}
-                          </Badge>
+                {competition.categories?.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>Categoría *</Label>
+                    <Select
+                      value={formData.category_id}
+                      onValueChange={(v) => setFormData({ ...formData, category_id: v })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {competition.categories.map((cat) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
                         ))}
-                      </div>
-                    </div>
-                  )}
-                </Card.Body>
-              </Card>
-            </Col>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">Selecciona la categoría en la que quieres competir</p>
+                  </div>
+                ) : (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="size-4" />
+                    <AlertDescription>
+                      <strong>No hay categorías disponibles</strong> para esta competición. Contacta al organizador.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            {/* Formulario de inscripción */}
-            <Col lg={8}>
-              <Card>
-                <Card.Header>
-                  <h5 className="mb-0">📝 Formulario de Inscripción</h5>
-                </Card.Header>
-                <Card.Body>
-                  {competition.signups_count >= competition.num_slots ? (
-                    <Alert variant="warning">
-                      <FaExclamationTriangle className="me-2" />
-                      <strong>¡Competición completa!</strong> No hay plazas disponibles en este momento.
-                    </Alert>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicle">Vehículo con el que competirás *</Label>
+                  <Input
+                    id="vehicle"
+                    value={formData.vehicle}
+                    onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
+                    placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
+                    required
+                  />
+                  <p className="text-sm text-muted-foreground">Especifica el modelo y marca de tu vehículo</p>
+                </div>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full flex items-center justify-center gap-2"
+                  disabled={submitting || !canSignup}
+                >
+                  {submitting ? (
+                    <>
+                      <Spinner className="size-4" />
+                      Enviando inscripción...
+                    </>
+                  ) : !canSignup && status?.times_registered > 0 ? (
+                    <>
+                      <AlertTriangle className="size-4" />
+                      Ya no es posible inscribirse porque la competición ha comenzado.
+                    </>
                   ) : (
-                    <Form onSubmit={handleSubmit} disabled={status && status.times_registered > 0}>
-                      {submitError && (
-                        <Alert variant="danger" className="mb-3">
-                          {submitError}
-                        </Alert>
-                      )}
-
-                      <Row>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Nombre completo *</Form.Label>
-                            <Form.Control
-                              type="text"
-                              value={formData.name}
-                              onChange={(e) => setFormData({...formData, name: e.target.value})}
-                              placeholder="Tu nombre completo"
-                              required
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Email *</Form.Label>
-                            <Form.Control
-                              type="email"
-                              value={formData.email}
-                              onChange={(e) => setFormData({...formData, email: e.target.value})}
-                              placeholder="tu@email.com"
-                              required
-                            />
-                          </Form.Group>
-                        </Col>
-                      </Row>
-
-                      {competition.categories && competition.categories.length > 0 ? (
-                        <Form.Group className="mb-3">
-                          <Form.Label>Categoría *</Form.Label>
-                          <Form.Select
-                            value={formData.category_id}
-                            onChange={(e) => setFormData({...formData, category_id: e.target.value})}
-                            required
-                          >
-                            <option value="">Selecciona una categoría</option>
-                            {competition.categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </Form.Select>
-                          <Form.Text className="text-muted">
-                            Selecciona la categoría en la que quieres competir
-                          </Form.Text>
-                        </Form.Group>
-                      ) : (
-                        <Alert variant="warning" className="mb-3">
-                          <FaExclamationTriangle className="me-2" />
-                          <strong>No hay categorías disponibles</strong> para esta competición. 
-                          Contacta al organizador para más información.
-                        </Alert>
-                      )}
-
-                      <Form.Group className="mb-4">
-                        <Form.Label>Vehículo con el que competirás *</Form.Label>
-                        <Form.Control
-                          type="text"
-                          value={formData.vehicle}
-                          onChange={(e) => setFormData({...formData, vehicle: e.target.value})}
-                          placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
-                          required
-                        />
-                        <Form.Text className="text-muted">
-                          Especifica el modelo y marca de tu vehículo
-                        </Form.Text>
-                      </Form.Group>
-
-                      <div className="d-grid">
-                        <Button 
-                          type="submit" 
-                          variant="primary" 
-                          size="lg"
-                          disabled={submitting || (status && status.times_registered > 0)}
-                          className="d-flex align-items-center justify-content-center gap-2"
-                        >
-                          {submitting ? (
-                            <>
-                              <Spinner animation="border" size="sm" />
-                              Enviando inscripción...
-                            </>
-                          ) : (status && status.times_registered > 0) ? (
-                            <>
-                              <FaExclamationTriangle /> Ya no es posible inscribirse porque la competición ha comenzado.
-                            </>
-                          ) : (
-                            <>
-                              <FaCheckCircle /> Enviar Inscripción
-                            </>
-                          )}
-                        </Button>
-                      </div>
-
-                      {status && status.times_registered > 0 && (
-                        <Alert variant="warning" className="mt-3">
-                          Ya no es posible inscribirse porque la competición ha comenzado.
-                        </Alert>
-                      )}
-                    </Form>
+                    <>
+                      <CheckCircle className="size-4" />
+                      Enviar Inscripción
+                    </>
                   )}
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Col>
-      </Row>
+                </Button>
 
-      {/* Modal de éxito */}
-      <Modal show={showSuccessModal} onHide={() => setShowSuccessModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title className="text-success">
-            <FaCheckCircle className="me-2" />
-            ¡Inscripción enviada!
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Tu inscripción ha sido enviada correctamente. El organizador de la competición revisará tu solicitud y te contactará si es necesario.</p>
-          <p className="text-muted mb-0">
-            <strong>Competición:</strong> {competition.name}
+                {status?.times_registered > 0 && (
+                  <Alert variant="destructive">
+                    <AlertDescription>Ya no es posible inscribirse porque la competición ha comenzado.</AlertDescription>
+                  </Alert>
+                )}
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <CheckCircle className="size-5" />
+              ¡Inscripción enviada!
+            </DialogTitle>
+            <DialogDescription>
+              Tu inscripción ha sido enviada correctamente. El organizador de la competición revisará tu solicitud y te contactará si es necesario.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            <strong>Competición:</strong> {competition?.name}
           </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowSuccessModal(false)}>
-            Cerrar
-          </Button>
-          <Button variant="primary" onClick={() => navigate('/')}>
-            Volver al inicio
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </Container>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSuccessModal(false)}>Cerrar</Button>
+            <Button onClick={() => navigate('/')}>Volver al inicio</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
-export default CompetitionSignup; 
+export default CompetitionSignup;

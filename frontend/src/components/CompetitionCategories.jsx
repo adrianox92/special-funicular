@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Card, Button, Badge, Modal, Form, Alert, ListGroup, ListGroupItem,
-  Spinner, Row, Col 
-} from 'react-bootstrap';
-import { 
-  FaTags, FaPlus, FaEdit, FaTrash, FaExclamationTriangle
-} from 'react-icons/fa';
+import { Tags, Plus, Pencil, Trash2 } from 'lucide-react';
 import axios from '../lib/axios';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader } from './ui/card';
+import { Badge } from './ui/badge';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Alert, AlertDescription } from './ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Spinner } from './ui/spinner';
 
 const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
   const [categories, setCategories] = useState([]);
@@ -14,15 +23,10 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  
-  // Estados para el modal
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [formData, setFormData] = useState({
-    name: ''
-  });
+  const [formData, setFormData] = useState({ name: '' });
 
-  // Cargar categorías
   const loadCategories = async () => {
     try {
       setLoading(true);
@@ -41,46 +45,32 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
     loadCategories();
   }, [competitionId]);
 
-  // Abrir modal para crear/editar
   const openModal = (category = null) => {
     setEditingCategory(category);
-    setFormData({
-      name: category ? category.name : ''
-    });
+    setFormData({ name: category ? category.name : '' });
     setShowModal(true);
     setSaveError(null);
   };
 
-  // Guardar categoría
   const handleSave = async (e) => {
     e.preventDefault();
-    
     if (!formData.name.trim()) {
       setSaveError('El nombre de la categoría es requerido');
       return;
     }
-
     try {
       setSaving(true);
       setSaveError(null);
-      
       if (editingCategory) {
-        // Actualizar categoría existente
         await axios.put(`/competitions/${competitionId}/categories/${editingCategory.id}`, formData);
       } else {
-        // Crear nueva categoría
         await axios.post(`/competitions/${competitionId}/categories`, formData);
       }
-      
       setShowModal(false);
       setEditingCategory(null);
       setFormData({ name: '' });
-      
-      // Recargar categorías y notificar al componente padre
       loadCategories();
-      if (onCategoryChange) {
-        onCategoryChange();
-      }
+      onCategoryChange?.();
     } catch (err) {
       console.error('Error al guardar categoría:', err);
       setSaveError(err.response?.data?.error || 'Error al guardar la categoría');
@@ -89,18 +79,12 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
     }
   };
 
-  // Eliminar categoría
   const handleDelete = async (categoryId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta categoría? Esta acción no se puede deshacer.')) {
-      return;
-    }
-
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta categoría? Esta acción no se puede deshacer.')) return;
     try {
       await axios.delete(`/competitions/${competitionId}/categories/${categoryId}`);
       loadCategories();
-      if (onCategoryChange) {
-        onCategoryChange();
-      }
+      onCategoryChange?.();
     } catch (err) {
       console.error('Error al eliminar categoría:', err);
       alert('Error al eliminar la categoría');
@@ -110,17 +94,16 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
   if (loading) {
     return (
       <Card>
-        <Card.Header>
-          <h6 className="mb-0 d-flex align-items-center gap-2">
-            <FaTags /> Categorías
+        <CardHeader>
+          <h6 className="font-semibold flex items-center gap-2">
+            <Tags className="size-4" />
+            Categorías
           </h6>
-        </Card.Header>
-        <Card.Body className="text-center py-4">
-          <Spinner animation="border" size="sm">
-            <span className="visually-hidden">Cargando...</span>
-          </Spinner>
-          <p className="mt-2 mb-0">Cargando categorías...</p>
-        </Card.Body>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <Spinner className="size-6 mx-auto mb-2" />
+          <p className="text-muted-foreground text-sm">Cargando categorías...</p>
+        </CardContent>
       </Card>
     );
   }
@@ -128,129 +111,105 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
   return (
     <>
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h6 className="mb-0 d-flex align-items-center gap-2">
-            <FaTags /> Categorías ({categories.length})
+        <CardHeader className="flex flex-row items-center justify-between">
+          <h6 className="font-semibold flex items-center gap-2">
+            <Tags className="size-4" />
+            Categorías ({categories.length})
           </h6>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => openModal()}
-            className="d-flex align-items-center gap-1"
-          >
-            <FaPlus /> Añadir
+          <Button size="sm" onClick={() => openModal()} className="flex items-center gap-1">
+            <Plus className="size-4" />
+            Añadir
           </Button>
-        </Card.Header>
-        <Card.Body>
+        </CardHeader>
+        <CardContent>
           {error && (
-            <Alert variant="danger" className="mb-3">
-              {error}
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           {categories.length === 0 ? (
-            <div className="text-center py-4">
-              <FaTags size={32} className="text-muted mb-3" />
-              <p className="text-muted mb-3">No hay categorías definidas</p>
-              <Button
-                variant="outline-primary"
-                size="sm"
-                onClick={() => openModal()}
-                className="d-flex align-items-center gap-1 mx-auto"
-              >
-                <FaPlus /> Crear Primera Categoría
+            <div className="text-center py-8">
+              <Tags className="size-8 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground mb-4">No hay categorías definidas</p>
+              <Button variant="outline" size="sm" onClick={() => openModal()} className="flex items-center gap-1 mx-auto">
+                <Plus className="size-4" />
+                Crear Primera Categoría
               </Button>
             </div>
           ) : (
-            <ListGroup variant="flush">
+            <div className="space-y-2">
               {categories.map((category) => (
-                <ListGroupItem key={category.id} className="px-0 d-flex justify-content-between align-items-center">
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge bg="info" className="me-2">
-                      {category.name}
-                    </Badge>
-                  </div>
-                  <div className="d-flex gap-1">
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => openModal(category)}
-                      className="d-flex align-items-center gap-1"
-                    >
-                      <FaEdit />
+                <div
+                  key={category.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                >
+                  <Badge variant="secondary">{category.name}</Badge>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => openModal(category)}>
+                      <Pencil className="size-4" />
                     </Button>
                     <Button
-                      variant="outline-danger"
+                      variant="outline"
                       size="sm"
+                      className="text-destructive hover:text-destructive"
                       onClick={() => handleDelete(category.id)}
-                      className="d-flex align-items-center gap-1"
                     >
-                      <FaTrash />
+                      <Trash2 className="size-4" />
                     </Button>
                   </div>
-                </ListGroupItem>
+                </div>
               ))}
-            </ListGroup>
+            </div>
           )}
-        </Card.Body>
+        </CardContent>
       </Card>
 
-      {/* Modal para crear/editar categoría */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <FaTags className="me-2" />
-            {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
-          </Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSave}>
-          <Modal.Body>
-            {saveError && (
-              <Alert variant="danger" className="mb-3">
-                {saveError}
-              </Alert>
-            )}
-
-            <Form.Group>
-              <Form.Label>Nombre de la categoría</Form.Label>
-              <Form.Control
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ej: F1, GT, Rally, Clásicos..."
-                required
-              />
-              <Form.Text className="text-muted">
-                Define una categoría para agrupar participantes similares
-              </Form.Text>
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowModal(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              type="submit" 
-              variant="primary"
-              disabled={saving}
-              className="d-flex align-items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <Spinner animation="border" size="sm" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <FaPlus /> {editingCategory ? 'Actualizar' : 'Crear'}
-                </>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tags className="size-5" />
+              {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+            </DialogTitle>
+            <DialogDescription>Define una categoría para agrupar participantes similares</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSave}>
+            <div className="space-y-4 py-4">
+              {saveError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{saveError}</AlertDescription>
+                </Alert>
               )}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+              <div className="space-y-2">
+                <Label htmlFor="category-name">Nombre de la categoría</Label>
+                <Input
+                  id="category-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Ej: F1, GT, Rally, Clásicos..."
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Spinner className="size-4 mr-2" />
+                    Guardando...
+                  </>
+                ) : (
+                  editingCategory ? 'Actualizar' : 'Crear'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
 
-export default CompetitionCategories; 
+export default CompetitionCategories;

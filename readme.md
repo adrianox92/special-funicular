@@ -325,11 +325,20 @@ ORDER BY position_updated_at DESC;
 - **Análisis de rendimiento**: Compara tiempos de mejor vuelta y promedio a lo largo del tiempo
 - **Seguimiento de progreso**: Identifica tendencias de mejora en diferentes circuitos
 
+### 🏁 Gestión de Circuitos
+- **Alta de circuitos**: Crea y persiste circuitos con nombre y descripción
+- **Número de carriles**: Define cuántos carriles tiene cada circuito
+- **Longitud por carril**: Especifica la longitud en metros de cada carril
+- **Integración con competiciones**: Asocia un circuito a cada competición
+- **Integración con tiempos**: Los tiempos de vehículos y competiciones referencian circuitos
+- **Filtrado por circuito**: Filtra tiempos por circuito en la tabla de tiempos
+
 ### 🏆 Sistema de Competiciones
 - **Creación de competiciones**: Configura eventos con múltiples rondas
+- **Selector de circuito**: Asocia competiciones a circuitos predefinidos
 - **Inscripciones públicas**: Enlaces públicos para que cualquiera se inscriba
 - **Gestión de participantes**: Añade pilotos y asigna vehículos
-- **Registro de tiempos**: Sistema completo de cronometraje por ronda
+- **Registro de tiempos**: Sistema completo de cronometraje por ronda (con selector de circuito)
 - **Clasificaciones automáticas**: Rankings en tiempo real
 - **Exportación de datos**: Descarga resultados en CSV
 
@@ -442,8 +451,13 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
 - `GET /competitions/presentation/:slug` - Modo presentación (Live TV View)
 
 ### Rutas Protegidas
+- `GET /api/circuits` - Lista de circuitos del usuario
+- `GET /api/circuits/:id` - Detalle de un circuito
+- `POST /api/circuits` - Crear circuito (name, description, num_lanes, lane_lengths)
+- `PUT /api/circuits/:id` - Actualizar circuito
+- `DELETE /api/circuits/:id` - Eliminar circuito (si no está en uso)
 - `GET /api/competitions/my-competitions` - Mis competiciones
-- `POST /api/competitions` - Crear competición
+- `POST /api/competitions` - Crear competición (acepta circuit_id)
 - `GET /api/competitions/:id` - Detalles de competición
 - `GET /api/competitions/:id/participants` - Participantes
 - `GET /api/competitions/:id/timings` - Tiempos registrados
@@ -466,18 +480,78 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
   - No requiere autenticación.
   - Respuesta: array de objetos con la estructura de las reglas (`rule_type`, `description`, `points_structure`, etc).
 
-## 🎨 Personalización
+## 🔑 API Keys e Integración
+
+El sistema incluye **API keys por usuario** para conectar proyectos externos (por ejemplo, una app de gestión de tiempos de circuito) con esta aplicación.
+
+### Cómo funciona
+
+- Cada usuario tiene una **API key única** que se genera automáticamente al acceder por primera vez a la sección de perfil.
+- La API key se usa enviando el header `X-API-Key` en las peticiones.
+- Puedes ver, copiar y regenerar tu API key en **Mi Perfil** (menú de usuario).
+
+### Endpoints de gestión de API keys (JWT)
+
+- `GET /api/api-keys/me` - Obtiene la API key del usuario. Si no existe, la crea automáticamente.
+- `POST /api/api-keys/regenerate` - Regenera la API key (la anterior deja de funcionar de inmediato).
+
+### Endpoints de sincronización (API key)
+
+Estos endpoints permiten a proyectos externos leer vehículos y registrar tiempos:
+
+- `GET /api/sync/vehicles` - Lista los vehículos del usuario (id, model, manufacturer, type, traction, image). Query: `?page=1&limit=25`.
+- `POST /api/sync/timings` - Crea un nuevo registro de tiempo. Body: `{ vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, timing_date? }`.
+
+**Ejemplo de uso desde otro proyecto:**
+
+```
+GET /api/sync/vehicles HTTP/1.1
+X-API-Key: tu_api_key_aqui
+```
+
+### Migración de base de datos
+
+Para crear la tabla `user_api_keys`, ejecuta:
+
+```bash
+cd backend
+node scripts/migrate-add-api-keys.js
+```
+
+Si no tienes la función `exec_sql` en Supabase, ejecuta manualmente el SQL en `backend/scripts/add-api-keys.sql` desde el SQL Editor del dashboard.
+
+**Backend:** Para que la sección "Mi Perfil" pueda obtener y crear API keys, el backend debe usar la **service role key** de Supabase (para poder leer/escribir en `user_api_keys` cuando RLS está activo). Añade en tu `.env` del backend:
+
+- `SUPABASE_SERVICE_ROLE_KEY` – clave "service_role" del proyecto en Supabase (Dashboard → Settings → API). Si no está definida, se usará `SUPABASE_KEY` (puede fallar si la tabla tiene RLS).
+
+## 🎨 Personalización y UI
+
+### shadcn/ui + Tailwind CSS
+The frontend uses **shadcn/ui** components with **Tailwind CSS** for styling:
+- **Component library**: shadcn/ui (Radix UI primitives + Tailwind)
+- **Styling**: Tailwind CSS with CSS variables for theming
+- **Icons**: lucide-react
+- **Theme**: Dark/Light mode toggle (persisted in localStorage)
+
+### Theme Toggle
+Users can switch between light and dark mode via the theme toggle button in the navbar. The preference is saved in localStorage.
+
+### Key UI Components
+- Layout: `Navbar`, `Footer` with responsive Sheet for mobile menu
+- Forms: `Input`, `Label`, `Select`, `Switch`, `Button`
+- Data display: `Card`, `Table`, `Badge`, `Tabs`
+- Feedback: `Alert`, `Spinner`, `Dialog`, `Tooltip`
+- Charts: Recharts (unchanged)
 
 ### Estilos CSS
 Los estilos están organizados en:
-- `frontend/src/styles/competitions.css` - Estilos de competiciones
-- `frontend/src/App.css` - Estilos generales
+- `frontend/src/index.css` - Tailwind directives + shadcn CSS variables
+- `frontend/src/styles/competitions.css` - Estilos de competiciones (variables CSS, compatible con dark mode)
+- `frontend/src/styles/InsightsCarousel.css` - Carousel (legacy, being migrated)
 
 ### Temas y Colores
-- **Primario**: Gradiente azul-morado (#667eea → #764ba2)
-- **Secundario**: Amarillo dorado (#ffd700)
-- **Éxito**: Verde (#28a745)
-- **Advertencia**: Naranja (#ffc107)
+- **Light/Dark**: CSS variables (`--background`, `--foreground`, `--primary`, etc.)
+- **Primary**: oklch-based palette (adapts to theme)
 
 ## 🤝 Contribución
 
@@ -528,6 +602,46 @@ Para facilitar las pruebas en Swagger, existe el endpoint:
 Este endpoint permite obtener un token JWT usando email y contraseña de un usuario registrado en Supabase. **No debe usarse en producción ni en el frontend, solo para pruebas en Swagger.**
 
 ## Cambios recientes
+
+### v1.10.0 - Módulo de Circuitos
+- **Nueva tabla `circuits`**: Almacena circuitos con nombre, descripción, número de carriles y longitud por carril
+- **Referencias `circuit_id`**: Las tablas `competitions`, `vehicle_timings` y `competition_timings` ahora referencian la tabla de circuitos
+- **Página Circuitos**: Nueva sección en el menú para crear, editar y eliminar circuitos
+- **Selector en competiciones**: Al crear competiciones se selecciona un circuito de la lista
+- **Selector en tiempos**: Al registrar tiempos (competición o vehículo) se selecciona el circuito
+- **Filtro en tabla de tiempos**: El filtro por circuito usa un dropdown con los circuitos definidos
+
+**Migración de base de datos:**
+```bash
+cd backend
+node scripts/migrate-create-circuits.js
+```
+Si no tienes `exec_sql` en Supabase, ejecuta manualmente en el SQL Editor:
+1. `backend/scripts/create-circuits-table.sql`
+2. `backend/scripts/migrate-circuit-references.sql`
+
+**Archivos creados:**
+- `backend/scripts/create-circuits-table.sql` - Crea tabla circuits
+- `backend/scripts/migrate-circuit-references.sql` - Añade circuit_id a competitions, vehicle_timings, competition_timings
+- `backend/scripts/migrate-create-circuits.js` - Script de migración
+- `backend/routes/circuits.js` - API CRUD de circuitos
+- `frontend/src/pages/Circuits.jsx` - Página de gestión de circuitos
+
+### v1.9.0 - Migración a shadcn/ui (COMPLETADA)
+- ✅ **Nuevo sistema de UI**: Migración de Bootstrap 5 a shadcn/ui + Tailwind CSS
+- ✅ **Dark/Light mode**: Toggle de tema con persistencia en localStorage
+- ✅ **Componentes migrados**: Navbar, Footer, LandingPage, Login, Dashboard, VehicleList, VehicleCard, AddVehicle, MetricCard, InsightsCarousel
+- ✅ **Layout responsive**: Sheet para menú móvil, NavigationMenu para desktop
+- ✅ **CRACO**: Path alias `@/` configurado para imports limpios
+- ✅ **Iconos**: lucide-react para iconografía consistente
+
+**Stack de UI actual:**
+- Tailwind CSS v3
+- shadcn/ui (Button, Card, Badge, Input, Dialog, Table, Tabs, etc.)
+- lucide-react
+- Recharts (sin cambios)
+
+**Nota**: Migración a shadcn/ui completada. Bootstrap CSS eliminado. Todos los componentes usan shadcn/ui. Iconos: lucide-react (incluyendo presentation: CompetitionHeader, RoundProgressGrid, BestLapHighlight). InstallPWAButton migrado a Button de shadcn. CompetitionPresentation (modo proyector) mantiene estilos propios con lucide-react.
 
 ### ✅ FASE 2 - Frontend: Editor Visual de Reglas (COMPLETADA)
 

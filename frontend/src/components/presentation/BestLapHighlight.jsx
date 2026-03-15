@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaTrophy, FaClock, FaUser, FaCar, FaTimes } from 'react-icons/fa';
+import { Trophy, Clock, User, Car, X } from 'lucide-react';
 
 const BestLapHighlight = ({ bestLap, participant }) => {
   // Formatea mejor vuelta (float o string) a mm:ss.mmm
@@ -18,12 +18,12 @@ const BestLapHighlight = ({ bestLap, participant }) => {
     return (
       <div className="best-lap-highlight">
         <h2 className="highlight-title">
-          <FaTrophy className="highlight-icon" />
+          <Trophy className="highlight-icon" />
           Mejor Vuelta
         </h2>
         <div className="highlight-content">
           <div className="no-best-lap">
-            <FaTimes className="no-lap-icon" />
+            <X className="no-lap-icon" />
             <p className="no-lap-text">Sin tiempos registrados</p>
           </div>
         </div>
@@ -34,7 +34,7 @@ const BestLapHighlight = ({ bestLap, participant }) => {
   return (
     <div className="best-lap-highlight">
       <h2 className="highlight-title">
-        <FaTrophy className="highlight-icon" />
+        <Trophy className="highlight-icon" />
         Mejor Vuelta
       </h2>
       
@@ -42,7 +42,7 @@ const BestLapHighlight = ({ bestLap, participant }) => {
         <div className="best-lap-info">
           <div className="best-lap-time">
             <p className="time-label">
-              <FaClock className="label-icon" />
+              <Clock className="label-icon" />
               Tiempo <span className="time-value">{formatBestLap(bestLap)}</span>
             </p>
             
@@ -50,7 +50,7 @@ const BestLapHighlight = ({ bestLap, participant }) => {
           
           <div className="best-lap-pilot">
             <p className="pilot-label">
-              <FaUser className="label-icon" />
+              <User className="label-icon" />
               Piloto <span className="pilot-name">{participant.driver_name}</span>
             </p>
             
@@ -61,7 +61,7 @@ const BestLapHighlight = ({ bestLap, participant }) => {
           
           <div className="best-lap-vehicle pb-2">
             <p className="vehicle-label">
-              <FaCar className="label-icon" />
+              <Car className="label-icon" />
               Vehículo <span className="vehicle-brand">{participant.vehicle_brand}</span> <span className="vehicle-name">{participant.vehicle_name} </span>
             </p>            
           </div>

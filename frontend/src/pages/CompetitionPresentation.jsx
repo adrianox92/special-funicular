@@ -5,6 +5,7 @@ import CompetitionHeader from '../components/presentation/CompetitionHeader';
 import LiveRankingTable from '../components/presentation/LiveRankingTable';
 import RoundProgressGrid from '../components/presentation/RoundProgressGrid';
 import BestLapHighlight from '../components/presentation/BestLapHighlight';
+import { Spinner } from '../components/ui/spinner';
 import '../styles/CompetitionPresentation.css';
 
 const CompetitionPresentation = () => {
@@ -42,10 +43,8 @@ const CompetitionPresentation = () => {
   if (loading) {
     return (
       <div className="presentation-loading">
-        <div className="spinner-border text-light" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-        <p className="mt-3 text-light">Cargando competición...</p>
+        <Spinner className="size-12 text-[#7876c6]" />
+        <p className="mt-3 text-[#b8b8b8]">Cargando competición...</p>
       </div>
     );
   }
@@ -53,8 +52,8 @@ const CompetitionPresentation = () => {
   if (error) {
     return (
       <div className="presentation-error">
-        <div className="alert alert-danger" role="alert">
-          <h4>Error</h4>
+        <div className="presentation-error-box">
+          <h4 className="text-[#ff6b6b]">Error</h4>
           <p>{error}</p>
         </div>
       </div>
@@ -64,8 +63,8 @@ const CompetitionPresentation = () => {
   if (!competition) {
     return (
       <div className="presentation-error">
-        <div className="alert alert-warning" role="alert">
-          <h4>Competición no encontrada</h4>
+        <div className="presentation-error-box">
+          <h4 className="text-amber-400">Competición no encontrada</h4>
           <p>La competición solicitada no existe o no está disponible.</p>
         </div>
       </div>

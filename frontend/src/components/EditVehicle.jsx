@@ -1,10 +1,33 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Form, Button, Alert, Row, Col, Spinner, Nav, Tab } from 'react-bootstrap';
+import { ExternalLink, Pencil, Trash2, Wrench } from 'lucide-react';
 import api from '../lib/axios';
-import { FiExternalLink } from 'react-icons/fi';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
 import TimingSpecsModal from './TimingSpecsModal';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Switch } from './ui/switch';
+import { Alert } from './ui/alert';
+import { Spinner } from './ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table';
+import { cn } from './ui/utils';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -24,7 +47,6 @@ const viewTypeMap = {
   'Superior': 'top',
   'Chasis': 'chassis',
   'Vista 3/4': 'three_quarters',
-  // También permitir los nombres internos por si ya están bien
   'front': 'front',
   'left': 'left',
   'right': 'right',
@@ -48,6 +70,8 @@ const componentTypes = [
   { value: 'guide', label: 'Guía' },
   { value: 'motor', label: 'Motor' },
 ];
+
+const vehicleTypes = ['Rally', 'GT', 'LMP', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'];
 
 const EditVehicle = () => {
   const { id } = useParams();
@@ -85,6 +109,7 @@ const EditVehicle = () => {
   const [loadingSpecs, setLoadingSpecs] = useState(false);
   const [timings, setTimings] = useState([]);
   const [editingTiming, setEditingTiming] = useState(null);
+  const [circuits, setCircuits] = useState([]);
   const [newTiming, setNewTiming] = useState({
     best_lap_time: '',
     total_time: '',
@@ -92,6 +117,7 @@ const EditVehicle = () => {
     average_time: '',
     lane: '',
     circuit: '',
+    circuit_id: '',
     timing_date: new Date().toISOString().split('T')[0],
     best_lap_timestamp: null,
     total_time_timestamp: null,
@@ -103,10 +129,10 @@ const EditVehicle = () => {
   const [selectedTiming, setSelectedTiming] = useState(null);
 
   useEffect(() => {
+    api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
     api.get(`/vehicles/${id}`)
       .then(async res => {
         setVehicle(res.data);
-        // Obtener imágenes del vehículo
         const imgRes = await api.get(`/vehicles/${id}/images`);
         const imgs = imgRes.data || [];
         const previewsObj = {};
@@ -131,28 +157,21 @@ const EditVehicle = () => {
     const setupResizeObserver = (element, key) => {
       if (element && !observers.has(key)) {
         const observer = new ResizeObserver(entries => {
-          // Cancelar el timeout anterior si existe
           if (timeouts.has(key)) {
             cancelAnimationFrame(timeouts.get(key));
           }
-          
-          // Usar requestAnimationFrame para limitar las actualizaciones
           const timeoutId = requestAnimationFrame(() => {
             if (!Array.isArray(entries) || !entries.length) {
               return;
             }
-            // Aquí podríamos hacer algo con el tamaño si fuera necesario
           });
-          
           timeouts.set(key, timeoutId);
         });
-        
         observer.observe(element);
         observers.set(key, observer);
       }
     };
 
-    // Configurar observadores para cada imagen
     Object.keys(imageRefs.current).forEach(key => {
       if (imageRefs.current[key]) {
         setupResizeObserver(imageRefs.current[key], key);
@@ -160,7 +179,6 @@ const EditVehicle = () => {
     });
 
     return () => {
-      // Limpiar timeouts y observadores
       timeouts.forEach(timeoutId => {
         if (timeoutId) {
           cancelAnimationFrame(timeoutId);
@@ -171,12 +189,10 @@ const EditVehicle = () => {
   }, [previews, images]);
 
   useEffect(() => {
-    // Cargar especificaciones técnicas
     const loadTechnicalSpecs = async () => {
       setLoadingSpecs(true);
       try {
         const response = await api.get(`/vehicles/${id}/technical-specs`);
-        // Organizar las especificaciones por tipo
         const specs = {
           modification: response.data.find(spec => spec.is_modification),
           technical: response.data.find(spec => !spec.is_modification)
@@ -196,17 +212,13 @@ const EditVehicle = () => {
   }, [id]);
 
   useEffect(() => {
-    // Cargar tiempos
     const loadTimings = async () => {
       try {
         setLoadingTimings(true);
         const response = await api.get(`/vehicles/${id}/timings`);
-        
-        // Recalcular promedios para cada tiempo
         const timingsWithRecalculatedAverages = response.data.map(timing => {
           const averageTime = calculateAverageTime(timing.total_time, timing.laps, timing.best_lap_time);
           let average_time_timestamp = null;
-          
           if (averageTime) {
             const avgMatch = averageTime.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
             if (avgMatch) {
@@ -214,14 +226,12 @@ const EditVehicle = () => {
               average_time_timestamp = minutes * 60 + seconds + milliseconds / 1000;
             }
           }
-
           return {
             ...timing,
             average_time: averageTime || timing.average_time,
             average_time_timestamp: average_time_timestamp || timing.average_time_timestamp
           };
         });
-
         setTimings(timingsWithRecalculatedAverages);
       } catch (error) {
         console.error('Error al cargar tiempos:', error);
@@ -266,7 +276,6 @@ const EditVehicle = () => {
     setDeletingImage(viewType);
     try {
       await api.delete(`/vehicles/${id}/images/${viewType}`);
-      // Actualizar ambos estados
       setImages(prev => {
         const newImages = { ...prev };
         delete newImages[viewType];
@@ -287,7 +296,6 @@ const EditVehicle = () => {
 
   const handleSpecChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const targetSpec = editingSpec || newSpec;
     const updateFn = editingSpec ? setEditingSpec : setNewSpec;
     updateFn(prev => ({
       ...prev,
@@ -338,6 +346,11 @@ const EditVehicle = () => {
 
   const handleAddSpec = async (e, isModificationTab = false) => {
     e.preventDefault();
+    const compType = editingSpec?.component_type || newSpec.component_type;
+    if (!compType) {
+      setError('El tipo de componente es requerido');
+      return;
+    }
     try {
       const specData = {
         is_modification: isModificationTab,
@@ -368,15 +381,12 @@ const EditVehicle = () => {
         await api.post(`/vehicles/${id}/technical-specs`, specData);
       }
 
-      // Recargar especificaciones técnicas
       const response = await api.get(`/vehicles/${id}/technical-specs`);
       const updatedSpecs = {
         modification: response.data.find(spec => spec.is_modification),
         technical: response.data.find(spec => !spec.is_modification)
       };
       setTechnicalSpecs(updatedSpecs);
-      
-      // Limpiar el formulario
       handleCancelEdit();
     } catch (error) {
       console.error('Error al guardar especificación:', error);
@@ -391,7 +401,6 @@ const EditVehicle = () => {
 
     try {
       await api.delete(`/vehicles/${id}/technical-specs/${specId}/components/${componentId}`);
-      // Recargar especificaciones técnicas
       const response = await api.get(`/vehicles/${id}/technical-specs`);
       const updatedSpecs = {
         modification: response.data.find(spec => spec.is_modification),
@@ -410,24 +419,18 @@ const EditVehicle = () => {
     setError(null);
     try {
       const formData = new FormData();
-      
-      // Procesar los datos antes de enviarlos
       const processedVehicle = {
         ...vehicle,
-        // Convertir valores numéricos vacíos o nulos a undefined
         price: vehicle.price === '' || vehicle.price === null ? undefined : Number(vehicle.price),
         total_price: vehicle.total_price === '' || vehicle.total_price === null ? undefined : Number(vehicle.total_price)
       };
 
-      // Añadir los datos procesados al FormData
       Object.entries(processedVehicle).forEach(([key, value]) => {
-        // Solo añadir valores que no sean undefined
         if (value !== undefined) {
           formData.append(key, value);
         }
       });
 
-      // Añadir las imágenes
       imageFields.forEach(({ name }) => {
         if (images[name]) {
           formData.append('images', images[name], name);
@@ -448,8 +451,7 @@ const EditVehicle = () => {
 
   const calculateAverageTime = (totalTime, laps, bestLapTime) => {
     if (!totalTime || !laps || laps <= 0 || !bestLapTime) return '';
-    
-    // Convertir los tiempos a segundos
+
     const getSeconds = (timeStr) => {
       const match = timeStr.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
       if (!match) return null;
@@ -459,10 +461,9 @@ const EditVehicle = () => {
 
     const totalSeconds = getSeconds(totalTime);
     const bestLapSeconds = getSeconds(bestLapTime);
-    
+
     if (totalSeconds === null || bestLapSeconds === null) return '';
 
-    // Validar que el tiempo total sea coherente
     const minimumTotalSeconds = bestLapSeconds * laps;
     if (totalSeconds < minimumTotalSeconds) {
       const minimumTime = `${String(Math.floor(minimumTotalSeconds / 60)).padStart(2, '0')}:${String(Math.floor(minimumTotalSeconds % 60)).padStart(2, '0')}.${String(Math.floor((minimumTotalSeconds % 1) * 1000)).padStart(3, '0')}`;
@@ -470,15 +471,12 @@ const EditVehicle = () => {
     } else {
       setTimingWarning(null);
     }
-    
-    // Calcular el promedio
+
     const averageSeconds = totalSeconds / laps;
-    
-    // Convertir de vuelta a formato mm:ss.ms
     const avgMinutes = Math.floor(averageSeconds / 60);
     const avgSeconds = Math.floor(averageSeconds % 60);
     const avgMilliseconds = Math.floor((averageSeconds % 1) * 1000);
-    
+
     return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
   };
 
@@ -487,10 +485,8 @@ const EditVehicle = () => {
     const targetTiming = editingTiming || newTiming;
     const updateFn = editingTiming ? setEditingTiming : setNewTiming;
 
-    // Convertir tiempos a timestamp si es necesario
     let timestamp = null;
     if (['best_lap_time', 'total_time', 'average_time'].includes(name)) {
-      // Formato esperado: mm:ss.ms (ejemplo: 01:23.456)
       const match = value.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
       if (match) {
         const [, minutes, seconds, milliseconds] = match.map(Number);
@@ -506,12 +502,11 @@ const EditVehicle = () => {
       [`${name}_timestamp`]: timestamp
     };
 
-    // Si se actualiza el tiempo total o las vueltas, recalcular el promedio
     if (name === 'total_time' || name === 'laps' || name === 'best_lap_time') {
       const totalTime = name === 'total_time' ? value : targetTiming.total_time;
       const laps = name === 'laps' ? value : targetTiming.laps;
       const bestLapTime = name === 'best_lap_time' ? value : targetTiming.best_lap_time;
-      
+
       const averageTime = calculateAverageTime(totalTime, laps, bestLapTime);
       if (averageTime) {
         const avgMatch = averageTime.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
@@ -527,10 +522,9 @@ const EditVehicle = () => {
   };
 
   const handleEditTiming = (timing) => {
-    // Calcular el promedio al cargar el tiempo para editar
     const averageTime = calculateAverageTime(timing.total_time, timing.laps, timing.best_lap_time);
     let average_time_timestamp = null;
-    
+
     if (averageTime) {
       const avgMatch = averageTime.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
       if (avgMatch) {
@@ -544,13 +538,14 @@ const EditVehicle = () => {
       best_lap_time: timing.best_lap_time,
       total_time: timing.total_time,
       laps: timing.laps,
-      average_time: averageTime || timing.average_time, // Usar el promedio recalculado o el existente
+      average_time: averageTime || timing.average_time,
       lane: timing.lane || '',
       circuit: timing.circuit || '',
+      circuit_id: timing.circuit_id || '',
       timing_date: timing.timing_date,
       best_lap_timestamp: timing.best_lap_timestamp,
       total_time_timestamp: timing.total_time_timestamp,
-      average_time_timestamp: average_time_timestamp || timing.average_time_timestamp // Usar el timestamp recalculado o el existente
+      average_time_timestamp: average_time_timestamp || timing.average_time_timestamp
     });
   };
 
@@ -563,6 +558,7 @@ const EditVehicle = () => {
       average_time: '',
       lane: '',
       circuit: '',
+      circuit_id: '',
       timing_date: new Date().toISOString().split('T')[0],
       best_lap_timestamp: null,
       total_time_timestamp: null,
@@ -576,25 +572,16 @@ const EditVehicle = () => {
       let response;
       if (editingTiming) {
         response = await api.put(`/vehicles/${id}/timings/${editingTiming.id}`, editingTiming);
-        console.log('Tiempo actualizado:', response.data);
-        
-        // Si el tiempo actualizado cambió posiciones, mostrar información
+
         if (response.data.position_updated) {
           const positionUpdates = response.data.position_updates || [];
           const successfulUpdates = positionUpdates.filter(u => u.success);
-          
+
           if (successfulUpdates.length > 0) {
-            console.log('✅ Posiciones actualizadas en cascada para circuitos:', successfulUpdates.map(u => u.circuit).join(', '));
-            
-            // Mostrar alerta de éxito temporal
             const originalError = error;
             setError(null);
-            
-            // Crear mensaje de éxito
             const circuitNames = successfulUpdates.map(u => u.circuit).join(', ');
             const successMessage = `✅ Posiciones actualizadas automáticamente en: ${circuitNames}`;
-            
-            // Mostrar mensaje temporal
             setTimingWarning(successMessage);
             setTimeout(() => {
               setTimingWarning(null);
@@ -604,13 +591,8 @@ const EditVehicle = () => {
         }
       } else {
         response = await api.post(`/vehicles/${id}/timings`, newTiming);
-        console.log('Tiempo añadido:', response.data);
-        
-        // Si el tiempo tiene información de posición actualizada, mostrarla
+
         if (response.data.position_updated) {
-          console.log('✅ Posiciones actualizadas automáticamente');
-          
-          // Mostrar mensaje de éxito temporal
           setTimingWarning('✅ Nuevo tiempo registrado y posiciones actualizadas automáticamente');
           setTimeout(() => {
             setTimingWarning(null);
@@ -618,11 +600,8 @@ const EditVehicle = () => {
         }
       }
 
-      // Recargar tiempos
       const reloadResponse = await api.get(`/vehicles/${id}/timings`);
       setTimings(reloadResponse.data);
-      
-      // Limpiar el formulario
       handleCancelEditTiming();
     } catch (error) {
       console.error('Error al guardar tiempo:', error);
@@ -637,20 +616,14 @@ const EditVehicle = () => {
 
     try {
       const response = await api.delete(`/vehicles/${id}/timings/${timingId}`);
-      console.log('Tiempo eliminado:', response.data);
-      
-      // Si se eliminó un tiempo que afectó posiciones, mostrar información
+
       if (response.data.position_updated) {
-        console.log('✅ Posiciones recalculadas después de eliminar tiempo');
-        
-        // Mostrar mensaje de éxito temporal
         setTimingWarning(`✅ Tiempo eliminado y posiciones recalculadas en: ${response.data.circuit}`);
         setTimeout(() => {
           setTimingWarning(null);
         }, 5000);
       }
-      
-      // Recargar tiempos
+
       const reloadResponse = await api.get(`/vehicles/${id}/timings`);
       setTimings(reloadResponse.data);
     } catch (error) {
@@ -659,10 +632,9 @@ const EditVehicle = () => {
     }
   };
 
-  // Función para agrupar tiempos por circuito, carril y vueltas
   const getTimingsByCircuitAndLane = () => {
     const grouped = {};
-    
+
     timings.forEach(timing => {
       if (timing.circuit && timing.lane) {
         const key = `${timing.circuit}-${timing.lane}-${timing.laps || 'sin-vueltas'}`;
@@ -678,199 +650,122 @@ const EditVehicle = () => {
       }
     });
 
-    // Solo incluir grupos con más de un tiempo para mostrar evolución
     return Object.values(grouped).filter(group => group.timings.length >= 2);
   };
 
   const renderSpecsForm = (isModificationTab = false) => {
     const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
     const components = currentSpec?.components || [];
+    const specValue = editingSpec || newSpec;
 
     return (
-      <div className="mt-4">
-        <h4>{editingSpec ? 'Editar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación Técnica'}</h4>
-        <Form onSubmit={e => handleAddSpec(e, isModificationTab)}>
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Tipo de Componente</Form.Label>
-                <Form.Select
-                  name="component_type"
-                  value={editingSpec?.component_type || newSpec.component_type}
-                  onChange={handleSpecChange}
-                  required
-                >
-                  <option value="">Seleccionar tipo</option>
+      <div className="mt-4 space-y-4">
+        <h4 className="text-lg font-semibold">{editingSpec ? 'Editar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación Técnica'}</h4>
+        <form onSubmit={e => handleAddSpec(e, isModificationTab)}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="component_type">Tipo de Componente</Label>
+              <Select
+                value={specValue.component_type || 'none'}
+                onValueChange={(v) => handleSpecChange({ target: { name: 'component_type', value: v === 'none' ? '' : v, type: 'select', checked: false } })}
+                required
+              >
+                <SelectTrigger id="component_type">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Seleccionar tipo</SelectItem>
                   {componentTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                   ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Elemento</Form.Label>
-                <Form.Control
-                  name="element"
-                  value={editingSpec?.element || newSpec.element}
-                  onChange={handleSpecChange}
-                  required
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Marca</Form.Label>
-                <Form.Control
-                  name="manufacturer"
-                  value={editingSpec?.manufacturer || newSpec.manufacturer}
-                  onChange={handleSpecChange}
-                  required
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Material</Form.Label>
-                <Form.Control
-                  name="material"
-                  value={editingSpec?.material || newSpec.material}
-                  onChange={handleSpecChange}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Tamaño</Form.Label>
-                <Form.Control
-                  name="size"
-                  value={editingSpec?.size || newSpec.size}
-                  onChange={handleSpecChange}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Color</Form.Label>
-                <Form.Control
-                  name="color"
-                  value={editingSpec?.color || newSpec.color}
-                  onChange={handleSpecChange}
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-          {['pinion', 'crown'].includes(editingSpec?.component_type || newSpec.component_type) && (
-            <Row>
-              <Col md={4}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Dientes</Form.Label>
-                  <Form.Control
-                    name="teeth"
-                    type="number"
-                    value={editingSpec?.teeth || newSpec.teeth}
-                    onChange={handleSpecChange}
-                    required
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="element">Elemento</Label>
+              <Input
+                id="element"
+                name="element"
+                value={specValue.element}
+                onChange={handleSpecChange}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manufacturer">Marca</Label>
+              <Input
+                id="manufacturer"
+                name="manufacturer"
+                value={specValue.manufacturer}
+                onChange={handleSpecChange}
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="material">Material</Label>
+              <Input id="material" name="material" value={specValue.material} onChange={handleSpecChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="size">Tamaño</Label>
+              <Input id="size" name="size" value={specValue.size} onChange={handleSpecChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="color">Color</Label>
+              <Input id="color" name="color" value={specValue.color} onChange={handleSpecChange} />
+            </div>
+          </div>
+          {['pinion', 'crown'].includes(specValue.component_type) && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="teeth">Dientes</Label>
+                <Input id="teeth" name="teeth" type="number" value={specValue.teeth} onChange={handleSpecChange} required />
+              </div>
+            </div>
           )}
-          {(editingSpec?.component_type || newSpec.component_type) === 'motor' && (
-            <Row>
-              <Col md={4}>
-                <Form.Group className="mb-3">
-                  <Form.Label>RPM</Form.Label>
-                  <Form.Control
-                    name="rpm"
-                    type="number"
-                    value={editingSpec?.rpm || newSpec.rpm}
-                    onChange={handleSpecChange}
-                    required
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Gaus</Form.Label>
-                  <Form.Control
-                    name="gaus"
-                    type="number"
-                    value={editingSpec?.gaus || newSpec.gaus}
-                    onChange={handleSpecChange}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+          {specValue.component_type === 'motor' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="rpm">RPM</Label>
+                <Input id="rpm" name="rpm" type="number" value={specValue.rpm} onChange={handleSpecChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="gaus">Gaus</Label>
+                <Input id="gaus" name="gaus" type="number" value={specValue.gaus} onChange={handleSpecChange} />
+              </div>
+            </div>
           )}
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Precio (€)</Form.Label>
-                <Form.Control
-                  name="price"
-                  type="number"
-                  step="0.01"
-                  value={editingSpec?.price || newSpec.price}
-                  onChange={handleSpecChange}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>URL</Form.Label>
-                <Form.Control
-                  name="url"
-                  type="url"
-                  value={editingSpec?.url || newSpec.url}
-                  onChange={handleSpecChange}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>SKU</Form.Label>
-                <Form.Control
-                  name="sku"
-                  value={editingSpec?.sku || newSpec.sku}
-                  onChange={handleSpecChange}
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-          <Row>
-            <Col md={12}>
-              <Form.Group className="mb-3">
-                <Form.Label>Descripción</Form.Label>
-                <Form.Control
-                  name="description"
-                  as="textarea"
-                  rows={3}
-                  value={editingSpec?.description || newSpec.description}
-                  onChange={handleSpecChange}
-                />
-              </Form.Group>
-            </Col>
-          </Row>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="price">Precio (€)</Label>
+              <Input id="price" name="price" type="number" step="0.01" value={specValue.price} onChange={handleSpecChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="url">URL</Label>
+              <Input id="url" name="url" type="url" value={specValue.url} onChange={handleSpecChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sku">SKU</Label>
+              <Input id="sku" name="sku" value={specValue.sku} onChange={handleSpecChange} />
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <Label htmlFor="description">Descripción</Label>
+            <Textarea id="description" name="description" rows={3} value={specValue.description} onChange={handleSpecChange} />
+          </div>
           {!isModificationTab && (
-            <Row>
-              <Col md={12}>
-                <Form.Group className="mb-3">
-                  <Form.Check
-                    type="checkbox"
-                    name="is_modification"
-                    label="Es una modificación"
-                    checked={editingSpec?.is_modification || newSpec.is_modification}
-                    onChange={handleSpecChange}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+            <div className="flex items-center space-x-2 mt-4">
+              <Switch
+                id="is_modification"
+                checked={specValue.is_modification}
+                onCheckedChange={(checked) => handleSpecChange({ target: { name: 'is_modification', value: '', type: 'checkbox', checked } })}
+              />
+              <Label htmlFor="is_modification">Es una modificación</Label>
+            </div>
           )}
-          <div className="d-flex gap-2 mt-3">
-            <Button type="submit" variant="primary">
+          <div className="flex gap-2 mt-4">
+            <Button type="submit">
               {editingSpec ? 'Actualizar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación'}
             </Button>
             {editingSpec && (
@@ -879,83 +774,76 @@ const EditVehicle = () => {
               </Button>
             )}
           </div>
-        </Form>
-        <div className="mt-4">
-          <h4>{isModificationTab ? 'Modificaciones Actuales' : 'Especificaciones Técnicas Actuales'}</h4>
+        </form>
+        <div className="mt-6">
+          <h4 className="text-lg font-semibold mb-4">{isModificationTab ? 'Modificaciones Actuales' : 'Especificaciones Técnicas Actuales'}</h4>
           {loadingSpecs ? (
-            <Spinner animation="border" />
+            <Spinner className="size-6" />
           ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Tipo</th>
-                    <th>Elemento</th>
-                    <th>Marca</th>
-                    <th>Material</th>
-                    <th>Tamaño</th>
-                    <th>Color</th>
-                    <th>Precio</th>
-                    <th>URL</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Elemento</TableHead>
+                    <TableHead>Marca</TableHead>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Tamaño</TableHead>
+                    <TableHead>Color</TableHead>
+                    <TableHead>Precio</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {components.length === 0 && (
-                    <tr><td colSpan="9" className="text-center">No hay {isModificationTab ? 'modificaciones' : 'especificaciones técnicas'}</td></tr>
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-muted-foreground">
+                        No hay {isModificationTab ? 'modificaciones' : 'especificaciones técnicas'}
+                      </TableCell>
+                    </TableRow>
                   )}
                   {components.map((comp, idx) => (
-                    <tr key={currentSpec.id + '-' + idx}>
-                      <td>{componentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}</td>
-                      <td>{comp.element}</td>
-                      <td>{comp.manufacturer}</td>
-                      <td>{comp.material}</td>
-                      <td>{comp.size}</td>
-                      <td>{comp.color}</td>
-                      <td>{comp.price ? `€${Number(comp.price).toFixed(2)}` : '-'}</td>
-                      <td>
+                    <TableRow key={currentSpec.id + '-' + idx}>
+                      <TableCell>{componentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}</TableCell>
+                      <TableCell>{comp.element}</TableCell>
+                      <TableCell>{comp.manufacturer}</TableCell>
+                      <TableCell>{comp.material}</TableCell>
+                      <TableCell>{comp.size}</TableCell>
+                      <TableCell>{comp.color}</TableCell>
+                      <TableCell>{comp.price ? `€${Number(comp.price).toFixed(2)}` : '-'}</TableCell>
+                      <TableCell>
                         {comp.url ? (
-                          <a href={comp.url} target="_blank" rel="noopener noreferrer" title="Abrir enlace">
-                            <FiExternalLink size={18} />
+                          <a href={comp.url} target="_blank" rel="noopener noreferrer" title="Abrir enlace" className="text-primary hover:underline">
+                            <ExternalLink className="size-4 inline" />
                           </a>
                         ) : (
-                          '-' 
+                          '-'
                         )}
-                      </td>
-                      <td>
-                        <div className="d-flex gap-1">
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleEditSpec(currentSpec, comp)}
-                            title="Editar"
-                          >
-                            ✏️
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="default" size="sm" onClick={() => handleEditSpec(currentSpec, comp)} title="Editar">
+                            <Pencil className="size-4" />
                           </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteSpec(currentSpec.id, comp.id)}
-                            title="Eliminar"
-                          >
-                            🗑️
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteSpec(currentSpec.id, comp.id)} title="Eliminar">
+                            <Trash2 className="size-4" />
                           </Button>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                  {/* Fila de suma total solo en la pestaña de modificaciones */}
                   {isModificationTab && components.length > 0 && (
-                    <tr>
-                      <td colSpan="7" className="text-end fw-bold">Total modificaciones</td>
-                      <td className="fw-bold">
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-right font-bold">Total modificaciones</TableCell>
+                      <TableCell className="font-bold">
                         €{components.reduce((sum, comp) => sum + (comp.price ? Number(comp.price) : 0), 0).toFixed(2)}
-                      </td>
-                      <td></td>
-                    </tr>
+                      </TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
@@ -965,119 +853,114 @@ const EditVehicle = () => {
 
   const renderTimingsForm = () => {
     return (
-      <div className="mt-4">
-        <h4>{editingTiming ? 'Editar' : 'Añadir'} Registro de Tiempo</h4>
+      <div className="mt-4 space-y-4">
+        <h4 className="text-lg font-semibold">{editingTiming ? 'Editar' : 'Añadir'} Registro de Tiempo</h4>
         {timingWarning && (
-          <Alert 
-            variant={timingWarning.includes('✅') ? 'success' : 'warning'} 
-            className="mb-3"
+          <Alert
+            className={cn(
+              "mb-4",
+              timingWarning.includes('✅') ? "border-green-500/50 bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-200" : "border-amber-500/50 bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+            )}
           >
             {timingWarning}
           </Alert>
         )}
-        <Form onSubmit={handleAddTiming}>
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Mejor Vuelta (mm:ss.ms)</Form.Label>
-                <Form.Control
-                  name="best_lap_time"
-                  value={editingTiming?.best_lap_time || newTiming.best_lap_time}
-                  onChange={handleTimingChange}
-                  placeholder="00:00.000"
-                  pattern="\d{2}:\d{2}\.\d{3}"
-                  title="Formato: mm:ss.ms (ejemplo: 01:23.456)"
-                  required
-                />
-                <Form.Text className="text-muted">
-                  Formato: mm:ss.ms (ejemplo: 01:23.456)
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Tiempo Total (mm:ss.ms)</Form.Label>
-                <Form.Control
-                  name="total_time"
-                  value={editingTiming?.total_time || newTiming.total_time}
-                  onChange={handleTimingChange}
-                  placeholder="00:00.000"
-                  pattern="\d{2}:\d{2}\.\d{3}"
-                  title="Formato: mm:ss.ms (ejemplo: 01:23.456)"
-                  required
-                />
-                <Form.Text className="text-muted">
-                  Formato: mm:ss.ms (ejemplo: 01:23.456)
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Vueltas</Form.Label>
-                <Form.Control
-                  name="laps"
-                  type="number"
-                  value={editingTiming?.laps || newTiming.laps}
-                  onChange={handleTimingChange}
-                  required
-                  min="1"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Tiempo Promedio (mm:ss.ms)</Form.Label>
-                <Form.Control
-                  name="average_time"
-                  value={editingTiming?.average_time || newTiming.average_time}
-                  readOnly
-                  className="bg-light"
-                />
-                <Form.Text className="text-muted">
-                  Calculado automáticamente
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Carril</Form.Label>
-                <Form.Control
-                  name="lane"
-                  value={editingTiming?.lane || newTiming.lane}
-                  onChange={handleTimingChange}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Fecha</Form.Label>
-                <Form.Control
-                  name="timing_date"
-                  type="date"
-                  value={editingTiming?.timing_date || newTiming.timing_date}
-                  onChange={handleTimingChange}
-                  required
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Circuito</Form.Label>
-                <Form.Control
-                  name="circuit"
-                  value={editingTiming?.circuit || newTiming.circuit}
-                  onChange={handleTimingChange}
-                  placeholder="Nombre del circuito"
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-          <div className="d-flex gap-2 mt-3">
-            <Button type="submit" variant="primary">
+        <form onSubmit={handleAddTiming}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="best_lap_time">Mejor Vuelta (mm:ss.ms)</Label>
+              <Input
+                id="best_lap_time"
+                name="best_lap_time"
+                value={editingTiming?.best_lap_time || newTiming.best_lap_time}
+                onChange={handleTimingChange}
+                placeholder="00:00.000"
+                pattern="\d{2}:\d{2}\.\d{3}"
+                title="Formato: mm:ss.ms (ejemplo: 01:23.456)"
+                required
+              />
+              <p className="text-xs text-muted-foreground">Formato: mm:ss.ms (ejemplo: 01:23.456)</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="total_time">Tiempo Total (mm:ss.ms)</Label>
+              <Input
+                id="total_time"
+                name="total_time"
+                value={editingTiming?.total_time || newTiming.total_time}
+                onChange={handleTimingChange}
+                placeholder="00:00.000"
+                pattern="\d{2}:\d{2}\.\d{3}"
+                title="Formato: mm:ss.ms (ejemplo: 01:23.456)"
+                required
+              />
+              <p className="text-xs text-muted-foreground">Formato: mm:ss.ms (ejemplo: 01:23.456)</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="laps">Vueltas</Label>
+              <Input
+                id="laps"
+                name="laps"
+                type="number"
+                value={editingTiming?.laps || newTiming.laps}
+                onChange={handleTimingChange}
+                required
+                min="1"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="average_time">Tiempo Promedio (mm:ss.ms)</Label>
+              <Input
+                id="average_time"
+                name="average_time"
+                value={editingTiming?.average_time || newTiming.average_time}
+                readOnly
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">Calculado automáticamente</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lane">Carril</Label>
+              <Input id="lane" name="lane" value={editingTiming?.lane || newTiming.lane} onChange={handleTimingChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="timing_date">Fecha</Label>
+              <Input
+                id="timing_date"
+                name="timing_date"
+                type="date"
+                value={editingTiming?.timing_date || newTiming.timing_date}
+                onChange={handleTimingChange}
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="circuit_id">Circuito</Label>
+              <Select
+                value={(editingTiming?.circuit_id || newTiming.circuit_id) || 'none'}
+                onValueChange={(v) => {
+                  const t = editingTiming || newTiming;
+                  const fn = editingTiming ? setEditingTiming : setNewTiming;
+                  fn({ ...t, circuit_id: v === 'none' ? '' : v });
+                }}
+              >
+                <SelectTrigger id="circuit_id">
+                  <SelectValue placeholder="Seleccionar circuito (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Ninguno</SelectItem>
+                  {circuits.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <Button type="submit">
               {editingTiming ? 'Actualizar' : 'Añadir'} Registro
             </Button>
             {editingTiming && (
@@ -1086,45 +969,47 @@ const EditVehicle = () => {
               </Button>
             )}
           </div>
-        </Form>
-        <div className="mt-4">
-          <h4>Registros de Tiempo</h4>
+        </form>
+        <div className="mt-6">
+          <h4 className="text-lg font-semibold mb-4">Registros de Tiempo</h4>
           {loadingTimings ? (
-            <Spinner animation="border" />
+            <Spinner className="size-6" />
           ) : (
             <>
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Mejor Vuelta</th>
-                      <th>Tiempo Total</th>
-                      <th>Vueltas</th>
-                      <th>Tiempo Promedio</th>
-                      <th>Carril</th>
-                      <th>Circuito</th>
-                      <th className="text-center">Configuración</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Mejor Vuelta</TableHead>
+                      <TableHead>Tiempo Total</TableHead>
+                      <TableHead>Vueltas</TableHead>
+                      <TableHead>Tiempo Promedio</TableHead>
+                      <TableHead>Carril</TableHead>
+                      <TableHead>Circuito</TableHead>
+                      <TableHead className="text-center">Configuración</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {timings.length === 0 && (
-                      <tr><td colSpan="8" className="text-center">No hay registros de tiempo</td></tr>
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-muted-foreground">No hay registros de tiempo</TableCell>
+                      </TableRow>
                     )}
                     {timings.map((timing) => (
-                      <tr key={timing.id}>
-                        <td>{new Date(timing.timing_date).toLocaleDateString()}</td>
-                        <td className="font-monospace">{timing.best_lap_time}</td>
-                        <td className="font-monospace">{timing.total_time}</td>
-                        <td>{timing.laps}</td>
-                        <td className="font-monospace">{timing.average_time}</td>
-                        <td>{timing.lane || '-'}</td>
-                        <td>{timing.circuit || '-'}</td>
-                        <td className="text-center">
+                      <TableRow key={timing.id}>
+                        <TableCell>{new Date(timing.timing_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-mono">{timing.best_lap_time}</TableCell>
+                        <TableCell className="font-mono">{timing.total_time}</TableCell>
+                        <TableCell>{timing.laps}</TableCell>
+                        <TableCell className="font-mono">{timing.average_time}</TableCell>
+                        <TableCell>{timing.lane || '-'}</TableCell>
+                        <TableCell>{timing.circuit || '-'}</TableCell>
+                        <TableCell className="text-center">
                           {timing.setup_snapshot ? (
                             <Button
-                              variant="outline-primary"
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 setSelectedTiming(timing);
@@ -1132,58 +1017,48 @@ const EditVehicle = () => {
                               }}
                               title="Ver especificaciones técnicas"
                             >
-                              🔧 Ver Config
+                              <Wrench className="size-4 mr-1" />
+                              Ver Config
                             </Button>
                           ) : (
-                            <span className="text-muted small">Sin config</span>
+                            <span className="text-muted-foreground text-sm">Sin config</span>
                           )}
-                        </td>
-                        <td>
-                          <div className="d-flex gap-1">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleEditTiming(timing)}
-                              title="Editar"
-                            >
-                              ✏️
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="default" size="sm" onClick={() => handleEditTiming(timing)} title="Editar">
+                              <Pencil className="size-4" />
                             </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleDeleteTiming(timing.id)}
-                              title="Eliminar"
-                            >
-                              🗑️
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTiming(timing.id)} title="Eliminar">
+                              <Trash2 className="size-4" />
                             </Button>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
 
-              {/* Gráficas de evolución de tiempos */}
               {timings.length > 0 && (
-                <div className="mt-5">
-                  <h4>Evolución de Tiempos por Circuito y Carril</h4>
-                  <p className="text-muted mb-4">
+                <div className="mt-8">
+                  <h4 className="text-lg font-semibold mb-4">Evolución de Tiempos por Circuito y Carril</h4>
+                  <p className="text-muted-foreground mb-4">
                     Se muestran gráficas de evolución para circuitos y carriles con múltiples registros de tiempo.
                   </p>
-                  
+
                   {(() => {
                     const groupedTimings = getTimingsByCircuitAndLane();
                     if (groupedTimings.length === 0) {
                       return (
-                        <div className="text-center text-muted py-4">
+                        <div className="text-center text-muted-foreground py-8">
                           <p>No hay suficientes registros de tiempo para mostrar evolución.</p>
-                          <p className="small">Se necesitan al menos 2 registros del mismo circuito y carril.</p>
+                          <p className="text-sm mt-1">Se necesitan al menos 2 registros del mismo circuito y carril.</p>
                         </div>
                       );
                     }
-                    
-                    return groupedTimings.map((group, index) => (
+
+                    return groupedTimings.map((group) => (
                       <TimingEvolutionChart
                         key={`${group.circuit}-${group.lane}-${group.laps}`}
                         timings={group.timings}
@@ -1202,165 +1077,185 @@ const EditVehicle = () => {
     );
   };
 
-  if (loading || !vehicle) return <Spinner animation="border" />;
-  if (error) return <Alert variant="danger">{error}</Alert>;
+  if (loading || !vehicle) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh]">
+        <Spinner className="size-8" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mt-4">
+        <Alert variant="destructive">{error}</Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2>Editar Vehículo{vehicle.model ? `: ${vehicle.model}` : ''}</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Editar Vehículo{vehicle.model ? `: ${vehicle.model}` : ''}</h2>
         <Button variant="secondary" onClick={() => navigate('/vehicles')}>
           Volver al listado
         </Button>
       </div>
-      <Tab.Container activeKey={activeTab} onSelect={setActiveTab}>
-        <Nav variant="tabs" className="mb-4">
-          <Nav.Item>
-            <Nav.Link eventKey="general">Información General</Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="technical">Especificaciones Técnicas</Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="modifications">Modificaciones</Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="timings">Tabla de Tiempos</Nav.Link>
-          </Nav.Item>
-        </Nav>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4 grid w-full grid-cols-2 lg:grid-cols-4">
+          <TabsTrigger value="general">Información General</TabsTrigger>
+          <TabsTrigger value="technical">Especificaciones Técnicas</TabsTrigger>
+          <TabsTrigger value="modifications">Modificaciones</TabsTrigger>
+          <TabsTrigger value="timings">Tabla de Tiempos</TabsTrigger>
+        </TabsList>
 
-        <Tab.Content>
-          <Tab.Pane eventKey="general">
-            <Form onSubmit={handleSubmit}>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Modelo</Form.Label>
-                    <Form.Control name="model" value={vehicle.model || ''} onChange={handleChange} required />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Referencia</Form.Label>
-                    <Form.Control name="reference" value={vehicle.reference || ''} onChange={handleChange} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Fabricante</Form.Label>
-                    <Form.Control name="manufacturer" value={vehicle.manufacturer || ''} onChange={handleChange} required />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Tipo</Form.Label>
-                    <Form.Select name="type" value={vehicle.type || ''} onChange={handleChange} required>
-                      <option value="">Selecciona tipo</option>
-                      <option>Rally</option>
-                      <option>GT</option>
-                      <option>LMP</option>
-                      <option>Clásico</option>
-                      <option>DTM</option>
-                      <option>F1</option>
-                      <option>Camiones</option>
-                      <option>Raid</option>
-                    </Form.Select>
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Tracción</Form.Label>
-                    <Form.Control name="traction" value={vehicle.traction || ''} onChange={handleChange} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Precio original (€)</Form.Label>
-                    <Form.Control name="price" type="number" step="0.01" value={vehicle.price || ''} onChange={handleChange} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Fecha de compra</Form.Label>
-                    <Form.Control name="purchase_date" type="date" value={vehicle.purchase_date ? vehicle.purchase_date.substring(0, 10) : ''} onChange={handleChange} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Lugar de compra</Form.Label>
-                    <Form.Control name="purchase_place" value={vehicle.purchase_place || ''} onChange={handleChange} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Check name="modified" label="Modificado" checked={!!vehicle.modified} onChange={handleChange} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Check name="digital" label="Digital" checked={!!vehicle.digital} onChange={handleChange} />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <h5>Fotografías</h5>
-                  <Row>
-                    {imageFields.map(({ name, label }) => (
-                      <Col xs={6} md={6} className="mb-3" key={name}>
-                        <Form.Label>{label} Imagen</Form.Label>
-                        <div className="border rounded d-flex flex-column align-items-center justify-content-center p-2 position-relative" 
-                             style={{ minHeight: 120, borderStyle: 'dashed', cursor: 'pointer', background: '#fff8f8' }} 
-                             onClick={(e) => {
-                               if (!previews[name] && !images[name]) {
-                                 document.getElementById(`img-${name}`).click();
-                               }
-                             }}>
-                          {previews[name] || images[name] ? (
-                            <>
-                              <img 
-                                ref={el => imageRefs.current[name] = el}
-                                src={previews[name] || URL.createObjectURL(images[name])} 
-                                alt={label} 
-                                style={{ maxWidth: '100%', maxHeight: 90, objectFit: 'contain' }} 
-                                loading="lazy"
-                              />
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                className="position-absolute top-0 end-0 m-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteImage(name);
-                                }}
-                                disabled={deletingImage === name}
-                              >
-                                {deletingImage === name ? (
-                                  <Spinner animation="border" size="sm" />
-                                ) : (
-                                  '×'
-                                )}
-                              </Button>
-                            </>
-                          ) : (
-                            <span className="text-secondary">Imagen</span>
-                          )}
-                          <input
-                            id={`img-${name}`}
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={e => handleImageChange(e, name)}
-                          />
-                        </div>
-                      </Col>
-                    ))}
-                  </Row>
-                </Col>
-              </Row>
-              {error && <Alert variant="danger">{error}</Alert>}
-              <div className="d-flex justify-content-end gap-2 mt-4">
-                <Button variant="secondary" onClick={() => navigate('/vehicles')}>Cancelar</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Actualizar'}</Button>
+        <TabsContent value="general">
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="model">Modelo</Label>
+                  <Input id="model" name="model" value={vehicle.model || ''} onChange={handleChange} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reference">Referencia</Label>
+                  <Input id="reference" name="reference" value={vehicle.reference || ''} onChange={handleChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="manufacturer">Fabricante</Label>
+                  <Input id="manufacturer" name="manufacturer" value={vehicle.manufacturer || ''} onChange={handleChange} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="type">Tipo</Label>
+                  <Select value={vehicle.type || 'none'} onValueChange={(v) => handleChange({ target: { name: 'type', value: v === 'none' ? '' : v, type: 'select', checked: false } })} required>
+                    <SelectTrigger id="type">
+                      <SelectValue placeholder="Selecciona tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecciona tipo</SelectItem>
+                      {vehicleTypes.map(t => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="traction">Tracción</Label>
+                  <Input id="traction" name="traction" value={vehicle.traction || ''} onChange={handleChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price">Precio original (€)</Label>
+                  <Input id="price" name="price" type="number" step="0.01" value={vehicle.price || ''} onChange={handleChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="purchase_date">Fecha de compra</Label>
+                  <Input id="purchase_date" name="purchase_date" type="date" value={vehicle.purchase_date ? vehicle.purchase_date.substring(0, 10) : ''} onChange={handleChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="purchase_place">Lugar de compra</Label>
+                  <Input id="purchase_place" name="purchase_place" value={vehicle.purchase_place || ''} onChange={handleChange} />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="modified" checked={!!vehicle.modified} onCheckedChange={(checked) => handleChange({ target: { name: 'modified', type: 'checkbox', checked } })} />
+                  <Label htmlFor="modified">Modificado</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="digital" checked={!!vehicle.digital} onCheckedChange={(checked) => handleChange({ target: { name: 'digital', type: 'checkbox', checked } })} />
+                  <Label htmlFor="digital">Digital</Label>
+                </div>
               </div>
-            </Form>
-          </Tab.Pane>
-          
-          <Tab.Pane eventKey="technical">
-            {renderSpecsForm(false)}
-          </Tab.Pane>
-          
-          <Tab.Pane eventKey="modifications">
-            {renderSpecsForm(true)}
-          </Tab.Pane>
-          
-          <Tab.Pane eventKey="timings">
-            {renderTimingsForm()}
-          </Tab.Pane>
-        </Tab.Content>
-      </Tab.Container>
+              <div>
+                <h5 className="text-lg font-semibold mb-4">Fotografías</h5>
+                <div className="grid grid-cols-2 gap-4">
+                  {imageFields.map(({ name, label }) => (
+                    <div key={name} className="space-y-2">
+                      <Label>{label} Imagen</Label>
+                      <div
+                        className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 relative min-h-[120px] cursor-pointer bg-muted/30 hover:bg-muted/50 transition-colors"
+                        onClick={(e) => {
+                          if (!previews[name] && !images[name]) {
+                            document.getElementById(`img-${name}`).click();
+                          }
+                        }}
+                      >
+                        {previews[name] || images[name] ? (
+                          <>
+                            <img
+                              ref={el => imageRefs.current[name] = el}
+                              src={previews[name] || URL.createObjectURL(images[name])}
+                              alt={label}
+                              className="max-w-full max-h-[90px] object-contain"
+                              loading="lazy"
+                            />
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-1 right-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteImage(name);
+                              }}
+                              disabled={deletingImage === name}
+                            >
+                              {deletingImage === name ? (
+                                <Spinner className="size-4" />
+                              ) : (
+                                '×'
+                              )}
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Imagen</span>
+                        )}
+                        <input
+                          id={`img-${name}`}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={e => handleImageChange(e, name)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {error && (
+              <Alert variant="destructive" className="mt-4">
+                {error}
+              </Alert>
+            )}
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="secondary" type="button" onClick={() => navigate('/vehicles')}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Spinner className="size-4 mr-2" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Actualizar'
+                )}
+              </Button>
+            </div>
+          </form>
+        </TabsContent>
 
-      {/* Modal de especificaciones técnicas */}
+        <TabsContent value="technical">
+          {renderSpecsForm(false)}
+        </TabsContent>
+
+        <TabsContent value="modifications">
+          {renderSpecsForm(true)}
+        </TabsContent>
+
+        <TabsContent value="timings">
+          {renderTimingsForm()}
+        </TabsContent>
+      </Tabs>
+
       <TimingSpecsModal
         show={showSpecsModal}
         onHide={() => setShowSpecsModal(false)}
@@ -1371,4 +1266,4 @@ const EditVehicle = () => {
   );
 };
 
-export default EditVehicle; 
+export default EditVehicle;

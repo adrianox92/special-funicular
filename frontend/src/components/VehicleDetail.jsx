@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Form, Button, Alert, Row, Col, Spinner } from 'react-bootstrap';
 import axios from 'axios';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Alert, AlertDescription } from './ui/alert';
+import { Spinner } from './ui/spinner';
+import { Switch } from './ui/switch';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -44,10 +49,7 @@ const VehicleDetail = () => {
   }, [id]);
 
   const handleDeleteImage = async (viewType) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
-      return;
-    }
-
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta imagen?')) return;
     setDeletingImage(viewType);
     try {
       await axios.delete(`http://localhost:5001/api/vehicles/${id}/images/${viewType}`);
@@ -59,9 +61,7 @@ const VehicleDetail = () => {
       const imgRes = await axios.get(`http://localhost:5001/api/vehicles/${id}/images`);
       const imgs = imgRes.data || [];
       const imagesObj = {};
-      imgs.forEach(img => {
-        imagesObj[img.view_type] = img.image_url;
-      });
+      imgs.forEach(img => { imagesObj[img.view_type] = img.image_url; });
       setImages(imagesObj);
     } catch (err) {
       setError('Error al eliminar la imagen');
@@ -70,110 +70,80 @@ const VehicleDetail = () => {
     }
   };
 
-  if (loading) return <Spinner animation="border" />;
-  if (error) return <Alert variant="danger">{error}</Alert>;
+  if (loading) return <div className="flex justify-center py-12"><Spinner className="size-8" /></div>;
+  if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;
   if (!vehicle) return null;
 
   return (
-    <div className="mt-4">
-      <h2>Detalle Vehículo</h2>
-      <Form>
-        <Row>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Modelo</Form.Label>
-              <Form.Control name="model" value={vehicle.model || ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Referencia</Form.Label>
-              <Form.Control name="reference" value={vehicle.reference || ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Fabricante</Form.Label>
-              <Form.Control name="manufacturer" value={vehicle.manufacturer || ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Tipo</Form.Label>
-              <Form.Select name="type" value={vehicle.type || ''} disabled readOnly>
-                <option value="">Selecciona tipo</option>
-                <option>Rally</option>
-                <option>GT</option>
-                <option>LMP</option>
-                <option>Clásico</option>
-                <option>DTM</option>
-                <option>F1</option>
-                <option>Camiones</option>
-                <option>Raid</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Tracción</Form.Label>
-              <Form.Control name="traction" value={vehicle.traction || ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Precio original (€)</Form.Label>
-              <Form.Control name="price" type="number" step="0.01" value={vehicle.price || ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Precio actual (€)</Form.Label>
-              <Form.Control name="total_price" type="number" step="0.01" value={vehicle.total_price || ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Fecha de compra</Form.Label>
-              <Form.Control name="purchase_date" type="date" value={vehicle.purchase_date ? vehicle.purchase_date.substring(0, 10) : ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Lugar de compra</Form.Label>
-              <Form.Control name="purchase_place" value={vehicle.purchase_place || ''} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Check name="modified" label="Modificado" checked={!!vehicle.modified} disabled readOnly />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Check name="digital" label="Digital" checked={!!vehicle.digital} disabled readOnly />
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <h5>Fotografías</h5>
-            <Row>
+    <div className="space-y-6 mt-6">
+      <h2 className="text-2xl font-bold">Detalle Vehículo</h2>
+      <form className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            {[
+              { name: 'model', label: 'Modelo', value: vehicle.model },
+              { name: 'reference', label: 'Referencia', value: vehicle.reference },
+              { name: 'manufacturer', label: 'Fabricante', value: vehicle.manufacturer },
+              { name: 'traction', label: 'Tracción', value: vehicle.traction },
+              { name: 'price', label: 'Precio original (€)', type: 'number', value: vehicle.price },
+              { name: 'total_price', label: 'Precio actual (€)', type: 'number', value: vehicle.total_price },
+              { name: 'purchase_date', label: 'Fecha de compra', type: 'date', value: vehicle.purchase_date?.substring(0, 10) },
+              { name: 'purchase_place', label: 'Lugar de compra', value: vehicle.purchase_place },
+            ].map(({ name, label, type, value }) => (
+              <div key={name} className="space-y-2">
+                <Label>{label}</Label>
+                <Input name={name} type={type || 'text'} value={value || ''} disabled readOnly />
+              </div>
+            ))}
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Input value={vehicle.type || ''} disabled readOnly />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={!!vehicle.modified} disabled />
+              <Label>Modificado</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={!!vehicle.digital} disabled />
+              <Label>Digital</Label>
+            </div>
+          </div>
+          <div>
+            <h5 className="font-semibold mb-4">Fotografías</h5>
+            <div className="grid grid-cols-2 gap-4">
               {imageFields.map(({ name, label }) => (
-                <Col xs={6} md={6} className="mb-3" key={name}>
-                  <Form.Label>{label} Imagen</Form.Label>
-                  <div className="border rounded d-flex flex-column align-items-center justify-content-center p-2 position-relative" 
-                       style={{ minHeight: 120, borderStyle: 'dashed', background: '#fff8f8' }}>
+                <div key={name} className="space-y-2">
+                  <Label>{label} Imagen</Label>
+                  <div className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 relative min-h-[120px] bg-muted/30">
                     {images[name] ? (
                       <>
-                        <img src={images[name]} alt={label} style={{ maxWidth: '100%', maxHeight: 90, objectFit: 'contain' }} />
+                        <img src={images[name]} alt={label} className="max-w-full max-h-[90px] object-contain" />
                         <Button
-                          variant="danger"
-                          size="sm"
-                          className="position-absolute top-0 end-0 m-1"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
                           onClick={() => handleDeleteImage(name)}
                           disabled={deletingImage === name}
                         >
-                          {deletingImage === name ? (
-                            <Spinner animation="border" size="sm" />
-                          ) : (
-                            '×'
-                          )}
+                          {deletingImage === name ? <Spinner className="size-4" /> : '×'}
                         </Button>
                       </>
                     ) : (
-                      <span className="text-secondary">Imagen</span>
+                      <span className="text-muted-foreground">Sin imagen</span>
                     )}
                   </div>
-                </Col>
+                </div>
               ))}
-            </Row>
-          </Col>
-        </Row>
-        <div className="d-flex justify-content-end gap-2 mt-4">
-          <Button variant="secondary" onClick={() => navigate('/vehicles')}>Volver al listado</Button>
-          <Button as={Link} to={`/edit/${id}`} variant="primary">Editar</Button>
+            </div>
+          </div>
         </div>
-      </Form>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => navigate('/vehicles')}>Volver al listado</Button>
+          <Button asChild><Link to={`/edit/${id}`}>Editar</Link></Button>
+        </div>
+      </form>
     </div>
   );
 };
 
-export default VehicleDetail; 
+export default VehicleDetail;

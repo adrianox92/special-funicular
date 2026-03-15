@@ -8,29 +8,19 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
-import { Card } from 'react-bootstrap';
+import { Card, CardContent, CardHeader } from '../ui/card';
 
 const COLORS = {
   bar: '#f28e2c'
 };
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="custom-tooltip" style={{
-        backgroundColor: 'white',
-        padding: '10px',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
-        <p className="mb-1" style={{ color: payload[0].color }}>
-          <strong>{data.name}</strong>
-        </p>
-        <p className="mb-0">
-          {data.value} vehículos ({data.percentage}%)
-        </p>
+      <div className="rounded-md border bg-popover p-3 shadow-md">
+        <p className="font-semibold mb-1">{data.name}</p>
+        <p className="text-sm mb-0">{data.value} vehículos ({data.percentage}%)</p>
       </div>
     );
   }
@@ -40,13 +30,13 @@ const CustomTooltip = ({ active, payload, label }) => {
 const StoreDistributionChart = ({ data }) => {
   if (!Array.isArray(data) || data.length === 0) {
     return (
-      <Card className="h-100 shadow-sm">
-        <Card.Body>
-          <Card.Title className="mb-4">Distribución por Tienda</Card.Title>
-          <div className="text-center text-muted">
+      <Card className="h-full">
+        <CardHeader><h5 className="font-semibold">Distribución por Tienda</h5></CardHeader>
+        <CardContent>
+          <div className="text-center text-muted-foreground py-8">
             No hay datos disponibles para mostrar la distribución de tiendas
           </div>
-        </Card.Body>
+        </CardContent>
       </Card>
     );
   }
@@ -66,9 +56,9 @@ const StoreDistributionChart = ({ data }) => {
   };
 
   return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <Card.Title className="mb-4">Distribución por Tienda</Card.Title>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Distribución por Tienda</h5></CardHeader>
+      <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
             <BarChart
@@ -102,7 +92,7 @@ const StoreDistributionChart = ({ data }) => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

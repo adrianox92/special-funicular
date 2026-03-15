@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaCheckCircle, FaClock, FaPause, FaListOl } from 'react-icons/fa';
+import { CheckCircle, Clock, Pause, ListOrdered } from 'lucide-react';
 
 const RoundProgressGrid = ({ competition, participants }) => {
   const formatTime = (timestamp) => {
@@ -27,12 +27,12 @@ const RoundProgressGrid = ({ competition, participants }) => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
-        return <FaCheckCircle />;
+        return <CheckCircle />;
       case 'in-progress':
-        return <FaClock />;
+        return <Clock />;
       case 'pending':
       default:
-        return <FaPause />;
+        return <Pause />;
     }
   };
 
@@ -51,7 +51,7 @@ const RoundProgressGrid = ({ competition, participants }) => {
   return (
     <div className="round-progress-grid">
       <h2 className="grid-title">
-        <FaListOl className="grid-icon" />
+        <ListOrdered className="grid-icon" />
         Progreso por Rondas
       </h2>
       
@@ -100,15 +100,15 @@ const RoundProgressGrid = ({ competition, participants }) => {
       
       <div className="grid-legend">
         <div className="legend-item">
-          <FaCheckCircle className="legend-icon" />
+          <CheckCircle className="legend-icon" />
           <span className="legend-text">Completada</span>
         </div>
         <div className="legend-item">
-          <FaClock className="legend-icon" />
+          <Clock className="legend-icon" />
           <span className="legend-text">En progreso</span>
         </div>
         <div className="legend-item">
-          <FaPause className="legend-icon" />
+          <Pause className="legend-icon" />
           <span className="legend-text">Pendiente</span>
         </div>
       </div>

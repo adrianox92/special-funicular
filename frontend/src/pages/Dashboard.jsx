@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Alert, Card, Button } from 'react-bootstrap';
-import { 
-  FaTruck, 
-  FaTools, 
-  FaEuroSign, 
-  FaChartLine,
-  FaTrophy,
-  FaClock,
-  FaCar,
-  FaCog,
-  FaPlus,
-  FaList
-} from 'react-icons/fa';
+import {
+  Truck,
+  Wrench,
+  Euro,
+  TrendingUp,
+  Trophy,
+  Clock,
+  Car,
+  Settings,
+  Plus,
+} from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import VehiclesByTypeChart from '../components/charts/VehiclesByTypeChart';
 import ModificationPieChart from '../components/charts/ModificationPieChart';
@@ -24,6 +22,10 @@ import InvestmentTimelineChart from '../components/charts/InvestmentTimelineChar
 import InsightsCarousel from '../components/InsightsCarousel';
 import LaneComparisonChart from '../components/LaneComparisonChart';
 import api from '../lib/axios';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader } from '../components/ui/card';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Spinner } from '../components/ui/spinner';
 
 const Dashboard = () => {
   const [metrics, setMetrics] = useState({
@@ -63,325 +65,120 @@ const Dashboard = () => {
         ]);
         setMetrics(metricsResponse.data);
         setChartsData(chartsResponse.data);
-        setLoading(false);
       } catch (err) {
         console.error('Error al cargar datos del dashboard:', err);
         setError('Error al cargar los datos del dashboard');
+      } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
-  if (loading) {
-    return (
-      <Container className="py-4">
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Cargando...</span>
-          </div>
-        </div>
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container className="py-4">
-        <div className="alert alert-danger" role="alert">
-          {error}
-        </div>
-      </Container>
-    );
-  }
-
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value);
-  };
-
-  const formatPercentage = (value) => {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'percent',
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1
-    }).format(value / 100);
-  };
-
-  const formatIncrementSubtitle = (vehicle) => {
-    if (!vehicle?.model || !vehicle?.manufacturer) return 'N/A';
-    return `${vehicle.manufacturer} ${vehicle.model}`;
-  };
-
+  const formatCurrency = (value) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value);
+  const formatPercentage = (value) => new Intl.NumberFormat('es-ES', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value / 100);
+  const formatIncrementSubtitle = (vehicle) => (!vehicle?.model || !vehicle?.manufacturer) ? 'N/A' : `${vehicle.manufacturer} ${vehicle.model}`;
   const formatTime = (timeStr) => {
     if (!timeStr) return 'N/A';
-    
-    // Si ya está en formato mm:ss.ms, devolverlo tal cual
-    if (typeof timeStr === 'string' && timeStr.match(/^\d{2}:\d{2}\.\d{3}$/)) {
-      return timeStr;
-    }
-    
-    // Si es un número (segundos), convertirlo a formato mm:ss.ms
+    if (typeof timeStr === 'string' && timeStr.match(/^\d{2}:\d{2}\.\d{3}$/)) return timeStr;
     const seconds = Number(timeStr);
     if (!isNaN(seconds)) {
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = (seconds % 60).toFixed(3);
       return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
     }
-    
     return 'N/A';
   };
+  const formatBestTimeSubtitle = (vehicle) => (!vehicle?.model || !vehicle?.manufacturer) ? 'N/A' : `${vehicle.manufacturer} ${vehicle.model}`;
 
-  const formatBestTimeSubtitle = (vehicle) => {
-    if (!vehicle?.model || !vehicle?.manufacturer) return 'N/A';
-    return `${vehicle.manufacturer} ${vehicle.model}`;
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Spinner className="size-8" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
-    <Container fluid className="py-4">
-      <h1 className="mb-2">Dashboard</h1>
-      
-      {error && (
-        <Alert variant="danger" className="mb-4">
-          {error}
-        </Alert>
-      )}
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Dashboard</h1>
 
-      {loading ? (
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Cargando...</span>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Carrusel de Insights de IA */}
-          <Row className="mb-4">
-            <Col xs={12}>
-              <InsightsCarousel />
-            </Col>
-          </Row>
+      <InsightsCarousel />
 
-          {/* Bloque de Acciones Rápidas */}
-          <Row className="mb-4">
-            <Col xs={12} lg={6}>
-              <Card className="action-card">
-                <Card.Header className="action-card-header">
-                  <h6 className="mb-0">
-                    <FaTrophy className="me-2" />
-                    Acciones Rápidas
-                  </h6>
-                </Card.Header>
-                <Card.Body>
-                  <div className="d-grid gap-3">
-                    <Button 
-                      variant="primary" 
-                      size="lg"
-                      className="action-button"
-                      onClick={() => window.location.href = '/competitions'}
-                    >
-                      <FaPlus className="me-2" />
-                      Crear Nueva Competición
-                    </Button>
-                    <Button 
-                      variant="outline-primary" 
-                      size="lg"
-                      className="action-button"
-                      onClick={() => window.location.href = '/vehicles'}
-                    >
-                      <FaCar className="me-2" />
-                      Gestionar Vehículos
-                    </Button>
-                    <Button 
-                      variant="outline-primary" 
-                      size="lg"
-                      className="action-button"
-                      onClick={() => window.location.href = '/timings'}
-                    >
-                      <FaClock className="me-2" />
-                      Ver Tiempos
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <h5 className="font-semibold flex items-center gap-2">
+              <Trophy className="size-4" />
+              Acciones Rápidas
+            </h5>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button className="w-full" size="lg" onClick={() => window.location.href = '/competitions'}>
+              <Plus className="size-4 mr-2" />
+              Crear Nueva Competición
+            </Button>
+            <Button variant="outline" className="w-full" size="lg" onClick={() => window.location.href = '/vehicles'}>
+              <Car className="size-4 mr-2" />
+              Gestionar Vehículos
+            </Button>
+            <Button variant="outline" className="w-full" size="lg" onClick={() => window.location.href = '/timings'}>
+              <Clock className="size-4 mr-2" />
+              Ver Tiempos
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Métricas Principales */}
-          <Row className="mb-4">
-            <Col xs={12} sm={6} lg={3} className="mb-3">
-              <MetricCard
-                title="Total Vehículos"
-                value={metrics.totalVehicles}
-                icon={<FaTruck />}
-                valueColor="primary"
-                trend={metrics.trends?.totalVehicles?.trend || 'stable'}
-                trendValue={metrics.trends?.totalVehicles?.value || 'Sin datos'}
-              />
-            </Col>
-            <Col xs={12} sm={6} lg={3} className="mb-3">
-              <MetricCard
-                title="Vehículos Modificados"
-                value={metrics.modifiedVehicles}
-                subtitle={`${((metrics.modifiedVehicles / metrics.totalVehicles) * 100).toFixed(1)}% del total`}
-                icon={<FaTools />}
-                valueColor="success"
-                trend={metrics.trends?.modifiedVehicles?.trend || 'stable'}
-                trendValue={metrics.trends?.modifiedVehicles?.value || 'Sin datos'}
-              />
-            </Col>
-            <Col xs={12} sm={6} lg={3} className="mb-3">
-              <MetricCard
-                title="Vehículos sin modificar"
-                value={metrics.stockVehicles}
-                subtitle={`${((metrics.stockVehicles / metrics.totalVehicles) * 100).toFixed(1)}% del total`}
-                icon={<FaCar />}
-                valueColor="info"
-                trend={metrics.trends?.stockVehicles?.trend || 'stable'}
-                trendValue={metrics.trends?.stockVehicles?.value || 'Sin datos'}
-              />
-            </Col>
-            <Col xs={12} sm={6} lg={3} className="mb-3">
-              <MetricCard
-                title="Inversión Total"
-                value={formatCurrency(metrics.totalInvestment)}
-                subtitle={`Promedio: ${formatCurrency(metrics.averageInvestmentPerVehicle)}`}
-                icon={<FaEuroSign />}
-                valueColor="warning"
-                trend={metrics.trends?.totalInvestment?.trend || 'stable'}
-                trendValue={metrics.trends?.totalInvestment?.value || 'Sin datos'}
-              />
-            </Col>
-          </Row>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard title="Total Vehículos" value={metrics.totalVehicles} icon={<Truck />} valueColor="primary" trend={metrics.trends?.totalVehicles?.trend || 'stable'} trendValue={metrics.trends?.totalVehicles?.value || 'Sin datos'} />
+        <MetricCard title="Vehículos Modificados" value={metrics.modifiedVehicles} subtitle={`${metrics.totalVehicles ? ((metrics.modifiedVehicles / metrics.totalVehicles) * 100).toFixed(1) : 0}% del total`} icon={<Wrench />} valueColor="success" trend={metrics.trends?.modifiedVehicles?.trend || 'stable'} trendValue={metrics.trends?.modifiedVehicles?.value || 'Sin datos'} />
+        <MetricCard title="Vehículos sin modificar" value={metrics.stockVehicles} subtitle={`${metrics.totalVehicles ? ((metrics.stockVehicles / metrics.totalVehicles) * 100).toFixed(1) : 0}% del total`} icon={<Car />} valueColor="info" trend={metrics.trends?.stockVehicles?.trend || 'stable'} trendValue={metrics.trends?.stockVehicles?.value || 'Sin datos'} />
+        <MetricCard title="Inversión Total" value={formatCurrency(metrics.totalInvestment)} subtitle={`Promedio: ${formatCurrency(metrics.averageInvestmentPerVehicle)}`} icon={<Euro />} valueColor="warning" trend={metrics.trends?.totalInvestment?.trend || 'stable'} trendValue={metrics.trends?.totalInvestment?.value || 'Sin datos'} />
+      </div>
 
-          {/* Métricas Secundarias */}
-          <Row className="mb-4">
-            
-            <Col xs={12} sm={6} lg={3} className="mb-3">
-              <MetricCard
-                title="Incremento Promedio"
-                value={formatPercentage(metrics.averagePriceIncrement)}
-                subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)}
-                icon={<FaChartLine />}
-                valueColor="success"
-                trend={metrics.trends?.averagePriceIncrement?.trend || 'stable'}
-                trendValue={metrics.trends?.averagePriceIncrement?.value || 'Sin datos'}
-              />
-            </Col>
-            <Col xs={12} sm={6} lg={3} className="mb-3">
-              <MetricCard
-                title="Última Actualización"
-                value={metrics.lastUpdate ? new Date(metrics.lastUpdate).toLocaleDateString('es-ES') : 'N/A'}
-                subtitle="Base de datos"
-                icon={<FaCog />}
-                valueColor="secondary"
-                trend={metrics.trends?.lastUpdate?.trend || 'stable'}
-                trendValue={metrics.trends?.lastUpdate?.value || 'Sistema activo'}
-              />
-            </Col>
-            <Col xs={12} sm={6} lg={3} className="mb-3">
-              <MetricCard
-                title="Competiciones Activas"
-                value={metrics.activeCompetitions || 0}
-                subtitle="En curso"
-                icon={<FaTrophy />}
-                valueColor="primary"
-                trend={metrics.trends?.activeCompetitions?.trend || 'stable'}
-                trendValue={metrics.trends?.activeCompetitions?.value || 'Sin datos'}
-              />
-            </Col>
-          </Row>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard title="Incremento Promedio" value={formatPercentage(metrics.averagePriceIncrement)} subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)} icon={<TrendingUp />} valueColor="success" trend={metrics.trends?.averagePriceIncrement?.trend || 'stable'} trendValue={metrics.trends?.averagePriceIncrement?.value || 'Sin datos'} />
+        <MetricCard title="Última Actualización" value={metrics.lastUpdate ? new Date(metrics.lastUpdate).toLocaleDateString('es-ES') : 'N/A'} subtitle="Base de datos" icon={<Settings />} valueColor="secondary" trend={metrics.trends?.lastUpdate?.trend || 'stable'} trendValue={metrics.trends?.lastUpdate?.value || 'Sistema activo'} />
+        <MetricCard title="Competiciones Activas" value={metrics.activeCompetitions || 0} subtitle="En curso" icon={<Trophy />} valueColor="primary" trend={metrics.trends?.activeCompetitions?.trend || 'stable'} trendValue={metrics.trends?.activeCompetitions?.value || 'Sin datos'} />
+      </div>
 
-          <Row className="g-3 mb-4">
-            <Col xs={12} lg={6}>
-              <BrandDistributionChart data={chartsData.brandDistribution || []} />
-            </Col>
-            <Col xs={12} lg={6}>
-              <StoreDistributionChart data={chartsData.storeDistribution || []} />
-            </Col>
-          </Row>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BrandDistributionChart data={chartsData.brandDistribution || []} />
+        <StoreDistributionChart data={chartsData.storeDistribution || []} />
+      </div>
 
-          <Row className="g-3 mb-4">
-            <Col xs={12} lg={6}>
-              <VehiclesByTypeChart data={chartsData.vehiclesByType || []} />
-            </Col>
-            <Col xs={12} lg={6}>
-              <ModificationPieChart data={chartsData.modificationStats || { modified: 0, stock: 0 }} />
-            </Col>
-          </Row>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <VehiclesByTypeChart data={chartsData.vehiclesByType || []} />
+        <ModificationPieChart data={chartsData.modificationStats || { modified: 0, stock: 0 }} />
+      </div>
 
-          <h4 className="mb-3">Métricas de Rendimiento</h4>
-          <Row className="g-3 mb-4">
-            <Col xs={12} md={6}>
-              <MetricCard
-                title="Mayor Incremento"
-                value={metrics.highestIncrementVehicle?.price_increment || 0}
-                subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)}
-                icon={<FaTrophy />}
-                details={{
-                  'Ultima actualización': metrics.highestIncrementVehicle?.purchase_date,
-                  'Precio Base': metrics.highestIncrementVehicle?.price,
-                  'Precio Total': metrics.highestIncrementVehicle?.total_price
-                }}
-                formatValue={formatPercentage}
-                valueColor="warning"
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <MetricCard
-                title="Mejor Tiempo"
-                value={metrics.bestTimeVehicle?.best_lap_time}
-                subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)}
-                icon={<FaClock />}
-                details={{
-                  'Ultima actualización': metrics.bestTimeVehicle?.timing_date,
-                  'Circuito': metrics.bestTimeVehicle?.circuit,
-                  'Vueltas': metrics.bestTimeVehicle?.laps,
-                  'Carril': metrics.bestTimeVehicle?.lane
-                }}
-                formatValue={formatTime}
-                valueColor="success"
-                threshold={{ good: 10, warning: 12 }}
-              />
-            </Col>
-          </Row>
+      <h4 className="font-semibold">Métricas de Rendimiento</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <MetricCard title="Mayor Incremento" value={metrics.highestIncrementVehicle?.price_increment || 0} subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)} icon={<Trophy />} details={{ 'Ultima actualización': metrics.highestIncrementVehicle?.purchase_date, 'Precio Base': metrics.highestIncrementVehicle?.price, 'Precio Total': metrics.highestIncrementVehicle?.total_price }} formatValue={formatPercentage} valueColor="warning" />
+        <MetricCard title="Mejor Tiempo" value={metrics.bestTimeVehicle?.best_lap_time} subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)} icon={<Clock />} details={{ 'Ultima actualización': metrics.bestTimeVehicle?.timing_date, 'Circuito': metrics.bestTimeVehicle?.circuit, 'Vueltas': metrics.bestTimeVehicle?.laps, 'Carril': metrics.bestTimeVehicle?.lane }} formatValue={formatTime} valueColor="success" threshold={{ good: 10, warning: 12 }} />
+      </div>
 
-          <Row className="g-3 mb-4">
-            <Col xs={12} lg={6}>
-              <PerformanceByTypeChart data={metrics.performanceByType || {}} />
-            </Col>
-            <Col xs={12} lg={6}>
-              <InvestmentTimelineChart data={metrics.investmentHistory || []} />
-            </Col>
-          </Row>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PerformanceByTypeChart data={metrics.performanceByType || {}} />
+        <InvestmentTimelineChart data={metrics.investmentHistory || []} />
+      </div>
 
-          
+      <TopCostTable data={chartsData.topCostVehicles || []} />
+      <TopComponentsTable data={chartsData.topComponents || []} />
 
-          <Row className="g-3 mb-4">
-            <Col xs={12}>
-              <TopCostTable data={chartsData.topCostVehicles || []} />
-            </Col>
-          </Row>
-
-          <Row className="g-3">
-            <Col xs={12}>
-              <TopComponentsTable data={chartsData.topComponents || []} />
-            </Col>
-          </Row>
-          {/* Nueva Sección: Comparativa de Carriles */}
-          <h4 className="mb-3 mt-4">Análisis de Tiempos por Carril</h4>
-          <Row className="g-3 mb-4">
-            <Col xs={12}>
-              <LaneComparisonChart />
-            </Col>
-          </Row>
-        </>
-      )}
-    </Container>
+      <h4 className="font-semibold mt-8">Análisis de Tiempos por Carril</h4>
+      <LaneComparisonChart />
+    </div>
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

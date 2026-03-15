@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card } from 'react-bootstrap';
+import { Card, CardContent, CardHeader } from '../ui/card';
 import {
   LineChart,
   Line,
@@ -13,12 +13,12 @@ import {
 const InvestmentTimelineChart = ({ data }) => {
   if (!Array.isArray(data) || data.length === 0) {
     return (
-      <Card className="h-100">
-        <Card.Body>
-          <div className="text-center text-muted">
+      <Card className="h-full">
+        <CardContent className="py-8">
+          <div className="text-center text-muted-foreground">
             No hay datos suficientes para mostrar la evolución de la colección
           </div>
-        </Card.Body>
+        </CardContent>
       </Card>
     );
   }
@@ -38,19 +38,17 @@ const InvestmentTimelineChart = ({ data }) => {
     }).format(value);
   };
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="custom-tooltip p-2 bg-white border rounded shadow-sm">
-          <p className="mb-1 fw-bold">{formatDate(data.date)} - {formatDate(data.endDate)}</p>
-          <p className="mb-1">Valor total: {formatCurrency(data.value)}</p>
+        <div className="rounded-md border bg-popover p-3 shadow-md">
+          <p className="font-semibold mb-1">{formatDate(data.date)} - {formatDate(data.endDate)}</p>
+          <p className="mb-1 text-sm">Valor total: {formatCurrency(data.value)}</p>
           <div className="mt-2">
-            <p className="mb-1 fw-bold">Vehículos en este trimestre:</p>
+            <p className="font-semibold mb-1 text-sm">Vehículos en este trimestre:</p>
             {data.vehicles.map((vehicle, index) => (
-              <p key={index} className="mb-1 small">
-                {vehicle.manufacturer} {vehicle.model}: {formatCurrency(vehicle.price)}
-              </p>
+              <p key={index} className="mb-1 text-xs">{vehicle.manufacturer} {vehicle.model}: {formatCurrency(vehicle.price)}</p>
             ))}
           </div>
         </div>
@@ -60,9 +58,9 @@ const InvestmentTimelineChart = ({ data }) => {
   };
 
   return (
-    <Card className="h-100">
-      <Card.Body>
-        <h5 className="card-title mb-4">Evolución de la Colección</h5>
+    <Card className="h-full">
+      <CardHeader><h5 className="font-semibold">Evolución de la Colección</h5></CardHeader>
+      <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
             <LineChart
@@ -96,7 +94,7 @@ const InvestmentTimelineChart = ({ data }) => {
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };

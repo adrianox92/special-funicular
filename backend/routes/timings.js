@@ -35,7 +35,7 @@ router.use(authMiddleware);
 // Obtener todos los tiempos de todos los vehículos del usuario
 router.get('/', async (req, res) => {
   try {
-    const { circuit } = req.query;
+    const { circuit, circuit_id } = req.query;
     // Primero obtenemos todos los vehículos del usuario
     const { data: vehicles, error: vehiclesError } = await supabase
       .from('vehicles')
@@ -66,11 +66,14 @@ router.get('/', async (req, res) => {
         *,
         previous_position,
         position_change,
-        position_updated_at
+        position_updated_at,
+        circuits(id, name, num_lanes, lane_lengths)
       `)
       .in('vehicle_id', vehicleIds)
       .order('timing_date', { ascending: false });
-    if (circuit) {
+    if (circuit_id) {
+      timingsQuery = timingsQuery.eq('circuit_id', circuit_id);
+    } else if (circuit) {
       timingsQuery = timingsQuery.ilike('circuit', `%${circuit}%`);
     }
     const { data: timings, error: timingsError } = await timingsQuery;

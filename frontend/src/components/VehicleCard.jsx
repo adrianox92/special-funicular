@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Card, Badge, Button } from 'react-bootstrap';
+import { Card, CardContent } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
-import { FaDownload, FaTrash, FaCalendarAlt, FaMapMarkerAlt } from 'react-icons/fa';
+import { Download, Trash2, Calendar, MapPin } from 'lucide-react';
 import api from '../lib/axios';
 import placeholderImage from '../assets/images/placeholder.png';
-import './VehicleCard.css';
 
 const VehicleCard = ({ vehicle, onDelete }) => {
   const navigate = useNavigate();
@@ -12,38 +13,18 @@ const VehicleCard = ({ vehicle, onDelete }) => {
 
   useEffect(() => {
     if (imgRef.current) {
-      let timeoutId;
-      const resizeObserver = new ResizeObserver(entries => {
-        if (timeoutId) {
-          cancelAnimationFrame(timeoutId);
-        }
-        
-        timeoutId = requestAnimationFrame(() => {
-          if (!Array.isArray(entries) || !entries.length) {
-            return;
-          }
-        });
-      });
-
-      resizeObserver.observe(imgRef.current);
-      return () => {
-        if (timeoutId) {
-          cancelAnimationFrame(timeoutId);
-        }
-        resizeObserver.disconnect();
-      };
+      const ro = new ResizeObserver(() => {});
+      ro.observe(imgRef.current);
+      return () => ro.disconnect();
     }
   }, []);
 
   const handleDelete = async (e) => {
     e.stopPropagation();
-    
     if (window.confirm('¿Estás seguro de que quieres eliminar este vehículo? Esta acción no se puede deshacer.')) {
       try {
         await api.delete(`/vehicles/${vehicle.id}`);
-        if (onDelete) {
-          onDelete(vehicle.id);
-        }
+        if (onDelete) onDelete(vehicle.id);
       } catch (error) {
         console.error('Error al eliminar vehículo:', error);
         alert('Error al eliminar el vehículo');
@@ -54,13 +35,11 @@ const VehicleCard = ({ vehicle, onDelete }) => {
   const handleDownloadSpecs = async (e) => {
     e.stopPropagation();
     try {
-      const response = await api.get(`/vehicles/${vehicle.id}/specs-pdf`, {
-        responseType: 'blob'
-      });
+      const response = await api.get(`/vehicles/${vehicle.id}/specs-pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `ficha-tecnica-${vehicle.model.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+      link.download = `ficha-tecnica-${vehicle.model.toLowerCase().replace(/\s+/g, '-')}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -71,91 +50,61 @@ const VehicleCard = ({ vehicle, onDelete }) => {
   };
 
   return (
-    <Card
-      className="vehicle-card mb-4"
-      onClick={() => navigate(`/vehicles/${vehicle.id}`)}
-    >
+    <Card className="relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/vehicles/${vehicle.id}`)}>
       {vehicle.modified && (
-        <Badge bg="dark" className="position-absolute top-0 start-0 m-2">
-          Modificado
-        </Badge>
+        <Badge className="absolute top-2 left-2 z-10">Modificado</Badge>
       )}
-      
-      <div className="position-absolute top-0 end-0 m-2 d-flex gap-1">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleDownloadSpecs}
-          title="Descargar ficha técnica"
-        >
-          <FaDownload />
+      <div className="absolute top-2 right-2 z-10 flex gap-1">
+        <Button size="sm" onClick={handleDownloadSpecs} title="Descargar ficha técnica">
+          <Download className="size-4" />
         </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={handleDelete}
-          title="Eliminar vehículo"
-        >
-          <FaTrash />
+        <Button size="sm" variant="destructive" onClick={handleDelete} title="Eliminar vehículo">
+          <Trash2 className="size-4" />
         </Button>
       </div>
-      
-      <Card.Img
-        ref={imgRef}
-        variant="top"
-        src={vehicle.image || placeholderImage}
-        alt={vehicle.model}
-        loading="lazy"
-      />
-      
-      <Card.Body>
-        <Card.Title className="card-title">{vehicle.model}</Card.Title>
-        
-        <div className="manufacturer-info">
+      <div className="relative aspect-[4/3] bg-muted">
+        <img ref={imgRef} src={vehicle.image || placeholderImage} alt={vehicle.model} className="w-full h-full object-cover" loading="lazy" />
+      </div>
+      <CardContent className="p-4">
+        <h3 className="font-semibold text-lg">{vehicle.model}</h3>
+        <p className="text-sm text-muted-foreground">
           {vehicle.manufacturer}
-          {vehicle.reference && (
-            <span className="reference"> - {vehicle.reference}</span>
-          )}
+          {vehicle.reference && <span> - {vehicle.reference}</span>}
+        </p>
+        <div className="flex flex-wrap gap-1 mt-2">
+          <Badge variant="secondary">{vehicle.type}</Badge>
+          <Badge variant="secondary">{vehicle.traction}</Badge>
         </div>
-        
-        <div className="mb-3">
-          <Badge bg="secondary" className="me-2">{vehicle.type}</Badge>
-          <Badge bg="secondary">{vehicle.traction}</Badge>
-        </div>
-        
-        <div className="price-container">
+        <div className="mt-3 text-sm">
           {vehicle.total_price !== undefined && vehicle.total_price !== null && vehicle.total_price !== vehicle.price ? (
             <>
               {vehicle.price && (
                 <>
-                  <span className="original-price">€{Number(vehicle.price).toFixed(2)}</span>
-                  <span className="total-price">€{Number(vehicle.total_price).toFixed(2)}</span>
+                  <span className="line-through text-muted-foreground">€{Number(vehicle.price).toFixed(2)}</span>
+                  <span className="ml-2 font-medium">€{Number(vehicle.total_price).toFixed(2)}</span>
                   {vehicle.price > 0 && (
-                    <span className="price-increment">
-                      (+{((vehicle.total_price - vehicle.price) / vehicle.price * 100).toFixed(1)}%)
-                    </span>
+                    <span className="text-green-600 dark:text-green-400 ml-1">(+{((vehicle.total_price - vehicle.price) / vehicle.price * 100).toFixed(1)}%)</span>
                   )}
                 </>
               )}
             </>
           ) : (
-            vehicle.price && <span className="single-price">€{Number(vehicle.price).toFixed(2)}</span>
+            vehicle.price && <span className="font-medium">€{Number(vehicle.price).toFixed(2)}</span>
           )}
         </div>
-        
-        <div className="purchase-info">
-          <div className="purchase-date">
-            <FaCalendarAlt />
-            <span>{new Date(vehicle.purchase_date).toLocaleDateString()}</span>
+        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Calendar className="size-3" />
+            {new Date(vehicle.purchase_date).toLocaleDateString()}
           </div>
           {vehicle.purchase_place && (
-            <div className="purchase-place">
-              <FaMapMarkerAlt />
-              <span>{vehicle.purchase_place}</span>
+            <div className="flex items-center gap-1">
+              <MapPin className="size-3" />
+              {vehicle.purchase_place}
             </div>
           )}
         </div>
-      </Card.Body>
+      </CardContent>
     </Card>
   );
 };
