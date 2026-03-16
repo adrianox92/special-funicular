@@ -328,7 +328,8 @@ ORDER BY position_updated_at DESC;
 - **Elementos visuales**: Tarjetas flotantes con iconos representativos de las funcionalidades
 - **Sección de características**: Grid de 6 funcionalidades principales con iconos y descripciones
 - **Call-to-action**: Sección destacada para motivar el registro
-- **Footer informativo**: Enlaces útiles y información de la plataforma
+- **Selector de tema ligero**: Botón flotante en la esquina superior derecha para cambiar entre dark/light sin mostrar la navbar completa
+- **Footer unificado**: Se usa el componente global `Footer` para el pie de página también en la home pública
 - **Navegación intuitiva**: Botones que llevan directamente al login/registro
 - **Responsive design**: Adaptable a todos los tamaños de pantalla
 - **Efectos visuales**: Animaciones suaves y efectos hover elegantes
@@ -510,10 +511,11 @@ El sistema incluye **API keys por usuario** para conectar proyectos externos (po
 - La API key se usa enviando el header `X-API-Key` en las peticiones.
 - Puedes ver, copiar y regenerar tu API key en **Mi Perfil** (menú de usuario).
 
-### Endpoints de gestión de API keys (JWT)
+### Endpoints de gestión de API keys
 
-- `GET /api/api-keys/me` - Obtiene la API key del usuario. Si no existe, la crea automáticamente.
-- `POST /api/api-keys/regenerate` - Regenera la API key (la anterior deja de funcionar de inmediato).
+- `GET /api/api-keys/me` - Obtiene la API key del usuario (requiere JWT). Si no existe, la crea automáticamente.
+- `POST /api/api-keys/regenerate` - Regenera la API key (requiere JWT; la anterior deja de funcionar de inmediato).
+- `POST /api/auth/api-key` - **Público (CORS permisivo)**: Envía `{ email, password }` y devuelve la API key del usuario (la crea si no existe). Pensado para aplicaciones externas.
 
 ### Endpoints de sincronización (API key)
 

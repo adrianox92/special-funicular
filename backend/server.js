@@ -43,10 +43,10 @@ const corsSyncOptions = {
   optionsSuccessStatus: 204
 };
 
-// CORS: permisivo para /api/sync (protegido por API key), restrictivo para el resto
+// CORS: permisivo para /api/sync y /api/auth/api-key (protegido por credenciales/API key), restrictivo para el resto
 app.use((req, res, next) => {
-  const isSyncRoute = req.path.startsWith('/api/sync');
-  cors(isSyncRoute ? corsSyncOptions : corsOptions)(req, res, next);
+  const isPublicApiRoute = req.path.startsWith('/api/sync') || req.path === '/api/auth/api-key';
+  cors(isPublicApiRoute ? corsSyncOptions : corsOptions)(req, res, next);
 });
 
 // Middleware para logging de CORS (ayuda en debugging)

@@ -1,8 +1,17 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
+);
+
+function generateApiKey() {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 /**
  * @swagger
@@ -45,6 +54,75 @@ router.post('/login', async (req, res) => {
     access_token: data.session.access_token,
     user: data.user
   });
+});
+
+/**
+ * POST /api/auth/api-key
+ * Public endpoint: authenticate with email/password and return API key
+ * (creates one if not exists). CORS permisivo for external apps.
+ */
+router.post('/api-key', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Se requieren email y password' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) {
+      return res.status(401).json({ error: authError.message });
+    }
+
+    const userId = authData.user.id;
+
+    let { data: existing, error: fetchError } = await supabaseAdmin
+      .from('user_api_keys')
+      .select('api_key, created_at')
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error al obtener API key:', fetchError);
+      if (fetchError.code === '42P01') {
+        return res.status(503).json({
+          error: 'La tabla user_api_keys no existe. Ejecuta la migración: backend/scripts/add-api-keys.sql'
+        });
+      }
+      return res.status(500).json({ error: 'Error al obtener la API key' });
+    }
+
+    if (!existing) {
+      const apiKey = generateApiKey();
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from('user_api_keys')
+        .insert([{ user_id: userId, api_key: apiKey }])
+        .select('api_key, created_at')
+        .single();
+
+      if (insertError) {
+        console.error('Error al crear API key:', insertError);
+        if (insertError.code === '42P01') {
+          return res.status(503).json({
+            error: 'La tabla user_api_keys no existe. Ejecuta la migración: backend/scripts/add-api-keys.sql'
+          });
+        }
+        return res.status(500).json({ error: 'Error al crear la API key' });
+      }
+
+      return res.json({
+        api_key: inserted.api_key,
+        created_at: inserted.created_at,
+      });
+    }
+
+    res.json({
+      api_key: existing.api_key,
+      created_at: existing.created_at,
+    });
+  } catch (error) {
+    console.error('Error en POST /api/auth/api-key:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 module.exports = router; 

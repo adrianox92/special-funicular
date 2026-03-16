@@ -29,6 +29,7 @@ Authorization: Bearer <tu_jwt_token>
 ```
 
 **Respuesta:**
+
 ```json
 {
   "api_key": "sc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -38,14 +39,41 @@ Authorization: Bearer <tu_jwt_token>
 
 Si no tienes API key, se crea automáticamente en esta petición.
 
+### Opción C: Login con credenciales para obtener API Key
+
+Para aplicaciones externas que no tienen JWT, puedes obtener la API key enviando email y contraseña. Este endpoint es **público** (CORS permisivo) para permitir llamadas desde cualquier origen.
+
+```http
+POST /api/auth/api-key
+Content-Type: application/json
+
+{
+  "email": "tu@email.com",
+  "password": "tu_contraseña"
+}
+```
+
+**Respuesta 200:**
+
+```json
+{
+  "api_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "created_at": "2025-03-16T12:00:00.000Z"
+}
+```
+
+Si el usuario no tiene API key, se crea automáticamente. Errores: `400` (campos faltantes), `401` (credenciales inválidas).
+
 ---
 
 ## 2. Base URL
 
-| Entorno | URL base |
-|---------|----------|
-| Local | `http://localhost:5001` |
+
+| Entorno    | URL base                                                             |
+| ---------- | -------------------------------------------------------------------- |
+| Local      | `http://localhost:5001`                                              |
 | Producción | `https://tu-dominio.com` (o la URL donde esté desplegado tu backend) |
+
 
 ---
 
@@ -74,12 +102,15 @@ X-API-Key: <tu_api_key>
 
 **Query parameters:**
 
-| Parámetro | Tipo | Default | Descripción |
-|-----------|------|---------|-------------|
-| `page` | number | 1 | Número de página |
-| `limit` | number | 25 | Vehículos por página |
+
+| Parámetro | Tipo   | Default | Descripción          |
+| --------- | ------ | ------- | -------------------- |
+| `page`    | number | 1       | Número de página     |
+| `limit`   | number | 25      | Vehículos por página |
+
 
 **Respuesta 200:**
+
 ```json
 {
   "vehicles": [
@@ -102,6 +133,7 @@ X-API-Key: <tu_api_key>
 ```
 
 **Errores:**
+
 - `401` - No se proporcionó API key o es inválida
 - `500` - Error interno del servidor
 
@@ -117,6 +149,7 @@ X-API-Key: <tu_api_key>
 ```
 
 **Respuesta 200:**
+
 ```json
 {
   "circuits": [
@@ -132,6 +165,7 @@ X-API-Key: <tu_api_key>
 ```
 
 **Errores:**
+
 - `401` - No se proporcionó API key o es inválida
 - `500` - Error interno del servidor
 
@@ -161,21 +195,24 @@ Content-Type: application/json
 
 **Campos del body:**
 
-| Campo | Tipo | Requerido | Descripción |
-|-------|------|-----------|-------------|
-| `vehicle_id` | string (UUID) | ✅ | ID del vehículo (debe pertenecer al usuario) |
-| `best_lap_time` | string | ✅ | Mejor vuelta en formato `mm:ss.mmm` |
-| `total_time` | string | ✅ | Tiempo total en formato `mm:ss.mmm` |
-| `laps` | number | ✅ | Número de vueltas |
-| `average_time` | string | ✅ | Tiempo promedio por vuelta en formato `mm:ss.mmm` |
-| `lane` | string | ❌ | Número de carril (ej: "1", "2") |
-| `circuit` | string | ❌ | Nombre del circuito (si no existe, se crea automáticamente) |
-| `circuit_id` | string (UUID) | ❌ | ID del circuito (prioridad sobre `circuit` si ambos se envían) |
-| `timing_date` | string | ❌ | Fecha en formato `YYYY-MM-DD` (default: hoy) |
+
+| Campo           | Tipo          | Requerido | Descripción                                                    |
+| --------------- | ------------- | --------- | -------------------------------------------------------------- |
+| `vehicle_id`    | string (UUID) | ✅         | ID del vehículo (debe pertenecer al usuario)                   |
+| `best_lap_time` | string        | ✅         | Mejor vuelta en formato `mm:ss.mmm`                            |
+| `total_time`    | string        | ✅         | Tiempo total en formato `mm:ss.mmm`                            |
+| `laps`          | number        | ✅         | Número de vueltas                                              |
+| `average_time`  | string        | ✅         | Tiempo promedio por vuelta en formato `mm:ss.mmm`              |
+| `lane`          | string        | ❌         | Número de carril (ej: "1", "2")                                |
+| `circuit`       | string        | ❌         | Nombre del circuito (si no existe, se crea automáticamente)    |
+| `circuit_id`    | string (UUID) | ❌         | ID del circuito (prioridad sobre `circuit` si ambos se envían) |
+| `timing_date`   | string        | ❌         | Fecha en formato `YYYY-MM-DD` (default: hoy)                   |
+
 
 **Resolución de circuito:**
-- **`circuit_id`** (prioridad): Si se envía, el backend verifica que pertenezca al usuario. Si es válido, el timing se guarda con ese circuito.
-- **`circuit`** (nombre): Si se envía y no hay `circuit_id`, el backend busca un circuito con ese nombre para el usuario. Si existe, lo usa. Si no existe, lo crea automáticamente con `num_lanes=1` y `lane_lengths=[]`.
+
+- `**circuit_id`** (prioridad): Si se envía, el backend verifica que pertenezca al usuario. Si es válido, el timing se guarda con ese circuito.
+- `**circuit**` (nombre): Si se envía y no hay `circuit_id`, el backend busca un circuito con ese nombre para el usuario. Si existe, lo usa. Si no existe, lo crea automáticamente con `num_lanes=1` y `lane_lengths=[]`.
 - **Ambos**: `circuit_id` tiene prioridad; `circuit` se ignora para la resolución.
 - **Ninguno**: El timing se guarda sin circuito asociado.
 | `best_lap_timestamp` | number | ❌ | Mejor vuelta en segundos (float) |
@@ -188,6 +225,7 @@ Content-Type: application/json
 **Cálculo automático:** Si el circuito tiene `lane_lengths` y se especifica `lane`, el backend calcula automáticamente: `total_distance_meters`, `avg_speed_kmh`, `avg_speed_scale_kmh`, `best_lap_speed_kmh`, `best_lap_speed_scale_kmh`. La velocidad escala es la equivalente a tamaño real (ej: 7.8 km/h en pista × 32 = 250 km/h para 1:32).
 
 **Respuesta 201:**
+
 ```json
 {
   "id": "uuid-del-timing",
@@ -210,6 +248,7 @@ Content-Type: application/json
 ```
 
 **Errores:**
+
 - `400` - Campos requeridos faltantes
 - `401` - API key inválida
 - `404` - Vehículo no encontrado, o circuito no encontrado (si se envió `circuit_id` inválido)
@@ -354,7 +393,7 @@ curl -X POST \
 
 ## 7. CORS
 
-Las rutas `/api/sync/*` tienen **CORS permisivo**: aceptan peticiones desde cualquier origen. La seguridad se garantiza mediante la API key (`X-API-Key`), por lo que no necesitas configurar orígenes adicionales para tu aplicación externa.
+Las rutas `/api/sync/*` y `POST /api/auth/api-key` tienen **CORS permisivo**: aceptan peticiones desde cualquier origen. La seguridad se garantiza mediante la API key (`X-API-Key`) o las credenciales (email/password en el login para API key), por lo que no necesitas configurar orígenes adicionales para tu aplicación externa.
 
 ---
 
@@ -389,6 +428,7 @@ CREATE POLICY "Users can delete own circuits" ON public.circuits FOR DELETE USIN
 ```
 
 Si ya tienes datos con circuitos en texto (`vehicle_timings.circuit`, `competitions.circuit_name`, `competition_timings.circuit`), ejecuta también:
+
 1. `backend/scripts/migrate-circuit-references.sql` – añade la columna `circuit_id`
 2. `backend/scripts/populate-circuit-id-from-text.sql` – crea circuitos y rellena `circuit_id` desde el texto
 
@@ -399,8 +439,11 @@ Si ya tienes datos con circuitos en texto (`vehicle_timings.circuit`, `competiti
 
 ## Resumen rápido
 
-| Qué necesitas | Dónde obtenerlo |
-|---------------|-----------------|
-| API Key | Perfil → sección API Key (o `GET /api/api-keys/me` con JWT) |
-| Base URL | `http://localhost:5001` (dev) o tu URL de producción |
-| Header | `X-API-Key: <tu_api_key>` |
+
+| Qué necesitas | Dónde obtenerlo                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| API Key       | Perfil → sección API Key, `GET /api/api-keys/me` (JWT), o `POST /api/auth/api-key` (email/password) |
+| Base URL      | `http://localhost:5001` (dev) o tu URL de producción                                                |
+| Header        | `X-API-Key: <tu_api_key>`                                                                           |
+
+
