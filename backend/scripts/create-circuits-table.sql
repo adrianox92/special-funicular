@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS public.circuits (
   description text,
   num_lanes  integer NOT NULL DEFAULT 1,
   lane_lengths jsonb NOT NULL DEFAULT '[]',
-  created_at timestamptz DEFAULT now()
+  created_at timestamptz DEFAULT now(),
+  CONSTRAINT circuits_user_id_name_unique UNIQUE (user_id, name)
 );
 
 -- Índices para consultas frecuentes

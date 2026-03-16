@@ -107,7 +107,37 @@ X-API-Key: <tu_api_key>
 
 ---
 
-### 4.2 Registrar tiempo
+### 4.2 Listar circuitos
+
+Obtiene la lista de circuitos del usuario autenticado. Útil para que una app externa conozca los IDs de circuitos antes de enviar un tiempo, y así poder usar `circuit_id` directamente en vez de un nombre de texto.
+
+```http
+GET /api/sync/circuits
+X-API-Key: <tu_api_key>
+```
+
+**Respuesta 200:**
+```json
+{
+  "circuits": [
+    {
+      "id": "uuid-del-circuito",
+      "name": "Circuito Barcelona",
+      "description": "Circuito de 2 carriles",
+      "num_lanes": 2,
+      "lane_lengths": [12.5, 13.0]
+    }
+  ]
+}
+```
+
+**Errores:**
+- `401` - No se proporcionó API key o es inválida
+- `500` - Error interno del servidor
+
+---
+
+### 4.3 Registrar tiempo
 
 Crea un nuevo registro de tiempo para un vehículo.
 
@@ -124,6 +154,7 @@ Content-Type: application/json
   "average_time": "01:18.086",
   "lane": "1",
   "circuit": "Circuito Barcelona",
+  "circuit_id": "uuid-del-circuito",
   "timing_date": "2025-03-13"
 }
 ```
@@ -138,13 +169,23 @@ Content-Type: application/json
 | `laps` | number | ✅ | Número de vueltas |
 | `average_time` | string | ✅ | Tiempo promedio por vuelta en formato `mm:ss.mmm` |
 | `lane` | string | ❌ | Número de carril (ej: "1", "2") |
-| `circuit` | string | ❌ | Nombre del circuito |
+| `circuit` | string | ❌ | Nombre del circuito (si no existe, se crea automáticamente) |
+| `circuit_id` | string (UUID) | ❌ | ID del circuito (prioridad sobre `circuit` si ambos se envían) |
 | `timing_date` | string | ❌ | Fecha en formato `YYYY-MM-DD` (default: hoy) |
+
+**Resolución de circuito:**
+- **`circuit_id`** (prioridad): Si se envía, el backend verifica que pertenezca al usuario. Si es válido, el timing se guarda con ese circuito.
+- **`circuit`** (nombre): Si se envía y no hay `circuit_id`, el backend busca un circuito con ese nombre para el usuario. Si existe, lo usa. Si no existe, lo crea automáticamente con `num_lanes=1` y `lane_lengths=[]`.
+- **Ambos**: `circuit_id` tiene prioridad; `circuit` se ignora para la resolución.
+- **Ninguno**: El timing se guarda sin circuito asociado.
 | `best_lap_timestamp` | number | ❌ | Mejor vuelta en segundos (float) |
 | `total_time_timestamp` | number | ❌ | Tiempo total en segundos (float) |
 | `average_time_timestamp` | number | ❌ | Tiempo promedio en segundos (float) |
+| `scale_factor` | number | ❌ | Escala del coche para velocidad equivalente (32 = 1:32). Si no se envía, se usa el del vehículo |
 
 **Formato de tiempos:** `mm:ss.mmm` (ejemplo: `01:23.456` = 1 min 23.456 seg)
+
+**Cálculo automático:** Si el circuito tiene `lane_lengths` y se especifica `lane`, el backend calcula automáticamente: `total_distance_meters`, `avg_speed_kmh`, `avg_speed_scale_kmh`, `best_lap_speed_kmh`, `best_lap_speed_scale_kmh`. La velocidad escala es la equivalente a tamaño real (ej: 7.8 km/h en pista × 32 = 250 km/h para 1:32).
 
 **Respuesta 201:**
 ```json
@@ -159,25 +200,61 @@ Content-Type: application/json
   "circuit": "Circuito Barcelona",
   "timing_date": "2025-03-13",
   "setup_snapshot": "[...]",
-  "created_at": "2025-03-13T12:00:00.000Z"
+  "created_at": "2025-03-13T12:00:00.000Z",
+  "total_distance_meters": 52.0,
+  "avg_speed_kmh": 7.8,
+  "avg_speed_scale_kmh": 249.6,
+  "best_lap_speed_kmh": 8.2,
+  "best_lap_speed_scale_kmh": 262.4
 }
 ```
 
 **Errores:**
 - `400` - Campos requeridos faltantes
 - `401` - API key inválida
-- `404` - Vehículo no encontrado (o no pertenece al usuario)
+- `404` - Vehículo no encontrado, o circuito no encontrado (si se envió `circuit_id` inválido)
 - `500` - Error interno del servidor
 
 ---
 
-## 5. Ejemplos de integración
+## 5. Endpoint find-or-create (JWT)
+
+Para integraciones que usan autenticación JWT (no API key), existe un endpoint para buscar o crear un circuito por nombre:
+
+```http
+POST /api/circuits/find-or-create
+Authorization: Bearer <tu_jwt_token>
+Content-Type: application/json
+
+{
+  "name": "Circuito Barcelona",
+  "description": "Opcional",
+  "num_lanes": 2,
+  "lane_lengths": [12.5, 13.0]
+}
+```
+
+**Respuesta 200 (encontrado):** `{ "circuit": { ... }, "created": false }`  
+**Respuesta 200 (creado):** `{ "circuit": { ... }, "created": true }`
+
+---
+
+## 6. Ejemplos de integración
 
 ### JavaScript / Fetch
 
 ```javascript
 const API_BASE = 'http://localhost:5001';  // o tu URL de producción
 const API_KEY = 'sc_tu_api_key_aqui';
+
+// Listar circuitos (para usar circuit_id en createTiming)
+async function getCircuits() {
+  const res = await fetch(`${API_BASE}/api/sync/circuits`, {
+    headers: { 'X-API-Key': API_KEY },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 
 // Listar vehículos
 async function getVehicles(page = 1, limit = 25) {
@@ -205,10 +282,22 @@ async function createTiming(data) {
   return res.json();
 }
 
-// Uso
-const { vehicles } = await getVehicles();
+// Uso: con circuit_id (opción recomendada si ya conoces circuitos)
+const { circuits } = await getCircuits();
+const circuit = circuits.find(c => c.name === 'Mi circuito');
 await createTiming({
-  vehicle_id: vehicles[0].id,
+  vehicle_id: (await getVehicles()).vehicles[0].id,
+  best_lap_time: '01:23.456',
+  total_time: '05:12.345',
+  laps: 4,
+  average_time: '01:18.086',
+  lane: '1',
+  circuit_id: circuit?.id,  // o circuit: 'Mi circuito' si no existe en la lista
+});
+
+// Uso: con nombre de circuito (find-or-create automático)
+await createTiming({
+  vehicle_id: (await getVehicles()).vehicles[0].id,
   best_lap_time: '01:23.456',
   total_time: '05:12.345',
   laps: 4,
@@ -263,15 +352,46 @@ curl -X POST \
 
 ---
 
-## 6. CORS
+## 7. CORS
 
 Las rutas `/api/sync/*` tienen **CORS permisivo**: aceptan peticiones desde cualquier origen. La seguridad se garantiza mediante la API key (`X-API-Key`), por lo que no necesitas configurar orígenes adicionales para tu aplicación externa.
 
 ---
 
-## 7. Seguridad
+## 8. Seguridad
 
 - **No compartas tu API key** en código público o repositorios
+
+---
+
+## 9. Error: `relation "public.circuits" does not exist`
+
+Si ves este error, la tabla `circuits` no existe en tu base de datos. Ejecuta en **Supabase SQL Editor** el contenido de `backend/scripts/create-circuits-table.sql`:
+
+```sql
+CREATE TABLE IF NOT EXISTS public.circuits (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name       text NOT NULL,
+  description text,
+  num_lanes  integer NOT NULL DEFAULT 1,
+  lane_lengths jsonb NOT NULL DEFAULT '[]',
+  created_at timestamptz DEFAULT now(),
+  CONSTRAINT circuits_user_id_name_unique UNIQUE (user_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_circuits_user_id ON public.circuits(user_id);
+CREATE INDEX IF NOT EXISTS idx_circuits_name ON public.circuits(name);
+ALTER TABLE public.circuits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own circuits" ON public.circuits FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own circuits" ON public.circuits FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own circuits" ON public.circuits FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own circuits" ON public.circuits FOR DELETE USING (auth.uid() = user_id);
+```
+
+Si ya tienes datos con circuitos en texto (`vehicle_timings.circuit`, `competitions.circuit_name`, `competition_timings.circuit`), ejecuta también:
+1. `backend/scripts/migrate-circuit-references.sql` – añade la columna `circuit_id`
+2. `backend/scripts/populate-circuit-id-from-text.sql` – crea circuitos y rellena `circuit_id` desde el texto
+
 - Usa variables de entorno para almacenar la API key
 - Si crees que la key ha sido comprometida, regenérala desde tu perfil
 

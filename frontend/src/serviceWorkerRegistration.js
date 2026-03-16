@@ -8,22 +8,14 @@ export function register() {
       navigator.serviceWorker
         .register(swUrl)
         .then(registration => {
-          console.log('Service Worker registered successfully: ', registration);
-          
           // Verificar si hay actualizaciones
           registration.addEventListener('updatefound', () => {
             const installingWorker = registration.installing;
-            if (installingWorker == null) {
-              return;
-            }
+            if (installingWorker == null) return;
 
             installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed') {
-                if (navigator.serviceWorker.controller) {
-                  console.log('New content is available; please refresh.');
-                } else {
-                  console.log('Content is cached for offline use.');
-                }
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Nueva versión disponible; el usuario puede recargar
               }
             };
           });
@@ -32,8 +24,6 @@ export function register() {
           console.error('Service Worker registration failed: ', registrationError);
         });
     });
-  } else {
-    console.log('Service Worker not supported in this browser');
   }
 }
 

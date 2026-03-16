@@ -53,46 +53,7 @@ export const checkPWASupport = () => {
 };
 
 export const logPWADiagnostics = () => {
-  const diagnostics = checkPWASupport();
-  
-  console.log('🔍 Diagnóstico PWA:');
-  console.log('==================');
-  console.log(`✅ HTTPS: ${diagnostics.https}`);
-  console.log(`✅ Service Worker: ${diagnostics.serviceWorker}`);
-  console.log(`✅ beforeinstallprompt: ${diagnostics.beforeinstallprompt}`);
-  console.log(`✅ Display Mode: ${diagnostics.displayMode}`);
-  console.log(`✅ Manifest: ${diagnostics.manifest}`);
-  console.log(`✅ Iconos: ${diagnostics.icons}`);
-  
-  if (diagnostics.errors.length > 0) {
-    console.log('❌ Errores encontrados:');
-    diagnostics.errors.forEach(error => console.log(`   - ${error}`));
-  }
-
-  // Verificar Service Worker registrado
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      console.log(`📱 Service Workers registrados: ${registrations.length}`);
-      registrations.forEach((registration, index) => {
-        console.log(`   ${index + 1}. Scope: ${registration.scope}`);
-        console.log(`      Estado: ${registration.active ? 'Activo' : 'Inactivo'}`);
-      });
-    });
-  }
-
-  // Verificar manifest
-  if (diagnostics.manifest) {
-    fetch('/manifest.json')
-      .then(response => response.json())
-      .then(manifest => {
-        console.log('📄 Manifest cargado:', manifest);
-      })
-      .catch(error => {
-        console.error('❌ Error cargando manifest:', error);
-      });
-  }
-
-  return diagnostics;
+  return checkPWASupport();
 };
 
 export const testInstallPrompt = () => {
@@ -160,7 +121,6 @@ export const clearPWACache = async () => {
       for (let registration of registrations) {
         await registration.unregister();
       }
-      console.log('✅ Service Workers desregistrados');
     } catch (error) {
       console.error('❌ Error desregistrando Service Workers:', error);
     }
@@ -170,7 +130,6 @@ export const clearPWACache = async () => {
     try {
       const cacheNames = await caches.keys();
       await Promise.all(cacheNames.map(name => caches.delete(name)));
-      console.log('✅ Cache limpiado');
     } catch (error) {
       console.error('❌ Error limpiando cache:', error);
     }

@@ -7,6 +7,7 @@ const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
 const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
+const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -349,7 +350,11 @@ router.put('/:id', upload.array('images'), async (req, res) => {
       modified: req.body.modified === 'true',
       digital: req.body.digital === 'true'
     };
-    
+    if (req.body.scale_factor != null) {
+      const sf = parseInt(req.body.scale_factor, 10);
+      updateData.scale_factor = !isNaN(sf) ? sf : DEFAULT_SCALE_FACTOR;
+    }
+
     // Si no está modificado, el total_price será igual al price
     if (updateData.modified === false) {
       updateData.total_price = Number(updateData.price);
@@ -402,10 +407,11 @@ router.put('/:id', upload.array('images'), async (req, res) => {
 // Crear un vehículo
 router.post('/', upload.array('images'), async (req, res) => {
   try {
-    const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, reference } = req.body;
+    const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, reference, scale_factor } = req.body;
     
     // Si no está modificado, el total_price será igual al price
     const total_price = modified === 'true' ? null : Number(price);
+    const scaleFactor = scale_factor != null ? parseInt(scale_factor, 10) : DEFAULT_SCALE_FACTOR;
     
     // Añadir user_id al crear el vehículo
     const { data, error } = await supabase
@@ -423,6 +429,7 @@ router.post('/', upload.array('images'), async (req, res) => {
           modified, 
           digital,
           reference,
+          scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
           user_id: req.user.id 
         }
       ])
@@ -942,10 +949,10 @@ router.post('/:id/timings', async (req, res) => {
       circuit_id
     } = req.body;
 
-    // Verificar que el vehículo pertenece al usuario
+    // Verificar que el vehículo pertenece al usuario y obtener scale_factor
     const { data: existingVehicle, error: checkError } = await supabase
       .from('vehicles')
-      .select('id')
+      .select('id, scale_factor')
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
@@ -976,43 +983,68 @@ router.post('/:id/timings', async (req, res) => {
     // Resolver circuito: circuit_id tiene prioridad
     let circuitToStore = circuit;
     let circuitIdToStore = null;
+    let circuitLaneLengths = [];
     if (circuit_id) {
       const { data: circuitRow, error: circuitError } = await supabase
         .from('circuits')
-        .select('name')
+        .select('name, lane_lengths')
         .eq('id', circuit_id)
         .eq('user_id', req.user.id)
         .single();
       if (!circuitError && circuitRow) {
         circuitIdToStore = circuit_id;
         circuitToStore = circuitRow.name;
+        circuitLaneLengths = Array.isArray(circuitRow.lane_lengths) ? circuitRow.lane_lengths : [];
       }
+    }
+
+    // Calcular distancia y velocidad si hay circuito, carril y longitud
+    const scaleFactor = req.body.scale_factor ?? existingVehicle.scale_factor ?? DEFAULT_SCALE_FACTOR;
+    const distanceSpeed = calculateDistanceAndSpeed({
+      laps,
+      lane,
+      circuitLaneLengths,
+      totalTimeSeconds: total_time_timestamp,
+      bestLapSeconds: best_lap_timestamp,
+      scaleFactor,
+    });
+
+    const insertData = {
+      vehicle_id: id,
+      best_lap_time,
+      total_time,
+      laps,
+      average_time,
+      lane,
+      timing_date,
+      best_lap_timestamp,
+      total_time_timestamp,
+      average_time_timestamp,
+      circuit: circuitToStore,
+      circuit_id: circuitIdToStore,
+      setup_snapshot: JSON.stringify(componentsSnapshot),
+      created_at: new Date().toISOString()
+    };
+    if (distanceSpeed) {
+      Object.assign(insertData, distanceSpeed);
     }
 
     // Crear el nuevo registro de tiempo con el snapshot
     const { data: timing, error: timingError } = await supabase
       .from('vehicle_timings')
-      .insert([{
-        vehicle_id: id,
-        best_lap_time,
-        total_time,
-        laps,
-        average_time,
-        lane,
-        timing_date,
-        best_lap_timestamp,
-        total_time_timestamp,
-        average_time_timestamp,
-        circuit: circuitToStore,
-        circuit_id: circuitIdToStore,
-        setup_snapshot: JSON.stringify(componentsSnapshot),
-        created_at: new Date().toISOString()
-      }])
+      .insert([insertData])
       .select()
       .single();
 
     if (timingError) {
       return res.status(500).json({ error: timingError.message });
+    }
+
+    // Actualizar odómetro del vehículo
+    try {
+      await updateVehicleOdometer(supabase, id);
+    } catch (odometerError) {
+      console.warn('Error al actualizar odómetro:', odometerError);
     }
 
     // Actualizar posiciones del circuito si se especificó uno
@@ -1066,10 +1098,10 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       circuit_id
     } = req.body;
 
-    // Verificar que el vehículo pertenece al usuario
+    // Verificar que el vehículo pertenece al usuario y obtener scale_factor
     const { data: existingVehicle, error: checkError } = await supabase
       .from('vehicles')
-      .select('id')
+      .select('id, scale_factor')
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
@@ -1091,17 +1123,19 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     // Resolver circuito: circuit_id tiene prioridad
     let circuitToStore = circuit;
     let circuitIdToStore = existingTiming.circuit_id;
+    let circuitLaneLengths = [];
     if (circuit_id !== undefined) {
       if (circuit_id) {
         const { data: circuitRow, error: circuitError } = await supabase
           .from('circuits')
-          .select('name')
+          .select('name, lane_lengths')
           .eq('id', circuit_id)
           .eq('user_id', req.user.id)
           .single();
         if (!circuitError && circuitRow) {
           circuitIdToStore = circuit_id;
           circuitToStore = circuitRow.name;
+          circuitLaneLengths = Array.isArray(circuitRow.lane_lengths) ? circuitRow.lane_lengths : [];
         }
       } else {
         circuitIdToStore = null;
@@ -1113,7 +1147,28 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     } else {
       circuitToStore = existingTiming.circuit;
       circuitIdToStore = existingTiming.circuit_id;
+      if (circuitIdToStore) {
+        const { data: circuitRow } = await supabase
+          .from('circuits')
+          .select('lane_lengths')
+          .eq('id', circuitIdToStore)
+          .single();
+        if (circuitRow) {
+          circuitLaneLengths = Array.isArray(circuitRow.lane_lengths) ? circuitRow.lane_lengths : [];
+        }
+      }
     }
+
+    // Calcular distancia y velocidad
+    const scaleFactor = req.body.scale_factor ?? existingVehicle.scale_factor ?? DEFAULT_SCALE_FACTOR;
+    const distanceSpeed = calculateDistanceAndSpeed({
+      laps,
+      lane,
+      circuitLaneLengths,
+      totalTimeSeconds: total_time_timestamp,
+      bestLapSeconds: best_lap_timestamp,
+      scaleFactor,
+    });
 
     // Detectar si hubo cambios que requieren recálculo de posiciones
     const previousCircuit = existingTiming.circuit;
@@ -1159,6 +1214,17 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       circuit: circuitToStore,
       circuit_id: circuitIdToStore
     };
+    if (distanceSpeed) {
+      Object.assign(updatePayload, distanceSpeed);
+    } else {
+      // Limpiar campos si no se puede calcular
+      updatePayload.track_length_meters = null;
+      updatePayload.total_distance_meters = null;
+      updatePayload.avg_speed_kmh = null;
+      updatePayload.avg_speed_scale_kmh = null;
+      updatePayload.best_lap_speed_kmh = null;
+      updatePayload.best_lap_speed_scale_kmh = null;
+    }
     const { data: updatedTiming, error: updateError } = await supabase
       .from('vehicle_timings')
       .update(updatePayload)
@@ -1168,6 +1234,13 @@ router.put('/:id/timings/:timingId', async (req, res) => {
 
     if (updateError) {
       return res.status(500).json({ error: updateError.message });
+    }
+
+    // Actualizar odómetro del vehículo
+    try {
+      await updateVehicleOdometer(supabase, id);
+    } catch (odometerError) {
+      console.warn('Error al actualizar odómetro:', odometerError);
     }
 
     // Recalcular posiciones si es necesario
@@ -1269,6 +1342,13 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
 
     if (deleteError) {
       return res.status(500).json({ error: deleteError.message });
+    }
+
+    // Actualizar odómetro del vehículo
+    try {
+      await updateVehicleOdometer(supabase, id);
+    } catch (odometerError) {
+      console.warn('Error al actualizar odómetro:', odometerError);
     }
 
     // Recalcular posiciones si el tiempo eliminado tenía circuito

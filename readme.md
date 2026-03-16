@@ -62,6 +62,25 @@ Si no ves el botón de instalación:
 
 ### 🆕 Nuevas Funcionalidades
 
+#### Velocidad, Distancia y Odómetro
+**Descripción**: Seguimiento de distancia recorrida y velocidad (en pista y equivalente a escala real) para cada sesión de tiempos.
+
+**Características**:
+- **Distancia por sesión**: Calculada automáticamente a partir de la longitud del carril del circuito y el número de vueltas
+- **Velocidad en pista**: Velocidad real medida en el circuito (km/h)
+- **Velocidad equivalente a escala**: Velocidad que tendría el coche real a tamaño natural (ej: 7.8 km/h en pista × 32 = 250 km/h equivalente para escala 1:32)
+- **Odómetro por vehículo**: Distancia total acumulada de todas las sesiones (entrenamientos y competiciones)
+- **Escala configurable**: Cada vehículo tiene un campo `scale_factor` (32 = 1:32, 43 = 1:43) para el cálculo de velocidad equivalente
+
+**Requisitos**: Los circuitos deben tener `lane_lengths` definidos (metros por carril) y el timing debe especificar circuito y carril.
+
+**API**: Los campos `total_distance_meters`, `avg_speed_kmh`, `avg_speed_scale_kmh`, `best_lap_speed_kmh`, `best_lap_speed_scale_kmh` están disponibles en las respuestas de timings y en la API de sincronización.
+
+**Archivos**:
+- `backend/scripts/add-speed-distance-fields.sql` - Migración de columnas
+- `backend/scripts/backfill-speed-distance.sql` - Relleno de datos históricos
+- `backend/lib/distanceCalculator.js` - Cálculo de distancia y velocidad
+
 #### Comparativa de Carriles en Dashboard
 **Descripción**: Nueva sección dedicada al análisis de rendimiento por carriles en el dashboard principal.
 
@@ -454,6 +473,7 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
 - `GET /api/circuits` - Lista de circuitos del usuario
 - `GET /api/circuits/:id` - Detalle de un circuito
 - `POST /api/circuits` - Crear circuito (name, description, num_lanes, lane_lengths)
+- `POST /api/circuits/find-or-create` - Buscar o crear circuito por nombre (devuelve `{ circuit, created }`)
 - `PUT /api/circuits/:id` - Actualizar circuito
 - `DELETE /api/circuits/:id` - Eliminar circuito (si no está en uso)
 - `GET /api/competitions/my-competitions` - Mis competiciones
@@ -500,7 +520,8 @@ El sistema incluye **API keys por usuario** para conectar proyectos externos (po
 Estos endpoints permiten a proyectos externos leer vehículos y registrar tiempos:
 
 - `GET /api/sync/vehicles` - Lista los vehículos del usuario (id, model, manufacturer, type, traction, image). Query: `?page=1&limit=25`.
-- `POST /api/sync/timings` - Crea un nuevo registro de tiempo. Body: `{ vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, timing_date? }`.
+- `GET /api/sync/circuits` - Lista los circuitos del usuario (id, name, description, num_lanes, lane_lengths). Permite usar `circuit_id` en timings.
+- `POST /api/sync/timings` - Crea un nuevo registro de tiempo. Body: `{ vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date? }`. Si envías `circuit` (nombre), se resuelve a `circuit_id` automáticamente (find-or-create).
 
 **Ejemplo de uso desde otro proyecto:**
 
@@ -519,6 +540,15 @@ node scripts/migrate-add-api-keys.js
 ```
 
 Si no tienes la función `exec_sql` en Supabase, ejecuta manualmente el SQL en `backend/scripts/add-api-keys.sql` desde el SQL Editor del dashboard.
+
+### Tabla `circuits` (circuitos)
+
+Si obtienes el error `relation "public.circuits" does not exist`, crea la tabla ejecutando en **Supabase SQL Editor**:
+
+1. `backend/scripts/create-circuits-table.sql` – crea la tabla de circuitos (incluye UNIQUE user_id+name)
+2. (Opcional) `backend/scripts/add-circuits-unique-constraint.sql` – añade UNIQUE (user_id, name) si la tabla ya existía sin ella
+3. (Opcional) `backend/scripts/migrate-circuit-references.sql` – añade `circuit_id` a otras tablas si lo necesitas
+4. (Opcional) `backend/scripts/populate-circuit-id-from-text.sql` – rellena `circuit_id` desde los circuitos en texto existentes (vehicle_timings, competitions, competition_timings)
 
 **Backend:** Para que la sección "Mi Perfil" pueda obtener y crear API keys, el backend debe usar la **service role key** de Supabase (para poder leer/escribir en `user_api_keys` cuando RLS está activo). Añade en tu `.env` del backend:
 
@@ -611,6 +641,12 @@ Este endpoint permite obtener un token JWT usando email y contraseña de un usua
 - **Selector en tiempos**: Al registrar tiempos (competición o vehículo) se selecciona el circuito
 - **Filtro en tabla de tiempos**: El filtro por circuito usa un dropdown con los circuitos definidos
 
+### v1.10.1 - Circuitos multi-usuario
+- **Restricción UNIQUE (user_id, name)**: Evita duplicados de circuitos con el mismo nombre por usuario
+- **POST /api/circuits/find-or-create**: Endpoint para buscar o crear circuito por nombre (JWT)
+- **GET /api/sync/circuits**: Lista circuitos del usuario vía API key (para apps externas)
+- **POST /api/sync/timings**: Acepta `circuit_id` o `circuit` (nombre); si se envía nombre, se resuelve a `circuit_id` automáticamente (find-or-create)
+
 **Migración de base de datos:**
 ```bash
 cd backend
@@ -623,6 +659,7 @@ Si no tienes `exec_sql` en Supabase, ejecuta manualmente en el SQL Editor:
 **Archivos creados:**
 - `backend/scripts/create-circuits-table.sql` - Crea tabla circuits
 - `backend/scripts/migrate-circuit-references.sql` - Añade circuit_id a competitions, vehicle_timings, competition_timings
+- `backend/scripts/populate-circuit-id-from-text.sql` - Rellena circuit_id desde circuit/circuit_name en texto
 - `backend/scripts/migrate-create-circuits.js` - Script de migración
 - `backend/routes/circuits.js` - API CRUD de circuitos
 - `frontend/src/pages/Circuits.jsx` - Página de gestión de circuitos

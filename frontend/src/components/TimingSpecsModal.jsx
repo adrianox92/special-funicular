@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table';
+import { formatDistance } from '../utils/formatUtils';
 
 const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   if (!setupSnapshot || !timing) return null;
@@ -125,6 +126,18 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
                 <strong className="text-sm text-muted-foreground">Circuito</strong>
                 <div>{timing.circuit || '-'} (Carril {timing.lane || '-'})</div>
               </div>
+              {timing.total_distance_meters != null && (
+                <div>
+                  <strong className="text-sm text-muted-foreground">Distancia</strong>
+                  <div>{formatDistance(timing.total_distance_meters)}</div>
+                </div>
+              )}
+              {timing.avg_speed_kmh != null && timing.avg_speed_scale_kmh != null && (
+                <div>
+                  <strong className="text-sm text-muted-foreground">Velocidad</strong>
+                  <div>{Number(timing.avg_speed_kmh).toFixed(1)} km/h ({Number(timing.avg_speed_scale_kmh).toFixed(0)} km/h eq.)</div>
+                </div>
+              )}
             </div>
           </div>
 

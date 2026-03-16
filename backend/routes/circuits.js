@@ -41,6 +41,108 @@ router.get('/', async (req, res) => {
 
 /**
  * @swagger
+ * /api/circuits/find-or-create:
+ *   post:
+ *     summary: Busca un circuito por nombre o lo crea si no existe
+ *     tags: [Circuits]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               num_lanes:
+ *                 type: integer
+ *               lane_lengths:
+ *                 type: array
+ *                 items:
+ *                   type: number
+ *     responses:
+ *       200:
+ *         description: Circuito encontrado o creado
+ *       400:
+ *         description: Nombre requerido
+ */
+router.post('/find-or-create', async (req, res) => {
+  try {
+    const { name, description, num_lanes, lane_lengths } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+
+    const trimmedName = name.trim();
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('circuits')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .eq('name', trimmedName)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('Error al buscar circuito:', fetchError);
+      return res.status(500).json({ error: fetchError.message });
+    }
+
+    if (existing) {
+      return res.json({ circuit: existing, created: false });
+    }
+
+    const lanes = num_lanes != null ? parseInt(num_lanes, 10) : 1;
+    const validLanes = isNaN(lanes) || lanes < 1 ? 1 : lanes;
+    let lengths = Array.isArray(lane_lengths) ? lane_lengths : [];
+    if (lengths.length !== validLanes) {
+      lengths = Array(validLanes).fill(null).map((_, i) => (lengths[i] != null ? Number(lengths[i]) : 0));
+    }
+    lengths = lengths.slice(0, validLanes).map((v) => (typeof v === 'number' && !isNaN(v) ? v : 0));
+
+    const circuitData = {
+      user_id: req.user.id,
+      name: trimmedName,
+      description: description ? description.trim() : null,
+      num_lanes: validLanes,
+      lane_lengths: lengths,
+    };
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('circuits')
+      .insert([circuitData])
+      .select()
+      .single();
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        const { data: raceExisting } = await supabase
+          .from('circuits')
+          .select('*')
+          .eq('user_id', req.user.id)
+          .eq('name', trimmedName)
+          .single();
+        if (raceExisting) {
+          return res.json({ circuit: raceExisting, created: false });
+        }
+      }
+      console.error('Error al crear circuito:', insertError);
+      return res.status(500).json({ error: insertError.message });
+    }
+
+    res.json({ circuit: inserted, created: true });
+  } catch (error) {
+    console.error('Error en POST /circuits/find-or-create:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
  * /api/circuits/{id}:
  *   get:
  *     summary: Obtiene el detalle de un circuito
@@ -150,6 +252,9 @@ router.post('/', async (req, res) => {
 
     if (error) {
       console.error('Error al crear circuito:', error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'Ya tienes un circuito con ese nombre' });
+      }
       return res.status(500).json({ error: error.message });
     }
 
@@ -246,6 +351,9 @@ router.put('/:id', async (req, res) => {
 
     if (error) {
       console.error('Error al actualizar circuito:', error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'Ya tienes un circuito con ese nombre' });
+      }
       return res.status(500).json({ error: error.message });
     }
 

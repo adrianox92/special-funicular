@@ -15,18 +15,10 @@ const STATIC_FILES = [
 
 // Instalación del Service Worker
 self.addEventListener("install", event => {
-  console.log('Service Worker: Installing...');
-  
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Service Worker: Caching static files');
-        return cache.addAll(STATIC_FILES);
-      })
-      .then(() => {
-        console.log('Service Worker: Static files cached');
-        return self.skipWaiting();
-      })
+      .then(cache => cache.addAll(STATIC_FILES))
+      .then(() => self.skipWaiting())
       .catch(error => {
         console.error('Service Worker: Error caching static files:', error);
       })
@@ -35,24 +27,18 @@ self.addEventListener("install", event => {
 
 // Activación del Service Worker
 self.addEventListener("activate", event => {
-  console.log('Service Worker: Activating...');
-  
   event.waitUntil(
     caches.keys()
       .then(cacheNames => {
         return Promise.all(
           cacheNames.map(cacheName => {
             if (cacheName !== CACHE_NAME) {
-              console.log('Service Worker: Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
           })
         );
       })
-      .then(() => {
-        console.log('Service Worker: Activated');
-        return self.clients.claim();
-      })
+      .then(() => self.clients.claim())
   );
 });
 

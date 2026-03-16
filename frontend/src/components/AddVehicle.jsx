@@ -22,7 +22,7 @@ const AddVehicle = () => {
   const navigate = useNavigate();
   const [vehicle, setVehicle] = useState({
     model: '', manufacturer: '', type: '', traction: '', price: '', total_price: '',
-    purchase_date: '', purchase_place: '', modified: false, digital: false, reference: ''
+    purchase_date: '', purchase_place: '', modified: false, digital: false, reference: '', scale_factor: 32
   });
   const [images, setImages] = useState({});
   const [previews, setPreviews] = useState({});
@@ -89,6 +89,11 @@ const AddVehicle = () => {
               <div className="space-y-2"><Label>Lugar de compra</Label><Input name="purchase_place" value={vehicle.purchase_place} onChange={handleChange} /></div>
               <div className="flex items-center gap-2"><Switch name="modified" checked={vehicle.modified} onCheckedChange={v => setVehicle(prev => ({ ...prev, modified: v }))} /><Label>Modificado</Label></div>
               <div className="flex items-center gap-2"><Switch name="digital" checked={vehicle.digital} onCheckedChange={v => setVehicle(prev => ({ ...prev, digital: v }))} /><Label>Digital</Label></div>
+              <div className="space-y-2">
+                <Label htmlFor="scale_factor">Escala (1:X)</Label>
+                <Input id="scale_factor" name="scale_factor" type="number" min="1" max="100" value={vehicle.scale_factor ?? 32} onChange={handleChange} placeholder="32" />
+                <p className="text-xs text-muted-foreground">Escala del coche para velocidad equivalente (32 = 1:32, 43 = 1:43)</p>
+              </div>
             </CardContent>
           </Card>
           <Card>

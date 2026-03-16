@@ -28,6 +28,7 @@ import {
   TableRow,
 } from './ui/table';
 import { cn } from './ui/utils';
+import { formatDistance } from '../utils/formatUtils';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -590,7 +591,8 @@ const EditVehicle = () => {
           }
         }
       } else {
-        response = await api.post(`/vehicles/${id}/timings`, newTiming);
+        const { id: _omit, ...timingToCreate } = newTiming;
+        response = await api.post(`/vehicles/${id}/timings`, timingToCreate);
 
         if (response.data.position_updated) {
           setTimingWarning('✅ Nuevo tiempo registrado y posiciones actualizadas automáticamente');
@@ -605,7 +607,16 @@ const EditVehicle = () => {
       handleCancelEditTiming();
     } catch (error) {
       console.error('Error al guardar tiempo:', error);
-      setError('Error al guardar el tiempo');
+      const backendError = error.response?.data?.error;
+      const status = error.response?.status;
+      if (status === 404 && editingTiming) {
+        setError(backendError || 'El registro no fue encontrado (puede haber sido eliminado). Los datos se han conservado para que puedas añadirlo como nuevo.');
+        const { id: _id, ...timingWithoutId } = editingTiming;
+        setNewTiming({ ...timingWithoutId, circuit_id: editingTiming.circuit_id || '' });
+        setEditingTiming(null);
+      } else {
+        setError(backendError || 'Error al guardar el tiempo');
+      }
     }
   };
 
@@ -985,6 +996,8 @@ const EditVehicle = () => {
                       <TableHead>Tiempo Total</TableHead>
                       <TableHead>Vueltas</TableHead>
                       <TableHead>Tiempo Promedio</TableHead>
+                      <TableHead>Distancia</TableHead>
+                      <TableHead>Velocidad</TableHead>
                       <TableHead>Carril</TableHead>
                       <TableHead>Circuito</TableHead>
                       <TableHead className="text-center">Configuración</TableHead>
@@ -994,7 +1007,7 @@ const EditVehicle = () => {
                   <TableBody>
                     {timings.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground">No hay registros de tiempo</TableCell>
+                        <TableCell colSpan={11} className="text-center text-muted-foreground">No hay registros de tiempo</TableCell>
                       </TableRow>
                     )}
                     {timings.map((timing) => (
@@ -1004,6 +1017,14 @@ const EditVehicle = () => {
                         <TableCell className="font-mono">{timing.total_time}</TableCell>
                         <TableCell>{timing.laps}</TableCell>
                         <TableCell className="font-mono">{timing.average_time}</TableCell>
+                        <TableCell>
+                          {formatDistance(timing.total_distance_meters)}
+                        </TableCell>
+                        <TableCell>
+                          {timing.avg_speed_kmh != null && timing.avg_speed_scale_kmh != null
+                            ? `${Number(timing.avg_speed_kmh).toFixed(1)} km/h (${Number(timing.avg_speed_scale_kmh).toFixed(0)} eq.)`
+                            : '-'}
+                        </TableCell>
                         <TableCell>{timing.lane || '-'}</TableCell>
                         <TableCell>{timing.circuit || '-'}</TableCell>
                         <TableCell className="text-center">
@@ -1095,8 +1116,15 @@ const EditVehicle = () => {
 
   return (
     <div className="container mt-4">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Editar Vehículo{vehicle.model ? `: ${vehicle.model}` : ''}</h2>
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold">Editar Vehículo{vehicle.model ? `: ${vehicle.model}` : ''}</h2>
+          {vehicle.total_distance_meters != null && vehicle.total_distance_meters > 0 && (
+            <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+              Odómetro: {formatDistance(vehicle.total_distance_meters)}
+            </span>
+          )}
+        </div>
         <Button variant="secondary" onClick={() => navigate('/vehicles')}>
           Volver al listado
         </Button>
@@ -1162,6 +1190,20 @@ const EditVehicle = () => {
                 <div className="flex items-center space-x-2">
                   <Switch id="digital" checked={!!vehicle.digital} onCheckedChange={(checked) => handleChange({ target: { name: 'digital', type: 'checkbox', checked } })} />
                   <Label htmlFor="digital">Digital</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="scale_factor">Escala (1:X)</Label>
+                  <Input
+                    id="scale_factor"
+                    name="scale_factor"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={vehicle.scale_factor ?? 32}
+                    onChange={handleChange}
+                    placeholder="32"
+                  />
+                  <p className="text-xs text-muted-foreground">Escala del coche para calcular velocidad equivalente (ej: 32 = 1:32, 43 = 1:43)</p>
                 </div>
               </div>
               <div>

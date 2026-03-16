@@ -25,6 +25,7 @@ import {
   TableRow,
 } from './ui/table';
 import './TimingsList.css';
+import { formatDistance } from '../utils/formatUtils';
 
 const TimingsList = () => {
   const [timings, setTimings] = useState([]);
@@ -47,18 +48,21 @@ const TimingsList = () => {
     setLoading(true);
     setError(null);
     try {
-      const [vehiclesResponse, timingsResponse, circuitsResponse] = await Promise.all([
+      const [vehiclesResponse, timingsResponse, circuitsResponse] = await Promise.allSettled([
         api.get('/vehicles'),
         api.get('/timings'),
         api.get('/circuits')
       ]);
+      if (vehiclesResponse.status === 'rejected') throw vehiclesResponse.reason;
+      if (timingsResponse.status === 'rejected') throw timingsResponse.reason;
+
       const vehiclesMap = {};
-      vehiclesResponse.data.vehicles.forEach(vehicle => {
+      vehiclesResponse.value.data.vehicles.forEach(vehicle => {
         vehiclesMap[vehicle.id] = vehicle;
       });
       setVehicles(vehiclesMap);
-      setTimings(timingsResponse.data);
-      setCircuits(circuitsResponse.data || []);
+      setTimings(timingsResponse.value.data);
+      setCircuits(circuitsResponse.status === 'fulfilled' ? (circuitsResponse.value.data || []) : []);
     } catch (err) {
       console.error('Error al cargar datos:', err);
       setError(err.response?.data?.error || 'Error al cargar los tiempos');
@@ -320,6 +324,8 @@ const TimingsList = () => {
               <TableHead>Circuito</TableHead>
               <TableHead>Carril</TableHead>
               <TableHead>Vueltas</TableHead>
+              <TableHead>Distancia</TableHead>
+              <TableHead>Velocidad</TableHead>
               <TableHead>Posición</TableHead>
               <TableHead>Mejor Vuelta</TableHead>
               <TableHead>Tiempo Total</TableHead>
@@ -332,7 +338,7 @@ const TimingsList = () => {
           <TableBody>
             {filteredGroups.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                   No hay registros de tiempo
                 </TableCell>
               </TableRow>
@@ -355,6 +361,14 @@ const TimingsList = () => {
                     <TableCell>{group.circuit}</TableCell>
                     <TableCell><Badge variant={getLaneBadgeVariant(group.lane)}>{group.lane}</Badge></TableCell>
                     <TableCell><Badge variant="secondary">{group.best_time.laps || 'N/A'}</Badge></TableCell>
+                    <TableCell>
+                      {formatDistance(group.best_time.total_distance_meters)}
+                    </TableCell>
+                    <TableCell>
+                      {group.best_time.avg_speed_kmh != null && group.best_time.avg_speed_scale_kmh != null
+                        ? `${Number(group.best_time.avg_speed_kmh).toFixed(1)} km/h (${Number(group.best_time.avg_speed_scale_kmh).toFixed(0)} eq.)`
+                        : '-'}
+                    </TableCell>
                     <TableCell>
                       {group.circuit_ranking ? (
                         <Badge variant={group.circuit_ranking.position === 1 ? 'default' : 'secondary'}>P{group.circuit_ranking.position}</Badge>
@@ -418,6 +432,14 @@ const TimingsList = () => {
                           </TableCell>
                           <TableCell><Badge variant={getLaneBadgeVariant(session.lane)}>{session.lane}</Badge></TableCell>
                           <TableCell><Badge variant="secondary">{session.laps || 'N/A'}</Badge></TableCell>
+                          <TableCell>
+                            {formatDistance(session.total_distance_meters)}
+                          </TableCell>
+                          <TableCell>
+                            {session.avg_speed_kmh != null && session.avg_speed_scale_kmh != null
+                              ? `${Number(session.avg_speed_kmh).toFixed(1)} (${Number(session.avg_speed_scale_kmh).toFixed(0)} eq.)`
+                              : '-'}
+                          </TableCell>
                           <TableCell></TableCell>
                           <TableCell className="font-mono">
                             {session.best_lap_time}

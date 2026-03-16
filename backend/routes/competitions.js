@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 const { calculatePoints } = require('../lib/pointsCalculator');
+const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -936,13 +937,24 @@ router.post('/:id/timings', async (req, res) => {
     // Verificar que el participante existe y pertenece a esta competición
     const { data: participant, error: partError } = await supabase
       .from('competition_participants')
-      .select('id')
+      .select('id, vehicle_id')
       .eq('id', participant_id)
       .eq('competition_id', competitionId)
       .single();
 
     if (partError || !participant) {
       return res.status(404).json({ error: 'Participante no encontrado en esta competición' });
+    }
+
+    // Obtener scale_factor del vehículo si el participante tiene uno
+    let scaleFactor = DEFAULT_SCALE_FACTOR;
+    if (participant.vehicle_id) {
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('scale_factor')
+        .eq('id', participant.vehicle_id)
+        .single();
+      if (vehicle?.scale_factor) scaleFactor = vehicle.scale_factor;
     }
 
     // Validaciones
@@ -988,19 +1000,34 @@ router.post('/:id/timings', async (req, res) => {
     if (total_time_timestamp) timingData.total_time_timestamp = total_time_timestamp;
     if (average_time_timestamp) timingData.average_time_timestamp = average_time_timestamp;
     if (setup_snapshot) timingData.setup_snapshot = setup_snapshot;
+    let circuitLaneLengths = [];
     if (circuit_id) {
       const { data: circuit, error: circuitError } = await supabase
         .from('circuits')
-        .select('name')
+        .select('name, lane_lengths')
         .eq('id', circuit_id)
         .eq('user_id', req.user.id)
         .single();
       if (!circuitError && circuit) {
         timingData.circuit_id = circuit_id;
         timingData.circuit = circuit.name;
+        circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
       }
     } else if (circuit) {
       timingData.circuit = circuit;
+    }
+
+    // Calcular distancia y velocidad
+    const distanceSpeed = calculateDistanceAndSpeed({
+      laps,
+      lane,
+      circuitLaneLengths,
+      totalTimeSeconds: total_time_timestamp,
+      bestLapSeconds: best_lap_timestamp,
+      scaleFactor,
+    });
+    if (distanceSpeed) {
+      Object.assign(timingData, distanceSpeed);
     }
 
     const { data, error } = await supabase
@@ -1012,6 +1039,15 @@ router.post('/:id/timings', async (req, res) => {
     if (error) {
       console.error('Error al registrar tiempo:', error);
       return res.status(500).json({ error: error.message });
+    }
+
+    // Actualizar odómetro del vehículo si el participante tiene uno
+    if (participant.vehicle_id) {
+      try {
+        await updateVehicleOdometer(supabase, participant.vehicle_id);
+      } catch (odometerError) {
+        console.warn('Error al actualizar odómetro:', odometerError);
+      }
     }
 
     res.status(201).json(data);
@@ -1130,7 +1166,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     // Verificar que el tiempo existe y pertenece a esta competición
     const { data: existingTiming, error: timingError } = await supabase
       .from('competition_timings')
-      .select('id, participant_id')
+      .select('id, participant_id, lane, total_time_timestamp, best_lap_timestamp, circuit_id')
       .eq('id', timingId)
       .single();
 
@@ -1141,13 +1177,24 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     // Verificar que el participante pertenece a esta competición
     const { data: participant, error: partError } = await supabase
       .from('competition_participants')
-      .select('id')
+      .select('id, vehicle_id')
       .eq('id', existingTiming.participant_id)
       .eq('competition_id', competitionId)
       .single();
 
     if (partError || !participant) {
       return res.status(404).json({ error: 'Participante no encontrado en esta competición' });
+    }
+
+    // Obtener scale_factor del vehículo
+    let scaleFactor = DEFAULT_SCALE_FACTOR;
+    if (participant.vehicle_id) {
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('scale_factor')
+        .eq('id', participant.vehicle_id)
+        .single();
+      if (vehicle?.scale_factor) scaleFactor = vehicle.scale_factor;
     }
 
     // Validaciones
@@ -1171,17 +1218,19 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     if (total_time_timestamp !== undefined) updateData.total_time_timestamp = total_time_timestamp;
     if (average_time_timestamp !== undefined) updateData.average_time_timestamp = average_time_timestamp;
     if (setup_snapshot !== undefined) updateData.setup_snapshot = setup_snapshot;
+    let circuitLaneLengths = [];
     if (circuit_id !== undefined) {
       if (circuit_id) {
         const { data: circuit, error: circuitError } = await supabase
           .from('circuits')
-          .select('name')
+          .select('name, lane_lengths')
           .eq('id', circuit_id)
           .eq('user_id', req.user.id)
           .single();
         if (!circuitError && circuit) {
           updateData.circuit_id = circuit_id;
           updateData.circuit = circuit.name;
+          circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
         }
       } else {
         updateData.circuit_id = null;
@@ -1189,6 +1238,39 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       }
     } else if (circuit !== undefined) {
       updateData.circuit = circuit;
+    } else if (existingTiming.circuit_id) {
+      // Obtener lane_lengths del circuito actual si no se cambió
+      const { data: circuit } = await supabase
+        .from('circuits')
+        .select('lane_lengths')
+        .eq('id', existingTiming.circuit_id)
+        .single();
+      if (circuit) {
+        circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
+      }
+    }
+
+    // Calcular distancia y velocidad (usar valores del body o existentes)
+    const effectiveLane = lane !== undefined ? lane : existingTiming.lane;
+    const effectiveTotalTime = total_time_timestamp ?? existingTiming.total_time_timestamp;
+    const effectiveBestLap = best_lap_timestamp ?? existingTiming.best_lap_timestamp;
+    const distanceSpeed = calculateDistanceAndSpeed({
+      laps,
+      lane: effectiveLane,
+      circuitLaneLengths,
+      totalTimeSeconds: effectiveTotalTime,
+      bestLapSeconds: effectiveBestLap,
+      scaleFactor,
+    });
+    if (distanceSpeed) {
+      Object.assign(updateData, distanceSpeed);
+    } else {
+      updateData.track_length_meters = null;
+      updateData.total_distance_meters = null;
+      updateData.avg_speed_kmh = null;
+      updateData.avg_speed_scale_kmh = null;
+      updateData.best_lap_speed_kmh = null;
+      updateData.best_lap_speed_scale_kmh = null;
     }
 
     const { data, error } = await supabase
@@ -1201,6 +1283,15 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     if (error) {
       console.error('Error al actualizar tiempo:', error);
       return res.status(500).json({ error: error.message });
+    }
+
+    // Actualizar odómetro del vehículo si el participante tiene uno
+    if (participant.vehicle_id) {
+      try {
+        await updateVehicleOdometer(supabase, participant.vehicle_id);
+      } catch (odometerError) {
+        console.warn('Error al actualizar odómetro:', odometerError);
+      }
     }
 
     res.json(data);
@@ -1241,7 +1332,7 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
     // Verificar que el participante pertenece a esta competición
     const { data: participant, error: partError } = await supabase
       .from('competition_participants')
-      .select('id')
+      .select('id, vehicle_id')
       .eq('id', existingTiming.participant_id)
       .eq('competition_id', competitionId)
       .single();
@@ -1259,6 +1350,15 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
     if (error) {
       console.error('Error al eliminar tiempo:', error);
       return res.status(500).json({ error: error.message });
+    }
+
+    // Actualizar odómetro del vehículo si el participante tiene uno
+    if (participant.vehicle_id) {
+      try {
+        await updateVehicleOdometer(supabase, participant.vehicle_id);
+      } catch (odometerError) {
+        console.warn('Error al actualizar odómetro:', odometerError);
+      }
     }
 
     res.json({ message: 'Tiempo eliminado correctamente' });
