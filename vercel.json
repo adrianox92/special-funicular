@@ -1,6 +1,5 @@
 {
-  "installCommand": "cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/build",
-  "framework": null
+  "framework": null,
+  "buildCommand": "NODE_OPTIONS=--max-old-space-size=4096 npm run build",
+  "outputDirectory": "build"
 }
