@@ -43,6 +43,7 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
 
   useEffect(() => {
     loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitionId]);
 
   const openModal = (category = null) => {

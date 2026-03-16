@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, Car, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2 } from 'lucide-react';
+import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2 } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
 import CompetitionCategories from '../components/CompetitionCategories';

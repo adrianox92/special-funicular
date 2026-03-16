@@ -16,7 +16,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
   const [showRuleModal, setShowRuleModal] = useState(false);
   const [showTemplatesDrawer, setShowTemplatesDrawer] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
-  const [competition, setCompetition] = useState(null);
+  const [, setCompetition] = useState(null);
   const [timesRegistered, setTimesRegistered] = useState(0);
 
   useEffect(() => {
@@ -42,6 +42,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
 
   useEffect(() => {
     loadRules();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitionId]);
 
   const openRuleModal = (rule = null) => {

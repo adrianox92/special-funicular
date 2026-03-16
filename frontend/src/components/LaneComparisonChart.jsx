@@ -51,6 +51,7 @@ const LaneComparisonChart = () => {
     if (selectedCircuit) {
       loadLaneData(selectedCircuit);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCircuit]);
 
   const loadLaneData = async (circuit) => {

@@ -64,6 +64,7 @@ const CompetitionSignup = () => {
   useEffect(() => {
     loadCompetition();
     axios.get(`/public-signup/${slug}/status`).then(res => setStatus(res.data.status)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const handleSubmit = async (e) => {

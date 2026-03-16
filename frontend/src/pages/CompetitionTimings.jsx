@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Plus,
   ArrowLeft,
-  Clock,
-  Check,
   AlertTriangle,
   Trophy,
   Users,
@@ -78,7 +76,7 @@ const CompetitionTimings = () => {
     circuit_id: '',
   });
 
-  const [rules, setRules] = useState([]);
+  const [, setRules] = useState([]);
   const [pointsByParticipant, setPointsByParticipant] = useState({});
 
   // Estados para el modal de penalización
@@ -179,12 +177,14 @@ const CompetitionTimings = () => {
   // Memo: getAggregatedTimes
   const aggregatedTimes = useMemo(
     () => getAggregatedTimes(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [timings, competition]
   );
 
   // Cargar datos de la competición
   useEffect(() => {
     loadCompetitionData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadCompetitionData = async () => {
@@ -307,7 +307,7 @@ const CompetitionTimings = () => {
     }
   };
 
-  const handleDeleteTiming = async (timingId) => {
+  const handleDeleteTiming = async (timingId) => { // eslint-disable-line no-unused-vars
     if (!window.confirm('¿Estás seguro de que quieres eliminar este tiempo?')) {
       return;
     }
@@ -363,7 +363,7 @@ const CompetitionTimings = () => {
   };
 
   // Función para obtener participantes que han completado todas las rondas
-  const getParticipantsWithAllRounds = () => {
+  const getParticipantsWithAllRounds = () => { // eslint-disable-line no-unused-vars
     const participantRounds = {};
 
     // Contar rondas completadas por cada participante

@@ -61,6 +61,7 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
   useEffect(() => {
     loadSignups();
     loadVehicles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitionId]);
 
   const openApproveModal = (signup) => {

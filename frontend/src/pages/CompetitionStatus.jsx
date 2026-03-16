@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Flag, Clock, Check, AlertTriangle, Download, Tv, Medal, Star, Route } from 'lucide-react';
+import { Trophy, Users, Flag, Clock, Check, Download, Tv, Star, Route } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
@@ -35,6 +35,7 @@ const CompetitionStatus = () => {
 
   useEffect(() => {
     loadCompetitionStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const loadCompetitionStatus = async () => {

@@ -31,13 +31,14 @@ const CompetitionPresentation = () => {
 
   useEffect(() => {
     fetchData();
-    
+
     // Auto-actualización cada 10 segundos
     const interval = setInterval(() => {
       fetchData();
     }, 10000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   if (loading) {

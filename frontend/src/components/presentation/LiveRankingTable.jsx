@@ -133,8 +133,7 @@ const LiveRankingTable = ({ participants }) => {
           <tbody>
             {participantsWithGaps.map((participant, index) => {
               const position = index + 1;
-              const totalTime = participant.total_time_timestamp || 0; // Ya incluye penalizaciones
-              
+
               return (
                 <tr key={participant.id} className={getPositionClass(position)}>
                   <td className="position-cell">
