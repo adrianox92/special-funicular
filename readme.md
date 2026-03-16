@@ -583,6 +583,15 @@ Los estilos están organizados en:
 - **Light/Dark**: CSS variables (`--background`, `--foreground`, `--primary`, etc.)
 - **Primary**: oklch-based palette (adapts to theme)
 
+## 🚀 Deploy en Vercel
+
+El proyecto incluye configuración para desplegar el frontend en Vercel:
+
+- **vercel.json**: Define `rootDirectory: "frontend"` para que Vercel construya solo el frontend
+- **postinstall**: Actualiza la base de datos de Browserslist (`caniuse-lite`) tras `npm install` para evitar warnings en el build
+
+Si el build falla por memoria, añade en Vercel → Settings → Environment Variables: `NODE_OPTIONS=--max-old-space-size=4096`
+
 ## 🤝 Contribución
 
 1. Fork el proyecto
