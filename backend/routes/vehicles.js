@@ -268,17 +268,34 @@ router.get('/', async (req, res) => {
     // Traer las imágenes solo para los vehículos de la página actual
     const { data: images, error: imageError } = await supabase
       .from('vehicle_images')
-      .select('vehicle_id, image_url')
+      .select('vehicle_id, image_url, view_type')
       .in('vehicle_id', vehicleIds);
 
     if (imageError) throw imageError;
 
-    // Asociar la primera imagen por vehicle_id
-    const imagesMap = new Map();
+    // Agrupar imágenes por vehicle_id y seleccionar con prioridad:
+    // three_quarters > left/right > primera disponible
+    const imagesByVehicle = new Map();
     for (const img of images) {
-      if (!imagesMap.has(img.vehicle_id)) {
-        imagesMap.set(img.vehicle_id, img.image_url);
+      if (!imagesByVehicle.has(img.vehicle_id)) {
+        imagesByVehicle.set(img.vehicle_id, []);
       }
+      imagesByVehicle.get(img.vehicle_id).push(img);
+    }
+
+    const imagesMap = new Map();
+    for (const [vehicleId, imgs] of imagesByVehicle) {
+      const threeQuarters = imgs.find(i => i.view_type === 'three_quarters');
+      if (threeQuarters) {
+        imagesMap.set(vehicleId, threeQuarters.image_url);
+        continue;
+      }
+      const lateral = imgs.find(i => i.view_type === 'left' || i.view_type === 'right');
+      if (lateral) {
+        imagesMap.set(vehicleId, lateral.image_url);
+        continue;
+      }
+      imagesMap.set(vehicleId, imgs[0].image_url);
     }
 
     const result = vehicles.map(v => ({
