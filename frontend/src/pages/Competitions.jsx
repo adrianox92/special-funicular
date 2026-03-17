@@ -25,6 +25,17 @@ import {
   DialogTrigger,
 } from '../components/ui/dialog';
 import { Spinner } from '../components/ui/spinner';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
 const Competitions = () => {
   const [competitions, setCompetitions] = useState([]);
@@ -40,6 +51,7 @@ const Competitions = () => {
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, competitionId: null });
 
   const navigate = useNavigate();
 
@@ -112,17 +124,19 @@ const Competitions = () => {
     }
   };
 
-  const handleDeleteCompetition = async (competitionId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta competición? Esta acción no se puede deshacer.')) {
-      return;
-    }
+  const handleDeleteCompetition = (competitionId) => {
+    setDeleteConfirm({ open: true, competitionId });
+  };
 
+  const confirmDeleteCompetition = async () => {
+    if (!deleteConfirm.competitionId) return;
     try {
-      await axios.delete(`/competitions/${competitionId}`);
+      await axios.delete(`/competitions/${deleteConfirm.competitionId}`);
+      setDeleteConfirm({ open: false, competitionId: null });
       loadCompetitions();
     } catch (err) {
       console.error('Error al eliminar competición:', err);
-      alert('Error al eliminar la competición');
+      toast.error('Error al eliminar la competición');
     }
   };
 
@@ -151,6 +165,23 @@ const Competitions = () => {
           <h1 className="text-2xl font-bold">Mis Competiciones</h1>
           <p className="text-muted-foreground">Gestiona tus competiciones y participantes</p>
         </div>
+        <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, competitionId: null })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar competición?</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Estás seguro de que quieres eliminar esta competición? Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteCompetition} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">

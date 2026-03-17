@@ -1,15 +1,28 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Download, Trash2, Calendar, MapPin } from 'lucide-react';
+import { Download, Trash2, Calendar, MapPin, Gauge } from 'lucide-react';
 import api from '../lib/axios';
+import { formatDistance } from '../utils/formatUtils';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import placeholderImage from '../assets/images/placeholder.png';
 
 const VehicleCard = ({ vehicle, onDelete }) => {
   const navigate = useNavigate();
   const imgRef = useRef(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (imgRef.current) {
@@ -19,16 +32,19 @@ const VehicleCard = ({ vehicle, onDelete }) => {
     }
   }, []);
 
-  const handleDelete = async (e) => {
+  const handleDelete = (e) => {
     e.stopPropagation();
-    if (window.confirm('¿Estás seguro de que quieres eliminar este vehículo? Esta acción no se puede deshacer.')) {
-      try {
-        await api.delete(`/vehicles/${vehicle.id}`);
-        if (onDelete) onDelete(vehicle.id);
-      } catch (error) {
-        console.error('Error al eliminar vehículo:', error);
-        alert('Error al eliminar el vehículo');
-      }
+    setDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/vehicles/${vehicle.id}`);
+      setDeleteConfirm(false);
+      if (onDelete) onDelete(vehicle.id);
+    } catch (error) {
+      console.error('Error al eliminar vehículo:', error);
+      toast.error('Error al eliminar el vehículo');
     }
   };
 
@@ -45,12 +61,30 @@ const VehicleCard = ({ vehicle, onDelete }) => {
       link.remove();
     } catch (error) {
       console.error('Error al descargar la ficha técnica:', error);
-      alert('Error al descargar la ficha técnica');
+      toast.error('Error al descargar la ficha técnica');
     }
   };
 
   return (
-    <Card className="relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/vehicles/${vehicle.id}`)}>
+    <>
+      <AlertDialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar vehículo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar este vehículo? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Card className="relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/vehicles/${vehicle.id}`)}>
       {vehicle.modified && (
         <Badge className="absolute top-2 left-2 z-10">Modificado</Badge>
       )}
@@ -103,9 +137,16 @@ const VehicleCard = ({ vehicle, onDelete }) => {
               {vehicle.purchase_place}
             </div>
           )}
+          {vehicle.total_distance_meters != null && vehicle.total_distance_meters > 0 && (
+            <div className="flex items-center gap-1">
+              <Gauge className="size-3" />
+              Odómetro: {formatDistance(vehicle.total_distance_meters)}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
+    </>
   );
 };
 

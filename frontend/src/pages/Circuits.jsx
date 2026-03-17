@@ -16,6 +16,17 @@ import {
   DialogTrigger,
 } from '../components/ui/dialog';
 import { Spinner } from '../components/ui/spinner';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { Textarea } from '../components/ui/textarea';
 
 const Circuits = () => {
@@ -32,6 +43,7 @@ const Circuits = () => {
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, circuit: null });
 
   const loadCircuits = async () => {
     try {
@@ -142,14 +154,19 @@ const Circuits = () => {
     }
   };
 
-  const handleDelete = async (circuit) => {
-    if (!window.confirm(`¿Eliminar el circuito "${circuit.name}"?`)) return;
+  const handleDelete = (circuit) => {
+    setDeleteConfirm({ open: true, circuit });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.circuit) return;
     try {
-      await axios.delete(`/circuits/${circuit.id}`);
+      await axios.delete(`/circuits/${deleteConfirm.circuit.id}`);
+      setDeleteConfirm({ open: false, circuit: null });
       loadCircuits();
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.usedBy;
-      alert(msg || 'Error al eliminar el circuito');
+      toast.error(msg || 'Error al eliminar el circuito');
     }
   };
 
@@ -168,6 +185,25 @@ const Circuits = () => {
           <h1 className="text-2xl font-bold">Circuitos</h1>
           <p className="text-muted-foreground">Gestiona tus circuitos con número de carriles y longitudes</p>
         </div>
+        <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, circuit: null })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar circuito?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteConfirm.circuit
+                  ? `¿Eliminar el circuito "${deleteConfirm.circuit.name}"? Esta acción no se puede deshacer.`
+                  : 'Esta acción no se puede deshacer.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingCircuit(null); }}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2" onClick={handleOpenCreate}>

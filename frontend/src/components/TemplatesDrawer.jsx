@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from './ui/sheet';
 import { Spinner } from './ui/spinner';
+import { toast } from 'sonner';
 
 const TemplatesDrawer = ({ show, onHide, competitionId, onTemplateApplied, disabled = false }) => {
   const [templates, setTemplates] = useState([]);
@@ -65,7 +66,7 @@ const TemplatesDrawer = ({ show, onHide, competitionId, onTemplateApplied, disab
       onHide();
     } catch (err) {
       console.error('Error al aplicar plantilla:', err);
-      alert(err.response?.data?.error || 'Error al aplicar la plantilla');
+      toast.error(err.response?.data?.error || 'Error al aplicar la plantilla');
     } finally {
       setApplying(false);
     }

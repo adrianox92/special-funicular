@@ -36,6 +36,17 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Spinner } from '../components/ui/spinner';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
 const CompetitionParticipants = () => {
   const { id: competitionId } = useParams();
@@ -58,6 +69,7 @@ const CompetitionParticipants = () => {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [participantType, setParticipantType] = useState('own');
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, participantId: null });
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState(null);
@@ -188,16 +200,21 @@ const CompetitionParticipants = () => {
     setShowEditModal(true);
   }, []);
 
-  const handleDeleteParticipant = useCallback(async (participantId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este participante?')) return;
+  const handleDeleteParticipant = useCallback((participantId) => {
+    setDeleteConfirm({ open: true, participantId });
+  }, []);
+
+  const confirmDeleteParticipant = useCallback(async () => {
+    if (!deleteConfirm.participantId) return;
     try {
-      await axios.delete(`/competitions/${competitionId}/participants/${participantId}`);
+      await axios.delete(`/competitions/${competitionId}/participants/${deleteConfirm.participantId}`);
+      setDeleteConfirm({ open: false, participantId: null });
       loadCompetition();
     } catch (err) {
       console.error('Error al eliminar participante:', err);
-      alert('Error al eliminar el participante');
+      toast.error('Error al eliminar el participante');
     }
-  }, [competitionId, loadCompetition]);
+  }, [competitionId, loadCompetition, deleteConfirm.participantId]);
 
   const getVehicleInfo = useCallback((participant) => {
     if (participant.vehicle_id && participant.vehicles) {
@@ -261,6 +278,23 @@ const CompetitionParticipants = () => {
 
   return (
     <div className="space-y-6">
+      <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, participantId: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar participante?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar este participante? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteParticipant} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -281,7 +315,7 @@ const CompetitionParticipants = () => {
                 size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(publicLink);
-                  alert('Enlace copiado al portapapeles');
+                  toast.success('Enlace copiado al portapapeles');
                 }}
                 title="Copiar enlace de inscripción pública"
               >
@@ -382,7 +416,7 @@ const CompetitionParticipants = () => {
                   className="text-sm font-medium text-primary break-all cursor-pointer select-all"
                   onClick={() => {
                     navigator.clipboard.writeText(statusLink);
-                    alert('Enlace copiado al portapapeles');
+                    toast.success('Enlace copiado al portapapeles');
                   }}
                   title="Haz clic para copiar"
                 >

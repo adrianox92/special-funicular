@@ -6,6 +6,17 @@ import { Card, CardContent, CardHeader } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Spinner } from './ui/spinner';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import RuleFormModal from './RuleFormModal';
 import TemplatesDrawer from './TemplatesDrawer';
 
@@ -18,6 +29,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
   const [editingRule, setEditingRule] = useState(null);
   const [, setCompetition] = useState(null);
   const [timesRegistered, setTimesRegistered] = useState(0);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, ruleId: null });
 
   useEffect(() => {
     if (competitionId) {
@@ -50,15 +62,20 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
     setShowRuleModal(true);
   };
 
-  const handleDelete = async (ruleId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta regla? Esta acción no se puede deshacer.')) return;
+  const handleDelete = (ruleId) => {
+    setDeleteConfirm({ open: true, ruleId });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.ruleId) return;
     try {
-      await axios.delete(`/competition-rules/${ruleId}`);
+      await axios.delete(`/competition-rules/${deleteConfirm.ruleId}`);
+      setDeleteConfirm({ open: false, ruleId: null });
       loadRules();
       onRuleChange?.();
     } catch (err) {
       console.error('Error al eliminar regla:', err);
-      alert('Error al eliminar la regla');
+      toast.error('Error al eliminar la regla');
     }
   };
 
@@ -221,6 +238,23 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, ruleId: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar regla?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar esta regla? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <RuleFormModal
         show={showRuleModal}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { Download, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { toast } from 'sonner';
 import { Input } from '../components/ui/input';
 
 const VehicleList = () => {
@@ -81,7 +82,7 @@ const VehicleList = () => {
       document.body.removeChild(link);
     } catch (error) {
       console.error('Error al exportar a CSV:', error);
-      alert('Error al exportar los datos a CSV');
+      toast.error('Error al exportar los datos a CSV');
     }
   };
 

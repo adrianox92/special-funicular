@@ -23,6 +23,17 @@ import {
   SelectValue,
 } from './ui/select';
 import { Spinner } from './ui/spinner';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 
 const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
   const [signups, setSignups] = useState([]);
@@ -34,6 +45,7 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
   const [selectedSignup, setSelectedSignup] = useState(null);
   const [approveForm, setApproveForm] = useState({ vehicle_id: '', vehicle_model: '' });
   const [vehicles, setVehicles] = useState([]);
+  const [rejectConfirm, setRejectConfirm] = useState({ open: false, signupId: null });
 
   const loadSignups = async () => {
     try {
@@ -96,15 +108,20 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
     }
   };
 
-  const handleRejectSignup = async (signupId) => {
-    if (!window.confirm('¿Estás seguro de que quieres rechazar esta inscripción?')) return;
+  const handleRejectSignup = (signupId) => {
+    setRejectConfirm({ open: true, signupId });
+  };
+
+  const confirmRejectSignup = async () => {
+    if (!rejectConfirm.signupId) return;
     try {
-      await axios.delete(`/competitions/${competitionId}/signups/${signupId}`);
+      await axios.delete(`/competitions/${competitionId}/signups/${rejectConfirm.signupId}`);
+      setRejectConfirm({ open: false, signupId: null });
       loadSignups();
       onSignupApproved?.();
     } catch (err) {
       console.error('Error al rechazar inscripción:', err);
-      alert('Error al rechazar la inscripción');
+      toast.error('Error al rechazar la inscripción');
     }
   };
 
@@ -208,6 +225,23 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={rejectConfirm.open} onOpenChange={(open) => !open && setRejectConfirm({ open: false, signupId: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Rechazar inscripción?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres rechazar esta inscripción? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRejectSignup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Rechazar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showApproveModal} onOpenChange={setShowApproveModal}>
         <DialogContent>

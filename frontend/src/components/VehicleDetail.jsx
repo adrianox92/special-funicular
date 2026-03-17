@@ -6,6 +6,20 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
 import { Spinner } from './ui/spinner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+} from './ui/dialog';
 import { Switch } from './ui/switch';
 
 const imageFields = [
@@ -26,6 +40,8 @@ const VehicleDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deletingImage, setDeletingImage] = useState(null);
+  const [deleteImageConfirm, setDeleteImageConfirm] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,8 +64,14 @@ const VehicleDetail = () => {
     fetchData();
   }, [id]);
 
-  const handleDeleteImage = async (viewType) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta imagen?')) return;
+  const handleDeleteImage = (viewType) => {
+    setDeleteImageConfirm(viewType);
+  };
+
+  const confirmDeleteImage = async () => {
+    if (!deleteImageConfirm) return;
+    const viewType = deleteImageConfirm;
+    setDeleteImageConfirm(null);
     setDeletingImage(viewType);
     try {
       await axios.delete(`http://localhost:5001/api/vehicles/${id}/images/${viewType}`);
@@ -75,7 +97,37 @@ const VehicleDetail = () => {
   if (!vehicle) return null;
 
   return (
-    <div className="space-y-6 mt-6">
+    <>
+      <AlertDialog open={!!deleteImageConfirm} onOpenChange={(open) => !open && setDeleteImageConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar imagen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar esta imagen? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteImage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-2 overflow-auto">
+          {lightboxImage && (
+            <img
+              src={lightboxImage.url}
+              alt={lightboxImage.label}
+              className="max-w-full max-h-[90vh] w-auto h-auto object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <div className="space-y-6 mt-6">
       <h2 className="text-2xl font-bold">Detalle Vehículo</h2>
       <form className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -117,7 +169,12 @@ const VehicleDetail = () => {
                   <div className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 relative min-h-[120px] bg-muted/30">
                     {images[name] ? (
                       <>
-                        <img src={images[name]} alt={label} className="max-w-full max-h-[90px] object-contain" />
+                        <img
+                          src={images[name]}
+                          alt={label}
+                          className="max-w-full max-h-[90px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={(e) => { e.stopPropagation(); setLightboxImage({ url: images[name], label }); }}
+                        />
                         <Button
                           variant="destructive"
                           size="icon"
@@ -143,6 +200,7 @@ const VehicleDetail = () => {
         </div>
       </form>
     </div>
+    </>
   );
 };
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -21,6 +22,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import InstallPWAButton from './components/InstallPWAButton';
 import { logPWADiagnostics } from './utils/pwaDiagnostics';
 import { Spinner } from './components/ui/spinner';
+import { Toaster } from './components/ui/sonner';
 
 const PageLayout = ({ children }) => (
   <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
@@ -162,6 +164,8 @@ function App() {
         <div>
           <InstallPWAButton />
           <AppContent />
+          <Toaster richColors position="top-right" />
+          <Analytics />
         </div>
       </Router>
     </AuthProvider>

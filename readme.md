@@ -43,6 +43,10 @@ Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo qu
 3. Haz clic en el icono y selecciona "Instalar"
 4. La app se abrirá en una ventana independiente
 
+### 📊 Vercel Web Analytics
+
+The application includes [Vercel Web Analytics](https://vercel.com/docs/analytics/quickstart) for visitor insights and page view tracking. Analytics are enabled automatically when deployed to Vercel. Enable Web Analytics in your Vercel project dashboard under **Analytics** to start collecting data.
+
 ### 🔧 Requisitos Técnicos PWA
 
 - **HTTPS obligatorio**: La PWA requiere conexión segura en producción
@@ -100,6 +104,32 @@ Si no ves el botón de instalación:
 **Archivos añadidos**:
 - `frontend/src/components/LaneComparisonChart.jsx` - Componente principal de comparativa
 - Integración en `frontend/src/pages/Dashboard.jsx`
+
+#### Shadcn UI: Toast and AlertDialog
+**Description**: All native browser `alert()` and `window.confirm()` dialogs have been replaced with Shadcn UI components for a consistent, accessible user experience.
+
+**Features**:
+- **Toast notifications (Sonner)**: Error, success, and warning messages now appear as non-blocking toast notifications in the top-right corner
+- **AlertDialog**: Confirmation dialogs (e.g., delete vehicle, remove participant) use Shadcn's AlertDialog with proper styling and accessibility
+- **Theme-aware**: Toasts respect the app's light/dark theme
+
+**Components added**:
+- `frontend/src/components/ui/alert-dialog.jsx` - AlertDialog for confirmations
+- `frontend/src/components/ui/sonner.jsx` - Toast notifications (Toaster + toast from sonner package)
+
+**Usage**: Import `toast` from `sonner` for notifications (`toast.error()`, `toast.success()`, `toast.warning()`). Use AlertDialog for confirmation flows.
+
+#### Vehicle Image Lightbox
+**Description**: In the vehicle detail page, clicking on any photograph in the gallery opens it in a lightbox at full/original size.
+
+**Features**:
+- Click on any vehicle image to view it enlarged
+- Modal overlay with the image at maximum viewable size (up to 95% of viewport)
+- Close by clicking the X button or outside the image
+- Cursor indicates images are clickable
+
+**Files modified**:
+- `frontend/src/components/VehicleDetail.jsx` - Added Dialog lightbox for image viewing
 
 ### 🔧 Problemas Resueltos
 

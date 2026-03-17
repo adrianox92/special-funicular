@@ -16,6 +16,17 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { Spinner } from './ui/spinner';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 
 const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
   const [categories, setCategories] = useState([]);
@@ -26,6 +37,7 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({ name: '' });
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, categoryId: null });
 
   const loadCategories = async () => {
     try {
@@ -80,15 +92,20 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
     }
   };
 
-  const handleDelete = async (categoryId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta categoría? Esta acción no se puede deshacer.')) return;
+  const handleDelete = (categoryId) => {
+    setDeleteConfirm({ open: true, categoryId });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.categoryId) return;
     try {
-      await axios.delete(`/competitions/${competitionId}/categories/${categoryId}`);
+      await axios.delete(`/competitions/${competitionId}/categories/${deleteConfirm.categoryId}`);
+      setDeleteConfirm({ open: false, categoryId: null });
       loadCategories();
       onCategoryChange?.();
     } catch (err) {
       console.error('Error al eliminar categoría:', err);
-      alert('Error al eliminar la categoría');
+      toast.error('Error al eliminar la categoría');
     }
   };
 
@@ -165,6 +182,23 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, categoryId: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar esta categoría? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent>

@@ -28,6 +28,16 @@ import {
   TableRow,
 } from './ui/table';
 import { cn } from './ui/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { formatDistance } from '../utils/formatUtils';
 
 const imageFields = [
@@ -84,6 +94,7 @@ const EditVehicle = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deletingImage, setDeletingImage] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const imageRefs = useRef({});
   const [activeTab, setActiveTab] = useState('general');
   const [technicalSpecs, setTechnicalSpecs] = useState({
@@ -269,11 +280,14 @@ const EditVehicle = () => {
     }
   };
 
-  const handleDeleteImage = async (viewType) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
-      return;
-    }
+  const handleDeleteImage = (viewType) => {
+    setDeleteConfirm({ type: 'image', viewType });
+  };
 
+  const confirmDeleteImage = async () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'image') return;
+    const viewType = deleteConfirm.viewType;
+    setDeleteConfirm(null);
     setDeletingImage(viewType);
     try {
       await api.delete(`/vehicles/${id}/images/${viewType}`);
@@ -395,11 +409,14 @@ const EditVehicle = () => {
     }
   };
 
-  const handleDeleteSpec = async (specId, componentId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta especificación?')) {
-      return;
-    }
+  const handleDeleteSpec = (specId, componentId) => {
+    setDeleteConfirm({ type: 'spec', specId, componentId });
+  };
 
+  const confirmDeleteSpec = async () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'spec') return;
+    const { specId, componentId } = deleteConfirm;
+    setDeleteConfirm(null);
     try {
       await api.delete(`/vehicles/${id}/technical-specs/${specId}/components/${componentId}`);
       const response = await api.get(`/vehicles/${id}/technical-specs`);
@@ -620,11 +637,14 @@ const EditVehicle = () => {
     }
   };
 
-  const handleDeleteTiming = async (timingId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este registro de tiempo?')) {
-      return;
-    }
+  const handleDeleteTiming = (timingId) => {
+    setDeleteConfirm({ type: 'timing', timingId });
+  };
 
+  const confirmDeleteTiming = async () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'timing') return;
+    const timingId = deleteConfirm.timingId;
+    setDeleteConfirm(null);
     try {
       const response = await api.delete(`/vehicles/${id}/timings/${timingId}`);
 
@@ -1114,8 +1134,54 @@ const EditVehicle = () => {
     );
   }
 
+  const getConfirmDialogContent = () => {
+    if (!deleteConfirm) return null;
+    if (deleteConfirm.type === 'image') {
+      return {
+        title: '¿Eliminar imagen?',
+        description: '¿Estás seguro de que quieres eliminar esta imagen? Esta acción no se puede deshacer.',
+        onConfirm: confirmDeleteImage
+      };
+    }
+    if (deleteConfirm.type === 'spec') {
+      return {
+        title: '¿Eliminar especificación?',
+        description: '¿Estás seguro de que quieres eliminar esta especificación? Esta acción no se puede deshacer.',
+        onConfirm: confirmDeleteSpec
+      };
+    }
+    if (deleteConfirm.type === 'timing') {
+      return {
+        title: '¿Eliminar registro de tiempo?',
+        description: '¿Estás seguro de que quieres eliminar este registro de tiempo? Esta acción no se puede deshacer.',
+        onConfirm: confirmDeleteTiming
+      };
+    }
+    return null;
+  };
+
+  const confirmContent = getConfirmDialogContent();
+
   return (
-    <div className="container mt-4">
+    <>
+      {confirmContent && (
+        <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmContent.title}</AlertDialogTitle>
+              <AlertDialogDescription>{confirmContent.description}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmContent.onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      <div className="container mt-4">
       <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold">Editar Vehículo{vehicle.model ? `: ${vehicle.model}` : ''}</h2>
@@ -1305,6 +1371,7 @@ const EditVehicle = () => {
         timing={selectedTiming}
       />
     </div>
+    </>
   );
 };
 

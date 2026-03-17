@@ -47,6 +47,17 @@ import {
   TooltipTrigger,
 } from '../components/ui/tooltip';
 import { Spinner } from '../components/ui/spinner';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
 const CompetitionTimings = () => {
   const { id } = useParams();
@@ -84,6 +95,7 @@ const CompetitionTimings = () => {
   const [penaltyTiming, setPenaltyTiming] = useState(null);
   const [penaltyValue, setPenaltyValue] = useState(0);
   const [penaltyLoading, setPenaltyLoading] = useState(false);
+  const [deleteTimingConfirm, setDeleteTimingConfirm] = useState({ open: false, timingId: null });
 
   // Memo: Mapa de participantes por ID
   const participantsMap = useMemo(() => {
@@ -281,7 +293,7 @@ const CompetitionTimings = () => {
       formData.round_number &&
       getAvailableParticipantsForRound(formData.round_number).length === 0
     ) {
-      alert(
+      toast.warning(
         'No hay participantes disponibles para esta ronda. Todos ya tienen tiempo registrado.'
       );
       return;
@@ -307,17 +319,19 @@ const CompetitionTimings = () => {
     }
   };
 
-  const handleDeleteTiming = async (timingId) => { // eslint-disable-line no-unused-vars
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este tiempo?')) {
-      return;
-    }
+  const handleDeleteTiming = (timingId) => {
+    setDeleteTimingConfirm({ open: true, timingId });
+  };
 
+  const confirmDeleteTiming = async () => {
+    if (!deleteTimingConfirm.timingId) return;
     try {
-      await axios.delete(`/competitions/${id}/timings/${timingId}`);
-      loadCompetitionData(); // Recargar datos
+      await axios.delete(`/competitions/${id}/timings/${deleteTimingConfirm.timingId}`);
+      setDeleteTimingConfirm({ open: false, timingId: null });
+      loadCompetitionData();
     } catch (error) {
       console.error('Error al eliminar tiempo:', error);
-      setError(error.response?.data?.error || 'Error al eliminar el tiempo');
+      toast.error(error.response?.data?.error || 'Error al eliminar el tiempo');
     }
   };
 
@@ -439,7 +453,7 @@ const CompetitionTimings = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error al exportar CSV:', error);
-      alert('Error al exportar los datos a CSV');
+      toast.error('Error al exportar los datos a CSV');
     }
   };
 
@@ -463,7 +477,7 @@ const CompetitionTimings = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error al exportar PDF:', error);
-      alert('Error al exportar los datos a PDF');
+      toast.error('Error al exportar los datos a PDF');
     }
   };
 
@@ -490,7 +504,7 @@ const CompetitionTimings = () => {
       handleClosePenaltyModal();
       loadCompetitionData();
     } catch (err) {
-      alert('Error al guardar la penalización');
+      toast.error('Error al guardar la penalización');
     } finally {
       setPenaltyLoading(false);
     }
@@ -568,6 +582,23 @@ const CompetitionTimings = () => {
 
   return (
     <TooltipProvider>
+      <AlertDialog open={deleteTimingConfirm.open} onOpenChange={(open) => !open && setDeleteTimingConfirm({ open: false, timingId: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar tiempo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar este tiempo? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTiming} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="mt-4 max-w-7xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex flex-col gap-4 mb-4">
