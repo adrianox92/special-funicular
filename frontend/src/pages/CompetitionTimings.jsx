@@ -319,10 +319,6 @@ const CompetitionTimings = () => {
     }
   };
 
-  const handleDeleteTiming = (timingId) => {
-    setDeleteTimingConfirm({ open: true, timingId });
-  };
-
   const confirmDeleteTiming = async () => {
     if (!deleteTimingConfirm.timingId) return;
     try {
