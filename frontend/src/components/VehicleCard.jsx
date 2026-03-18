@@ -108,6 +108,8 @@ const VehicleCard = ({ vehicle, onDelete }) => {
         <div className="flex flex-wrap gap-1 mt-2">
           <Badge variant="secondary">{vehicle.type}</Badge>
           <Badge variant="secondary">{vehicle.traction}</Badge>
+          {vehicle.museo && <Badge variant="secondary">Museo</Badge>}
+          {vehicle.taller && <Badge variant="secondary">Taller</Badge>}
         </div>
         <div className="mt-3 text-sm">
           {vehicle.total_price !== undefined && vehicle.total_price !== null && vehicle.total_price !== vehicle.price ? (

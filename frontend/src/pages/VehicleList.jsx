@@ -2,10 +2,16 @@ import React, { useState, useEffect } from 'react';
 import VehicleCard from '../components/VehicleCard';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
-import { Download, Plus } from 'lucide-react';
+import { Download, Plus, ChevronDown } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '../components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 
 const VehicleList = () => {
   const navigate = useNavigate();
@@ -13,7 +19,7 @@ const VehicleList = () => {
   const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
-  const [filters, setFilters] = useState({ manufacturer: '', type: '', modified: '', digital: '' });
+  const [filters, setFilters] = useState({ manufacturer: '', type: '', modified: '', digital: '', filterMuseo: false, filterTaller: false });
 
   const loadVehicles = async (page = 1) => {
     try {
@@ -40,7 +46,14 @@ const VehicleList = () => {
       const t = filters.type ? v.type === filters.type : true;
       const mo = filters.modified === '' ? true : filters.modified === 'Sí' ? v.modified : !v.modified;
       const d = filters.digital === '' ? true : filters.digital === 'Digital' ? v.digital : !v.digital;
-      return m && t && mo && d;
+      const museoTaller = !filters.filterMuseo && !filters.filterTaller
+        ? true
+        : filters.filterMuseo && filters.filterTaller
+          ? (v.museo || v.taller)
+          : filters.filterMuseo
+            ? v.museo
+            : v.taller;
+      return m && t && mo && d && museoTaller;
     });
     setFiltered(result);
   }, [filters, vehicles]);
@@ -107,22 +120,48 @@ const VehicleList = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Input placeholder="Buscar por fabricante..." value={filters.manufacturer} onChange={e => setFilters({ ...filters, manufacturer: e.target.value })} />
-        <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}>
+      <div className="flex flex-wrap gap-4">
+        <Input placeholder="Buscar por fabricante..." value={filters.manufacturer} onChange={e => setFilters({ ...filters, manufacturer: e.target.value })} className="min-w-[140px] flex-1" />
+        <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}>
           <option value="">Todos los tipos</option>
           {['Rally', 'GT', 'LMP', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.modified} onChange={e => setFilters({ ...filters, modified: e.target.value })}>
+        <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.modified} onChange={e => setFilters({ ...filters, modified: e.target.value })}>
           <option value="">Modificado/Serie</option>
           <option value="Sí">Modificado</option>
           <option value="No">Serie</option>
         </select>
-        <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.digital} onChange={e => setFilters({ ...filters, digital: e.target.value })}>
+        <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.digital} onChange={e => setFilters({ ...filters, digital: e.target.value })}>
           <option value="">Digital/Analógico</option>
           <option value="Digital">Digital</option>
           <option value="Analógico">Analógico</option>
         </select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="h-9 min-w-[140px] flex-1 justify-between px-3 text-sm font-normal">
+              <span className="truncate">
+                {!filters.filterMuseo && !filters.filterTaller
+                  ? 'Museo / Taller'
+                  : [filters.filterMuseo && 'Museo', filters.filterTaller && 'Taller'].filter(Boolean).join(', ')}
+              </span>
+              <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+            <DropdownMenuCheckboxItem
+              checked={filters.filterMuseo}
+              onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterMuseo: !!checked }))}
+            >
+              Museo
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={filters.filterTaller}
+              onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterTaller: !!checked }))}
+            >
+              Taller
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

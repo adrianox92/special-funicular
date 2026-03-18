@@ -74,7 +74,9 @@ Si no ves el botón de instalación:
 - **Taller** (boolean): Indicates if the vehicle is in workshop/maintenance
 - **Anotaciones** (text): Free-form textarea for user comments and notes on the vehicle card
 
-**Usage**: Available in Add Vehicle form, Edit Vehicle form, Vehicle Detail view, and exported PDF technical sheet.
+**Usage**: Available in Add Vehicle form, Edit Vehicle form, Vehicle Detail view, exported PDF technical sheet, vehicle list badges, and collection filters.
+
+**List view**: Museo and Taller appear as badges on vehicle cards (next to type and traction). Two new filters in the collection list allow filtering by Museo and Taller; both filters can be applied simultaneously (e.g. show only vehicles in museum AND in workshop).
 
 **Database**: Run `backend/scripts/add-museo-taller-anotaciones-fields.sql` in Supabase SQL Editor to add the new columns.
 
@@ -84,6 +86,8 @@ Si no ves el botón de instalación:
 - `frontend/src/components/AddVehicle.jsx` - Form fields
 - `frontend/src/components/EditVehicle.jsx` - Form fields
 - `frontend/src/components/VehicleDetail.jsx` - Read-only display
+- `frontend/src/components/VehicleCard.jsx` - Museo/Taller badges in list
+- `frontend/src/pages/VehicleList.jsx` - Museo/Taller filters (both can be applied at once)
 - `backend/src/utils/pdfGenerator.js` - PDF technical sheet
 
 #### Velocidad, Distancia y Odómetro
