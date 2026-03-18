@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import VehicleCard from '../components/VehicleCard';
+import VehicleTable from '../components/VehicleTable';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
-import { Download, Plus, ChevronDown } from 'lucide-react';
+import { Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '../components/ui/input';
@@ -13,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 const VehicleList = () => {
   const navigate = useNavigate();
   const [vehicles, setVehicles] = useState([]);
@@ -20,25 +23,46 @@ const VehicleList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
   const [filters, setFilters] = useState({ manufacturer: '', type: '', modified: '', digital: '', filterMuseo: false, filterTaller: false });
-
-  const loadVehicles = async (page = 1) => {
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('vehicleViewMode') || 'grid'; } catch { return 'grid'; }
+  });
+  const [pageSize, setPageSize] = useState(() => {
     try {
-      const response = await api.get(`/vehicles?page=${page}&limit=25`);
+      const stored = parseInt(localStorage.getItem('vehiclePageSize'), 10);
+      return PAGE_SIZE_OPTIONS.includes(stored) ? stored : 25;
+    } catch { return 25; }
+  });
+
+  const loadVehicles = useCallback(async (page = 1, limit = pageSize) => {
+    try {
+      const response = await api.get(`/vehicles?page=${page}&limit=${limit}`);
       const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
       setVehicles(vehiclesData);
       setFiltered(vehiclesData);
-      setPagination(response.data.pagination || { total: 0, page: 1, limit: 25, totalPages: 0 });
+      setPagination(response.data.pagination || { total: 0, page: 1, limit, totalPages: 0 });
     } catch (error) {
       console.error('Error al cargar vehículos:', error);
       setVehicles([]);
       setFiltered([]);
-      setPagination({ total: 0, page: 1, limit: 25, totalPages: 0 });
+      setPagination({ total: 0, page: 1, limit, totalPages: 0 });
     }
-  };
+  }, [pageSize]);
 
   useEffect(() => {
-    loadVehicles(currentPage);
-  }, [currentPage]);
+    loadVehicles(currentPage, pageSize);
+  }, [currentPage, pageSize, loadVehicles]);
+
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem('vehicleViewMode', mode); } catch {}
+  };
+
+  const handlePageSizeChange = (e) => {
+    const value = parseInt(e.target.value, 10);
+    setPageSize(value);
+    setCurrentPage(1);
+    try { localStorage.setItem('vehiclePageSize', String(value)); } catch {}
+  };
 
   useEffect(() => {
     const result = vehicles.filter(v => {
@@ -108,7 +132,27 @@ const VehicleList = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold">Mi Colección</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <div className="flex border rounded-md p-0.5" role="group" aria-label="Vista">
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => handleViewModeChange('grid')}
+              title="Vista cuadrícula"
+            >
+              <LayoutGrid className="size-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => handleViewModeChange('table')}
+              title="Vista tabla"
+            >
+              <TableIcon className="size-4" />
+            </Button>
+          </div>
           <Button variant="outline" onClick={exportToCSV}>
             <Download className="size-4 mr-2" />
             Exportar CSV
@@ -164,23 +208,51 @@ const VehicleList = () => {
         </DropdownMenu>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filtered.map(vehicle => (
-          <VehicleCard key={vehicle.id} vehicle={vehicle} onDelete={handleDeleteVehicle} />
-        ))}
-      </div>
-
-      {pagination.totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-6">
-          <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Anterior</Button>
-          {startPage > 1 && <Button variant="outline" size="sm" onClick={() => handlePageChange(1)}>1</Button>}
-          {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(n => (
-            <Button key={n} variant={n === currentPage ? 'default' : 'outline'} size="sm" onClick={() => handlePageChange(n)}>{n}</Button>
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filtered.map(vehicle => (
+            <VehicleCard key={vehicle.id} vehicle={vehicle} onDelete={handleDeleteVehicle} />
           ))}
-          {endPage < pagination.totalPages && <Button variant="outline" size="sm" onClick={() => handlePageChange(pagination.totalPages)}>{pagination.totalPages}</Button>}
-          <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === pagination.totalPages}>Siguiente</Button>
         </div>
+      ) : (
+        <VehicleTable vehicles={filtered} onDelete={handleDeleteVehicle} />
       )}
+
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+        <div className="text-sm text-muted-foreground order-2 sm:order-1">
+          {pagination.total > 0 ? (
+            <>Mostrando {(currentPage - 1) * pagination.limit + 1}–{Math.min(currentPage * pagination.limit, pagination.total)} de {pagination.total} vehículos</>
+          ) : (
+            <>No hay vehículos</>
+          )}
+        </div>
+        <div className="flex items-center gap-2 order-1 sm:order-2">
+          {pagination.totalPages > 1 && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Anterior</Button>
+              {startPage > 1 && <Button variant="outline" size="sm" onClick={() => handlePageChange(1)}>1</Button>}
+              {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(n => (
+                <Button key={n} variant={n === currentPage ? 'default' : 'outline'} size="sm" onClick={() => handlePageChange(n)}>{n}</Button>
+              ))}
+              {endPage < pagination.totalPages && <Button variant="outline" size="sm" onClick={() => handlePageChange(pagination.totalPages)}>{pagination.totalPages}</Button>}
+              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === pagination.totalPages}>Siguiente</Button>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2 order-3">
+          <label htmlFor="page-size" className="text-sm text-muted-foreground whitespace-nowrap">Por página:</label>
+          <select
+            id="page-size"
+            value={pageSize}
+            onChange={handlePageSizeChange}
+            className="flex h-9 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm"
+          >
+            {PAGE_SIZE_OPTIONS.map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </div>
+      </div>
     </div>
   );
 };

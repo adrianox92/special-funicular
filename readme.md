@@ -121,6 +121,20 @@ Si no ves el botón de instalación:
 - `frontend/src/pages/VehicleList.jsx` - Museo/Taller filters (both can be applied at once)
 - `backend/src/utils/pdfGenerator.js` - PDF technical sheet
 
+#### Vehicle List: Grid/Table View and Configurable Pagination
+**Description**: The vehicle collection list supports two view modes and configurable pagination. Users can switch between a card grid and a compact table view, and choose how many items to display per page (10, 25, 50, or 100).
+
+**Features**:
+- **Grid view**: Card layout with images, badges, and full details (default)
+- **Table view**: Compact table with thumbnail, model, type, status badges, price, purchase info, odometer, and actions (PDF download, delete)
+- **View toggle**: Icons in the header to switch between Grid and Table; preference is saved in localStorage
+- **Configurable pagination**: Selector for items per page (10, 25, 50, 100); preference is saved in localStorage
+- **Pagination bar**: Shows "Showing X–Y of Z vehicles", page navigation buttons, and page size selector
+
+**Files modified**:
+- `frontend/src/pages/VehicleList.jsx` - View modes, toggle, pagination, page size selector
+- `frontend/src/components/VehicleTable.jsx` - New compact table component for vehicle list
+
 #### Velocidad, Distancia y Odómetro
 **Descripción**: Seguimiento de distancia recorrida y velocidad (en pista y equivalente a escala real) para cada sesión de tiempos.
 
