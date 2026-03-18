@@ -70,6 +70,22 @@ Si no ves el botón de instalación:
 
 ### 🆕 Nuevas Funcionalidades
 
+#### Add Vehicle Form Validation
+**Description**: Client-side validation for required fields when creating a new vehicle.
+
+**Features**:
+- **Required fields**: Modelo (Model), Fabricante (Manufacturer), Tipo (Type)
+- **Validation on submit**: If any required field is empty, the form shows a clear message listing the missing fields
+- **Visual feedback**: Empty required fields are highlighted with a red border when validation fails
+- **UX**: Error message clears when the user edits any required field
+- **Numeric fields**: Backend converts empty price/scale_factor to null to avoid DB errors; optional price can be left blank
+- **API errors**: Frontend displays API error messages to the user (e.g. invalid numeric values); numeric errors are shown in user-friendly Spanish
+
+**Files modified**:
+- `frontend/src/components/AddVehicle.jsx` - Validation logic, error display, API error handling
+- `backend/routes/vehicles.js` - Sanitize empty strings to null for numeric/optional fields
+- `frontend/src/components/VehicleCard.jsx` - Show "Precio no disponible" when price is empty; hide labels (badges, date, place) when their values are empty
+
 #### Bug Fix: Delete Image in Vehicle Detail/Edit
 **Issue**: When clicking the delete image icon in the vehicle detail or edit form, the confirmation dialog appeared briefly but the user was redirected to the vehicle list without being able to confirm the deletion.
 

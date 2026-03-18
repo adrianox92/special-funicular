@@ -428,9 +428,10 @@ router.post('/', upload.array('images'), async (req, res) => {
   try {
     const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, museo, taller, anotaciones, reference, scale_factor } = req.body;
     
-    // Si no está modificado, el total_price será igual al price
-    const total_price = modified === 'true' ? null : Number(price);
-    const scaleFactor = scale_factor != null ? parseInt(scale_factor, 10) : DEFAULT_SCALE_FACTOR;
+    // Campos numéricos: convertir vacío a null para evitar "invalid input syntax for type numeric"
+    const priceNum = (price === '' || price == null) ? null : Number(price);
+    const total_price = modified === 'true' ? null : (priceNum != null ? priceNum : null);
+    const scaleFactor = (scale_factor === '' || scale_factor == null) ? DEFAULT_SCALE_FACTOR : parseInt(scale_factor, 10);
     
     // Añadir user_id al crear el vehículo
     const { data, error } = await supabase
@@ -440,11 +441,11 @@ router.post('/', upload.array('images'), async (req, res) => {
           model, 
           manufacturer, 
           type, 
-          traction, 
-          price, 
+          traction: traction || null, 
+          price: priceNum, 
           total_price,
-          purchase_date,
-          purchase_place, 
+          purchase_date: purchase_date || null,
+          purchase_place: purchase_place || null, 
           modified, 
           digital,
           museo,

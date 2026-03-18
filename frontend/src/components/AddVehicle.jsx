@@ -19,6 +19,12 @@ const imageFields = [
   { name: 'three_quarters', label: 'Vista 3/4' },
 ];
 
+const requiredFields = [
+  { key: 'model', label: 'Modelo' },
+  { key: 'manufacturer', label: 'Fabricante' },
+  { key: 'type', label: 'Tipo' },
+];
+
 const AddVehicle = () => {
   const navigate = useNavigate();
   const [vehicle, setVehicle] = useState({
@@ -34,6 +40,7 @@ const AddVehicle = () => {
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     setVehicle(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    if (error && requiredFields.some(f => f.key === name)) setError(null);
   };
 
   const handleFileForField = (file, field) => {
@@ -78,10 +85,23 @@ const AddVehicle = () => {
     if (file) handleFileForField(file, field);
   };
 
+  const validateRequired = () => {
+    const missing = requiredFields.filter(({ key }) => !vehicle[key]?.toString().trim());
+    return missing;
+  };
+
   const handleSubmit = async e => {
     e.preventDefault();
-    setSaving(true);
     setError(null);
+
+    const missing = validateRequired();
+    if (missing.length > 0) {
+      const fieldNames = missing.map(({ label }) => label).join(', ');
+      setError(`Por favor, rellena los siguientes campos obligatorios: ${fieldNames}`);
+      return;
+    }
+
+    setSaving(true);
     try {
       const formData = new FormData();
       Object.entries(vehicle).forEach(([key, value]) => formData.append(key, value));
@@ -91,7 +111,11 @@ const AddVehicle = () => {
       await api.post('/vehicles', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       navigate('/vehicles');
     } catch (err) {
-      setError('Error al crear el vehículo');
+      const apiError = err.response?.data?.error;
+      const userMessage = apiError && typeof apiError === 'string'
+        ? (apiError.includes('numeric') ? 'El valor del precio no es válido. Deja el campo vacío o introduce un número.' : apiError)
+        : 'Error al crear el vehículo';
+      setError(userMessage);
     } finally {
       setSaving(false);
     }
@@ -105,12 +129,12 @@ const AddVehicle = () => {
           <Card>
             <CardHeader><CardTitle>Datos del vehículo</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2"><Label>Modelo</Label><Input name="model" value={vehicle.model} onChange={handleChange} required /></div>
+              <div className="space-y-2"><Label>Modelo</Label><Input name="model" value={vehicle.model} onChange={handleChange} className={error && !vehicle.model?.trim() ? 'border-destructive' : ''} /></div>
               <div className="space-y-2"><Label>Referencia</Label><Input name="reference" value={vehicle.reference} onChange={handleChange} /></div>
-              <div className="space-y-2"><Label>Fabricante</Label><Input name="manufacturer" value={vehicle.manufacturer} onChange={handleChange} required /></div>
+              <div className="space-y-2"><Label>Fabricante</Label><Input name="manufacturer" value={vehicle.manufacturer} onChange={handleChange} className={error && !vehicle.manufacturer?.trim() ? 'border-destructive' : ''} /></div>
               <div className="space-y-2">
                 <Label>Tipo</Label>
-                <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" name="type" value={vehicle.type} onChange={handleChange} required>
+                <select className={`flex h-9 w-full rounded-md border px-3 py-2 text-sm ${error && !vehicle.type?.trim() ? 'border-destructive bg-background' : 'border-input bg-background'}`} name="type" value={vehicle.type} onChange={handleChange}>
                   <option value="">Selecciona tipo</option>
                   {['Rally', 'GT', 'LMP', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>

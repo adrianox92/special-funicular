@@ -106,15 +106,15 @@ const VehicleCard = ({ vehicle, onDelete }) => {
           {vehicle.reference && <span> - {vehicle.reference}</span>}
         </p>
         <div className="flex flex-wrap gap-1 mt-2">
-          <Badge variant="secondary">{vehicle.type}</Badge>
-          <Badge variant="secondary">{vehicle.traction}</Badge>
+          {vehicle.type && <Badge variant="secondary">{vehicle.type}</Badge>}
+          {vehicle.traction && <Badge variant="secondary">{vehicle.traction}</Badge>}
           {vehicle.museo && <Badge variant="secondary">Museo</Badge>}
           {vehicle.taller && <Badge variant="secondary">Taller</Badge>}
         </div>
         <div className="mt-3 text-sm">
           {vehicle.total_price !== undefined && vehicle.total_price !== null && vehicle.total_price !== vehicle.price ? (
             <>
-              {vehicle.price && (
+              {vehicle.price != null && vehicle.price !== '' ? (
                 <>
                   <span className="line-through text-muted-foreground">€{Number(vehicle.price).toFixed(2)}</span>
                   <span className="ml-2 font-medium">€{Number(vehicle.total_price).toFixed(2)}</span>
@@ -122,17 +122,23 @@ const VehicleCard = ({ vehicle, onDelete }) => {
                     <span className="text-green-600 dark:text-green-400 ml-1">(+{((vehicle.total_price - vehicle.price) / vehicle.price * 100).toFixed(1)}%)</span>
                   )}
                 </>
+              ) : (
+                <span className="font-medium">€{Number(vehicle.total_price).toFixed(2)}</span>
               )}
             </>
+          ) : vehicle.price != null && vehicle.price !== '' ? (
+            <span className="font-medium">€{Number(vehicle.price).toFixed(2)}</span>
           ) : (
-            vehicle.price && <span className="font-medium">€{Number(vehicle.price).toFixed(2)}</span>
+            <span className="text-muted-foreground italic">Precio no disponible</span>
           )}
         </div>
         <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Calendar className="size-3" />
-            {new Date(vehicle.purchase_date).toLocaleDateString()}
-          </div>
+          {vehicle.purchase_date && (
+            <div className="flex items-center gap-1">
+              <Calendar className="size-3" />
+              {new Date(vehicle.purchase_date).toLocaleDateString()}
+            </div>
+          )}
           {vehicle.purchase_place && (
             <div className="flex items-center gap-1">
               <MapPin className="size-3" />
