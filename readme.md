@@ -47,6 +47,10 @@ Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo qu
 
 The application includes [Vercel Web Analytics](https://vercel.com/docs/analytics/quickstart) for visitor insights and page view tracking. Analytics are enabled automatically when deployed to Vercel. Enable Web Analytics in your Vercel project dashboard under **Analytics** to start collecting data.
 
+### ⚡ Vercel Speed Insights
+
+The application includes [Vercel Speed Insights](https://vercel.com/docs/speed-insights) for real-time performance metrics (Core Web Vitals: LCP, FID, CLS, INP, TTFB). Data is collected automatically when deployed to Vercel. Enable Speed Insights in your Vercel project dashboard under **Speed Insights** to start collecting performance data. If no data appears after 30 seconds, check for content blockers and try navigating between pages.
+
 ### 🔧 Requisitos Técnicos PWA
 
 - **HTTPS obligatorio**: La PWA requiere conexión segura en producción
