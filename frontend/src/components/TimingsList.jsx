@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3 } from 'lucide-react';
 import api from '../lib/axios';
@@ -41,7 +41,9 @@ const TimingsList = () => {
   const [comparisonSessions, setComparisonSessions] = useState([]);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceTiming, setPerformanceTiming] = useState(null);
+  const [timingHasLaps, setTimingHasLaps] = useState({});
   const [expandedGroups, setExpandedGroups] = useState(new Set());
+  const checkedTimingIdsRef = useRef(new Set());
   const [filter, setFilter] = useState({
     vehicle: '',
     dateFrom: '',
@@ -80,6 +82,38 @@ const TimingsList = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Check which timings have individual lap data so we can hide/show the performance icon correctly.
+  useEffect(() => {
+    if (!timings.length) return;
+
+    let cancelled = false;
+    const ids = Array.from(new Set(timings.map((t) => t.id).filter(Boolean)));
+    const concurrency = 5;
+    let cursor = 0;
+
+    const worker = async () => {
+      while (cursor < ids.length) {
+        const id = ids[cursor++];
+        if (!id || cancelled) return;
+        if (checkedTimingIdsRef.current.has(id)) continue;
+        checkedTimingIdsRef.current.add(id);
+        try {
+          const r = await api.get(`/timings/${id}/laps`);
+          const hasLaps = (r.data?.laps || []).length > 0;
+          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: hasLaps }));
+        } catch {
+          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: false }));
+        }
+      }
+    };
+
+    Promise.all(new Array(concurrency).fill(0).map(worker)).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [timings]);
 
   const getSeconds = (timeStr) => {
     const [minutes, seconds] = timeStr.split(':');
@@ -424,15 +458,17 @@ const TimingsList = () => {
                             <Wrench className="size-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => { setPerformanceTiming(group.best_time); setShowPerformanceModal(true); }}
-                          title="Ver análisis de rendimiento"
-                        >
-                          <BarChart3 className="size-4" />
-                        </Button>
+                        {timingHasLaps[group.best_time?.id] && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => { setPerformanceTiming(group.best_time); setShowPerformanceModal(true); }}
+                            title="Ver análisis de rendimiento"
+                          >
+                            <BarChart3 className="size-4" />
+                          </Button>
+                        )}
                         {group.sessions.length >= 2 ? (
                           <Button
                             variant="outline"
@@ -468,7 +504,12 @@ const TimingsList = () => {
                           </TableCell>
                           <TableCell>
                             {session.avg_speed_kmh != null && session.avg_speed_scale_kmh != null
-                              ? `${Number(session.avg_speed_kmh).toFixed(1)} (${Number(session.avg_speed_scale_kmh).toFixed(0)} eq.)`
+                              ? (
+                                <div className="leading-tight">
+                                  <div>{Number(session.avg_speed_kmh).toFixed(1)} km/h</div>
+                                  <div className="text-muted-foreground">{Number(session.avg_speed_scale_kmh).toFixed(0)} km/h eq.</div>
+                                </div>
+                              )
                               : '-'}
                           </TableCell>
                           <TableCell></TableCell>
@@ -492,15 +533,17 @@ const TimingsList = () => {
                                   <Wrench className="size-4" />
                                 </Button>
                               )}
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => { setPerformanceTiming(session); setShowPerformanceModal(true); }}
-                                title="Ver análisis de rendimiento"
-                              >
-                                <BarChart3 className="size-4" />
-                              </Button>
+                              {timingHasLaps[session.id] && (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => { setPerformanceTiming(session); setShowPerformanceModal(true); }}
+                                  title="Ver análisis de rendimiento"
+                                >
+                                  <BarChart3 className="size-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

@@ -96,9 +96,11 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
     return result;
   };
 
+  // Compute moving average once (not per-lap) for performance.
+  const movingAvgs = movingAvg(times, 3);
+
   const evolutionData = laps.map((lap, i) => {
     const time = parseFloat(lap.lap_time_seconds) || 0;
-    const movingAvgs = movingAvg(times, 3);
     return {
       lap: lap.lap_number,
       time: time || null,
@@ -245,13 +247,13 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs leading-relaxed">
                             <p>
-                              La consistencia mide la variabilidad de tus vueltas: cuanto menor sea el porcentaje, mas
-                              regular es la sesion.
+                              La consistencia mide la variabilidad de tus vueltas: cuanto menor sea el porcentaje, más
+                              regular es la sesión.
                             </p>
                             <p className="mt-1">
                               Formula: <span className="font-mono">((desv. estandar / media) * 100)</span>.
                             </p>
-                            <p className="mt-1 text-xs">Se calcula cuando hay al menos 3 vueltas validas.</p>
+                            <p className="mt-1 text-xs">Se calcula cuando hay al menos 3 vueltas válidas.</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>

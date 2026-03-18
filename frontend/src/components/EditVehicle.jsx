@@ -144,6 +144,8 @@ const EditVehicle = () => {
   const [selectedTiming, setSelectedTiming] = useState(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceTiming, setPerformanceTiming] = useState(null);
+  const [timingHasLaps, setTimingHasLaps] = useState({});
+  const checkedTimingIdsRef = useRef(new Set());
 
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
@@ -262,6 +264,38 @@ const EditVehicle = () => {
       loadTimings();
     }
   }, [id]);
+
+  // Determine which timings have per-lap data, so we only show the performance button when useful.
+  useEffect(() => {
+    if (!timings.length) return;
+
+    let cancelled = false;
+    const ids = Array.from(new Set(timings.map((t) => t.id).filter(Boolean)));
+    const concurrency = 4;
+    let cursor = 0;
+
+    const worker = async () => {
+      while (cursor < ids.length) {
+        const id = ids[cursor++];
+        if (!id || cancelled) return;
+        if (checkedTimingIdsRef.current.has(id)) continue;
+        checkedTimingIdsRef.current.add(id);
+        try {
+          const r = await api.get(`/timings/${id}/laps`);
+          const hasLaps = (r.data?.laps || []).length > 0;
+          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: hasLaps }));
+        } catch {
+          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: false }));
+        }
+      }
+    };
+
+    Promise.all(new Array(concurrency).fill(0).map(worker)).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [timings]);
 
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
@@ -1104,14 +1138,16 @@ const EditVehicle = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => { setPerformanceTiming(timing); setShowPerformanceModal(true); }}
-                              title="Ver análisis de rendimiento"
-                            >
-                              <BarChart3 className="size-4" />
-                            </Button>
+                            {timingHasLaps[timing.id] && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => { setPerformanceTiming(timing); setShowPerformanceModal(true); }}
+                                title="Ver análisis de rendimiento"
+                              >
+                                <BarChart3 className="size-4" />
+                              </Button>
+                            )}
                             <Button variant="default" size="sm" onClick={() => handleEditTiming(timing)} title="Editar">
                               <Pencil className="size-4" />
                             </Button>

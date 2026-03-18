@@ -175,7 +175,7 @@ Si no ves el botón de instalación:
 **Features**:
 - **Evolution tab**: KPI cards (best lap, worst lap, mean, median, consistency %, best-worst diff), lap time evolution line chart with 3-lap moving average and reference lines (best/mean), delta vs best lap bar chart
 - **Statistics tab**: First-half vs second-half comparison (mean, best lap), lap time distribution histogram, detailed lap table with delta vs best, delta vs mean, and best/worst indicators
-- **Access points**: Available from the global timings table (group row and expanded session rows) and from the vehicle detail page (Tabla de Tiempos tab) via the BarChart3 icon button
+- **Access points**: Available from the global timings table (group row and expanded session rows) and from the vehicle detail page (Tabla de Tiempos tab) via the BarChart3 icon button. The icon is only shown when that timing has individual lap data (`GET /api/timings/:id/laps` returns non-empty `laps`).
 
 **Usage**:
 1. From **Timings** page: Click the chart icon on any group or expanded session row
