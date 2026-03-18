@@ -176,4 +176,50 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/timings/:id/laps
+ * Get individual lap times for a timing session.
+ */
+router.get('/:id/laps', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: timing, error: timingError } = await supabase
+      .from('vehicle_timings')
+      .select('id, vehicle_id')
+      .eq('id', id)
+      .single();
+
+    if (timingError || !timing) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    const { data: vehicles } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', timing.vehicle_id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (!vehicles) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    const { data: laps, error: lapsError } = await supabase
+      .from('timing_laps')
+      .select('id, lap_number, lap_time_seconds, lap_time_text')
+      .eq('timing_id', id)
+      .order('lap_number', { ascending: true });
+
+    if (lapsError) {
+      return res.status(500).json({ error: lapsError.message });
+    }
+
+    res.json({ laps: laps || [] });
+  } catch (err) {
+    console.error('Error al obtener vueltas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router; 

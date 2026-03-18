@@ -70,7 +70,10 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
         ['Precio Actual', `${Number(vehicle.total_price).toFixed(2) || Number(vehicle.price).toFixed(2)}€`],
         ['Fecha de Compra', new Date(vehicle.purchase_date).toLocaleDateString()],
         ['Digital', vehicle.digital ? 'Sí' : 'No'],
-        ['Modificado', vehicle.modified ? 'Sí' : 'No']
+        ['Modificado', vehicle.modified ? 'Sí' : 'No'],
+        ['Museo', vehicle.museo ? 'Sí' : 'No'],
+        ['Taller', vehicle.taller ? 'Sí' : 'No'],
+        ['Anotaciones', vehicle.anotaciones || '-']
       ];
       let y = doc.y;
       basicData.forEach(([label, value]) => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,22 @@ import {
   TableRow,
 } from './ui/table';
 import { formatDistance } from '../utils/formatUtils';
+import LapBreakdownChart from './charts/LapBreakdownChart';
+import api from '../lib/axios';
 
 const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
+  const [laps, setLaps] = useState([]);
+
+  useEffect(() => {
+    if (show && timing?.id) {
+      api.get(`/timings/${timing.id}/laps`)
+        .then((r) => setLaps(r.data?.laps || []))
+        .catch(() => setLaps([]));
+    } else {
+      setLaps([]);
+    }
+  }, [show, timing?.id]);
+
   if (!setupSnapshot || !timing) return null;
 
   const specs = JSON.parse(setupSnapshot);
@@ -138,8 +152,33 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
                   <div>{Number(timing.avg_speed_kmh).toFixed(1)} km/h ({Number(timing.avg_speed_scale_kmh).toFixed(0)} km/h eq.)</div>
                 </div>
               )}
+              {timing.consistency_score != null && (
+                <div>
+                  <strong className="text-sm text-muted-foreground">Consistencia</strong>
+                  <div className={timing.consistency_score < 5 ? 'text-green-600' : timing.consistency_score > 15 ? 'text-destructive' : ''}>
+                    {Number(timing.consistency_score).toFixed(2)}%
+                  </div>
+                </div>
+              )}
+              {timing.worst_lap_timestamp != null && (
+                <div>
+                  <strong className="text-sm text-muted-foreground">Peor vuelta</strong>
+                  <div className="font-mono">
+                    {(() => {
+                      const s = timing.worst_lap_timestamp;
+                      const mins = Math.floor(s / 60);
+                      const secs = (s % 60).toFixed(3);
+                      return `${String(mins).padStart(2, '0')}:${secs.padStart(6, '0')}`;
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {laps.length > 0 && (
+            <LapBreakdownChart laps={laps} bestLapTimestamp={timing.best_lap_timestamp ?? undefined} />
+          )}
 
           <h6 className="font-semibold">Componentes del Vehículo</h6>
           {Object.entries(groupedSpecs).map(([type, components]) => (

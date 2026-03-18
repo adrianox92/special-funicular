@@ -105,9 +105,30 @@ router.get('/circuits', async (req, res) => {
 });
 
 /**
+ * Calculate consistency_score (coefficient of variation) and worst_lap_timestamp from lap times.
+ * @param {Array<{lap_number?: number, time_seconds?: number, lap_time_seconds?: number}>} lapTimes
+ * @returns {{ consistency_score?: number, worst_lap_timestamp?: number } | null}
+ */
+function calculateConsistencyFromLaps(lapTimes) {
+  const times = lapTimes
+    .map((l) => l.time_seconds ?? l.lap_time_seconds)
+    .filter((t) => typeof t === 'number' && t > 0);
+  if (times.length < 3) return null;
+  const mean = times.reduce((a, b) => a + b, 0) / times.length;
+  const variance = times.reduce((sum, t) => sum + (t - mean) ** 2, 0) / times.length;
+  const stdDev = Math.sqrt(variance);
+  const consistencyScore = mean > 0 ? (stdDev / mean) * 100 : null;
+  const worstLap = Math.max(...times);
+  return {
+    consistency_score: consistencyScore != null ? Math.round(consistencyScore * 100) / 100 : null,
+    worst_lap_timestamp: worstLap,
+  };
+}
+
+/**
  * POST /api/sync/timings
  * Create a new timing record for a vehicle.
- * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, timing_date? }
+ * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, timing_date?, lap_times?: [{ lap_number, time_seconds|lap_time_seconds, time_text? }] }
  */
 router.post('/timings', async (req, res) => {
   try {
@@ -124,6 +145,7 @@ router.post('/timings', async (req, res) => {
       best_lap_timestamp,
       total_time_timestamp,
       average_time_timestamp,
+      lap_times,
     } = req.body;
 
     if (!vehicle_id || !best_lap_time || !total_time || laps == null || !average_time) {
@@ -230,6 +252,39 @@ router.post('/timings', async (req, res) => {
       return res.status(500).json({ error: timingError.message });
     }
 
+    let finalTiming = { ...timing };
+
+    if (Array.isArray(lap_times) && lap_times.length > 0) {
+      const lapsToInsert = lap_times
+        .map((l, idx) => ({
+          timing_id: timing.id,
+          lap_number: l.lap_number ?? l.lapNumber ?? idx + 1,
+          lap_time_seconds: l.time_seconds ?? l.lap_time_seconds ?? l.lapTimeSeconds ?? 0,
+          lap_time_text: l.time_text ?? l.lap_time_text ?? null,
+        }))
+        .filter((l) => l.lap_time_seconds > 0);
+
+      if (lapsToInsert.length === 0) {
+        console.warn('lap_times recibido pero sin vueltas válidas (time_seconds > 0)');
+      } else {
+        const { error: lapsError } = await supabase.from('timing_laps').insert(lapsToInsert);
+        if (lapsError) {
+          console.warn('Error al insertar vueltas individuales:', lapsError);
+        } else {
+          const consistencyData = calculateConsistencyFromLaps(lapsToInsert);
+          if (consistencyData) {
+            const { data: updated, error: updateErr } = await supabase
+              .from('vehicle_timings')
+              .update(consistencyData)
+              .eq('id', timing.id)
+              .select()
+              .single();
+            if (!updateErr && updated) finalTiming = updated;
+          }
+        }
+      }
+    }
+
     try {
       await updateVehicleOdometer(supabase, vehicle_id);
     } catch (odometerError) {
@@ -244,7 +299,7 @@ router.post('/timings', async (req, res) => {
       }
     }
 
-    res.status(201).json(timing);
+    res.status(201).json(finalTiming);
   } catch (error) {
     console.error('Error en POST /api/sync/timings:', error);
     res.status(500).json({ error: 'Error interno del servidor' });

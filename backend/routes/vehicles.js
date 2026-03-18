@@ -365,7 +365,9 @@ router.put('/:id', upload.array('images'), async (req, res) => {
     const updateData = {
       ...req.body,
       modified: req.body.modified === 'true',
-      digital: req.body.digital === 'true'
+      digital: req.body.digital === 'true',
+      museo: req.body.museo === 'true',
+      taller: req.body.taller === 'true'
     };
     if (req.body.scale_factor != null) {
       const sf = parseInt(req.body.scale_factor, 10);
@@ -424,7 +426,7 @@ router.put('/:id', upload.array('images'), async (req, res) => {
 // Crear un vehículo
 router.post('/', upload.array('images'), async (req, res) => {
   try {
-    const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, reference, scale_factor } = req.body;
+    const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, museo, taller, anotaciones, reference, scale_factor } = req.body;
     
     // Si no está modificado, el total_price será igual al price
     const total_price = modified === 'true' ? null : Number(price);
@@ -445,6 +447,9 @@ router.post('/', upload.array('images'), async (req, res) => {
           purchase_place, 
           modified, 
           digital,
+          museo,
+          taller,
+          anotaciones,
           reference,
           scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
           user_id: req.user.id 

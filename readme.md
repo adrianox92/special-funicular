@@ -66,6 +66,26 @@ Si no ves el botón de instalación:
 
 ### 🆕 Nuevas Funcionalidades
 
+#### Vehicle Card Fields: Museo, Taller and Anotaciones
+**Description**: New boolean fields (Museo, Taller) and a free-text field (Anotaciones) for vehicle cards, following the same pattern as Modified and Digital.
+
+**Features**:
+- **Museo** (boolean): Indicates if the vehicle is part of a museum/display collection
+- **Taller** (boolean): Indicates if the vehicle is in workshop/maintenance
+- **Anotaciones** (text): Free-form textarea for user comments and notes on the vehicle card
+
+**Usage**: Available in Add Vehicle form, Edit Vehicle form, Vehicle Detail view, and exported PDF technical sheet.
+
+**Database**: Run `backend/scripts/add-museo-taller-anotaciones-fields.sql` in Supabase SQL Editor to add the new columns.
+
+**Files modified**:
+- `backend/scripts/add-museo-taller-anotaciones-fields.sql` - Migration script
+- `backend/routes/vehicles.js` - POST and PUT routes
+- `frontend/src/components/AddVehicle.jsx` - Form fields
+- `frontend/src/components/EditVehicle.jsx` - Form fields
+- `frontend/src/components/VehicleDetail.jsx` - Read-only display
+- `backend/src/utils/pdfGenerator.js` - PDF technical sheet
+
 #### Velocidad, Distancia y Odómetro
 **Descripción**: Seguimiento de distancia recorrida y velocidad (en pista y equivalente a escala real) para cada sesión de tiempos.
 
@@ -104,6 +124,31 @@ Si no ves el botón de instalación:
 **Archivos añadidos**:
 - `frontend/src/components/LaneComparisonChart.jsx` - Componente principal de comparativa
 - Integración en `frontend/src/pages/Dashboard.jsx`
+
+#### Telemetry: Per-Lap Data, Consistency and Session Comparison
+**Description**: Enhanced telemetry with individual lap storage, consistency metrics, and session comparison tools.
+
+**Features**:
+- **Per-lap storage**: Store each lap time individually via `lap_times` array in the sync API
+- **Consistency score**: Coefficient of variation (std_dev/mean × 100) — lower = more consistent. Calculated when ≥3 laps are provided
+- **Worst lap**: Time of the slowest lap in the session
+- **Lap breakdown chart**: Bar chart showing each lap time with the best lap highlighted (in TimingSpecsModal)
+- **Speed evolution chart**: Line chart showing avg_speed_kmh and best_lap_speed_kmh across sessions (in vehicle detail)
+- **Session comparison modal**: Compare two sessions side-by-side with metrics table and lap-by-lap overlay chart when both have lap data
+
+**API**:
+- `POST /api/sync/timings` — Optional `lap_times: [{ lap_number?, time_seconds|lap_time_seconds, time_text? }]`. Backward compatible.
+- `GET /api/timings/:id/laps` — Returns `{ laps: [{ lap_number, lap_time_seconds, lap_time_text }] }` for a session (JWT required)
+
+**Database**: Run `backend/scripts/add-timing-laps-table.sql` in Supabase SQL Editor to create `timing_laps` table and add `consistency_score`, `worst_lap_timestamp` to `vehicle_timings`.
+
+**Files**:
+- `backend/scripts/add-timing-laps-table.sql` — Migration
+- `backend/routes/sync.js` — Accepts lap_times, inserts into timing_laps
+- `backend/routes/timings.js` — GET /:id/laps endpoint
+- `frontend/src/components/charts/LapBreakdownChart.jsx`
+- `frontend/src/components/charts/SpeedEvolutionChart.jsx`
+- `frontend/src/components/SessionComparisonModal.jsx`
 
 #### Shadcn UI: Toast and AlertDialog
 **Description**: All native browser `alert()` and `window.confirm()` dialogs have been replaced with Shadcn UI components for a consistent, accessible user experience.
@@ -501,6 +546,8 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
 - `GET /competitions/presentation/:slug` - Modo presentación (Live TV View)
 
 ### Rutas Protegidas
+- `GET /api/timings` - Lista todos los tiempos del usuario (query: circuit, circuit_id)
+- `GET /api/timings/:id/laps` - Vueltas individuales de una sesión (devuelve `{ laps }`)
 - `GET /api/circuits` - Lista de circuitos del usuario
 - `GET /api/circuits/:id` - Detalle de un circuito
 - `POST /api/circuits` - Crear circuito (name, description, num_lanes, lane_lengths)
@@ -553,7 +600,7 @@ Estos endpoints permiten a proyectos externos leer vehículos y registrar tiempo
 
 - `GET /api/sync/vehicles` - Lista los vehículos del usuario (id, model, manufacturer, type, traction, image). Query: `?page=1&limit=25`.
 - `GET /api/sync/circuits` - Lista los circuitos del usuario (id, name, description, num_lanes, lane_lengths). Permite usar `circuit_id` en timings.
-- `POST /api/sync/timings` - Crea un nuevo registro de tiempo. Body: `{ vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date? }`. Si envías `circuit` (nombre), se resuelve a `circuit_id` automáticamente (find-or-create).
+- `POST /api/sync/timings` - Crea un nuevo registro de tiempo. Body: `{ vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date?, lap_times? }`. Si envías `circuit` (nombre), se resuelve a `circuit_id` automáticamente (find-or-create). Opcional `lap_times: [{ lap_number?, time_seconds|lap_time_seconds, time_text? }]` para almacenar vueltas individuales y calcular consistencia.
 
 **Ejemplo de uso desde otro proyecto:**
 

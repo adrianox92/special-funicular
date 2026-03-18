@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ExternalLink, Pencil, Trash2, Wrench } from 'lucide-react';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
+import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
 import TimingSpecsModal from './TimingSpecsModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -1100,13 +1101,20 @@ const EditVehicle = () => {
                     }
 
                     return groupedTimings.map((group) => (
-                      <TimingEvolutionChart
-                        key={`${group.circuit}-${group.lane}-${group.laps}`}
-                        timings={group.timings}
-                        circuit={group.circuit}
-                        lane={group.lane}
-                        laps={group.laps}
-                      />
+                      <React.Fragment key={`${group.circuit}-${group.lane}-${group.laps}`}>
+                        <TimingEvolutionChart
+                          timings={group.timings}
+                          circuit={group.circuit}
+                          lane={group.lane}
+                          laps={group.laps}
+                        />
+                        <SpeedEvolutionChart
+                          timings={group.timings}
+                          circuit={group.circuit}
+                          lane={group.lane}
+                          laps={group.laps}
+                        />
+                      </React.Fragment>
                     ));
                   })()}
                 </div>
@@ -1249,13 +1257,27 @@ const EditVehicle = () => {
                   <Label htmlFor="purchase_place">Lugar de compra</Label>
                   <Input id="purchase_place" name="purchase_place" value={vehicle.purchase_place || ''} onChange={handleChange} />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="modified" checked={!!vehicle.modified} onCheckedChange={(checked) => handleChange({ target: { name: 'modified', type: 'checkbox', checked } })} />
-                  <Label htmlFor="modified">Modificado</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch id="modified" checked={!!vehicle.modified} onCheckedChange={(checked) => handleChange({ target: { name: 'modified', type: 'checkbox', checked } })} />
+                    <Label htmlFor="modified">Modificado</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="digital" checked={!!vehicle.digital} onCheckedChange={(checked) => handleChange({ target: { name: 'digital', type: 'checkbox', checked } })} />
+                    <Label htmlFor="digital">Digital</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="museo" checked={!!vehicle.museo} onCheckedChange={(checked) => handleChange({ target: { name: 'museo', type: 'checkbox', checked } })} />
+                    <Label htmlFor="museo">Museo</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="taller" checked={!!vehicle.taller} onCheckedChange={(checked) => handleChange({ target: { name: 'taller', type: 'checkbox', checked } })} />
+                    <Label htmlFor="taller">Taller</Label>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="digital" checked={!!vehicle.digital} onCheckedChange={(checked) => handleChange({ target: { name: 'digital', type: 'checkbox', checked } })} />
-                  <Label htmlFor="digital">Digital</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="anotaciones">Anotaciones</Label>
+                  <Textarea id="anotaciones" name="anotaciones" rows={3} value={vehicle.anotaciones || ''} onChange={handleChange} placeholder="Añade tus comentarios..." />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="scale_factor">Escala (1:X)</Label>

@@ -207,6 +207,11 @@ Content-Type: application/json
 | `circuit`       | string        | ❌         | Nombre del circuito (si no existe, se crea automáticamente)    |
 | `circuit_id`    | string (UUID) | ❌         | ID del circuito (prioridad sobre `circuit` si ambos se envían) |
 | `timing_date`   | string        | ❌         | Fecha en formato `YYYY-MM-DD` (default: hoy)                   |
+| `best_lap_timestamp` | number | ❌ | Mejor vuelta en segundos (float) |
+| `total_time_timestamp` | number | ❌ | Tiempo total en segundos (float) |
+| `average_time_timestamp` | number | ❌ | Tiempo promedio en segundos (float) |
+| `scale_factor` | number | ❌ | Escala del coche para velocidad equivalente (32 = 1:32). Si no se envía, se usa el del vehículo |
+| `lap_times` | array | ❌ | Array de vueltas individuales. Cada elemento: `{ lap_number?, time_seconds|lap_time_seconds, time_text? }`. Si se envía con ≥3 vueltas válidas, se calcula `consistency_score` y `worst_lap_timestamp` |
 
 
 **Resolución de circuito:**
@@ -215,14 +220,12 @@ Content-Type: application/json
 - `**circuit**` (nombre): Si se envía y no hay `circuit_id`, el backend busca un circuito con ese nombre para el usuario. Si existe, lo usa. Si no existe, lo crea automáticamente con `num_lanes=1` y `lane_lengths=[]`.
 - **Ambos**: `circuit_id` tiene prioridad; `circuit` se ignora para la resolución.
 - **Ninguno**: El timing se guarda sin circuito asociado.
-| `best_lap_timestamp` | number | ❌ | Mejor vuelta en segundos (float) |
-| `total_time_timestamp` | number | ❌ | Tiempo total en segundos (float) |
-| `average_time_timestamp` | number | ❌ | Tiempo promedio en segundos (float) |
-| `scale_factor` | number | ❌ | Escala del coche para velocidad equivalente (32 = 1:32). Si no se envía, se usa el del vehículo |
 
 **Formato de tiempos:** `mm:ss.mmm` (ejemplo: `01:23.456` = 1 min 23.456 seg)
 
 **Cálculo automático:** Si el circuito tiene `lane_lengths` y se especifica `lane`, el backend calcula automáticamente: `total_distance_meters`, `avg_speed_kmh`, `avg_speed_scale_kmh`, `best_lap_speed_kmh`, `best_lap_speed_scale_kmh`. La velocidad escala es la equivalente a tamaño real (ej: 7.8 km/h en pista × 32 = 250 km/h para 1:32).
+
+**Vueltas individuales (lap_times):** Si envías `lap_times` con al menos 3 vueltas válidas (`time_seconds` > 0), el backend almacena cada vuelta en `timing_laps` y calcula `consistency_score` (coeficiente de variación, menor = más consistente) y `worst_lap_timestamp` (tiempo de la peor vuelta en segundos). Ejemplo: `"lap_times": [{ "lap_number": 1, "time_seconds": 12.5 }, { "lap_number": 2, "time_seconds": 12.3 }, ... ]`
 
 **Respuesta 201:**
 
@@ -243,7 +246,9 @@ Content-Type: application/json
   "avg_speed_kmh": 7.8,
   "avg_speed_scale_kmh": 249.6,
   "best_lap_speed_kmh": 8.2,
-  "best_lap_speed_scale_kmh": 262.4
+  "best_lap_speed_scale_kmh": 262.4,
+  "consistency_score": 4.2,
+  "worst_lap_timestamp": 12.8
 }
 ```
 

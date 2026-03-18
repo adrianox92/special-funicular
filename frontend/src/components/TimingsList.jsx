@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Wrench } from 'lucide-react';
+import { ChevronDown, ChevronRight, Wrench, GitCompare } from 'lucide-react';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
+import SessionComparisonModal from './SessionComparisonModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -35,6 +36,8 @@ const TimingsList = () => {
   const [error, setError] = useState(null);
   const [selectedTiming, setSelectedTiming] = useState(null);
   const [showSpecsModal, setShowSpecsModal] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [comparisonSessions, setComparisonSessions] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [filter, setFilter] = useState({
     vehicle: '',
@@ -86,6 +89,13 @@ const TimingsList = () => {
     const [minutes, seconds] = timeStr.split(':');
     const [secs, ms] = seconds?.split('.') || ['0', '0'];
     return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+  };
+
+  const formatTimeFromSeconds = (seconds) => {
+    if (seconds == null) return '—';
+    const mins = Math.floor(seconds / 60);
+    const secs = (seconds % 60).toFixed(3);
+    return `${String(mins).padStart(2, '0')}:${secs.padStart(6, '0')}`;
   };
 
   const groupTimings = (timings) => {
@@ -326,6 +336,8 @@ const TimingsList = () => {
               <TableHead>Vueltas</TableHead>
               <TableHead>Distancia</TableHead>
               <TableHead>Velocidad</TableHead>
+              <TableHead>Consistencia</TableHead>
+              <TableHead>Peor vuelta</TableHead>
               <TableHead>Posición</TableHead>
               <TableHead>Mejor Vuelta</TableHead>
               <TableHead>Tiempo Total</TableHead>
@@ -333,12 +345,13 @@ const TimingsList = () => {
               <TableHead>Mejora</TableHead>
               <TableHead>Última Sesión</TableHead>
               <TableHead className="text-center">Configuración</TableHead>
+              <TableHead className="text-center">Comparar</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredGroups.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                   No hay registros de tiempo
                 </TableCell>
               </TableRow>
@@ -368,6 +381,20 @@ const TimingsList = () => {
                       {group.best_time.avg_speed_kmh != null && group.best_time.avg_speed_scale_kmh != null
                         ? `${Number(group.best_time.avg_speed_kmh).toFixed(1)} km/h (${Number(group.best_time.avg_speed_scale_kmh).toFixed(0)} eq.)`
                         : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {group.best_time.consistency_score != null ? (
+                        <span className={group.best_time.consistency_score < 5 ? 'text-green-600' : group.best_time.consistency_score > 15 ? 'text-destructive' : 'text-amber-600'}>
+                          {Number(group.best_time.consistency_score).toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {group.best_time.worst_lap_timestamp != null
+                        ? formatTimeFromSeconds(group.best_time.worst_lap_timestamp)
+                        : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       {group.circuit_ranking ? (
@@ -420,6 +447,23 @@ const TimingsList = () => {
                         <span className="text-muted-foreground text-sm">-</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-center">
+                      {group.sessions.length >= 2 ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setComparisonSessions(group.sessions);
+                            setShowComparisonModal(true);
+                          }}
+                          title="Comparar sesiones"
+                        >
+                          <GitCompare className="size-4" />
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                   {expandedGroups.has(group.key) && group.sessions.length > 1 && (
                     group.sessions
@@ -439,6 +483,16 @@ const TimingsList = () => {
                             {session.avg_speed_kmh != null && session.avg_speed_scale_kmh != null
                               ? `${Number(session.avg_speed_kmh).toFixed(1)} (${Number(session.avg_speed_scale_kmh).toFixed(0)} eq.)`
                               : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {session.consistency_score != null ? (
+                              <span className={session.consistency_score < 5 ? 'text-green-600' : session.consistency_score > 15 ? 'text-destructive' : 'text-amber-600'}>
+                                {Number(session.consistency_score).toFixed(1)}%
+                              </span>
+                            ) : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {session.worst_lap_timestamp != null ? formatTimeFromSeconds(session.worst_lap_timestamp) : '—'}
                           </TableCell>
                           <TableCell></TableCell>
                           <TableCell className="font-mono">
@@ -461,6 +515,7 @@ const TimingsList = () => {
                               </Button>
                             )}
                           </TableCell>
+                          <TableCell></TableCell>
                         </TableRow>
                       ))
                   )}
@@ -472,6 +527,7 @@ const TimingsList = () => {
       </div>
 
       <TimingSpecsModal show={showSpecsModal} onHide={() => setShowSpecsModal(false)} setupSnapshot={selectedTiming?.setup_snapshot} timing={selectedTiming} />
+      <SessionComparisonModal show={showComparisonModal} onHide={() => setShowComparisonModal(false)} sessions={comparisonSessions} />
     </div>
   );
 };

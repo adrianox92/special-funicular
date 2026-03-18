@@ -151,14 +151,30 @@ const VehicleDetail = () => {
               <Label>Tipo</Label>
               <Input value={vehicle.type || ''} disabled readOnly />
             </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={!!vehicle.modified} disabled />
-              <Label>Modificado</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                <Switch checked={!!vehicle.modified} disabled />
+                <Label>Modificado</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={!!vehicle.digital} disabled />
+                <Label>Digital</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={!!vehicle.museo} disabled />
+                <Label>Museo</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={!!vehicle.taller} disabled />
+                <Label>Taller</Label>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={!!vehicle.digital} disabled />
-              <Label>Digital</Label>
-            </div>
+            {(vehicle.anotaciones != null && vehicle.anotaciones !== '') && (
+              <div className="space-y-2">
+                <Label>Anotaciones</Label>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap rounded-md border border-input bg-muted/30 p-3">{vehicle.anotaciones}</p>
+              </div>
+            )}
           </div>
           <div>
             <h5 className="font-semibold mb-4">Fotografías</h5>
