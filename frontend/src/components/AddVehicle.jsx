@@ -29,22 +29,53 @@ const AddVehicle = () => {
   const [previews, setPreviews] = useState({});
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [draggingOver, setDraggingOver] = useState(null);
 
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     setVehicle(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const handleFileForField = (file, field) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    setImages(prev => ({ ...prev, [field]: file }));
+    const reader = new FileReader();
+    reader.onloadend = () => setPreviews(prev => ({ ...prev, [field]: reader.result }));
+    reader.readAsDataURL(file);
+  };
+
   const handleImageChange = (e, field) => {
     const file = e.target.files[0];
-    setImages(prev => ({ ...prev, [field]: file }));
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setPreviews(prev => ({ ...prev, [field]: reader.result }));
-      reader.readAsDataURL(file);
-    } else {
+    if (file) handleFileForField(file, field);
+    else {
+      setImages(prev => ({ ...prev, [field]: undefined }));
       setPreviews(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  const handleDragEnter = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingOver(field);
+  };
+
+  const handleDragLeave = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget)) setDraggingOver(null);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingOver(null);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileForField(file, field);
   };
 
   const handleSubmit = async e => {
@@ -112,8 +143,23 @@ const AddVehicle = () => {
                 {imageFields.map(({ name, label }) => (
                   <div key={name} className="space-y-2">
                     <Label>{label}</Label>
-                    <div className="border border-dashed rounded-md flex flex-col items-center justify-center p-2 min-h-[120px] cursor-pointer bg-muted/30 hover:bg-muted/50" onClick={() => document.getElementById(`img-${name}`).click()}>
-                      {previews[name] ? <img src={previews[name]} alt={label} className="max-w-full max-h-[90px] object-contain" /> : <span className="text-muted-foreground text-sm">Imagen</span>}
+                    <div
+                      className={`border-2 border-dashed rounded-md flex flex-col items-center justify-center p-2 min-h-[120px] cursor-pointer transition-colors ${
+                        draggingOver === name ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 bg-muted/30 hover:bg-muted/50'
+                      }`}
+                      onClick={() => document.getElementById(`img-${name}`).click()}
+                      onDragEnter={(e) => handleDragEnter(e, name)}
+                      onDragLeave={(e) => handleDragLeave(e, name)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, name)}
+                    >
+                      {previews[name] ? (
+                        <img src={previews[name]} alt={label} className="max-w-full max-h-[90px] object-contain pointer-events-none" />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          {draggingOver === name ? 'Suelta la imagen aquí' : 'Arrastra o haz clic'}
+                        </span>
+                      )}
                       <input id={`img-${name}`} type="file" accept="image/*" className="hidden" onChange={e => handleImageChange(e, name)} />
                     </div>
                   </div>

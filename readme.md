@@ -70,6 +70,17 @@ Si no ves el botón de instalación:
 
 ### 🆕 Nuevas Funcionalidades
 
+#### Bug Fix: Delete Image in Vehicle Detail/Edit
+**Issue**: When clicking the delete image icon in the vehicle detail or edit form, the confirmation dialog appeared briefly but the user was redirected to the vehicle list without being able to confirm the deletion.
+
+**Cause**: The delete image button was inside a form and lacked `type="button"`, so it defaulted to `type="submit"`. Clicking it triggered form submission (and navigation in the edit form) before the user could confirm.
+
+**Fix**: Added `type="button"` and `e.preventDefault()` to image delete buttons, and hardened the edit form submit handler so it only runs when the explicit `Actualizar` submit button is used (`name="save-vehicle"` + `submitter` guard).
+
+**Files modified**:
+- `frontend/src/components/VehicleDetail.jsx` - Delete image button and AlertDialogAction
+- `frontend/src/components/EditVehicle.jsx` - Delete image button, dialog buttons and submit guard
+
 #### Vehicle Card Fields: Museo, Taller and Anotaciones
 **Description**: New boolean fields (Museo, Taller) and a free-text field (Anotaciones) for vehicle cards, following the same pattern as Modified and Digital.
 
@@ -420,7 +431,7 @@ ORDER BY position_updated_at DESC;
 
 ### 🚗 Gestión de Vehículos
 - **Catálogo completo**: Registra todos tus coches Scalextric con detalles técnicos
-- **Fotos múltiples**: Añade varias imágenes por vehículo
+- **Fotos múltiples**: Añade varias imágenes por vehículo con drag & drop por vista (delantera, perfiles, trasera, etc.)
 - **Categorización**: Organiza por fabricante, tipo y tracción
 - **Búsqueda avanzada**: Encuentra rápidamente cualquier vehículo
 - **Estadísticas visuales**: Gráficos de distribución por marca y tipo

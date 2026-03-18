@@ -108,7 +108,7 @@ const VehicleDetail = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteImage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction type="button" onClick={confirmDeleteImage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -192,10 +192,11 @@ const VehicleDetail = () => {
                           onClick={(e) => { e.stopPropagation(); setLightboxImage({ url: images[name], label }); }}
                         />
                         <Button
+                          type="button"
                           variant="destructive"
                           size="icon"
                           className="absolute top-2 right-2 h-8 w-8"
-                          onClick={() => handleDeleteImage(name)}
+                          onClick={(e) => { e.preventDefault(); handleDeleteImage(name); }}
                           disabled={deletingImage === name}
                         >
                           {deletingImage === name ? <Spinner className="size-4" /> : '×'}
@@ -211,7 +212,7 @@ const VehicleDetail = () => {
           </div>
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => navigate('/vehicles')}>Volver al listado</Button>
+          <Button type="button" variant="outline" onClick={() => navigate('/vehicles')}>Volver al listado</Button>
           <Button asChild><Link to={`/edit/${id}`}>Editar</Link></Button>
         </div>
       </form>

@@ -96,6 +96,7 @@ const EditVehicle = () => {
   const [loading, setLoading] = useState(true);
   const [deletingImage, setDeletingImage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [draggingOver, setDraggingOver] = useState(null);
   const imageRefs = useRef({});
   const [activeTab, setActiveTab] = useState('general');
   const [technicalSpecs, setTechnicalSpecs] = useState({
@@ -267,18 +268,46 @@ const EditVehicle = () => {
     });
   };
 
+  const handleFileForField = (file, field) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    setImages(prev => ({ ...prev, [field]: file }));
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      requestAnimationFrame(() => {
+        setPreviews(prev => ({ ...prev, [field]: reader.result }));
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleImageChange = (e, field) => {
     const file = e.target.files[0];
-    setImages({ ...images, [field]: file });
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        requestAnimationFrame(() => {
-          setPreviews(prev => ({ ...prev, [field]: reader.result }));
-        });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) handleFileForField(file, field);
+  };
+
+  const handleDragEnter = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingOver(field);
+  };
+
+  const handleDragLeave = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget)) setDraggingOver(null);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e, field) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingOver(null);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileForField(file, field);
   };
 
   const handleDeleteImage = (viewType) => {
@@ -434,6 +463,10 @@ const EditVehicle = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
+    const submitter = e.nativeEvent?.submitter;
+    if (submitter?.name !== 'save-vehicle') {
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -1180,8 +1213,8 @@ const EditVehicle = () => {
               <AlertDialogDescription>{confirmContent.description}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmContent.onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+              <AlertDialogAction type="button" onClick={confirmContent.onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 Eliminar
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -1301,12 +1334,15 @@ const EditVehicle = () => {
                     <div key={name} className="space-y-2">
                       <Label>{label} Imagen</Label>
                       <div
-                        className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 relative min-h-[120px] cursor-pointer bg-muted/30 hover:bg-muted/50 transition-colors"
-                        onClick={(e) => {
-                          if (!previews[name] && !images[name]) {
-                            document.getElementById(`img-${name}`).click();
-                          }
-                        }}
+                        className={cn(
+                          'border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 relative min-h-[120px] cursor-pointer transition-colors',
+                          draggingOver === name ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 bg-muted/30 hover:bg-muted/50'
+                        )}
+                        onClick={() => document.getElementById(`img-${name}`).click()}
+                        onDragEnter={(e) => handleDragEnter(e, name)}
+                        onDragLeave={(e) => handleDragLeave(e, name)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, name)}
                       >
                         {previews[name] || images[name] ? (
                           <>
@@ -1314,14 +1350,16 @@ const EditVehicle = () => {
                               ref={el => imageRefs.current[name] = el}
                               src={previews[name] || URL.createObjectURL(images[name])}
                               alt={label}
-                              className="max-w-full max-h-[90px] object-contain"
+                              className="max-w-full max-h-[90px] object-contain pointer-events-none"
                               loading="lazy"
                             />
                             <Button
+                              type="button"
                               variant="destructive"
                               size="sm"
-                              className="absolute top-1 right-1"
+                              className="absolute top-1 right-1 z-10"
                               onClick={(e) => {
+                                e.preventDefault();
                                 e.stopPropagation();
                                 handleDeleteImage(name);
                               }}
@@ -1335,7 +1373,9 @@ const EditVehicle = () => {
                             </Button>
                           </>
                         ) : (
-                          <span className="text-muted-foreground">Imagen</span>
+                          <span className="text-muted-foreground text-sm">
+                            {draggingOver === name ? 'Suelta la imagen aquí' : 'Arrastra o haz clic'}
+                          </span>
                         )}
                         <input
                           id={`img-${name}`}
@@ -1359,7 +1399,7 @@ const EditVehicle = () => {
               <Button variant="secondary" type="button" onClick={() => navigate('/vehicles')}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" name="save-vehicle" disabled={saving}>
                 {saving ? (
                   <>
                     <Spinner className="size-4 mr-2" />
