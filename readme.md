@@ -169,6 +169,24 @@ Si no ves el botón de instalación:
 - `frontend/src/components/charts/SpeedEvolutionChart.jsx`
 - `frontend/src/components/SessionComparisonModal.jsx`
 
+#### Session Performance Analysis
+**Description**: Detailed performance analysis for each timing session with lap-by-lap evolution, statistics, and visualizations.
+
+**Features**:
+- **Evolution tab**: KPI cards (best lap, worst lap, mean, median, consistency %, best-worst diff), lap time evolution line chart with 3-lap moving average and reference lines (best/mean), delta vs best lap bar chart
+- **Statistics tab**: First-half vs second-half comparison (mean, best lap), lap time distribution histogram, detailed lap table with delta vs best, delta vs mean, and best/worst indicators
+- **Access points**: Available from the global timings table (group row and expanded session rows) and from the vehicle detail page (Tabla de Tiempos tab) via the BarChart3 icon button
+
+**Usage**:
+1. From **Timings** page: Click the chart icon on any group or expanded session row
+2. From **Vehicle detail** page: Go to "Tabla de Tiempos" tab and click the chart icon on any timing row
+
+**Files**:
+- `frontend/src/components/SessionPerformanceModal.jsx` — Main modal with tabs
+- `frontend/src/components/charts/LapDeltaChart.jsx` — Delta vs best lap bar chart
+- `frontend/src/components/TimingsList.jsx` — Performance button integration
+- `frontend/src/components/EditVehicle.jsx` — Performance button in vehicle timings table
+
 #### Shadcn UI: Toast and AlertDialog
 **Description**: All native browser `alert()` and `window.confirm()` dialogs have been replaced with Shadcn UI components for a consistent, accessible user experience.
 

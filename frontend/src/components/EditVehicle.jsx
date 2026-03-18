@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Pencil, Trash2, Wrench } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2, Wrench, BarChart3 } from 'lucide-react';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
 import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
 import TimingSpecsModal from './TimingSpecsModal';
+import SessionPerformanceModal from './SessionPerformanceModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -141,6 +142,8 @@ const EditVehicle = () => {
   const [timingWarning, setTimingWarning] = useState(null);
   const [showSpecsModal, setShowSpecsModal] = useState(false);
   const [selectedTiming, setSelectedTiming] = useState(null);
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false);
+  const [performanceTiming, setPerformanceTiming] = useState(null);
 
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
@@ -1101,6 +1104,14 @@ const EditVehicle = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => { setPerformanceTiming(timing); setShowPerformanceModal(true); }}
+                              title="Ver análisis de rendimiento"
+                            >
+                              <BarChart3 className="size-4" />
+                            </Button>
                             <Button variant="default" size="sm" onClick={() => handleEditTiming(timing)} title="Editar">
                               <Pencil className="size-4" />
                             </Button>
@@ -1431,6 +1442,12 @@ const EditVehicle = () => {
         onHide={() => setShowSpecsModal(false)}
         setupSnapshot={selectedTiming?.setup_snapshot}
         timing={selectedTiming}
+      />
+      <SessionPerformanceModal
+        show={showPerformanceModal}
+        onHide={() => setShowPerformanceModal(false)}
+        timing={performanceTiming}
+        vehicle={vehicle}
       />
     </div>
     </>

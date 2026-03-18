@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Wrench, GitCompare } from 'lucide-react';
+import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3 } from 'lucide-react';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
 import SessionComparisonModal from './SessionComparisonModal';
+import SessionPerformanceModal from './SessionPerformanceModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -38,6 +39,8 @@ const TimingsList = () => {
   const [showSpecsModal, setShowSpecsModal] = useState(false);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
   const [comparisonSessions, setComparisonSessions] = useState([]);
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false);
+  const [performanceTiming, setPerformanceTiming] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [filter, setFilter] = useState({
     vehicle: '',
@@ -421,6 +424,15 @@ const TimingsList = () => {
                             <Wrench className="size-4" />
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => { setPerformanceTiming(group.best_time); setShowPerformanceModal(true); }}
+                          title="Ver análisis de rendimiento"
+                        >
+                          <BarChart3 className="size-4" />
+                        </Button>
                         {group.sessions.length >= 2 ? (
                           <Button
                             variant="outline"
@@ -480,6 +492,15 @@ const TimingsList = () => {
                                   <Wrench className="size-4" />
                                 </Button>
                               )}
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => { setPerformanceTiming(session); setShowPerformanceModal(true); }}
+                                title="Ver análisis de rendimiento"
+                              >
+                                <BarChart3 className="size-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -494,6 +515,7 @@ const TimingsList = () => {
 
       <TimingSpecsModal show={showSpecsModal} onHide={() => setShowSpecsModal(false)} setupSnapshot={selectedTiming?.setup_snapshot} timing={selectedTiming} />
       <SessionComparisonModal show={showComparisonModal} onHide={() => setShowComparisonModal(false)} sessions={comparisonSessions} />
+      <SessionPerformanceModal show={showPerformanceModal} onHide={() => setShowPerformanceModal(false)} timing={performanceTiming} />
     </div>
   );
 };
