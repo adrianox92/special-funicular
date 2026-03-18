@@ -24,6 +24,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from './ui/tooltip';
 import placeholderImage from '../assets/images/placeholder.png';
 
 const VehicleTableRow = ({ vehicle, onDelete }) => {
@@ -104,12 +110,27 @@ const VehicleTableRow = ({ vehicle, onDelete }) => {
 
       <TableRow className="cursor-pointer transition-colors hover:bg-muted" onClick={handleRowClick}>
         <TableCell className="w-12 p-2">
-          <img
-            src={vehicle.image || placeholderImage}
-            alt={vehicle.model}
-            className="w-10 h-[30px] object-cover rounded"
-            loading="lazy"
-          />
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-block cursor-pointer rounded overflow-hidden">
+                  <img
+                    src={vehicle.image || placeholderImage}
+                    alt={vehicle.model}
+                    className="w-10 h-[30px] object-cover rounded"
+                    loading="lazy"
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="p-1 bg-background border shadow-lg">
+                <img
+                  src={vehicle.image || placeholderImage}
+                  alt={vehicle.model}
+                  className="w-48 h-32 object-contain rounded-md"
+                />
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </TableCell>
         <TableCell className="min-w-[140px]">
           <div className="font-medium">{vehicle.model}</div>
