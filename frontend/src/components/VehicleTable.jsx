@@ -102,7 +102,7 @@ const VehicleTableRow = ({ vehicle, onDelete }) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={handleRowClick}>
+      <TableRow className="cursor-pointer transition-colors hover:bg-muted" onClick={handleRowClick}>
         <TableCell className="w-12 p-2">
           <img
             src={vehicle.image || placeholderImage}
