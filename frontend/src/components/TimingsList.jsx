@@ -91,13 +91,6 @@ const TimingsList = () => {
     return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
   };
 
-  const formatTimeFromSeconds = (seconds) => {
-    if (seconds == null) return '—';
-    const mins = Math.floor(seconds / 60);
-    const secs = (seconds % 60).toFixed(3);
-    return `${String(mins).padStart(2, '0')}:${secs.padStart(6, '0')}`;
-  };
-
   const groupTimings = (timings) => {
     const groups = {};
     timings.forEach(timing => {
@@ -326,7 +319,7 @@ const TimingsList = () => {
         </div>
       )}
 
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border timings-table-wrapper">
         <Table>
           <TableHeader>
             <TableRow>
@@ -334,24 +327,21 @@ const TimingsList = () => {
               <TableHead>Circuito</TableHead>
               <TableHead>Carril</TableHead>
               <TableHead>Vueltas</TableHead>
-              <TableHead>Distancia</TableHead>
-              <TableHead>Velocidad</TableHead>
-              <TableHead>Consistencia</TableHead>
-              <TableHead>Peor vuelta</TableHead>
-              <TableHead>Posición</TableHead>
-              <TableHead>Mejor Vuelta</TableHead>
-              <TableHead>Tiempo Total</TableHead>
-              <TableHead>Sesiones</TableHead>
+              <TableHead>Dist.</TableHead>
+              <TableHead>Vel.</TableHead>
+              <TableHead>Pos.</TableHead>
+              <TableHead>Mejor</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead>Ses.</TableHead>
               <TableHead>Mejora</TableHead>
-              <TableHead>Última Sesión</TableHead>
-              <TableHead className="text-center">Configuración</TableHead>
-              <TableHead className="text-center">Comparar</TableHead>
+              <TableHead>Última</TableHead>
+              <TableHead className="text-center w-[80px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredGroups.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                   No hay registros de tiempo
                 </TableCell>
               </TableRow>
@@ -381,20 +371,6 @@ const TimingsList = () => {
                       {group.best_time.avg_speed_kmh != null && group.best_time.avg_speed_scale_kmh != null
                         ? `${Number(group.best_time.avg_speed_kmh).toFixed(1)} km/h (${Number(group.best_time.avg_speed_scale_kmh).toFixed(0)} eq.)`
                         : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {group.best_time.consistency_score != null ? (
-                        <span className={group.best_time.consistency_score < 5 ? 'text-green-600' : group.best_time.consistency_score > 15 ? 'text-destructive' : 'text-amber-600'}>
-                          {Number(group.best_time.consistency_score).toFixed(1)}%
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {group.best_time.worst_lap_timestamp != null
-                        ? formatTimeFromSeconds(group.best_time.worst_lap_timestamp)
-                        : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       {group.circuit_ranking ? (
@@ -438,31 +414,30 @@ const TimingsList = () => {
                       )}
                     </TableCell>
                     <TableCell>{new Date(group.last_session.timing_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-center">
-                      {group.best_time.setup_snapshot ? (
-                        <Button variant="outline" size="icon" onClick={() => { setSelectedTiming(group.best_time); setShowSpecsModal(true); }} title="Ver especificaciones">
-                          <Wrench className="size-4" />
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {group.sessions.length >= 2 ? (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            setComparisonSessions(group.sessions);
-                            setShowComparisonModal(true);
-                          }}
-                          title="Comparar sesiones"
-                        >
-                          <GitCompare className="size-4" />
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
+                    <TableCell className="text-center w-[80px]">
+                      <div className="flex items-center justify-center gap-1">
+                        {group.best_time.setup_snapshot && (
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(group.best_time); setShowSpecsModal(true); }} title="Ver especificaciones">
+                            <Wrench className="size-4" />
+                          </Button>
+                        )}
+                        {group.sessions.length >= 2 ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              setComparisonSessions(group.sessions);
+                              setShowComparisonModal(true);
+                            }}
+                            title="Comparar sesiones"
+                          >
+                            <GitCompare className="size-4" />
+                          </Button>
+                        ) : (
+                          !group.best_time.setup_snapshot && <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                   {expandedGroups.has(group.key) && group.sessions.length > 1 && (
@@ -484,16 +459,6 @@ const TimingsList = () => {
                               ? `${Number(session.avg_speed_kmh).toFixed(1)} (${Number(session.avg_speed_scale_kmh).toFixed(0)} eq.)`
                               : '-'}
                           </TableCell>
-                          <TableCell>
-                            {session.consistency_score != null ? (
-                              <span className={session.consistency_score < 5 ? 'text-green-600' : session.consistency_score > 15 ? 'text-destructive' : 'text-amber-600'}>
-                                {Number(session.consistency_score).toFixed(1)}%
-                              </span>
-                            ) : '—'}
-                          </TableCell>
-                          <TableCell>
-                            {session.worst_lap_timestamp != null ? formatTimeFromSeconds(session.worst_lap_timestamp) : '—'}
-                          </TableCell>
                           <TableCell></TableCell>
                           <TableCell className="font-mono">
                             {session.best_lap_time}
@@ -509,13 +474,14 @@ const TimingsList = () => {
                           <TableCell></TableCell>
                           <TableCell></TableCell>
                           <TableCell className="text-center">
-                            {session.setup_snapshot && (
-                              <Button variant="outline" size="icon" onClick={() => { setSelectedTiming(session); setShowSpecsModal(true); }} title="Ver especificaciones">
-                                <Wrench className="size-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-center gap-1">
+                              {session.setup_snapshot && (
+                                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(session); setShowSpecsModal(true); }} title="Ver especificaciones">
+                                  <Wrench className="size-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
-                          <TableCell></TableCell>
                         </TableRow>
                       ))
                   )}

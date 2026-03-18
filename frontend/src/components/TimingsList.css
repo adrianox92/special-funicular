@@ -1,4 +1,35 @@
 /* Estilos para la tabla de tiempos */
+.timings-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.timings-table-wrapper table {
+  table-layout: auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.timings-table-wrapper th,
+.timings-table-wrapper td {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  vertical-align: middle;
+}
+
+.timings-table-wrapper th:first-child,
+.timings-table-wrapper td:first-child {
+  min-width: 100px;
+}
+
+.timings-table-wrapper .font-mono {
+  font-size: 0.75rem;
+}
+
+.timings-table-wrapper .flex.gap-1 {
+  flex-wrap: nowrap;
+}
+
 .position-badge {
   display: flex;
   justify-content: center;

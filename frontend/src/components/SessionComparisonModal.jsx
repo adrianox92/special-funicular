@@ -39,6 +39,8 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
   const [loadingLaps, setLoadingLaps] = useState(false);
 
   const sortedSessions = [...sessions].sort((a, b) => new Date(b.timing_date) - new Date(a.timing_date));
+  const sessionsForA = sortedSessions.filter((s) => s.id !== sessionB?.id);
+  const sessionsForB = sortedSessions.filter((s) => s.id !== sessionA?.id);
 
   useEffect(() => {
     if (!show) {
@@ -85,6 +87,7 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
     { key: 'laps', label: 'Vueltas', fmt: (t) => t.laps },
     { key: 'total_distance_meters', label: 'Distancia', fmt: (t) => formatDistance(t.total_distance_meters) },
     { key: 'avg_speed_kmh', label: 'Velocidad media (km/h)', fmt: (t) => (t.avg_speed_kmh != null ? Number(t.avg_speed_kmh).toFixed(1) : '—') },
+    { key: 'avg_speed_scale_kmh', label: 'Velocidad media escala (km/h eq.)', fmt: (t) => (t.avg_speed_scale_kmh != null ? Number(t.avg_speed_scale_kmh).toFixed(0) : '—') },
     { key: 'best_lap_speed_kmh', label: 'Velocidad mejor vuelta (km/h)', fmt: (t) => (t.best_lap_speed_kmh != null ? Number(t.best_lap_speed_kmh).toFixed(1) : '—') },
     { key: 'consistency_score', label: 'Consistencia (%)', fmt: (t) => (t.consistency_score != null ? `${Number(t.consistency_score).toFixed(2)}%` : '—') },
   ];
@@ -100,13 +103,20 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Sesión A</label>
-              <Select value={sessionA?.id || '__none__'} onValueChange={(v) => setSessionA(sessions.find((s) => s.id === v) || null)}>
+              <Select
+                value={sessionA?.id || '__none__'}
+                onValueChange={(v) => {
+                  const newSession = sessions.find((s) => s.id === v) || null;
+                  setSessionA(newSession);
+                  if (newSession?.id === sessionB?.id) setSessionB(null);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar sesión" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">—</SelectItem>
-                  {sortedSessions.map((s) => (
+                  {sessionsForA.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {new Date(s.timing_date).toLocaleDateString()} — {s.best_lap_time}
                     </SelectItem>
@@ -116,13 +126,20 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
             </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Sesión B</label>
-              <Select value={sessionB?.id || '__none__'} onValueChange={(v) => setSessionB(sessions.find((s) => s.id === v) || null)}>
+              <Select
+                value={sessionB?.id || '__none__'}
+                onValueChange={(v) => {
+                  const newSession = sessions.find((s) => s.id === v) || null;
+                  setSessionB(newSession);
+                  if (newSession?.id === sessionA?.id) setSessionA(null);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar sesión" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">—</SelectItem>
-                  {sortedSessions.map((s) => (
+                  {sessionsForB.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {new Date(s.timing_date).toLocaleDateString()} — {s.best_lap_time}
                     </SelectItem>
