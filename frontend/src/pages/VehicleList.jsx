@@ -168,7 +168,7 @@ const VehicleList = () => {
         <Input placeholder="Buscar por fabricante..." value={filters.manufacturer} onChange={e => setFilters({ ...filters, manufacturer: e.target.value })} className="min-w-[140px] flex-1" />
         <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}>
           <option value="">Todos los tipos</option>
-          {['Rally', 'GT', 'LMP', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => <option key={t} value={t}>{t}</option>)}
+          {['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.modified} onChange={e => setFilters({ ...filters, modified: e.target.value })}>
           <option value="">Modificado/Serie</option>

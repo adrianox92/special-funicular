@@ -84,7 +84,7 @@ const componentTypes = [
   { value: 'motor', label: 'Motor' },
 ];
 
-const vehicleTypes = ['Rally', 'GT', 'LMP', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'];
+const vehicleTypes = ['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'];
 
 const EditVehicle = () => {
   const { id } = useParams();

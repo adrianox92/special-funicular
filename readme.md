@@ -135,6 +135,36 @@ Si no ves el botón de instalación:
 - `frontend/src/pages/VehicleList.jsx` - View modes, toggle, pagination, page size selector
 - `frontend/src/components/VehicleTable.jsx` - New compact table component for vehicle list
 
+#### Vehicle Technical Sheet PDF - Redesign
+**Description**: The downloadable vehicle technical sheet PDF has been redesigned for a clean, professional look.
+
+**Features**:
+- **Header**: Branded header with "Scalextric Collection · Ficha Técnica" and generation date on every page
+- **Footer**: Page numbers, odometer, and generation date on every page
+- **Color palette**: Dark header (#1a1a2e), accent color (#e94560) for section headers and badges
+- **Badges**: Digital, Modificado, Museo, Taller shown as inline badges instead of table rows
+- **Image**: Vehicle image with border; placeholder when image is missing or unavailable
+- **Price summary**: Box with base price, modifications cost, and total price
+- **Tables**: Styled component tables with header background, alternating row colors, and 4 columns (Componente, Fabricante, Detalle, Precio)
+- **New fields**: Purchase place, scale factor (1:XX), odometer (total_distance_meters)
+- **Safe formatting**: No NaN or invalid prices; defensive price handling
+
+**Files modified**:
+- `backend/src/utils/pdfGenerator.js` - Complete redesign with helpers for header, footer, sections, tables, badges, and price summary
+
+#### Vehicle Types: Hypercar, Grupo 5, Road Car
+**Description**: Three new vehicle types added to the type selector when creating or editing a vehicle.
+
+**New types**:
+- **Hypercar**: For hypercar category vehicles
+- **Grupo 5**: For Group 5 racing cars
+- **Road Car**: For road/street legal cars
+
+**Files modified**:
+- `frontend/src/components/EditVehicle.jsx` - vehicleTypes array
+- `frontend/src/components/AddVehicle.jsx` - Type select options
+- `frontend/src/pages/VehicleList.jsx` - Type filter dropdown
+
 #### Velocidad, Distancia y Odómetro
 **Descripción**: Seguimiento de distancia recorrida y velocidad (en pista y equivalente a escala real) para cada sesión de tiempos.
 

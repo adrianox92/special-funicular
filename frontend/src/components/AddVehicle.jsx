@@ -136,7 +136,7 @@ const AddVehicle = () => {
                 <Label>Tipo</Label>
                 <select className={`flex h-9 w-full rounded-md border px-3 py-2 text-sm ${error && !vehicle.type?.trim() ? 'border-destructive bg-background' : 'border-input bg-background'}`} name="type" value={vehicle.type} onChange={handleChange}>
                   <option value="">Selecciona tipo</option>
-                  {['Rally', 'GT', 'LMP', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => <option key={t} value={t}>{t}</option>)}
+                  {['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div className="space-y-2"><Label>Tracción</Label><Input name="traction" value={vehicle.traction} onChange={handleChange} /></div>
