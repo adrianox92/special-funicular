@@ -6,12 +6,12 @@ async function testPointsCalculation() {
     // Reemplaza con el ID de tu competición de prueba
     const competitionId = 'a96fc1bf-64ef-4d51-ba2a-376109761fc6';
     
-    console.log('🧪 Probando cálculo de puntos...');
+    console.log('Probando cálculo de puntos...');
     
     // Obtener progreso y puntos
     const response = await axios.get(`http://localhost:3001/api/competitions/${competitionId}/progress`);
     
-    console.log('📊 Datos de progreso:');
+    console.log('Datos de progreso:');
     console.log('- Participantes:', response.data.participants_count);
     console.log('- Rondas:', response.data.rounds);
     console.log('- Tiempos registrados:', response.data.times_registered);
@@ -19,12 +19,12 @@ async function testPointsCalculation() {
     console.log('- Completada:', response.data.is_completed);
     console.log('- Progreso:', response.data.progress_percentage + '%');
     
-    console.log('\n🏆 Puntos por participante:');
+    console.log('\nPuntos por participante:');
     response.data.participant_stats.forEach(participant => {
       console.log(`- Participante ${participant.participant_id}: ${participant.points} puntos`);
     });
     
-    console.log('\n📋 Tiempos por ronda:');
+    console.log('\nTiempos por ronda:');
     Object.entries(response.data.times_by_round).forEach(([round, timings]) => {
       console.log(`Ronda ${round}:`);
       timings.forEach(timing => {
@@ -34,7 +34,7 @@ async function testPointsCalculation() {
     });
     
   } catch (error) {
-    console.error('❌ Error:', error.response?.data || error.message);
+    console.error('[ERR] Error:', error.response?.data || error.message);
   }
 }
 

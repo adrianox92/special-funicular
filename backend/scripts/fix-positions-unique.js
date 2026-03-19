@@ -27,11 +27,11 @@ function timeToSeconds(timeStr) {
  * Los demás registros tendrán current_position = null
  */
 async function fixUniquePositions() {
-  console.log('🔄 Iniciando corrección de posiciones únicas...');
+  console.log('Iniciando corrección de posiciones únicas...');
   
   try {
     // 1. Resetear todas las posiciones
-    console.log('\n🗑️  Reseteando todas las posiciones...');
+    console.log('\nReseteando todas las posiciones...');
     const { error: resetError } = await supabase
       .from('vehicle_timings')
       .update({
@@ -43,13 +43,13 @@ async function fixUniquePositions() {
       .not('circuit', 'is', null);
 
     if (resetError) {
-      console.error('❌ Error al resetear posiciones:', resetError.message);
+      console.error('[ERR] Error al resetear posiciones:', resetError.message);
       return;
     }
-    console.log('✅ Posiciones reseteadas correctamente');
+    console.log('[OK] Posiciones reseteadas correctamente');
 
     // 2. Obtener todos los circuitos únicos
-    console.log('\n🔍 Obteniendo circuitos únicos...');
+    console.log('\nObteniendo circuitos únicos...');
     const { data: circuits, error: circuitsError } = await supabase
       .from('vehicle_timings')
       .select('circuit')
@@ -57,16 +57,16 @@ async function fixUniquePositions() {
       .neq('circuit', '');
 
     if (circuitsError) {
-      console.error('❌ Error al obtener circuitos:', circuitsError.message);
+      console.error('[ERR] Error al obtener circuitos:', circuitsError.message);
       return;
     }
 
     const uniqueCircuits = [...new Set(circuits.map(c => c.circuit))];
-    console.log(`📊 Encontrados ${uniqueCircuits.length} circuitos únicos:`, uniqueCircuits);
+    console.log(`Encontrados ${uniqueCircuits.length} circuitos únicos:`, uniqueCircuits);
 
     // 3. Procesar cada circuito
     for (const circuit of uniqueCircuits) {
-      console.log(`\n🏁 Procesando circuito: ${circuit}`);
+      console.log(`\nProcesando circuito: ${circuit}`);
       
       // Obtener todos los tiempos de este circuito
       const { data: allTimings, error: timingsError } = await supabase
@@ -76,12 +76,12 @@ async function fixUniquePositions() {
         .not('best_lap_time', 'is', null);
 
       if (timingsError) {
-        console.error(`❌ Error al obtener tiempos del circuito ${circuit}:`, timingsError.message);
+        console.error(`[ERR] Error al obtener tiempos del circuito ${circuit}:`, timingsError.message);
         continue;
       }
 
       if (!allTimings || allTimings.length === 0) {
-        console.log(`ℹ️  No hay tiempos para el circuito: ${circuit}`);
+        console.log(`[INFO] No hay tiempos para el circuito: ${circuit}`);
         continue;
       }
 
@@ -123,17 +123,17 @@ async function fixUniquePositions() {
           .eq('id', timing.id); // Solo el ID específico del mejor tiempo
 
         if (updateError) {
-          console.error(`❌ Error al actualizar posición:`, updateError.message);
+          console.error(`[ERR] Error al actualizar posición:`, updateError.message);
         } else {
           console.log(`   P${position}: ID ${timing.id} - Vehículo ${timing.vehicle_id.substring(0,8)} - Carril ${timing.lane} (${timing.laps || 'N/A'} vueltas) - ${timing.best_lap_time}`);
         }
       }
     }
 
-    console.log('\n🎉 Corrección de posiciones únicas completada exitosamente!');
+    console.log('\nCorrección de posiciones únicas completada exitosamente!');
 
     // 6. Verificar resultados
-    console.log('\n🔍 Verificando posiciones únicas...');
+    console.log('\nVerificando posiciones únicas...');
     for (const circuit of uniqueCircuits.slice(0, 2)) {
       const { data: verifyTimings, error: verifyError } = await supabase
         .from('vehicle_timings')
@@ -144,7 +144,7 @@ async function fixUniquePositions() {
         .limit(10);
 
       if (!verifyError && verifyTimings) {
-        console.log(`\n🏆 Ranking único en ${circuit}:`);
+        console.log(`\nRanking único en ${circuit}:`);
         verifyTimings.forEach(t => {
           console.log(`   P${t.current_position}: ID ${t.id} - Vehículo ${t.vehicle_id.substring(0,8)} - Carril ${t.lane} (${t.laps || 'N/A'} vueltas) - ${t.best_lap_time}`);
         });
@@ -152,16 +152,16 @@ async function fixUniquePositions() {
     }
 
     // 7. Verificar que no hay duplicados
-    console.log('\n🔍 Verificando ausencia de posiciones duplicadas...');
+    console.log('\nVerificando ausencia de posiciones duplicadas...');
     const { data: duplicates, error: duplicatesError } = await supabase
       .rpc('check_duplicate_positions', { p_circuit: uniqueCircuits[0] });
 
     if (!duplicatesError) {
-      console.log('✅ No se encontraron posiciones duplicadas');
+      console.log('[OK] No se encontraron posiciones duplicadas');
     }
 
   } catch (error) {
-    console.error('❌ Error durante la corrección:', error);
+    console.error('[ERR] Error durante la corrección:', error);
   }
 }
 

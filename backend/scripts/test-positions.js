@@ -12,7 +12,7 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function testPositions() {
-  console.log('🧪 Probando posiciones antes y después del cambio...');
+  console.log('Probando posiciones antes y después del cambio...');
   
   try {
     // Obtener un circuito con múltiples tiempos
@@ -23,14 +23,14 @@ async function testPositions() {
       .neq('circuit', '');
 
     if (!circuits || circuits.length === 0) {
-      console.log('⚠️  No hay circuitos con tiempos');
+      console.log('[WARN] No hay circuitos con tiempos');
       return;
     }
 
     const uniqueCircuits = [...new Set(circuits.map(c => c.circuit))];
     const testCircuit = uniqueCircuits[0];
 
-    console.log(`🏁 Probando con circuito: ${testCircuit}`);
+    console.log(`Probando con circuito: ${testCircuit}`);
 
     // Obtener todos los tiempos de este circuito
     const { data: allTimings } = await supabase
@@ -50,7 +50,7 @@ async function testPositions() {
       .not('best_lap_time', 'is', null)
       .order('best_lap_time', { ascending: true });
 
-    console.log(`\n📊 Total de tiempos en ${testCircuit}: ${allTimings.length}`);
+    console.log(`\nTotal de tiempos en ${testCircuit}: ${allTimings.length}`);
 
     // Agrupar por vehículo + carril
     const groupedByVehicleLane = {};
@@ -62,16 +62,16 @@ async function testPositions() {
       groupedByVehicleLane[key].push(timing);
     });
 
-    console.log(`📊 Combinaciones vehículo+carril únicas: ${Object.keys(groupedByVehicleLane).length}`);
+    console.log(`Combinaciones vehículo+carril únicas: ${Object.keys(groupedByVehicleLane).length}`);
     
     // Mostrar algunos ejemplos
-    console.log('\n🔍 Primeros 10 tiempos en la base de datos:');
+    console.log('\nPrimeros 10 tiempos en la base de datos:');
     allTimings.slice(0, 10).forEach((timing, index) => {
       console.log(`   ${index + 1}. P${timing.current_position || 'SIN POS'}: ${timing.vehicles.manufacturer} ${timing.vehicles.model} - ${timing.best_lap_time} (Carril: ${timing.lane || 'N/A'})`);
     });
 
     // Mostrar agrupaciones
-    console.log('\n📝 Agrupaciones por vehículo+carril:');
+    console.log('\nAgrupaciones por vehículo+carril:');
     Object.entries(groupedByVehicleLane).slice(0, 5).forEach(([key, timings]) => {
       const [vehicleId, lane] = key.split('-');
       const vehicle = timings[0].vehicles;
@@ -89,7 +89,7 @@ async function testPositions() {
     });
 
   } catch (error) {
-    console.error('❌ Error durante la prueba:', error);
+    console.error('[ERR] Error durante la prueba:', error);
   }
 }
 

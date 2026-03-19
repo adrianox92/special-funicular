@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from './ui/select';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Check } from 'lucide-react';
 import api from '../lib/axios';
 import { formatDistance } from '../utils/formatUtils';
 
@@ -206,7 +207,9 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                             }
                           >
                             {row.fmt(sessionA)}
-                            {better === 'A' && <span className="ml-1.5 text-green-600 dark:text-green-400" aria-label="Mejor">✓</span>}
+                            {better === 'A' && (
+                              <Check className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                            )}
                           </TableCell>
                           <TableCell
                             className={
@@ -216,7 +219,9 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                             }
                           >
                             {row.fmt(sessionB)}
-                            {better === 'B' && <span className="ml-1.5 text-green-600 dark:text-green-400" aria-label="Mejor">✓</span>}
+                            {better === 'B' && (
+                              <Check className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                            )}
                           </TableCell>
                         </TableRow>
                       );

@@ -297,7 +297,15 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                       <LineChart data={evolutionData} margin={{ top: 20, right: 20, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
                         <XAxis dataKey="lap" />
-                        <YAxis tickFormatter={(v) => formatTime(v)} width={80} />
+                        <YAxis
+                          tickFormatter={(v) => formatTime(v)}
+                          width={80}
+                          domain={
+                            bestTime != null && worstTime != null
+                              ? [Math.max(0, bestTime - 2), worstTime + 2]
+                              : undefined
+                          }
+                        />
                         <RechartsTooltip content={<CustomTooltip />} />
                         {bestTime != null && (
                           <ReferenceLine y={bestTime} stroke="hsl(142, 76%, 36%)" strokeDasharray="3 3" label={{ value: 'Mejor', position: 'right' }} />

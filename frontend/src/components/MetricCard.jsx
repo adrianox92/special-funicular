@@ -1,4 +1,5 @@
 import React from 'react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import {
   Tooltip,
@@ -55,11 +56,16 @@ const MetricCard = ({
 
   const getTrendIcon = () => {
     if (!trend) return null;
+    const cls = 'inline size-3.5 align-middle';
     switch (trend) {
-      case 'up': return '↗️';
-      case 'down': return '↘️';
-      case 'stable': return '→';
-      default: return null;
+      case 'up':
+        return <TrendingUp className={cls} aria-hidden />;
+      case 'down':
+        return <TrendingDown className={cls} aria-hidden />;
+      case 'stable':
+        return <Minus className={cls} aria-hidden />;
+      default:
+        return null;
     }
   };
 
@@ -95,8 +101,9 @@ const MetricCard = ({
           <div className="flex items-center justify-between gap-2">
             <h5 className="text-sm font-medium text-muted-foreground">{title}</h5>
             {trend && (
-              <span className={cn('text-xs', trendColorClasses[getTrendColor()])}>
-                {getTrendIcon()} {trendValue}
+              <span className={cn('inline-flex items-center gap-1 text-xs', trendColorClasses[getTrendColor()])}>
+                {getTrendIcon()}
+                {trendValue}
               </span>
             )}
           </div>

@@ -1,6 +1,6 @@
-# 🏁 Guía Completa del Sistema de Competiciones
+# Guía Completa del Sistema de Competiciones
 
-## 📋 **Resumen del Sistema**
+## **Resumen del Sistema**
 
 El sistema de competiciones permite organizar y gestionar competiciones de Scalextric de manera completa, desde la creación hasta el seguimiento de resultados. El flujo se divide en **tres pasos principales**:
 
@@ -8,7 +8,7 @@ El sistema de competiciones permite organizar y gestionar competiciones de Scale
 2. **Gestionar participantes** (añadir competidores)
 3. **Registrar tiempos** (seguimiento de resultados)
 
-## 🎯 **Paso 1: Crear Competición**
+##  **Paso 1: Crear Competición**
 
 ### **Campos Requeridos**
 - **Nombre**: Identificador único de la competición
@@ -22,7 +22,7 @@ El sistema de competiciones permite organizar y gestionar competiciones de Scale
 - El progreso se calcula automáticamente: `(tiempos_registrados / total_requerido) * 100`
 - Una competición está **completada** cuando todos los participantes han registrado todos sus tiempos
 
-## 👥 **Paso 2: Gestionar Participantes**
+## **Paso 2: Gestionar Participantes**
 
 ### **Tipos de Participantes**
 
@@ -46,7 +46,7 @@ El sistema de competiciones permite organizar y gestionar competiciones de Scale
 - No se pueden duplicar participantes
 - Se puede editar o eliminar participantes en cualquier momento
 
-## ⏱️ **Paso 3: Registrar Tiempos**
+##  **Paso 3: Registrar Tiempos**
 
 ### **Nueva Funcionalidad: Gestión Completa de Tiempos**
 
@@ -72,9 +72,9 @@ El sistema de competiciones permite organizar y gestionar competiciones de Scale
 #### **1. Vista por Rondas**
 - Muestra cada ronda como una tarjeta separada
 - Indica el estado de cada ronda:
-  - 🟡 **Pendiente**: Sin tiempos registrados
-  - 🟠 **Parcial**: Algunos participantes han registrado tiempo
-  - 🟢 **Completa**: Todos los participantes han registrado tiempo
+  - **Pendiente** (amarillo): Sin tiempos registrados
+  - **Parcial** (naranja): Algunos participantes han registrado tiempo
+  - **Completa** (verde): Todos los participantes han registrado tiempo
 - Lista los tiempos de cada ronda en una tabla compacta
 
 #### **2. Vista por Participantes**
@@ -105,7 +105,7 @@ Progreso = (Tiempos Registrados / Total Requerido) × 100
 Total Requerido = Número de Participantes × Número de Rondas
 ```
 
-## 🔧 **API Endpoints Implementados**
+##  **API Endpoints Implementados**
 
 ### **Gestión de Tiempos**
 - `GET /api/competitions/:id/timings` - Obtener todos los tiempos
@@ -119,7 +119,7 @@ Total Requerido = Número de Participantes × Número de Rondas
   - Tiempos agrupados por ronda
   - Rondas completadas y pendientes por participante
 
-## 🎨 **Interfaz de Usuario**
+##  **Interfaz de Usuario**
 
 ### **Navegación**
 - **Competiciones** → **Participantes** → **Tiempos**
@@ -136,7 +136,7 @@ Total Requerido = Número de Participantes × Número de Rondas
 - **Barras de progreso**: Visualización del avance
 - **Iconos informativos**: Para diferentes estados y acciones
 
-## 📊 **Estructura de Datos**
+##  **Estructura de Datos**
 
 ### **Tabla `competition_timings`**
 ```sql
@@ -165,7 +165,7 @@ CREATE TABLE competition_timings (
 - **competition_participants** → **competitions** (competition_id)
 - **competition_participants** → **vehicles** (vehicle_id, opcional)
 
-## 🚀 **Flujo de Trabajo Completo**
+##  **Flujo de Trabajo Completo**
 
 ### **Ejemplo Práctico**
 
@@ -219,7 +219,7 @@ CREATE TABLE competition_timings (
    4. Carlos López - 12.567s
    ```
 
-## 🎯 **Próximas Mejoras**
+##  **Próximas Mejoras**
 
 ### **Funcionalidades Planificadas**
 - [ ] **Clasificación automática** por mejores tiempos
@@ -238,15 +238,15 @@ CREATE TABLE competition_timings (
 
 ---
 
-**¡El sistema de competiciones está ahora completamente funcional y listo para organizar tus carreras de Scalextric! 🏁** 
+**¡El sistema de competiciones está ahora completamente funcional y listo para organizar tus carreras de Scalextric!**
 
 # Guía de Competiciones - Scalextric Collection
 
-## 🏁 Sistema Completo de Competiciones
+## Sistema Completo de Competiciones
 
 El sistema de competiciones ha sido completamente renovado con nuevas funcionalidades avanzadas para gestionar competiciones de Scalextric de manera profesional.
 
-## 📋 Características Principales
+## Características Principales
 
 ### 1. Gestión de Competiciones
 - **Creación de competiciones** con nombre, número de plazas y rondas
@@ -275,7 +275,7 @@ El sistema de competiciones ha sido completamente renovado con nuevas funcionali
 - **Estructura personalizable** de puntos
 - **Cálculo automático** de puntuaciones
 
-## 🚀 Cómo Usar el Sistema
+##  Cómo Usar el Sistema
 
 ### Crear una Nueva Competición
 
@@ -353,7 +353,7 @@ El sistema de competiciones ha sido completamente renovado con nuevas funcionali
    - El participante se convierte en oficial
    - Aparece en la lista de participantes confirmados
 
-## 📊 Gestión de Tiempos
+##  Gestión de Tiempos
 
 ### Registrar Tiempos por Ronda
 
@@ -378,7 +378,7 @@ El sistema de competiciones ha sido completamente renovado con nuevas funcionali
    - Genera reportes en PDF
    - Incluye estadísticas completas
 
-## 🔧 Configuración Técnica
+##  Configuración Técnica
 
 ### Base de Datos
 
@@ -431,7 +431,7 @@ competition_timings (id, competition_id, participant_id, round_number, time, lap
 - `POST /competitions/:id/signups/:signupId/approve` - Aprobar inscripción
 - `DELETE /competitions/:id/signups/:signupId` - Rechazar inscripción
 
-## 🎯 Mejores Prácticas
+##  Mejores Prácticas
 
 ### Organización de Competiciones
 
@@ -467,7 +467,7 @@ competition_timings (id, competition_id, participant_id, round_number, time, lap
    - Proporciona información clara sobre la competición
    - Establece fechas límite claras
 
-## 🚨 Solución de Problemas
+## Solución de Problemas
 
 ### Problemas Comunes
 
@@ -490,7 +490,7 @@ Si encuentras problemas técnicos:
 2. Verifica la configuración de la base de datos
 3. Contacta al equipo de desarrollo
 
-## 🔄 Actualizaciones Futuras
+## Actualizaciones Futuras
 
 El sistema está diseñado para ser extensible. Próximas funcionalidades planificadas:
 
@@ -503,4 +503,4 @@ El sistema está diseñado para ser extensible. Próximas funcionalidades planif
 
 ---
 
-¡Disfruta organizando tus competiciones de Scalextric con este sistema completo y profesional! 🏁 
+¡Disfruta organizando tus competiciones de Scalextric con este sistema completo y profesional!  

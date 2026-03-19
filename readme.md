@@ -1,12 +1,12 @@
-# 🏁 Scalextric Collection - Gestión de Competiciones
+# Scalextric Collection - Gestión de Competiciones
 
 Una aplicación web completa para gestionar tu colección de coches Scalextric y organizar competiciones de manera profesional.
 
-## 📱 PWA (Progressive Web App)
+## PWA (Progressive Web App)
 
 Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo que significa que puedes instalarla en tu dispositivo móvil o computadora como una aplicación nativa.
 
-### ✨ Características PWA
+### Características PWA
 
 - **Instalable**: Puedes instalar la app en tu dispositivo desde el navegador
 - **Funcionamiento offline**: La aplicación funciona sin conexión a internet
@@ -14,7 +14,7 @@ Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo qu
 - **Experiencia nativa**: Se comporta como una aplicación móvil nativa
 - **Actualizaciones automáticas**: Se actualiza automáticamente cuando hay nuevas versiones
 
-### 🏁 Funcionalidades de Tiempos y Carriles
+### Funcionalidades de Tiempos y Carriles
 
 - **Comparativa de Carriles**: Análisis detallado de rendimiento por carril en cada circuito
 - **Filtrado por Circuito**: Selecciona cualquier circuito para analizar sus carriles
@@ -23,7 +23,7 @@ Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo qu
 - **Identificación de Rápidos**: Descubre qué vehículos son más rápidos en cada carril específico
 - **Métricas de Rendimiento**: Estadísticas completas incluyendo tiempos promedio y mejores marcas
 
-### 📲 Cómo Instalar la PWA
+### Cómo Instalar la PWA
 
 #### En Android (Chrome):
 1. Abre la aplicación en Chrome
@@ -43,22 +43,22 @@ Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo qu
 3. Haz clic en el icono y selecciona "Instalar"
 4. La app se abrirá en una ventana independiente
 
-### 📊 Vercel Web Analytics
+### Vercel Web Analytics
 
 The application includes [Vercel Web Analytics](https://vercel.com/docs/analytics/quickstart) for visitor insights and page view tracking. Analytics are enabled automatically when deployed to Vercel. Enable Web Analytics in your Vercel project dashboard under **Analytics** to start collecting data.
 
-### ⚡ Vercel Speed Insights
+### Vercel Speed Insights
 
 The application includes [Vercel Speed Insights](https://vercel.com/docs/speed-insights) for real-time performance metrics (Core Web Vitals: LCP, FID, CLS, INP, TTFB). Data is collected automatically when deployed to Vercel. Enable Speed Insights in your Vercel project dashboard under **Speed Insights** to start collecting performance data. If no data appears after 30 seconds, check for content blockers and try navigating between pages.
 
-### 🔧 Requisitos Técnicos PWA
+### Requisitos Técnicos PWA
 
 - **HTTPS obligatorio**: La PWA requiere conexión segura en producción
 - **Service Worker**: Para funcionamiento offline y cacheo
 - **Manifest.json**: Configuración de la aplicación instalable
 - **Iconos**: Múltiples tamaños para diferentes dispositivos
 
-### 🛠️ Solución de Problemas PWA
+### Solución de Problemas PWA
 
 Si no ves el botón de instalación:
 
@@ -68,7 +68,7 @@ Si no ves el botón de instalación:
 4. **Revisa la consola**: Busca errores relacionados con el Service Worker
 5. **Reinstala**: Si ya está instalada, desinstala y vuelve a instalar
 
-### 🆕 Nuevas Funcionalidades
+###🆕 Nuevas Funcionalidades
 
 #### Add Vehicle Form Validation
 **Description**: Client-side validation for required fields when creating a new vehicle.
@@ -292,6 +292,27 @@ Si no ves el botón de instalación:
 - `frontend/src/components/TimingsList.jsx` — Performance button integration
 - `frontend/src/components/EditVehicle.jsx` — Performance button in vehicle timings table
 
+#### Setup Performance Analysis (Configuration Comparison)
+**Description**: Analytics in the vehicle detail page that compare performance across different setup configurations. When a vehicle has timing sessions recorded with two or more distinct component configurations (reglajes), a new "Análisis Config." tab appears.
+
+**Features**:
+- **Conditional visibility**: The tab only appears when there are at least 2 different configurations among the vehicle's timing sessions (detected via `setup_snapshot` fingerprinting)
+- **Configuration cards**: Each configuration group shows session count, date range, best lap, average lap, average speed, and key component changes vs previous config
+- **Comparison table**: Side-by-side metrics with visual indicators for best values (green highlight and checkmark)
+- **Bar chart**: Best lap and average lap per configuration
+- **Timeline chart**: Performance evolution over time with vertical reference lines marking configuration changes
+- **Component diff detection**: Automatically identifies which components changed between configurations (e.g. pinion, motor, crown)
+
+**Usage**:
+1. Go to vehicle detail (Edit Vehicle)
+2. Ensure the vehicle has timing sessions with different setups (e.g. changed motor, pinion, or other components between sessions)
+3. If 2+ distinct configurations exist, the "Análisis Config." tab appears
+4. Open the tab to view performance comparison and evolution
+
+**Files**:
+- `frontend/src/components/SetupPerformanceAnalysis.jsx` — Main component with fingerprinting, grouping, cards, comparison table, and charts
+- `frontend/src/components/EditVehicle.jsx` — Conditional 5th tab integration
+
 #### Shadcn UI: Toast and AlertDialog
 **Description**: All native browser `alert()` and `window.confirm()` dialogs have been replaced with Shadcn UI components for a consistent, accessible user experience.
 
@@ -318,7 +339,7 @@ Si no ves el botón de instalación:
 **Files modified**:
 - `frontend/src/components/VehicleDetail.jsx` - Added Dialog lightbox for image viewing
 
-### 🔧 Problemas Resueltos
+### Problemas Resueltos
 
 #### Simplificación de Tabla de Tiempos
 **Problema**: La tabla de tiempos tenía lógica compleja de cambio de posiciones que podía causar confusión y problemas de rendimiento.
@@ -379,11 +400,11 @@ Si no ves el botón de instalación:
 - `frontend/src/components/Navbar.jsx` - Lógica del menú móvil corregida
 - `frontend/src/components/Navbar.css` - Estilos mejorados para móvil
 
-### 🧪 Herramientas de Debug
+### Herramientas de Debug
 
 En modo desarrollo, se añaden botones de debug:
-- **🔍 Debug PWA**: Muestra diagnóstico completo de la PWA
-- **🧪 Test Nav**: Prueba la navegación programática
+- ** Debug PWA**: Muestra diagnóstico completo de la PWA
+- ** Test Nav**: Prueba la navegación programática
 
 Para usar las herramientas de debug:
 1. Abre la consola del navegador (F12)
@@ -391,13 +412,13 @@ Para usar las herramientas de debug:
 3. Haz clic en "Debug PWA" para ver el estado completo
 4. Usa "Test Nav" para probar la navegación
 
-### 📊 Estado de la PWA
+### Estado de la PWA
 
-- ✅ Manifest.json configurado
+-  Manifest.json configurado
 
-## 🏆 Sistema de Seguimiento de Posiciones
+## Sistema de Seguimiento de Posiciones
 
-### ✨ Nueva Funcionalidad
+### Nueva Funcionalidad
 
 La aplicación ahora incluye un **sistema avanzado de seguimiento de posiciones** que permite:
 
@@ -409,7 +430,7 @@ La aplicación ahora incluye un **sistema avanzado de seguimiento de posiciones*
 - **Rankings por circuito**: Clasificaciones separadas para cada circuito
 - **Feedback visual**: El usuario recibe notificaciones cuando las posiciones se actualizan automáticamente
 
-### 🔧 Características Técnicas
+### Características Técnicas
 
 #### Base de Datos
 - **Nuevos campos añadidos**:
@@ -426,12 +447,12 @@ La aplicación ahora incluye un **sistema avanzado de seguimiento de posiciones*
 #### Frontend
 - **Nueva columna**: Columna dedicada a mostrar la posición y cambios
 - **Indicadores visuales**: 
-  - ⬆️ Verde para subidas de posición
-  - ⬇️ Rojo para bajadas de posición
+  - ^ Verde para subidas de posición
+  - v Rojo para bajadas de posición
   - Badges de posición con colores diferenciados
 - **Estilos responsivos**: Adaptado para dispositivos móviles y desktop
 
-### 📊 Cómo Funciona
+### Cómo Funciona
 
 1. **Registro de tiempo**: Al registrar un nuevo tiempo en un circuito
 2. **Cálculo automático**: El sistema recalcula todas las posiciones del circuito
@@ -439,7 +460,7 @@ La aplicación ahora incluye un **sistema avanzado de seguimiento de posiciones*
 4. **Actualización en tiempo real**: La interfaz muestra inmediatamente los cambios
 5. **Historial preservado**: Se mantiene un registro de todas las posiciones anteriores
 
-### 🚀 Implementación
+### Implementación
 
 #### Migración de Base de Datos
 ```bash
@@ -457,24 +478,24 @@ node scripts/migrate-add-position-tracking.js
 - `frontend/src/components/TimingsList.jsx` - Nueva columna de posición
 - `frontend/src/components/TimingsList.css` - Estilos para la nueva funcionalidad
 
-### 🎯 Casos de Uso
+### Casos de Uso
 
 #### Ejemplo 1: Subida de Posición
 - **Antes**: Vehículo A en posición 5
 - **Nuevo tiempo**: Mejor tiempo que mejora la posición
-- **Resultado**: Vehículo A sube a posición 4, se muestra ⬆️ +1
+- **Resultado**: Vehículo A sube a posición 4, se muestra ^ +1
 
 #### Ejemplo 2: Bajada de Posición
 - **Antes**: Vehículo B en posición 2
 - **Nuevo tiempo**: Otro vehículo mejora y le adelanta
-- **Resultado**: Vehículo B baja a posición 3, se muestra ⬇️ -1
+- **Resultado**: Vehículo B baja a posición 3, se muestra v -1
 
 #### Ejemplo 3: Sin Cambios
 - **Antes**: Vehículo C en posición 1
 - **Nuevo tiempo**: Mantiene el mejor tiempo
 - **Resultado**: Vehículo C mantiene posición 1, sin indicador de cambio
 
-### 🔍 Monitoreo y Debug
+### Monitoreo y Debug
 
 #### Logs del Backend
 ```bash
@@ -496,7 +517,7 @@ WHERE circuit IS NOT NULL
 ORDER BY position_updated_at DESC;
 ```
 
-### 📈 Beneficios
+### Beneficios
 
 1. **Transparencia**: Los usuarios pueden ver exactamente cómo evolucionan las posiciones
 2. **Motivación**: Los cambios de posición proporcionan feedback inmediato
@@ -504,22 +525,22 @@ ORDER BY position_updated_at DESC;
 4. **Análisis**: Permite analizar tendencias de rendimiento por circuito
 5. **Experiencia**: Interfaz más rica y atractiva para los usuarios
 
-### 🔮 Futuras Mejoras
+### Futuras Mejoras
 
 - **Notificaciones**: Alertas cuando un vehículo cambie de posición
 - **Gráficos**: Visualización de la evolución de posiciones a lo largo del tiempo
 - **Estadísticas**: Análisis de frecuencia de cambios de posición
 - **Exportación**: Incluir información de posiciones en reportes PDF/CSV
 - **Comparativas**: Comparar rendimiento entre diferentes períodos
-- ✅ Service Worker registrado
-- ✅ Iconos en múltiples tamaños
-- ✅ Botón de instalación implementado
-- ✅ Funcionamiento offline básico
-- ✅ Actualizaciones automáticas
+-  Service Worker registrado
+-  Iconos en múltiples tamaños
+-  Botón de instalación implementado
+-  Funcionamiento offline básico
+-  Actualizaciones automáticas
 
-## ✨ Características Principales
+## Características Principales
 
-### 🎨 Interfaz de Usuario Profesional
+### Interfaz de Usuario Profesional
 - **Página principal atractiva**: Landing page minimalista y profesional para usuarios no logueados
 - **Navbar moderno**: Diseño profesional con logo animado y navegación intuitiva
 - **Indicadores visuales**: Página activa resaltada con animaciones suaves
@@ -539,7 +560,7 @@ ORDER BY position_updated_at DESC;
 - **Paleta de colores profesional**: Gradientes y colores consistentes
 - **Tipografía mejorada**: Jerarquía visual clara con diferentes pesos y tamaños
 
-### 🏠 Página Principal (Landing Page)
+### Página Principal (Landing Page)
 - **Diseño minimalista**: Interfaz limpia y profesional para usuarios no logueados
 - **Hero section atractivo**: Título con gradiente, descripción clara y botones de acción
 - **Elementos visuales**: Tarjetas flotantes con iconos representativos de las funcionalidades
@@ -552,7 +573,7 @@ ORDER BY position_updated_at DESC;
 - **Efectos visuales**: Animaciones suaves y efectos hover elegantes
 - **Colores coherentes**: Paleta de colores consistente con el resto de la aplicación
 
-### 🚗 Gestión de Vehículos
+### Gestión de Vehículos
 - **Catálogo completo**: Registra todos tus coches Scalextric con detalles técnicos
 - **Fotos múltiples**: Añade varias imágenes por vehículo con drag & drop por vista (delantera, perfiles, trasera, etc.)
 - **Categorización**: Organiza por fabricante, tipo y tracción
@@ -562,7 +583,7 @@ ORDER BY position_updated_at DESC;
 - **Análisis de rendimiento**: Compara tiempos de mejor vuelta y promedio a lo largo del tiempo
 - **Seguimiento de progreso**: Identifica tendencias de mejora en diferentes circuitos
 
-### 🏁 Gestión de Circuitos
+### Gestión de Circuitos
 - **Alta de circuitos**: Crea y persiste circuitos con nombre y descripción
 - **Número de carriles**: Define cuántos carriles tiene cada circuito
 - **Longitud por carril**: Especifica la longitud en metros de cada carril
@@ -570,7 +591,7 @@ ORDER BY position_updated_at DESC;
 - **Integración con tiempos**: Los tiempos de vehículos y competiciones referencian circuitos
 - **Filtrado por circuito**: Filtra tiempos por circuito en la tabla de tiempos
 
-### 🏆 Sistema de Competiciones
+### Sistema de Competiciones
 - **Creación de competiciones**: Configura eventos con múltiples rondas
 - **Selector de circuito**: Asocia competiciones a circuitos predefinidos
 - **Inscripciones públicas**: Enlaces públicos para que cualquiera se inscriba
@@ -579,7 +600,7 @@ ORDER BY position_updated_at DESC;
 - **Clasificaciones automáticas**: Rankings en tiempo real
 - **Exportación de datos**: Descarga resultados en CSV
 
-### 🖥️ Modo Presentación (Live TV View)
+### Modo Presentación (Live TV View)
 
 ### Características del Modo Presentación
 El Modo Presentación es una vista especial diseñada para proyectar competiciones en tiempo real en pantallas grandes, proyectores o televisores. **Actualizado con el nuevo sistema de diseño profesional**.
@@ -618,9 +639,9 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
 #### Progreso por Rondas
 - **Grid visual**: Tabla con estado de cada participante por ronda
 - **Iconos de estado**: 
-  - ✅ Completada (verde con efecto de sombra)
+  -  Completada (verde con efecto de sombra)
   - ⏳ En progreso (amarillo con animación pulsante)
-  - ⏸️ Pendiente (gris)
+  -  Pendiente (gris)
 - **Tiempos por ronda**: Visualización de tiempos cuando están disponibles
 - **Leyenda interactiva**: Explicación de iconos con efectos hover
 - **Diseño responsive**: Adaptable a diferentes tamaños de pantalla
@@ -678,7 +699,7 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
 - **Animaciones**: Efectos sutiles para mejor experiencia visual
 - **Tipografía**: Fuente optimizada para legibilidad
 
-## 🔧 API Endpoints
+## API Endpoints
 
 ### Rutas Públicas
 - `GET /api/public/:slug` - Información de competición para inscripción
@@ -720,7 +741,7 @@ El Modo Presentación es una vista especial diseñada para proyectar competicion
   - No requiere autenticación.
   - Respuesta: array de objetos con la estructura de las reglas (`rule_type`, `description`, `points_structure`, etc).
 
-## 🔑 API Keys e Integración
+## API Keys e Integración
 
 El sistema incluye **API keys por usuario** para conectar proyectos externos (por ejemplo, una app de gestión de tiempos de circuito) con esta aplicación.
 
@@ -775,7 +796,7 @@ Si obtienes el error `relation "public.circuits" does not exist`, crea la tabla 
 
 - `SUPABASE_SERVICE_ROLE_KEY` – clave "service_role" del proyecto en Supabase (Dashboard → Settings → API). Si no está definida, se usará `SUPABASE_KEY` (puede fallar si la tabla tiene RLS).
 
-## 🎨 Personalización y UI
+## Personalización y UI
 
 ### shadcn/ui + Tailwind CSS
 The frontend uses **shadcn/ui** components with **Tailwind CSS** for styling:
@@ -804,7 +825,7 @@ Los estilos están organizados en:
 - **Light/Dark**: CSS variables (`--background`, `--foreground`, `--primary`, etc.)
 - **Primary**: oklch-based palette (adapts to theme)
 
-## 🚀 Deploy en Vercel
+## Deploy en Vercel
 
 El proyecto incluye configuración para desplegar el frontend en Vercel:
 
@@ -813,7 +834,7 @@ El proyecto incluye configuración para desplegar el frontend en Vercel:
 
 Si el build falla por memoria, añade en Vercel → Settings → Environment Variables: `NODE_OPTIONS=--max-old-space-size=4096`
 
-## 🤝 Contribución
+## Contribución
 
 1. Fork el proyecto
 2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
@@ -821,18 +842,18 @@ Si el build falla por memoria, añade en Vercel → Settings → Environment Var
 4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
 
-## 📝 Licencia
+## Licencia
 
 Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
 
-## 🆘 Soporte
+## Soporte
 
 Si tienes problemas o preguntas:
 1. Revisa la documentación en `COMPETITIONS_GUIDE.md`
 2. Abre un issue en GitHub
 3. Contacta al equipo de desarrollo
 
-## 🚀 Roadmap
+## Roadmap
 
 ### Próximas Funcionalidades
 - [ ] Exportación PDF de resultados
@@ -895,12 +916,12 @@ Si no tienes `exec_sql` en Supabase, ejecuta manualmente en el SQL Editor:
 - `frontend/src/pages/Circuits.jsx` - Página de gestión de circuitos
 
 ### v1.9.0 - Migración a shadcn/ui (COMPLETADA)
-- ✅ **Nuevo sistema de UI**: Migración de Bootstrap 5 a shadcn/ui + Tailwind CSS
-- ✅ **Dark/Light mode**: Toggle de tema con persistencia en localStorage
-- ✅ **Componentes migrados**: Navbar, Footer, LandingPage, Login, Dashboard, VehicleList, VehicleCard, AddVehicle, MetricCard, InsightsCarousel
-- ✅ **Layout responsive**: Sheet para menú móvil, NavigationMenu para desktop
-- ✅ **CRACO**: Path alias `@/` configurado para imports limpios
-- ✅ **Iconos**: lucide-react para iconografía consistente
+-  **Nuevo sistema de UI**: Migración de Bootstrap 5 a shadcn/ui + Tailwind CSS
+-  **Dark/Light mode**: Toggle de tema con persistencia en localStorage
+-  **Componentes migrados**: Navbar, Footer, LandingPage, Login, Dashboard, VehicleList, VehicleCard, AddVehicle, MetricCard, InsightsCarousel
+-  **Layout responsive**: Sheet para menú móvil, NavigationMenu para desktop
+-  **CRACO**: Path alias `@/` configurado para imports limpios
+-  **Iconos**: lucide-react para iconografía consistente
 
 **Stack de UI actual:**
 - Tailwind CSS v3
@@ -910,7 +931,7 @@ Si no tienes `exec_sql` en Supabase, ejecuta manualmente en el SQL Editor:
 
 **Nota**: Migración a shadcn/ui completada. Bootstrap CSS eliminado. Todos los componentes usan shadcn/ui. Iconos: lucide-react (incluyendo presentation: CompetitionHeader, RoundProgressGrid, BestLapHighlight). InstallPWAButton migrado a Button de shadcn. CompetitionPresentation (modo proyector) mantiene estilos propios con lucide-react.
 
-### ✅ FASE 2 - Frontend: Editor Visual de Reglas (COMPLETADA)
+### FASE 2 - Frontend: Editor Visual de Reglas (COMPLETADA)
 
 Se ha implementado completamente el editor visual de reglas para las competiciones:
 
@@ -935,7 +956,7 @@ Se ha implementado completamente el editor visual de reglas para las competicion
 4. **Editar regla existente** - Modificar puntos y descripción
 5. **Eliminar regla** - Confirmación y actualización
 
-### ✅ FASE 1 - Backend: API para gestionar reglas y plantillas (COMPLETADA)
+### FASE 1 - Backend: API para gestionar reglas y plantillas (COMPLETADA)
 
 Se ha implementado un sistema completo de gestión de reglas y plantillas para las competiciones:
 
@@ -964,20 +985,20 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 
 ---
 
-**¡Disfruta organizando tus competiciones de Scalextric! 🏁**
+**¡Disfruta organizando tus competiciones de Scalextric!**
 
-## 🔄 Actualizaciones Recientes
+## Actualizaciones Recientes
 
 ### v1.7.0 - Modo Presentación (Live TV View)
-- ✅ **Nueva Vista Fullscreen**: Diseño optimizado para proyectores y pantallas grandes
-- ✅ **Ranking en Vivo**: Clasificación actualizada automáticamente cada 10 segundos
-- ✅ **Mejor Vuelta Destacada**: Visualización prominente del tiempo más rápido
-- ✅ **Grid de Progreso por Rondas**: Vista visual del estado de cada participante
-- ✅ **URL Dedicada**: Acceso directo via `/competitions/presentation/:slug`
-- ✅ **Sin Controles de Usuario**: Interfaz limpia para presentaciones públicas
-- ✅ **Diseño Responsive**: Adaptable a diferentes tamaños de pantalla
-- ✅ **Auto-actualización**: Polling automático sin interacción requerida
-- ✅ **Endpoint Backend Específico**: `/api/public-signup/:slug/presentation` optimizado para presentación
+-  **Nueva Vista Fullscreen**: Diseño optimizado para proyectores y pantallas grandes
+-  **Ranking en Vivo**: Clasificación actualizada automáticamente cada 10 segundos
+-  **Mejor Vuelta Destacada**: Visualización prominente del tiempo más rápido
+-  **Grid de Progreso por Rondas**: Vista visual del estado de cada participante
+-  **URL Dedicada**: Acceso directo via `/competitions/presentation/:slug`
+-  **Sin Controles de Usuario**: Interfaz limpia para presentaciones públicas
+-  **Diseño Responsive**: Adaptable a diferentes tamaños de pantalla
+-  **Auto-actualización**: Polling automático sin interacción requerida
+-  **Endpoint Backend Específico**: `/api/public-signup/:slug/presentation` optimizado para presentación
 
 **Archivos Creados:**
 - `frontend/src/pages/CompetitionPresentation.jsx` - Página principal del modo presentación
@@ -1004,11 +1025,11 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 8. **Documentación Swagger**: API documentada para el nuevo endpoint
 
 ### v1.4.0 - Corrección de Bug: Campo category_id en Participantes
-- ✅ **Problema Resuelto**: El campo `category_id` ahora se guarda correctamente en la base de datos
-- ✅ **Validación Mejorada**: Verificación de que la categoría existe antes de asignar participantes
-- ✅ **Migración de Base de Datos**: Script para añadir el campo `category_id` a la tabla `competition_participants`
-- ✅ **Backend Actualizado**: Rutas POST y PUT para participantes ahora procesan correctamente el `category_id`
-- ✅ **Validación de Categorías**: Verificación de que la categoría pertenece a la competición correcta
+-  **Problema Resuelto**: El campo `category_id` ahora se guarda correctamente en la base de datos
+-  **Validación Mejorada**: Verificación de que la categoría existe antes de asignar participantes
+-  **Migración de Base de Datos**: Script para añadir el campo `category_id` a la tabla `competition_participants`
+-  **Backend Actualizado**: Rutas POST y PUT para participantes ahora procesan correctamente el `category_id`
+-  **Validación de Categorías**: Verificación de que la categoría pertenece a la competición correcta
 
 **Archivos Modificados:**
 - `backend/routes/competitions.js` - Rutas POST y PUT actualizadas
@@ -1022,12 +1043,12 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 4. **Migración de Base de Datos**: Campo `category_id` añadido con referencia a `competition_categories`
 
 ### v1.5.0 - Refactorización del Sistema de Reglas: Bonus por Mejor Vuelta
-- ✅ **Eliminación de Tipo de Regla**: Removido el tipo "Mejor tiempo por ronda" del selector
-- ✅ **Nuevo Sistema de Bonus**: Implementado el campo `use_bonus_best_lap` para otorgar 1 punto adicional
-- ✅ **Lógica Simplificada**: El bonus se aplica automáticamente a las reglas de tipo "Por ronda"
-- ✅ **Cálculos Actualizados**: Backend modificado para usar el nuevo sistema de bonus
-- ✅ **Plantillas Limpiadas**: Eliminada la plantilla "Mejor Vuelta por Ronda" y actualizadas las existentes
-- ✅ **Documentación Actualizada**: Todas las guías actualizadas para reflejar los cambios
+-  **Eliminación de Tipo de Regla**: Removido el tipo "Mejor tiempo por ronda" del selector
+-  **Nuevo Sistema de Bonus**: Implementado el campo `use_bonus_best_lap` para otorgar 1 punto adicional
+-  **Lógica Simplificada**: El bonus se aplica automáticamente a las reglas de tipo "Por ronda"
+-  **Cálculos Actualizados**: Backend modificado para usar el nuevo sistema de bonus
+-  **Plantillas Limpiadas**: Eliminada la plantilla "Mejor Vuelta por Ronda" y actualizadas las existentes
+-  **Documentación Actualizada**: Todas las guías actualizadas para reflejar los cambios
 
 **Archivos Modificados:**
 - `frontend/src/components/RuleFormModal.jsx` - Eliminada opción best_time_per_round
@@ -1047,11 +1068,11 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 5. **Documentación**: Todas las guías actualizadas para reflejar los cambios
 
 ### v1.8.0 - Corrección de Navegación PWA en Mobile
-- ✅ **Problema Resuelto**: El icono de la PWA en móviles ahora navega correctamente al dashboard (si estás logueado) o al login (si no lo estás)
-- ✅ **Service Worker Mejorado**: Corregida la interceptación de peticiones que interferían con React Router
-- ✅ **Navegación del Logo**: El logo ahora funciona correctamente tanto en navegadores como en PWA
-- ✅ **Start URL Actualizada**: Manifest.json configurado con parámetro de tracking PWA
-- ✅ **Herramientas de Debug**: Agregadas utilidades de diagnóstico PWA para desarrollo
+-  **Problema Resuelto**: El icono de la PWA en móviles ahora navega correctamente al dashboard (si estás logueado) o al login (si no lo estás)
+-  **Service Worker Mejorado**: Corregida la interceptación de peticiones que interferían con React Router
+-  **Navegación del Logo**: El logo ahora funciona correctamente tanto en navegadores como en PWA
+-  **Start URL Actualizada**: Manifest.json configurado con parámetro de tracking PWA
+-  **Herramientas de Debug**: Agregadas utilidades de diagnóstico PWA para desarrollo
 
 **Problema Identificado:**
 - Cuando se abría la PWA desde el icono del móvil, quedaba en una página en blanco
@@ -1079,11 +1100,11 @@ Se ha implementado un sistema completo de gestión de reglas y plantillas para l
 5. **Debug Tools**: Diagnóstico completo de PWA en modo desarrollo
 
 ### v1.6.0 - Corrección del Cálculo de Puntos en Tiempos Agregados
-- ✅ **Problema Resuelto**: Los puntos en la pestaña "Tiempos Agregados" ahora se calculan correctamente
-- ✅ **Cálculo Unificado**: Eliminado el cálculo de puntos en el frontend, ahora se obtiene del backend
-- ✅ **Penalizaciones Consideradas**: Los puntos ahora consideran las penalizaciones aplicadas
-- ✅ **Bonus por Mejor Vuelta**: El bonus por mejor vuelta se aplica correctamente
-- ✅ **Consistencia**: Los puntos son idénticos entre `CompetitionTimings` y `CompetitionStatus`
+-  **Problema Resuelto**: Los puntos en la pestaña "Tiempos Agregados" ahora se calculan correctamente
+-  **Cálculo Unificado**: Eliminado el cálculo de puntos en el frontend, ahora se obtiene del backend
+-  **Penalizaciones Consideradas**: Los puntos ahora consideran las penalizaciones aplicadas
+-  **Bonus por Mejor Vuelta**: El bonus por mejor vuelta se aplica correctamente
+-  **Consistencia**: Los puntos son idénticos entre `CompetitionTimings` y `CompetitionStatus`
 
 **Archivos Modificados:**
 - `frontend/src/pages/CompetitionTimings.jsx` - Eliminada función calculatePoints, puntos obtenidos del backend

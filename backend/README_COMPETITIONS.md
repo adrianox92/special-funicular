@@ -1,6 +1,6 @@
-# 🏁 Backend - Gestión de Competiciones
+# Backend - Gestión de Competiciones
 
-## 📋 Estructura de Base de Datos
+## Estructura de Base de Datos
 
 ### Tabla `competitions`
 ```sql
@@ -48,7 +48,7 @@ CREATE TABLE public.competition_participants (
 );
 ```
 
-## 🚀 API Endpoints
+##  API Endpoints
 
 ### Competiciones
 
@@ -118,40 +118,40 @@ Eliminar un participante
 #### `GET /api/competitions/vehicles`
 Obtener vehículos del usuario para seleccionar en competiciones
 
-## 🔧 Validaciones
+##  Validaciones
 
 ### Crear Competición
-- ✅ Nombre requerido y no vacío
-- ✅ Número de plazas > 0
-- ✅ Número de rondas > 0
-- ✅ Circuito opcional
+-  Nombre requerido y no vacío
+-  Número de plazas > 0
+-  Número de rondas > 0
+-  Circuito opcional
 
 ### Añadir Participante
-- ✅ Nombre del piloto requerido
-- ✅ Solo una fuente de vehículo (colección O externo)
-- ✅ Vehículo de colección debe existir y pertenecer al usuario
-- ✅ No exceder número de plazas disponibles
+-  Nombre del piloto requerido
+-  Solo una fuente de vehículo (colección O externo)
+-  Vehículo de colección debe existir y pertenecer al usuario
+-  No exceder número de plazas disponibles
 
 ### Actualizar Competición
-- ✅ No reducir plazas por debajo de participantes actuales
-- ✅ No reducir rondas si ya hay tiempos registrados
-- ✅ Validaciones de campos individuales
+-  No reducir plazas por debajo de participantes actuales
+-  No reducir rondas si ya hay tiempos registrados
+-  Validaciones de campos individuales
 
-## 🛡️ Seguridad
+##  Seguridad
 
-- ✅ Autenticación requerida en todos los endpoints (excepto `/test`)
-- ✅ Verificación de propiedad de competiciones
-- ✅ Verificación de propiedad de vehículos
-- ✅ Validación de permisos de usuario
+-  Autenticación requerida en todos los endpoints (excepto `/test`)
+-  Verificación de propiedad de competiciones
+-  Verificación de propiedad de vehículos
+-  Validación de permisos de usuario
 
-## 📝 Notas de Implementación
+##  Notas de Implementación
 
 1. **Middleware de Autenticación**: Todas las rutas usan el middleware de Supabase
 2. **Cascada de Eliminación**: Al eliminar una competición, se eliminan automáticamente todos los participantes
 3. **Validación de Vehículos**: Los vehículos externos y de colección son mutuamente excluyentes
 4. **Conteo de Participantes**: Se incluye automáticamente en las consultas de competiciones
 
-## 🔄 Flujo de Trabajo
+##  Flujo de Trabajo
 
 1. **Crear Competición** → `POST /api/competitions`
 2. **Añadir Participantes** → `POST /api/competitions/:id/participants`

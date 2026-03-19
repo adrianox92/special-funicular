@@ -181,9 +181,9 @@ function drawComponentsTable(doc, components, options = {}) {
 
 function drawPriceSummary(doc, vehicle, totalModCost) {
   const baseY = doc.y;
-  const totalPrice = vehicle.total_price != null && !isNaN(Number(vehicle.total_price))
-    ? Number(vehicle.total_price)
-    : (vehicle.price != null && !isNaN(Number(vehicle.price)) ? Number(vehicle.price) : 0);
+  const basePrice = vehicle.price != null && !isNaN(Number(vehicle.price)) ? Number(vehicle.price) : 0;
+  // Siempre sumar modificaciones al precio de compra cuando existan
+  const totalPrice = basePrice + (totalModCost || 0);
 
   doc.save();
   doc.strokeColor(COLORS.border).lineWidth(0.5);
@@ -302,11 +302,13 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
 
       // Información de compra
       drawSectionTitle(doc, 'Información de compra');
+      const basePrice = vehicle.price != null && !isNaN(Number(vehicle.price)) ? Number(vehicle.price) : 0;
+      const computedTotalPrice = basePrice + (totalModCost || 0);
       const purchaseRows = [
         ['Fecha de compra', vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString('es-ES') : '-'],
         ['Lugar de compra', vehicle.purchase_place],
         ['Precio base', formatPrice(vehicle.price)],
-        ['Precio total', formatPrice(vehicle.total_price || vehicle.price)],
+        ['Precio total', formatPrice(computedTotalPrice)],
       ];
       drawInfoTable(doc, purchaseRows);
 

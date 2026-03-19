@@ -1,4 +1,5 @@
 import React from 'react';
+import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader } from '../ui/card';
 
@@ -37,7 +38,7 @@ const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
     
     const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
     
-    return difference < 0 ? `🔽 Mejoró ${timeStr}` : `🔼 Empeoró ${timeStr}`;
+    return difference < 0 ? `Mejoró ${timeStr}` : `Empeoró ${timeStr}`;
   };
 
   // Ordenar por fecha y preparar datos para la gráfica
@@ -177,7 +178,20 @@ const TimingEvolutionChart = ({ timings, circuit, lane, laps }) => {
             Se muestran {filteredTimings.length} registros de tiempo para {circuit}, carril {lane}, con {laps} vueltas.
             {filteredTimings.length >= 3 && ' Cada gráfica muestra la evolución independiente de cada métrica con su propia escala.'}
             <br />
-            <span className="text-primary">🔽</span> Mejoró, <span className="text-destructive">🔼</span> Empeoró, <span className="text-muted">➡️</span> Sin cambios
+            <span className="inline-flex items-center gap-1">
+              <TrendingDown className="inline size-3.5 text-primary" aria-hidden />
+              Mejoró
+            </span>
+            {', '}
+            <span className="inline-flex items-center gap-1">
+              <TrendingUp className="inline size-3.5 text-destructive" aria-hidden />
+              Empeoró
+            </span>
+            {', '}
+            <span className="inline-flex items-center gap-1">
+              <Minus className="inline size-3.5 text-muted-foreground" aria-hidden />
+              Sin cambios
+            </span>
           </small>
         </div>
       </CardContent>

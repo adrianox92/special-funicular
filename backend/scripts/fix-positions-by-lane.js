@@ -29,11 +29,11 @@ function timeToSeconds(timeStr) {
  * - Carriles separados (carril 1 y carril 2 = posiciones independientes)
  */
 async function fixPositionsByLane() {
-  console.log('🔄 Iniciando corrección de posiciones por carril...');
+  console.log('Iniciando corrección de posiciones por carril...');
   
   try {
     // 1. Resetear todas las posiciones
-    console.log('\n🗑️  Reseteando todas las posiciones...');
+    console.log('\nReseteando todas las posiciones...');
     const { error: resetError } = await supabase
       .from('vehicle_timings')
       .update({
@@ -45,13 +45,13 @@ async function fixPositionsByLane() {
       .not('circuit', 'is', null);
 
     if (resetError) {
-      console.error('❌ Error al resetear posiciones:', resetError.message);
+      console.error('[ERR] Error al resetear posiciones:', resetError.message);
       return;
     }
-    console.log('✅ Posiciones reseteadas correctamente');
+    console.log('[OK] Posiciones reseteadas correctamente');
 
     // 2. Obtener todos los circuitos únicos
-    console.log('\n🔍 Obteniendo circuitos únicos...');
+    console.log('\nObteniendo circuitos únicos...');
     const { data: circuits, error: circuitsError } = await supabase
       .from('vehicle_timings')
       .select('circuit')
@@ -59,16 +59,16 @@ async function fixPositionsByLane() {
       .neq('circuit', '');
 
     if (circuitsError) {
-      console.error('❌ Error al obtener circuitos:', circuitsError.message);
+      console.error('[ERR] Error al obtener circuitos:', circuitsError.message);
       return;
     }
 
     const uniqueCircuits = [...new Set(circuits.map(c => c.circuit))];
-    console.log(`📊 Encontrados ${uniqueCircuits.length} circuitos únicos:`, uniqueCircuits);
+    console.log(`Encontrados ${uniqueCircuits.length} circuitos únicos:`, uniqueCircuits);
 
     // 3. Procesar cada circuito
     for (const circuit of uniqueCircuits) {
-      console.log(`\n🏁 Procesando circuito: ${circuit}`);
+      console.log(`\nProcesando circuito: ${circuit}`);
       
       // Obtener todos los tiempos de este circuito
       const { data: allTimings, error: timingsError } = await supabase
@@ -78,12 +78,12 @@ async function fixPositionsByLane() {
         .not('best_lap_time', 'is', null);
 
       if (timingsError) {
-        console.error(`❌ Error al obtener tiempos del circuito ${circuit}:`, timingsError.message);
+        console.error(`[ERR] Error al obtener tiempos del circuito ${circuit}:`, timingsError.message);
         continue;
       }
 
       if (!allTimings || allTimings.length === 0) {
-        console.log(`ℹ️  No hay tiempos para el circuito: ${circuit}`);
+        console.log(`[INFO] No hay tiempos para el circuito: ${circuit}`);
         continue;
       }
 
@@ -128,17 +128,17 @@ async function fixPositionsByLane() {
             .eq('laps', timing.laps || null);
 
           if (updateError) {
-            console.error(`❌ Error al actualizar posición:`, updateError.message);
+            console.error(`[ERR] Error al actualizar posición:`, updateError.message);
           } else {
             console.log(`   P${position}: Vehículo ${timing.vehicle_id} - Carril ${timing.lane} (${timing.laps || 'N/A'} vueltas) - ${timing.best_lap_time}`);
           }
         }
     }
 
-    console.log('\n🎉 Corrección de posiciones completada exitosamente!');
+    console.log('\nCorrección de posiciones completada exitosamente!');
 
     // 6. Verificar resultados
-    console.log('\n🔍 Verificando posiciones actualizadas...');
+    console.log('\nVerificando posiciones actualizadas...');
     for (const circuit of uniqueCircuits.slice(0, 2)) {
       const { data: verifyTimings, error: verifyError } = await supabase
         .from('vehicle_timings')
@@ -150,7 +150,7 @@ async function fixPositionsByLane() {
         .limit(10);
 
       if (!verifyError && verifyTimings) {
-        console.log(`\n🏆 Ranking en ${circuit}:`);
+        console.log(`\nRanking en ${circuit}:`);
         verifyTimings.forEach(t => {
           console.log(`   P${t.current_position} (Carril ${t.lane}): Vehículo ${t.vehicle_id} - ${t.best_lap_time} (${t.laps || 'N/A'} vueltas)`);
         });
@@ -158,7 +158,7 @@ async function fixPositionsByLane() {
     }
 
   } catch (error) {
-    console.error('❌ Error durante la corrección:', error);
+    console.error('[ERR] Error durante la corrección:', error);
   }
 }
 

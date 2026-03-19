@@ -966,7 +966,22 @@ router.get('/:id/timings', async (req, res) => {
       return res.status(500).json({ error: timingsError.message });
     }
 
-    res.json(timings);
+    // Enriquecer con has_laps (vueltas individuales en timing_laps)
+    const timingIds = (timings || []).map(t => t.id).filter(Boolean);
+    const timingsWithLapsSet = new Set();
+    if (timingIds.length > 0) {
+      const { data: lapsData } = await supabase
+        .from('timing_laps')
+        .select('timing_id')
+        .in('timing_id', timingIds);
+      (lapsData || []).forEach(l => timingsWithLapsSet.add(l.timing_id));
+    }
+    const enrichedTimings = (timings || []).map(t => ({
+      ...t,
+      has_laps: timingsWithLapsSet.has(t.id),
+    }));
+
+    res.json(enrichedTimings);
   } catch (err) {
     console.error('Error al obtener tiempos:', err);
     res.status(500).json({ error: err.message });
@@ -1092,11 +1107,11 @@ router.post('/:id/timings', async (req, res) => {
     // Actualizar posiciones del circuito si se especificó uno
     if (circuitToStore) {
       try {
-        console.log(`🔄 Actualizando posiciones para el circuito: ${circuitToStore}`);
+        console.log(`Actualizando posiciones para el circuito: ${circuitToStore}`);
         const positionUpdate = await updatePositionsAfterNewTiming(circuitToStore, timing.id);
         
         if (positionUpdate.success) {
-          console.log(`✅ Posiciones actualizadas para el circuito: ${circuitToStore}`);
+          console.log(`[OK] Posiciones actualizadas para el circuito: ${circuitToStore}`);
           // Enriquecer la respuesta con información de posiciones
           const enrichedTiming = {
             ...timing,
@@ -1105,11 +1120,11 @@ router.post('/:id/timings', async (req, res) => {
           };
           res.status(201).json(enrichedTiming);
         } else {
-          console.warn(`⚠️  No se pudieron actualizar las posiciones para el circuito: ${circuitToStore}`);
+          console.warn(`[WARN] No se pudieron actualizar las posiciones para el circuito: ${circuitToStore}`);
           res.status(201).json(timing);
         }
       } catch (positionError) {
-        console.error(`❌ Error al actualizar posiciones para el circuito ${circuitToStore}:`, positionError);
+        console.error(`[ERR] Error al actualizar posiciones para el circuito ${circuitToStore}:`, positionError);
         // Aún devolvemos el timing creado, pero sin información de posiciones
         res.status(201).json(timing);
       }
@@ -1230,7 +1245,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       previousCircuit !== newCircuit     // Cambió el circuito
     );
 
-    console.log(`🔄 Actualizando tiempo ${timingId}:`, {
+    console.log(`Actualizando tiempo ${timingId}:`, {
       previousBestLap,
       newBestLap,
       previousCircuit,
@@ -1287,7 +1302,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
 
     // Recalcular posiciones si es necesario
     if (needsPositionUpdate) {
-      console.log(`🔄 Recalculando posiciones debido a cambios en el tiempo...`);
+      console.log(`Recalculando posiciones debido a cambios en el tiempo...`);
       
       // Si cambió de circuito, actualizar ambos circuitos
       const circuitsToUpdate = new Set();
@@ -1298,18 +1313,18 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       
       for (const circuitToUpdate of circuitsToUpdate) {
         try {
-          console.log(`🔄 Actualizando posiciones para el circuito: ${circuitToUpdate}`);
+          console.log(`Actualizando posiciones para el circuito: ${circuitToUpdate}`);
           const positionUpdate = await updatePositionsAfterNewTiming(circuitToUpdate, timingId);
           
           if (positionUpdate.success) {
-            console.log(`✅ Posiciones actualizadas para el circuito: ${circuitToUpdate}`);
+            console.log(`[OK] Posiciones actualizadas para el circuito: ${circuitToUpdate}`);
             positionUpdates.push({
               circuit: circuitToUpdate,
               success: true,
               ranking: positionUpdate.ranking
             });
           } else {
-            console.warn(`⚠️ No se pudieron actualizar las posiciones para el circuito: ${circuitToUpdate}`);
+            console.warn(`[WARN] No se pudieron actualizar las posiciones para el circuito: ${circuitToUpdate}`);
             positionUpdates.push({
               circuit: circuitToUpdate,
               success: false,
@@ -1317,7 +1332,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
             });
           }
         } catch (positionError) {
-          console.error(`❌ Error al actualizar posiciones para el circuito ${circuitToUpdate}:`, positionError);
+          console.error(`[ERR] Error al actualizar posiciones para el circuito ${circuitToUpdate}:`, positionError);
           positionUpdates.push({
             circuit: circuitToUpdate,
             success: false,
@@ -1336,7 +1351,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       
       res.json(enrichedTiming);
     } else {
-      console.log(`ℹ️ No se requiere recálculo de posiciones para el tiempo ${timingId}`);
+      console.log(`[INFO] No se requiere recálculo de posiciones para el tiempo ${timingId}`);
       res.json(updatedTiming);
     }
 
@@ -1396,22 +1411,22 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
     // Recalcular posiciones si el tiempo eliminado tenía circuito
     if (deletedCircuit) {
       try {
-        console.log(`🔄 Recalculando posiciones después de eliminar tiempo en circuito: ${deletedCircuit}`);
+        console.log(`Recalculando posiciones después de eliminar tiempo en circuito: ${deletedCircuit}`);
         const positionUpdate = await updatePositionsAfterNewTiming(deletedCircuit, null);
         
         if (positionUpdate.success) {
-          console.log(`✅ Posiciones recalculadas para el circuito: ${deletedCircuit}`);
+          console.log(`[OK] Posiciones recalculadas para el circuito: ${deletedCircuit}`);
           res.json({ 
             message: 'Registro de tiempo eliminado correctamente',
             position_updated: true,
             circuit: deletedCircuit
           });
         } else {
-          console.warn(`⚠️ No se pudieron recalcular las posiciones para el circuito: ${deletedCircuit}`);
+          console.warn(`[WARN] No se pudieron recalcular las posiciones para el circuito: ${deletedCircuit}`);
           res.json({ message: 'Registro de tiempo eliminado correctamente' });
         }
       } catch (positionError) {
-        console.error(`❌ Error al recalcular posiciones para el circuito ${deletedCircuit}:`, positionError);
+        console.error(`[ERR] Error al recalcular posiciones para el circuito ${deletedCircuit}:`, positionError);
         // Aún devolvemos éxito en la eliminación, pero sin actualización de posiciones
         res.json({ message: 'Registro de tiempo eliminado correctamente' });
       }

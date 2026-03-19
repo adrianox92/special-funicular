@@ -15,7 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function migrateAddCategoryId() {
   try {
-    console.log('🚀 Iniciando migración: Añadir category_id a competition_participants...');
+    console.log('Iniciando migración: Añadir category_id a competition_participants...');
 
     // Leer el archivo SQL
     const sqlPath = path.join(__dirname, 'add-category-id-to-participants.sql');
@@ -25,17 +25,17 @@ async function migrateAddCategoryId() {
     const { error } = await supabase.rpc('exec_sql', { sql: sqlContent });
 
     if (error) {
-      console.error('❌ Error al ejecutar la migración:', error);
+      console.error('[ERR] Error al ejecutar la migración:', error);
       return;
     }
 
-    console.log('✅ Migración completada exitosamente');
-    console.log('📋 Cambios realizados:');
+    console.log('[OK] Migración completada exitosamente');
+    console.log('Cambios realizados:');
     console.log('   - Añadido campo category_id a la tabla competition_participants');
     console.log('   - Creado índice para mejorar el rendimiento de consultas');
 
   } catch (error) {
-    console.error('❌ Error durante la migración:', error);
+    console.error('[ERR] Error durante la migración:', error);
   }
 }
 

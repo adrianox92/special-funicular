@@ -13,7 +13,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 async function addCircuitNameColumn() {
   try {
-    console.log('🔄 Iniciando migración para agregar campo circuit_name...');
+    console.log('Iniciando migración para agregar campo circuit_name...');
 
     // Verificar si la columna ya existe
     const { data: columns, error: columnsError } = await supabase
@@ -24,7 +24,7 @@ async function addCircuitNameColumn() {
     } else {
       const hasCircuitName = columns.some(col => col.column_name === 'circuit_name');
       if (hasCircuitName) {
-        console.log('✅ La columna circuit_name ya existe en la tabla competitions');
+        console.log('[OK] La columna circuit_name ya existe en la tabla competitions');
         return;
       }
     }
@@ -46,16 +46,16 @@ async function addCircuitNameColumn() {
         .limit(1);
 
       if (sqlError && sqlError.message.includes('circuit_name')) {
-        console.log('✅ La columna circuit_name ya existe');
+        console.log('[OK] La columna circuit_name ya existe');
         return;
       }
 
-      console.log('⚠️ No se pudo verificar automáticamente. Por favor, ejecuta manualmente:');
+      console.log('[WARN] No se pudo verificar automáticamente. Por favor, ejecuta manualmente:');
       console.log('ALTER TABLE public.competitions ADD COLUMN circuit_name text;');
       return;
     }
 
-    console.log('✅ Columna circuit_name agregada exitosamente');
+    console.log('[OK] Columna circuit_name agregada exitosamente');
 
     // Agregar comentario a la columna
     try {
@@ -65,16 +65,16 @@ async function addCircuitNameColumn() {
           column_name: 'circuit_name',
           comment: 'Nombre del circuito donde se realizará la competición'
         });
-      console.log('✅ Comentario agregado a la columna circuit_name');
+      console.log('[OK] Comentario agregado a la columna circuit_name');
     } catch (commentError) {
-      console.log('⚠️ No se pudo agregar el comentario automáticamente');
+      console.log('[WARN] No se pudo agregar el comentario automáticamente');
     }
 
-    console.log('🎉 Migración completada exitosamente');
+    console.log('Migración completada exitosamente');
 
   } catch (error) {
-    console.error('❌ Error durante la migración:', error);
-    console.log('\n📝 Para ejecutar manualmente, usa este SQL en Supabase:');
+    console.error('[ERR] Error durante la migración:', error);
+    console.log('\nPara ejecutar manualmente, usa este SQL en Supabase:');
     console.log('ALTER TABLE public.competitions ADD COLUMN circuit_name text;');
     console.log('COMMENT ON COLUMN public.competitions.circuit_name IS \'Nombre del circuito donde se realizará la competición\';');
   }
@@ -83,10 +83,10 @@ async function addCircuitNameColumn() {
 // Ejecutar la migración
 addCircuitNameColumn()
   .then(() => {
-    console.log('✅ Proceso completado');
+    console.log('[OK] Proceso completado');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('❌ Error fatal:', error);
+    console.error('[ERR] Error fatal:', error);
     process.exit(1);
   }); 

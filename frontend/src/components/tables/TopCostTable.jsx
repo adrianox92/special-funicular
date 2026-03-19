@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Badge } from '../ui/badge';
 import {
@@ -65,7 +66,10 @@ const IncrementBar = ({ value, maxValue, basePrice, totalPrice }) => {
         </TooltipTrigger>
         <TooltipContent side="top" className="text-left">
           <div>Coste original: {formatCurrency(basePrice)}</div>
-          <div>→ Total: {formatCurrency(totalPrice)}</div>
+          <div className="flex items-center gap-1">
+            <ArrowRight className="size-3.5 shrink-0" aria-hidden />
+            Total: {formatCurrency(totalPrice)}
+          </div>
           <div className="font-semibold">Incremento: {formatPercentage(value)}</div>
         </TooltipContent>
       </Tooltip>
@@ -104,8 +108,13 @@ const TopCostTable = ({ data }) => {
   };
 
   const getSortIcon = (key) => {
-    if (sortConfig.key !== key) return '↕️';
-    return sortConfig.direction === 'asc' ? '↑' : '↓';
+    const cls = 'inline size-3.5 align-middle opacity-70';
+    if (sortConfig.key !== key) return <ArrowUpDown className={cls} aria-hidden />;
+    return sortConfig.direction === 'asc' ? (
+      <ArrowUp className={cls} aria-hidden />
+    ) : (
+      <ArrowDown className={cls} aria-hidden />
+    );
   };
 
   // Calcular el máximo incremento para escalar las barras
@@ -120,9 +129,21 @@ const TopCostTable = ({ data }) => {
             <TableHeader>
               <TableRow>
                 <TableHead>Modelo</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('basePrice')}>Precio Base {getSortIcon('basePrice')}</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('totalPrice')}>Precio Total {getSortIcon('totalPrice')}</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('incrementPercentage')}>Incremento {getSortIcon('incrementPercentage')}</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('basePrice')}>
+                  <span className="inline-flex items-center gap-1">
+                    Precio Base {getSortIcon('basePrice')}
+                  </span>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('totalPrice')}>
+                  <span className="inline-flex items-center gap-1">
+                    Precio Total {getSortIcon('totalPrice')}
+                  </span>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('incrementPercentage')}>
+                  <span className="inline-flex items-center gap-1">
+                    Incremento {getSortIcon('incrementPercentage')}
+                  </span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

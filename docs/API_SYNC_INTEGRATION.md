@@ -198,20 +198,20 @@ Content-Type: application/json
 
 | Campo           | Tipo          | Requerido | Descripción                                                    |
 | --------------- | ------------- | --------- | -------------------------------------------------------------- |
-| `vehicle_id`    | string (UUID) | ✅         | ID del vehículo (debe pertenecer al usuario)                   |
-| `best_lap_time` | string        | ✅         | Mejor vuelta en formato `mm:ss.mmm`                            |
-| `total_time`    | string        | ✅         | Tiempo total en formato `mm:ss.mmm`                            |
-| `laps`          | number        | ✅         | Número de vueltas                                              |
-| `average_time`  | string        | ✅         | Tiempo promedio por vuelta en formato `mm:ss.mmm`              |
-| `lane`          | string        | ❌         | Número de carril (ej: "1", "2")                                |
-| `circuit`       | string        | ❌         | Nombre del circuito (si no existe, se crea automáticamente)    |
-| `circuit_id`    | string (UUID) | ❌         | ID del circuito (prioridad sobre `circuit` si ambos se envían) |
-| `timing_date`   | string        | ❌         | Fecha en formato `YYYY-MM-DD` (default: hoy)                   |
-| `best_lap_timestamp` | number | ❌ | Mejor vuelta en segundos (float) |
-| `total_time_timestamp` | number | ❌ | Tiempo total en segundos (float) |
-| `average_time_timestamp` | number | ❌ | Tiempo promedio en segundos (float) |
-| `scale_factor` | number | ❌ | Escala del coche para velocidad equivalente (32 = 1:32). Si no se envía, se usa el del vehículo |
-| `lap_times` | array | ❌ | Array de vueltas individuales. Cada elemento: `{ lap_number?, time_seconds|lap_time_seconds, time_text? }`. Si se envía con ≥3 vueltas válidas, se calcula `consistency_score` y `worst_lap_timestamp` |
+| `vehicle_id`    | string (UUID) | Sí         | ID del vehículo (debe pertenecer al usuario)                   |
+| `best_lap_time` | string        | Sí         | Mejor vuelta en formato `mm:ss.mmm`                            |
+| `total_time`    | string        | Sí         | Tiempo total en formato `mm:ss.mmm`                            |
+| `laps`          | number        | Sí         | Número de vueltas                                              |
+| `average_time`  | string        | Sí         | Tiempo promedio por vuelta en formato `mm:ss.mmm`              |
+| `lane`          | string        | No         | Número de carril (ej: "1", "2")                                |
+| `circuit`       | string        | No         | Nombre del circuito (si no existe, se crea automáticamente)    |
+| `circuit_id`    | string (UUID) | No         | ID del circuito (prioridad sobre `circuit` si ambos se envían) |
+| `timing_date`   | string        | No         | Fecha en formato `YYYY-MM-DD` (default: hoy)                   |
+| `best_lap_timestamp` | number | No | Mejor vuelta en segundos (float) |
+| `total_time_timestamp` | number | No | Tiempo total en segundos (float) |
+| `average_time_timestamp` | number | No | Tiempo promedio en segundos (float) |
+| `scale_factor` | number | No | Escala del coche para velocidad equivalente (32 = 1:32). Si no se envía, se usa el del vehículo |
+| `lap_times` | array | No | Array de vueltas individuales. Cada elemento: `{ lap_number?, time_seconds|lap_time_seconds, time_text? }`. Si se envía con ≥3 vueltas válidas, se calcula `consistency_score` y `worst_lap_timestamp` |
 
 
 **Resolución de circuito:**

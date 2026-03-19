@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Badge } from '../ui/badge';
 import {
@@ -79,8 +79,13 @@ const TopComponentsTable = ({ data }) => {
   };
 
   const getSortIcon = (key) => {
-    if (sortConfig.key !== key) return '↕️';
-    return sortConfig.direction === 'asc' ? '↑' : '↓';
+    const cls = 'inline size-3.5 align-middle opacity-70';
+    if (sortConfig.key !== key) return <ArrowUpDown className={cls} aria-hidden />;
+    return sortConfig.direction === 'asc' ? (
+      <ArrowUp className={cls} aria-hidden />
+    ) : (
+      <ArrowDown className={cls} aria-hidden />
+    );
   };
 
   const renderComponentLinks = (component) => {
@@ -128,8 +133,16 @@ const TopComponentsTable = ({ data }) => {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Componente</TableHead>
                 <TableHead>SKU</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('unitPrice')}>Precio Unitario {getSortIcon('unitPrice')}</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('totalInvestment')}>Inversión Total {getSortIcon('totalInvestment')}</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('unitPrice')}>
+                  <span className="inline-flex items-center gap-1">
+                    Precio Unitario {getSortIcon('unitPrice')}
+                  </span>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('totalInvestment')}>
+                  <span className="inline-flex items-center gap-1">
+                    Inversión Total {getSortIcon('totalInvestment')}
+                  </span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

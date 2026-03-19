@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Flag, Clock, Check, Download, Tv, Star, Route } from 'lucide-react';
+import { Trophy, Users, Flag, Clock, Check, Download, Tv, Star, Route, AlertTriangle } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
@@ -257,7 +257,8 @@ const CompetitionStatus = () => {
                         <TableCell>
                           {penalty > 0 ? (
                             <span title={`Original: ${secondsToTimeString(totalTimeSeconds)}`} className="cursor-help">
-                              {participant.total_time} <span className="text-amber-600">⚠️</span>
+                              {participant.total_time}{' '}
+                              <AlertTriangle className="inline size-3.5 align-middle text-amber-600" aria-hidden />
                             </span>
                           ) : (
                             participant.total_time
@@ -326,7 +327,8 @@ const CompetitionStatus = () => {
                           <div className="font-semibold">
                             {penalty > 0 ? (
                               <span title={`Original: ${secondsToTimeString(totalTimeSeconds)}`} className="cursor-help">
-                                {participant.total_time} <span className="text-amber-600">⚠️</span>
+                                {participant.total_time}{' '}
+                                <AlertTriangle className="inline size-3.5 align-middle text-amber-600" aria-hidden />
                               </span>
                             ) : (
                               participant.total_time
@@ -345,7 +347,8 @@ const CompetitionStatus = () => {
                                 <small className="text-muted-foreground">
                                   {Number(timing.penalty_seconds) > 0 ? (
                                     <span title={`Original: ${secondsToTimeString(timeStringToSeconds(timing.total_time))}`} className="cursor-help">
-                                      {timing.total_time} <span className="text-amber-600">⚠️</span>
+                                      {timing.total_time}{' '}
+                                      <AlertTriangle className="inline size-3.5 align-middle text-amber-600" aria-hidden />
                                     </span>
                                   ) : (
                                     timing.total_time

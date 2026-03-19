@@ -109,7 +109,7 @@ router.get('/', async (req, res) => {
         const ranking = await getCircuitRanking(circuitName);
         circuitPositions[circuitName] = ranking;
       } catch (error) {
-        console.warn(`⚠️  Error al obtener ranking del circuito ${circuitName}:`, error.message);
+        console.warn(`[WARN] Error al obtener ranking del circuito ${circuitName}:`, error.message);
         circuitPositions[circuitName] = [];
       }
     }));

@@ -876,9 +876,10 @@ const CompetitionTimings = () => {
                                             <TooltipTrigger asChild>
                                               <span className="cursor-pointer">
                                                 {secondsToTimeString(adjusted)}{' '}
-                                                <span className="text-amber-600">
-                                                  ⚠️
-                                                </span>
+                                                <AlertTriangle
+                                                  className="inline size-3.5 align-middle text-amber-600"
+                                                  aria-hidden
+                                                />
                                               </span>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -905,9 +906,9 @@ const CompetitionTimings = () => {
                                         {isBestLap && (
                                           <Badge
                                             variant="secondary"
-                                            className="ml-1 bg-amber-500/20 text-amber-800 dark:text-amber-200"
+                                            className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-200"
                                           >
-                                            🏆
+                                            <Trophy className="size-3" aria-hidden />
                                           </Badge>
                                         )}
                                       </TableCell>
@@ -1005,9 +1006,10 @@ const CompetitionTimings = () => {
                                             <TooltipTrigger asChild>
                                               <span className="cursor-pointer">
                                                 {secondsToTimeString(adjusted)}{' '}
-                                                <span className="text-amber-600">
-                                                  ⚠️
-                                                </span>
+                                                <AlertTriangle
+                                                  className="inline size-3.5 align-middle text-amber-600"
+                                                  aria-hidden
+                                                />
                                               </span>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -1034,9 +1036,9 @@ const CompetitionTimings = () => {
                                         {isBestLap && (
                                           <Badge
                                             variant="secondary"
-                                            className="ml-1 bg-amber-500/20 text-amber-800 dark:text-amber-200"
+                                            className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-200"
                                           >
-                                            🏆
+                                            <Trophy className="size-3" aria-hidden />
                                           </Badge>
                                         )}
                                       </TableCell>
@@ -1245,9 +1247,10 @@ const CompetitionTimings = () => {
                                     <TooltipTrigger asChild>
                                       <span className="cursor-pointer">
                                         {secondsToTimeString(adjusted)}{' '}
-                                        <span className="text-amber-600">
-                                          ⚠️
-                                        </span>
+                                        <AlertTriangle
+                                          className="inline size-3.5 align-middle text-amber-600"
+                                          aria-hidden
+                                        />
                                       </span>
                                     </TooltipTrigger>
                                     <TooltipContent>

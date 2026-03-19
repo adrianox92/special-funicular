@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Pencil, Trash2, Wrench, BarChart3 } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2, Wrench, BarChart3, AlertTriangle, CircleCheck } from 'lucide-react';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
 import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
 import TimingSpecsModal from './TimingSpecsModal';
 import SessionPerformanceModal from './SessionPerformanceModal';
+import SetupPerformanceAnalysis, { hasMultipleConfigs } from './SetupPerformanceAnalysis';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -139,13 +140,12 @@ const EditVehicle = () => {
     average_time_timestamp: null
   });
   const [loadingTimings, setLoadingTimings] = useState(false);
-  const [timingWarning, setTimingWarning] = useState(null);
+  const [timingNotice, setTimingNotice] = useState(null);
   const [showSpecsModal, setShowSpecsModal] = useState(false);
   const [selectedTiming, setSelectedTiming] = useState(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceTiming, setPerformanceTiming] = useState(null);
   const [timingHasLaps, setTimingHasLaps] = useState({});
-  const checkedTimingIdsRef = useRef(new Set());
 
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
@@ -265,36 +265,13 @@ const EditVehicle = () => {
     }
   }, [id]);
 
-  // Determine which timings have per-lap data, so we only show the performance button when useful.
+  // Derive has_laps from API response (GET /vehicles/:id/timings returns has_laps)
   useEffect(() => {
-    if (!timings.length) return;
-
-    let cancelled = false;
-    const ids = Array.from(new Set(timings.map((t) => t.id).filter(Boolean)));
-    const concurrency = 4;
-    let cursor = 0;
-
-    const worker = async () => {
-      while (cursor < ids.length) {
-        const id = ids[cursor++];
-        if (!id || cancelled) return;
-        if (checkedTimingIdsRef.current.has(id)) continue;
-        checkedTimingIdsRef.current.add(id);
-        try {
-          const r = await api.get(`/timings/${id}/laps`);
-          const hasLaps = (r.data?.laps || []).length > 0;
-          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: hasLaps }));
-        } catch {
-          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: false }));
-        }
-      }
-    };
-
-    Promise.all(new Array(concurrency).fill(0).map(worker)).catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
+    const map = {};
+    timings.forEach((t) => {
+      if (t.id != null) map[t.id] = !!t.has_laps;
+    });
+    setTimingHasLaps(map);
   }, [timings]);
 
   const handleChange = e => {
@@ -556,9 +533,12 @@ const EditVehicle = () => {
     const minimumTotalSeconds = bestLapSeconds * laps;
     if (totalSeconds < minimumTotalSeconds) {
       const minimumTime = `${String(Math.floor(minimumTotalSeconds / 60)).padStart(2, '0')}:${String(Math.floor(minimumTotalSeconds % 60)).padStart(2, '0')}.${String(Math.floor((minimumTotalSeconds % 1) * 1000)).padStart(3, '0')}`;
-      setTimingWarning(`⚠️ El tiempo total (${totalTime}) es menor que el mínimo posible (${minimumTime}) para ${laps} vueltas con mejor vuelta de ${bestLapTime}`);
+      setTimingNotice({
+        variant: 'warning',
+        message: `El tiempo total (${totalTime}) es menor que el mínimo posible (${minimumTime}) para ${laps} vueltas con mejor vuelta de ${bestLapTime}`,
+      });
     } else {
-      setTimingWarning(null);
+      setTimingNotice(null);
     }
 
     const averageSeconds = totalSeconds / laps;
@@ -670,10 +650,12 @@ const EditVehicle = () => {
             const originalError = error;
             setError(null);
             const circuitNames = successfulUpdates.map(u => u.circuit).join(', ');
-            const successMessage = `✅ Posiciones actualizadas automáticamente en: ${circuitNames}`;
-            setTimingWarning(successMessage);
+            setTimingNotice({
+              variant: 'success',
+              message: `Posiciones actualizadas automáticamente en: ${circuitNames}`,
+            });
             setTimeout(() => {
-              setTimingWarning(null);
+              setTimingNotice(null);
               setError(originalError);
             }, 5000);
           }
@@ -683,9 +665,12 @@ const EditVehicle = () => {
         response = await api.post(`/vehicles/${id}/timings`, timingToCreate);
 
         if (response.data.position_updated) {
-          setTimingWarning('✅ Nuevo tiempo registrado y posiciones actualizadas automáticamente');
+          setTimingNotice({
+            variant: 'success',
+            message: 'Nuevo tiempo registrado y posiciones actualizadas automáticamente',
+          });
           setTimeout(() => {
-            setTimingWarning(null);
+            setTimingNotice(null);
           }, 5000);
         }
       }
@@ -720,9 +705,12 @@ const EditVehicle = () => {
       const response = await api.delete(`/vehicles/${id}/timings/${timingId}`);
 
       if (response.data.position_updated) {
-        setTimingWarning(`✅ Tiempo eliminado y posiciones recalculadas en: ${response.data.circuit}`);
+        setTimingNotice({
+          variant: 'success',
+          message: `Tiempo eliminado y posiciones recalculadas en: ${response.data.circuit}`,
+        });
         setTimeout(() => {
-          setTimingWarning(null);
+          setTimingNotice(null);
         }, 5000);
       }
 
@@ -957,14 +945,21 @@ const EditVehicle = () => {
     return (
       <div className="mt-4 space-y-4">
         <h4 className="text-lg font-semibold">{editingTiming ? 'Editar' : 'Añadir'} Registro de Tiempo</h4>
-        {timingWarning && (
+        {timingNotice && (
           <Alert
             className={cn(
-              "mb-4",
-              timingWarning.includes('✅') ? "border-green-500/50 bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-200" : "border-amber-500/50 bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+              'mb-4 flex items-start gap-2',
+              timingNotice.variant === 'success'
+                ? 'border-green-500/50 bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-200'
+                : 'border-amber-500/50 bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200',
             )}
           >
-            {timingWarning}
+            {timingNotice.variant === 'success' ? (
+              <CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
+            ) : (
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            )}
+            <span>{timingNotice.message}</span>
           </Alert>
         )}
         <form onSubmit={handleAddTiming}>
@@ -1284,11 +1279,14 @@ const EditVehicle = () => {
         </Button>
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4 grid w-full grid-cols-2 lg:grid-cols-4">
+        <TabsList className={cn('mb-4 grid w-full', hasMultipleConfigs(timings) ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 lg:grid-cols-4')}>
           <TabsTrigger value="general">Información General</TabsTrigger>
           <TabsTrigger value="technical">Especificaciones Técnicas</TabsTrigger>
           <TabsTrigger value="modifications">Modificaciones</TabsTrigger>
           <TabsTrigger value="timings">Tabla de Tiempos</TabsTrigger>
+          {hasMultipleConfigs(timings) && (
+            <TabsTrigger value="config-analysis">Análisis Config.</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general">
@@ -1471,6 +1469,11 @@ const EditVehicle = () => {
         <TabsContent value="timings">
           {renderTimingsForm()}
         </TabsContent>
+        {hasMultipleConfigs(timings) && (
+          <TabsContent value="config-analysis">
+            <SetupPerformanceAnalysis timings={timings} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <TimingSpecsModal

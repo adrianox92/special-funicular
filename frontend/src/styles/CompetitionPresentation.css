@@ -241,11 +241,15 @@
   margin-bottom: 0.25rem;
 }
 
+/* Icono tipo bandera (equivalente visual a lucide Flag), sin emoji */
 .circuit-info::before {
-  content: '🏁';
-  font-size: 1.125rem;
+  content: '';
   display: block;
+  width: 1.25rem;
+  height: 1.25rem;
   margin-bottom: 0.25rem;
+  background: no-repeat center / contain
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2378dbfa' d='M4 22V15h.01M4 15V5c0-.55.45-1 1-1h0c1.66 0 3.21.81 4.2 2.17C10.15 6.28 11.79 7 13.5 7H20c.55 0 1 .45 1 1v8c0 .55-.45 1-1 1h-6.5c-1.71 0-3.35.72-4.29 1.83A4.98 4.98 0 0 1 5 19h0c-.55 0-1-.45-1-1z'/%3E%3C/svg%3E");
 }
 
 /* Layout Principal */

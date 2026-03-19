@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Users, Calendar, Flag, ArrowRight, Clock } from 'lucide-react';
+import { Trophy, Users, Calendar, Flag, ArrowRight, Clock, Lightbulb } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../lib/axios';
 import { Button } from './ui/button';
@@ -81,7 +81,10 @@ const RecentCompetitions = () => {
         <CardContent>
           <p className="text-muted-foreground mb-4">No tienes competiciones creadas</p>
           <div className="text-sm text-muted-foreground mb-4">
-            <p className="mb-2">💡 <strong>Flujo recomendado:</strong></p>
+            <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <Lightbulb className="size-4 shrink-0 text-amber-500" aria-hidden />
+              <strong className="text-foreground">Flujo recomendado:</strong>
+            </div>
             <ol className="list-decimal list-inside space-y-1">
               <li>Crea una competición</li>
               <li>Añade todos los participantes</li>

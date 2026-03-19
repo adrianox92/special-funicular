@@ -1,8 +1,8 @@
-# 🏆 Guía del Sistema de Reglas y Plantillas de Competición
+# Guía del Sistema de Reglas y Plantillas de Competición
 
 Esta guía explica cómo funciona el nuevo sistema de reglas y plantillas para las competiciones de Scalextric.
 
-## 📋 Índice
+## Índice
 
 1. [Conceptos Básicos](#conceptos-básicos)
 2. [Tipos de Reglas](#tipos-de-reglas)
@@ -11,7 +11,7 @@ Esta guía explica cómo funciona el nuevo sistema de reglas y plantillas para l
 5. [Ejemplos de Uso](#ejemplos-de-uso)
 6. [Configuración de la Base de Datos](#configuración-de-la-base-de-datos)
 
-## 🎯 Conceptos Básicos
+##  Conceptos Básicos
 
 ### ¿Qué son las Reglas?
 Las reglas definen cómo se asignan los puntos en una competición. Cada regla tiene:
@@ -26,7 +26,7 @@ Las plantillas son reglas reutilizables que puedes aplicar a múltiples competic
 - **Estructura de puntos**: Configuración predefinida
 - **Opciones adicionales**: Como bonus por mejor vuelta
 
-## 🎮 Tipos de Reglas
+## Tipos de Reglas
 
 ### 1. Por Ronda (`per_round`)
 Se aplica al final de cada ronda individual.
@@ -79,7 +79,7 @@ En este caso:
 - 2º lugar: 8 puntos + 1 punto (si tiene mejor vuelta) = 9 puntos
 - 3º lugar: 6 puntos + 1 punto (si tiene mejor vuelta) = 7 puntos
 
-## 📚 Plantillas Predefinidas
+## Plantillas Predefinidas
 
 ### Plantillas Disponibles
 
@@ -118,7 +118,7 @@ En este caso:
    - **Puntos**: 1º=15, 2º=12, 3º=10, 4º=8, 5º=6, 6º=4, 7º=2, 8º=1
    - **Bonus**: No
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### Obtener Plantillas
 ```http
@@ -193,7 +193,7 @@ DELETE /api/competition-rules/{ruleId}
 Authorization: Bearer <token>
 ```
 
-## 💡 Ejemplos de Uso
+## Ejemplos de Uso
 
 ### Ejemplo 1: Crear una Competición con Sistema F1
 
@@ -255,7 +255,7 @@ curl -X POST "http://localhost:5001/api/competition-rules/apply-template/{templa
   -d '{"competition_id": "uuid-de-competicion"}'
 ```
 
-## 🗄️ Configuración de la Base de Datos
+##  Configuración de la Base de Datos
 
 ### Campos Nuevos en `competition_rules`
 
@@ -274,7 +274,7 @@ cd backend
 node scripts/migrate-insert-templates.js
 ```
 
-## 🔧 Consideraciones Técnicas
+##  Consideraciones Técnicas
 
 ### Validaciones
 - Las plantillas requieren un nombre
@@ -292,7 +292,7 @@ node scripts/migrate-insert-templates.js
 - Paginación disponible para listas grandes
 - Caché de plantillas frecuentemente usadas
 
-## 🚀 Próximas Funcionalidades
+##  Próximas Funcionalidades
 
 - [ ] Editor visual de reglas
 - [ ] Plantillas por categoría de vehículo
@@ -303,4 +303,4 @@ node scripts/migrate-insert-templates.js
 
 ---
 
-**¡Disfruta configurando tus competiciones con el nuevo sistema de reglas! 🏁** 
+**¡Disfruta configurando tus competiciones con el nuevo sistema de reglas!** 

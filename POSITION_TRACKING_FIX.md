@@ -1,35 +1,35 @@
-# 🔧 Corrección del Sistema de Tracking de Posiciones
+# Corrección del Sistema de Tracking de Posiciones
 
-## 📋 Problema Identificado
+## Problema Identificado
 
 Cuando se añadía un nuevo tiempo que mejoraba la posición de un vehículo, el sistema solo mostraba el `position_change` como un valor negativo (por ejemplo, -1 cuando un vehículo bajaba de posición 3 a 4), pero **no se registraba correctamente la mejora de posiciones para otros vehículos** que deberían haber subido en la clasificación.
 
-### 🔍 Síntomas del Problema
+###  Síntomas del Problema
 
 1. **Cambios de posición incorrectos**: Los vehículos mostraban `position_change: -1` cuando deberían mostrar `position_change: +1` (subida)
 2. **Posiciones no actualizadas**: Los vehículos que mejoraban su posición no reflejaban el cambio correctamente
 3. **Inconsistencia en la base de datos**: Los campos `previous_position` y `position_change` no coincidían con la realidad
 
-## 🕵️ Causa Raíz
+##  Causa Raíz
 
 El problema estaba en la función `updateCircuitPositions` del archivo `backend/lib/positionTracker.js`:
 
 ```javascript
-// ❌ CÓDIGO PROBLEMÁTICO (ANTES)
+//  CÓDIGO PROBLEMÁTICO (ANTES)
 const previousPosition = timing.current_position || currentPosition;
 const positionChange = previousPosition - currentPosition;
 ```
 
 **Problema**: La variable `timing.current_position` ya contenía la posición actualizada del vehículo, por lo que al calcular `previousPosition` se estaba usando un valor que ya había cambiado, causando que el cálculo del `position_change` fuera incorrecto.
 
-## ✅ Solución Implementada
+##  Solución Implementada
 
 ### 1. Preservar la Posición Anterior
 
 Modificamos la lógica para obtener la posición actual desde la base de datos **antes** de hacer cualquier cambio:
 
 ```javascript
-// ✅ CÓDIGO CORREGIDO (DESPUÉS)
+//  CÓDIGO CORREGIDO (DESPUÉS)
 // IMPORTANTE: Preservar la posición anterior ANTES de actualizar
 const { data: currentTimingData, error: currentTimingError } = await supabase
   .from('vehicle_timings')
@@ -38,7 +38,7 @@ const { data: currentTimingData, error: currentTimingError } = await supabase
   .single();
 
 if (currentTimingError) {
-  console.error(`❌ Error al obtener posición actual del timing ${timing.id}:`, currentTimingError.message);
+  console.error(` Error al obtener posición actual del timing ${timing.id}:`, currentTimingError.message);
   return { success: false, error: currentTimingError.message };
 }
 
@@ -51,7 +51,7 @@ const positionChange = previousPosition - currentPosition; // Positivo = subió,
 También corregimos la función `getCircuitRanking` para que use los valores almacenados correctamente:
 
 ```javascript
-// ✅ CÓDIGO CORREGIDO
+//  CÓDIGO CORREGIDO
 return timings.map((timing, index) => {
   const currentPosition = index + 1;
   // Usar el previous_position almacenado en la base de datos, no calcularlo
@@ -62,7 +62,7 @@ return timings.map((timing, index) => {
 });
 ```
 
-## 🧪 Scripts de Prueba y Verificación
+##  Scripts de Prueba y Verificación
 
 ### 1. Script de Prueba (`test-position-tracking.js`)
 
@@ -90,7 +90,7 @@ Este script recalcula **todas** las posiciones existentes en la base de datos co
 - Proporciona un resumen detallado del proceso
 - Verifica que los resultados sean correctos
 
-## 🔄 Cómo Funciona Ahora
+##  Cómo Funciona Ahora
 
 ### 1. Flujo de Actualización de Posiciones
 
@@ -121,15 +121,15 @@ Este script recalcula **todas** las posiciones existentes en la base de datos co
 - Vehículo C: P2 (subió 1 posición, `position_change: +1`)
 - Vehículo B: P3 (bajó 1 posición, `position_change: -1`)
 
-## 🚀 Pasos para Aplicar la Corrección
+##  Pasos para Aplicar la Corrección
 
 ### 1. Verificar que los cambios están en el código
 
 Los archivos ya han sido modificados:
-- ✅ `backend/lib/positionTracker.js` - Lógica de cálculo de posiciones corregida
-- ✅ `backend/test-position-tracking.js` - Script de prueba del sistema mejorado
-- ✅ `backend/scripts/recalculate-positions.js` - Script para recalcular posiciones existentes
-- ✅ `backend/test-scenario-improvement.js` - Script para probar escenarios de mejora
+-  `backend/lib/positionTracker.js` - Lógica de cálculo de posiciones corregida
+-  `backend/test-position-tracking.js` - Script de prueba del sistema mejorado
+-  `backend/scripts/recalculate-positions.js` - Script para recalcular posiciones existentes
+-  `backend/test-scenario-improvement.js` - Script para probar escenarios de mejora
 
 ### 2. Ejecutar el recálculo completo
 
@@ -166,14 +166,14 @@ Este script simula exactamente el escenario que describes:
    - **Positivos** (+1, +2, etc.) para vehículos que suben
    - **Negativos** (-1, -2, etc.) para vehículos que bajan
 
-## 🔍 Verificación de la Corrección
+##  Verificación de la Corrección
 
 ### En el Frontend
 
 En `frontend/src/components/TimingsList.jsx`, ahora deberías ver:
 
-- **Flechas hacia arriba** (⬆️) para vehículos que subieron de posición
-- **Flechas hacia abajo** (⬇️) para vehículos que bajaron de posición
+- **Flechas hacia arriba** (^) para vehículos que subieron de posición
+- **Flechas hacia abajo** (v) para vehículos que bajaron de posición
 - **Valores correctos** de `position_change` (+1, +2, -1, etc.)
 
 ### En la Base de Datos
@@ -184,7 +184,7 @@ Los campos deberían mostrar:
 - `position_change`: Diferencia entre posiciones (positivo = subida, negativo = bajada)
 - `position_updated_at`: Timestamp de la última actualización
 
-## 📊 Beneficios de la Corrección
+##  Beneficios de la Corrección
 
 1. **Tracking preciso**: Las posiciones se calculan y muestran correctamente
 2. **Historial completo**: Se mantiene un registro de todos los cambios de posición
@@ -192,14 +192,14 @@ Los campos deberían mostrar:
 4. **Datos consistentes**: La base de datos refleja la realidad del ranking
 5. **Análisis mejorado**: Se pueden generar estadísticas precisas de rendimiento
 
-## 🎯 Próximos Pasos
+##  Próximos Pasos
 
 1. **Monitoreo**: Observar que las posiciones se actualicen correctamente
 2. **Pruebas**: Verificar con diferentes escenarios de competición
 3. **Optimización**: Considerar mejoras adicionales en el rendimiento
 4. **Documentación**: Actualizar guías de usuario si es necesario
 
-## 🧪 Escenario de Prueba Específico
+##  Escenario de Prueba Específico
 
 Para probar exactamente el escenario que describes (vehículo que mejora su tiempo y sube posiciones), puedes usar:
 
@@ -215,25 +215,25 @@ Este script:
 4. **Recalcula todas las posiciones**
 5. **Muestra el análisis completo** de quién subió y quién bajó
 
-### 📊 Ejemplo de Salida Esperada
+###  Ejemplo de Salida Esperada
 
 ```
-🟢 SUBIDAS de posición (1):
+SUBIDAS de posición (1):
    Vehículo 123: P5 → P3 (+2)
 
-🔴 BAJADAS de posición (2):
+BAJADAS de posición (2):
    Vehículo 456: P3 → P4 (-1)
    Vehículo 789: P4 → P5 (-1)
 ```
 
 Esto confirma que:
-- ✅ El vehículo que mejoró su tiempo **subió 2 posiciones** (+2)
-- ✅ Los vehículos afectados **bajaron 1 posición** (-1)
-- ✅ Las flechas en el frontend mostrarán **⬆️ +2** y **⬇️ -1** correctamente
+-  El vehículo que mejoró su tiempo **subió 2 posiciones** (+2)
+-  Los vehículos afectados **bajaron 1 posición** (-1)
+-  Las flechas en el frontend mostrarán **^ +2** y **v -1** correctamente
 
 ---
 
 **Fecha de corrección**: Diciembre 2024  
-**Estado**: ✅ Implementado y probado  
+**Estado**:  Implementado y probado  
 **Responsable**: Sistema de tracking de posiciones corregido
 

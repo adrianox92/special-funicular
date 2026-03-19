@@ -12,9 +12,10 @@ import { Alert, AlertDescription } from './ui/alert';
 const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [activeTab, setActiveTab] = useState('login');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
@@ -62,6 +63,26 @@ const Login = () => {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      setError(err.message ?? 'No se pudo iniciar sesión con Google');
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!googleLoading && !loading) {
+        handleGoogleSignIn();
+      }
+    }
+  };
+
   return (
     <div className="flex justify-center items-center min-h-screen py-12 px-4">
       <Card className="w-full max-w-md">
@@ -76,7 +97,29 @@ const Login = () => {
             </TabsList>
 
             <TabsContent value="login">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleGoogleSignIn}
+                  onKeyDown={handleGoogleKeyDown}
+                  disabled={loading || googleLoading}
+                  aria-label="Iniciar sesión con Google"
+                  tabIndex={0}
+                >
+                  {googleLoading ? 'Conectando con Google…' : 'Continuar con Google'}
+                </Button>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">o con email</span>
+                  </div>
+                </div>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -99,14 +142,36 @@ const Login = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                   {loading ? 'Cargando...' : 'Iniciar Sesión'}
                 </Button>
               </form>
             </TabsContent>
 
             <TabsContent value="register">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleGoogleSignIn}
+                  onKeyDown={handleGoogleKeyDown}
+                  disabled={loading || googleLoading}
+                  aria-label="Registrarse con Google"
+                  tabIndex={0}
+                >
+                  {googleLoading ? 'Conectando con Google…' : 'Continuar con Google'}
+                </Button>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">o con email</span>
+                  </div>
+                </div>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="reg-email">Email</Label>
                   <Input
@@ -140,7 +205,7 @@ const Login = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                   {loading ? 'Cargando...' : 'Registrarse'}
                 </Button>
               </form>

@@ -92,16 +92,16 @@ export const showPWADiagnostics = () => {
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   `;
 
-  let html = '<h4>🔍 Diagnóstico PWA</h4>';
-  html += `<div>✅ HTTPS: ${diagnostics.https}</div>`;
-  html += `<div>✅ Service Worker: ${diagnostics.serviceWorker}</div>`;
-  html += `<div>✅ beforeinstallprompt: ${diagnostics.beforeinstallprompt}</div>`;
-  html += `<div>✅ Display Mode: ${diagnostics.displayMode}</div>`;
-  html += `<div>✅ Manifest: ${diagnostics.manifest}</div>`;
-  html += `<div>✅ Iconos: ${diagnostics.icons}</div>`;
+  let html = '<h4>Diagnóstico PWA</h4>';
+  html += `<div>HTTPS: ${diagnostics.https}</div>`;
+  html += `<div>Service Worker: ${diagnostics.serviceWorker}</div>`;
+  html += `<div>beforeinstallprompt: ${diagnostics.beforeinstallprompt}</div>`;
+  html += `<div>Display Mode: ${diagnostics.displayMode}</div>`;
+  html += `<div>Manifest: ${diagnostics.manifest}</div>`;
+  html += `<div>Iconos: ${diagnostics.icons}</div>`;
   
   if (diagnostics.errors.length > 0) {
-    html += '<h5>❌ Errores:</h5>';
+    html += '<h5>Errores:</h5>';
     diagnostics.errors.forEach(error => {
       html += `<div style="color: #ff6b6b;">- ${error}</div>`;
     });
@@ -122,7 +122,7 @@ export const clearPWACache = async () => {
         await registration.unregister();
       }
     } catch (error) {
-      console.error('❌ Error desregistrando Service Workers:', error);
+      console.error('Error desregistrando Service Workers:', error);
     }
   }
 
@@ -131,7 +131,7 @@ export const clearPWACache = async () => {
       const cacheNames = await caches.keys();
       await Promise.all(cacheNames.map(name => caches.delete(name)));
     } catch (error) {
-      console.error('❌ Error limpiando cache:', error);
+      console.error('Error limpiando cache:', error);
     }
   }
 }; 

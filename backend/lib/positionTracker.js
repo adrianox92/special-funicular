@@ -23,7 +23,7 @@ function timeToSeconds(timeStr) {
  */
 async function updateCircuitPositions(circuit, newTimingId = null) {
   try {
-    console.log(`🔄 Actualizando posiciones para el circuito: ${circuit}`);
+    console.log(`Actualizando posiciones para el circuito: ${circuit}`);
     
     // Obtener todos los tiempos del circuito
     const { data: allTimings, error: timingsError } = await supabase
@@ -38,7 +38,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
     }
 
     if (!allTimings || allTimings.length === 0) {
-      console.log(`ℹ️  No hay tiempos registrados para el circuito: ${circuit}`);
+      console.log(`[INFO] No hay tiempos registrados para el circuito: ${circuit}`);
       return { success: true, message: 'No hay tiempos para actualizar' };
     }
 
@@ -61,7 +61,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
     // Convertir a array y ordenar por mejor tiempo
     const timings = Object.values(bestTimingsByVehicleLaneVueltas).sort((a, b) => a.lapTime - b.lapTime);
 
-    console.log(`📊 Procesando ${timings.length} mejores tiempos únicos para el circuito ${circuit} (de ${allTimings.length} tiempos totales)`);
+    console.log(`Procesando ${timings.length} mejores tiempos únicos para el circuito ${circuit} (de ${allTimings.length} tiempos totales)`);
 
     // PRIMERO: Obtener las posiciones actuales de todos los vehículos ANTES de hacer cambios
     const currentPositions = {};
@@ -73,7 +73,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
         .single();
       
       if (currentTimingError) {
-        console.error(`❌ Error al obtener posición actual del timing ${timing.id}:`, currentTimingError.message);
+        console.error(`[ERR] Error al obtener posición actual del timing ${timing.id}:`, currentTimingError.message);
         currentPositions[timing.id] = 999; // Posición muy alta como fallback
       } else {
         currentPositions[timing.id] = currentTimingData.current_position || 999;
@@ -86,7 +86,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
       const previousPosition = currentPositions[timing.id];
       const positionChange = previousPosition - newPosition; // Positivo = subió, negativo = bajó
 
-      console.log(`   🔍 Vehículo ${timing.vehicle_id}: P${previousPosition} → P${newPosition} (cambio: ${positionChange > 0 ? '+' : ''}${positionChange})`);
+      console.log(`   Vehículo ${timing.vehicle_id}: P${previousPosition} → P${newPosition} (cambio: ${positionChange > 0 ? '+' : ''}${positionChange})`);
 
       // Actualizar TODOS los tiempos de este vehículo+circuito+carril+vueltas con la misma posición
       // Cada combinación vehículo+carril+vueltas tiene su propia posición en el ranking global
@@ -101,7 +101,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
         .eq('laps', timing.laps || null);
 
       if (vehicleTimingsError) {
-        console.error(`❌ Error al obtener tiempos del vehículo ${timing.vehicle_id}:`, vehicleTimingsError.message);
+        console.error(`[ERR] Error al obtener tiempos del vehículo ${timing.vehicle_id}:`, vehicleTimingsError.message);
         return { success: false, error: vehicleTimingsError.message };
       }
 
@@ -122,7 +122,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
           .eq('id', timing.id);
 
         if (updateBestError) {
-          console.error(`❌ Error al actualizar mejor tiempo ${timing.id}:`, updateBestError.message);
+          console.error(`[ERR] Error al actualizar mejor tiempo ${timing.id}:`, updateBestError.message);
           return { success: false, error: updateBestError.message };
         }
 
@@ -143,16 +143,16 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
             .in('id', otherTimingIds);
 
           if (updateOthersError) {
-            console.error(`❌ Error al actualizar otros tiempos:`, updateOthersError.message);
+            console.error(`[ERR] Error al actualizar otros tiempos:`, updateOthersError.message);
           } else {
-            console.log(`   📝 Otros ${otherTimingIds.length} registros actualizados a position = null`);
+            console.log(`   Otros ${otherTimingIds.length} registros actualizados a position = null`);
           }
         }
 
         // Log del cambio de posición si es significativo
         if (positionChange !== 0) {
           const changeText = positionChange > 0 ? `subió ${positionChange} puesto(s)` : `bajó ${Math.abs(positionChange)} puesto(s)`;
-          console.log(`📈 Vehículo ${timing.vehicle_id} ${changeText} en ${circuit}: P${previousPosition} → P${newPosition} (1 mejor tiempo + ${otherTimingIds.length} otros actualizados)`);
+          console.log(`Vehículo ${timing.vehicle_id} ${changeText} en ${circuit}: P${previousPosition} → P${newPosition} (1 mejor tiempo + ${otherTimingIds.length} otros actualizados)`);
         }
 
         return { success: true, positionChange, previousPosition, currentPosition: newPosition, timingsUpdated: 1 + otherTimingIds.length };
@@ -166,10 +166,10 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
     const successfulUpdates = results.filter(r => r.success);
     const failedUpdates = results.filter(r => !r.success);
 
-    console.log(`✅ Circuito ${circuit} actualizado: ${successfulUpdates.length} posiciones procesadas`);
+    console.log(`[OK] Circuito ${circuit} actualizado: ${successfulUpdates.length} posiciones procesadas`);
 
     if (failedUpdates.length > 0) {
-      console.warn(`⚠️  ${failedUpdates.length} actualizaciones fallaron`);
+      console.warn(`[WARN] ${failedUpdates.length} actualizaciones fallaron`);
     }
 
     return {
@@ -182,7 +182,7 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
     };
 
   } catch (error) {
-    console.error(`❌ Error al actualizar posiciones del circuito ${circuit}:`, error);
+    console.error(`[ERR] Error al actualizar posiciones del circuito ${circuit}:`, error);
     return {
       success: false,
       error: error.message,
@@ -267,7 +267,7 @@ async function getCircuitRanking(circuit) {
     });
 
   } catch (error) {
-    console.error(`❌ Error al obtener ranking del circuito ${circuit}:`, error);
+    console.error(`[ERR] Error al obtener ranking del circuito ${circuit}:`, error);
     throw error;
   }
 }
@@ -300,7 +300,7 @@ async function updatePositionsAfterNewTiming(circuit, timingId) {
     };
 
   } catch (error) {
-    console.error(`❌ Error al actualizar posiciones después de nuevo tiempo:`, error);
+    console.error(`[ERR] Error al actualizar posiciones después de nuevo tiempo:`, error);
     return {
       success: false,
       error: error.message,

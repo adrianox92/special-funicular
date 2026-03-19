@@ -1,8 +1,8 @@
-# 🎨 FASE 2 - Frontend: Editor Visual de Reglas
+# FASE 2 - Frontend: Editor Visual de Reglas
 
 Esta guía documenta la implementación del frontend para el sistema de reglas y plantillas de competición.
 
-## 📋 Componentes Implementados
+## Componentes Implementados
 
 ### 1. CompetitionRulesPanel.jsx
 **Vista principal** que reemplaza al antiguo `CompetitionRules.jsx`
@@ -66,7 +66,7 @@ Esta guía documenta la implementación del frontend para el sistema de reglas y
 />
 ```
 
-## 🔄 Flujo de Trabajo
+##  Flujo de Trabajo
 
 ### 1. Ver Reglas Existentes
 ```
@@ -107,7 +107,7 @@ Usuario → Botón "Eliminar" en regla → Confirmación
 → Regla eliminada
 ```
 
-## 🎯 Características de UX
+##  Características de UX
 
 ### Validaciones de Seguridad
 - **Tiempos registrados**: Si hay tiempos, se deshabilitan todas las acciones de edición
@@ -126,7 +126,7 @@ Usuario → Botón "Eliminar" en regla → Confirmación
 - **Modales centrados**: Formularios en ventanas modales
 - **Botones contextuales**: Acciones cerca del contenido relevante
 
-## 🔧 Integración con Backend
+##  Integración con Backend
 
 ### Endpoints Utilizados
 ```javascript
@@ -186,7 +186,7 @@ POST /api/competition-rules/apply-template/:templateId
 }
 ```
 
-## 🎨 Estilos y Diseño
+##  Estilos y Diseño
 
 ### Colores de Badges
 - **Por ronda**: `primary` (azul)
@@ -201,7 +201,7 @@ POST /api/competition-rules/apply-template/:templateId
 - **Edit**: Para editar regla
 - **Trash**: Para eliminar regla
 
-## 🚀 Próximas Mejoras
+##  Próximas Mejoras
 
 ### Funcionalidades Planificadas
 - [ ] **Editor visual de puntos**: Drag & drop para reordenar posiciones
@@ -216,7 +216,7 @@ POST /api/competition-rules/apply-template/:templateId
 - [ ] **Búsqueda avanzada**: Filtros por tipo y características
 - [ ] **Accesibilidad**: Mejoras para lectores de pantalla
 
-## 🔍 Testing
+##  Testing
 
 ### Casos de Prueba Principales
 1. **Crear regla desde cero** - Todos los tipos de regla
@@ -235,4 +235,4 @@ POST /api/competition-rules/apply-template/:templateId
 
 ---
 
-**¡El sistema de reglas está listo para usar! 🏁** 
+**¡El sistema de reglas está listo para usar!**
