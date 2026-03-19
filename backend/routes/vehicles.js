@@ -1419,7 +1419,7 @@ router.get('/:id/specs-pdf', async (req, res) => {
     if (vehicleError || !vehicle) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
-    // Obtener imagen principal (preferiblemente tipo 'front', si no la primera disponible)
+    // Obtener imagen principal (misma lógica que listado: three_quarters > left/right > primera disponible)
     let imageUrl = null;
     const { data: images, error: imagesError } = await supabase
       .from('vehicle_images')
@@ -1427,8 +1427,13 @@ router.get('/:id/specs-pdf', async (req, res) => {
       .eq('vehicle_id', vehicleId)
       .order('created_at', { ascending: true });
     if (!imagesError && images && images.length > 0) {
-      const frontImg = images.find(img => img.view_type === 'front');
-      imageUrl = frontImg ? frontImg.image_url : images[0].image_url;
+      const threeQuarters = images.find(img => img.view_type === 'three_quarters');
+      if (threeQuarters) {
+        imageUrl = threeQuarters.image_url;
+      } else {
+        const lateral = images.find(img => img.view_type === 'left' || img.view_type === 'right');
+        imageUrl = lateral ? lateral.image_url : images[0].image_url;
+      }
     }
     // Obtener especificaciones técnicas y sus componentes
     const { data: specs, error: specsError } = await supabase

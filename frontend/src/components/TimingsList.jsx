@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3 } from 'lucide-react';
 import api from '../lib/axios';
@@ -41,9 +41,7 @@ const TimingsList = () => {
   const [comparisonSessions, setComparisonSessions] = useState([]);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceTiming, setPerformanceTiming] = useState(null);
-  const [timingHasLaps, setTimingHasLaps] = useState({});
   const [expandedGroups, setExpandedGroups] = useState(new Set());
-  const checkedTimingIdsRef = useRef(new Set());
   const [filter, setFilter] = useState({
     vehicle: '',
     dateFrom: '',
@@ -82,38 +80,6 @@ const TimingsList = () => {
   useEffect(() => {
     loadData();
   }, []);
-
-  // Check which timings have individual lap data so we can hide/show the performance icon correctly.
-  useEffect(() => {
-    if (!timings.length) return;
-
-    let cancelled = false;
-    const ids = Array.from(new Set(timings.map((t) => t.id).filter(Boolean)));
-    const concurrency = 5;
-    let cursor = 0;
-
-    const worker = async () => {
-      while (cursor < ids.length) {
-        const id = ids[cursor++];
-        if (!id || cancelled) return;
-        if (checkedTimingIdsRef.current.has(id)) continue;
-        checkedTimingIdsRef.current.add(id);
-        try {
-          const r = await api.get(`/timings/${id}/laps`);
-          const hasLaps = (r.data?.laps || []).length > 0;
-          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: hasLaps }));
-        } catch {
-          if (!cancelled) setTimingHasLaps((prev) => ({ ...prev, [id]: false }));
-        }
-      }
-    };
-
-    Promise.all(new Array(concurrency).fill(0).map(worker)).catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [timings]);
 
   const getSeconds = (timeStr) => {
     const [minutes, seconds] = timeStr.split(':');
@@ -228,46 +194,51 @@ const TimingsList = () => {
     });
   };
 
-  const groupedTimings = groupTimings(timings);
-  const circuitRankings = calculateCircuitRanking(groupedTimings);
+  const groupedTimings = useMemo(() => groupTimings(timings), [timings]);
 
-  Object.values(groupedTimings).forEach(group => {
-    const localRankingEntry = circuitRankings[group.circuit]?.find(entry => entry.key === group.key);
-    if (localRankingEntry) {
-      group.circuit_ranking = {
-        position: localRankingEntry.circuit_position,
-        gap_to_leader: localRankingEntry.circuit_gap_to_leader,
-        gap_to_previous: localRankingEntry.circuit_gap_to_previous,
-        gap_to_best_total: localRankingEntry.circuit_gap_to_best_total,
-        position_change: null
-      };
-      const timingWithRanking = group.sessions.find(s => s.circuit_ranking || s.current_position != null || s.position_change != null);
-      if (timingWithRanking?.circuit_ranking) {
-        group.circuit_ranking.previous_position = timingWithRanking.circuit_ranking.previous_position;
-        group.circuit_ranking.position_change = timingWithRanking.circuit_ranking.position_change;
-      } else if (timingWithRanking?.current_position != null) {
-        group.circuit_ranking.previous_position = timingWithRanking.previous_position;
-        group.circuit_ranking.position_change = timingWithRanking.position_change;
+  const circuitRankings = useMemo(() => calculateCircuitRanking(groupedTimings), [groupedTimings]);
+
+  useMemo(() => {
+    Object.values(groupedTimings).forEach(group => {
+      const localRankingEntry = circuitRankings[group.circuit]?.find(entry => entry.key === group.key);
+      if (localRankingEntry) {
+        group.circuit_ranking = {
+          position: localRankingEntry.circuit_position,
+          gap_to_leader: localRankingEntry.circuit_gap_to_leader,
+          gap_to_previous: localRankingEntry.circuit_gap_to_previous,
+          gap_to_best_total: localRankingEntry.circuit_gap_to_best_total,
+          position_change: null
+        };
+        const timingWithRanking = group.sessions.find(s => s.circuit_ranking || s.current_position != null || s.position_change != null);
+        if (timingWithRanking?.circuit_ranking) {
+          group.circuit_ranking.previous_position = timingWithRanking.circuit_ranking.previous_position;
+          group.circuit_ranking.position_change = timingWithRanking.circuit_ranking.position_change;
+        } else if (timingWithRanking?.current_position != null) {
+          group.circuit_ranking.previous_position = timingWithRanking.previous_position;
+          group.circuit_ranking.position_change = timingWithRanking.position_change;
+        }
       }
-    }
-  });
+    });
+  }, [groupedTimings, circuitRankings]);
 
-  const selectedCircuit = circuits.find(c => c.id === filter.circuit_id);
-  const filteredGroups = Object.values(groupedTimings).filter(group => {
-    const matchesVehicle = !filter.vehicle || group.vehicle_id === filter.vehicle;
-    const matchesDateFrom = !filter.dateFrom || new Date(group.best_time.timing_date) >= new Date(filter.dateFrom);
-    const matchesDateTo = !filter.dateTo || new Date(group.best_time.timing_date) <= new Date(filter.dateTo);
-    const matchesCircuit = !filter.circuit_id || group.circuit_id === filter.circuit_id || (selectedCircuit && group.circuit === selectedCircuit.name);
-    const matchesLane = !filter.lane || group.lane.toLowerCase().includes(filter.lane.toLowerCase());
-    return matchesVehicle && matchesDateFrom && matchesDateTo && matchesCircuit && matchesLane;
-  }).sort((a, b) => {
-    if (a.circuit === b.circuit) {
-      const aPos = a.circuit_ranking?.position || 999;
-      const bPos = b.circuit_ranking?.position || 999;
-      if (aPos !== bPos) return aPos - bPos;
-    }
-    return a.best_time.seconds - b.best_time.seconds;
-  });
+  const filteredGroups = useMemo(() => {
+    const selectedCircuit = circuits.find(c => c.id === filter.circuit_id);
+    return Object.values(groupedTimings).filter(group => {
+      const matchesVehicle = !filter.vehicle || group.vehicle_id === filter.vehicle;
+      const matchesDateFrom = !filter.dateFrom || new Date(group.best_time.timing_date) >= new Date(filter.dateFrom);
+      const matchesDateTo = !filter.dateTo || new Date(group.best_time.timing_date) <= new Date(filter.dateTo);
+      const matchesCircuit = !filter.circuit_id || group.circuit_id === filter.circuit_id || (selectedCircuit && group.circuit === selectedCircuit.name);
+      const matchesLane = !filter.lane || group.lane.toLowerCase().includes(filter.lane.toLowerCase());
+      return matchesVehicle && matchesDateFrom && matchesDateTo && matchesCircuit && matchesLane;
+    }).sort((a, b) => {
+      if (a.circuit === b.circuit) {
+        const aPos = a.circuit_ranking?.position || 999;
+        const bPos = b.circuit_ranking?.position || 999;
+        if (aPos !== bPos) return aPos - bPos;
+      }
+      return a.best_time.seconds - b.best_time.seconds;
+    });
+  }, [groupedTimings, circuits, filter]);
 
   if (loading) {
     return (
@@ -458,7 +429,7 @@ const TimingsList = () => {
                             <Wrench className="size-4" />
                           </Button>
                         )}
-                        {timingHasLaps[group.best_time?.id] && (
+                        {group.best_time?.has_laps && (
                           <Button
                             variant="outline"
                             size="icon"
@@ -533,7 +504,7 @@ const TimingsList = () => {
                                   <Wrench className="size-4" />
                                 </Button>
                               )}
-                              {timingHasLaps[session.id] && (
+                              {session.has_laps && (
                                 <Button
                                   variant="outline"
                                   size="icon"

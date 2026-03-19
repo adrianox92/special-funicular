@@ -143,7 +143,7 @@ Si no ves el botón de instalación:
 - **Footer**: Page numbers, odometer, and generation date on every page
 - **Color palette**: Dark header (#1a1a2e), accent color (#e94560) for section headers and badges
 - **Badges**: Digital, Modificado, Museo, Taller shown as inline badges instead of table rows
-- **Image**: Vehicle image with border; placeholder when image is missing or unavailable
+- **Image**: Vehicle image with border; placeholder when image is missing or unavailable. Image priority matches vehicle list: three_quarters > left/right > first available
 - **Price summary**: Box with base price, modifications cost, and total price
 - **Tables**: Styled component tables with header background, alternating row colors, and 4 columns (Componente, Fabricante, Detalle, Precio)
 - **New fields**: Purchase place, scale factor (1:XX), odometer (total_distance_meters)

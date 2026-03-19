@@ -82,18 +82,29 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Error al obtener los tiempos' });
     }
 
+    // Obtener qué timings tienen vueltas individuales (una sola query bulk)
+    const allTimingIds = timings.map(t => t.id).filter(Boolean);
+    const timingsWithLapsSet = new Set();
+    if (allTimingIds.length > 0) {
+      const { data: lapsData } = await supabase
+        .from('timing_laps')
+        .select('timing_id')
+        .in('timing_id', allTimingIds);
+      (lapsData || []).forEach(l => timingsWithLapsSet.add(l.timing_id));
+    }
+
     // Enriquecer los tiempos con la información del vehículo y posiciones
     let enrichedTimings = timings.map(timing => ({
       ...timing,
       vehicle_model: vehiclesMap[timing.vehicle_id]?.model,
-      vehicle_manufacturer: vehiclesMap[timing.vehicle_id]?.manufacturer
+      vehicle_manufacturer: vehiclesMap[timing.vehicle_id]?.manufacturer,
+      has_laps: timingsWithLapsSet.has(timing.id)
     }));
 
-    // Obtener información de posiciones por circuito
-    const circuitPositions = {};
+    // Obtener información de posiciones por circuito (en paralelo)
     const uniqueCircuits = [...new Set(timings.filter(t => t.circuit).map(t => t.circuit))];
-    
-    for (const circuitName of uniqueCircuits) {
+    const circuitPositions = {};
+    await Promise.all(uniqueCircuits.map(async (circuitName) => {
       try {
         const ranking = await getCircuitRanking(circuitName);
         circuitPositions[circuitName] = ranking;
@@ -101,7 +112,7 @@ router.get('/', async (req, res) => {
         console.warn(`⚠️  Error al obtener ranking del circuito ${circuitName}:`, error.message);
         circuitPositions[circuitName] = [];
       }
-    }
+    }));
 
     // Enriquecer con información de posiciones
     enrichedTimings = enrichedTimings.map(timing => {
