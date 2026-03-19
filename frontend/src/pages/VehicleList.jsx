@@ -15,10 +15,29 @@ import {
 } from '../components/ui/dropdown-menu';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const ALL_VEHICLES_LIMIT = 10000;
+
+const applyFilters = (list, filters) => {
+  return list.filter(v => {
+    const m = filters.manufacturer ? v.manufacturer?.toLowerCase().includes(filters.manufacturer.toLowerCase()) : true;
+    const t = filters.type ? v.type === filters.type : true;
+    const mo = filters.modified === '' ? true : filters.modified === 'Sí' ? v.modified : !v.modified;
+    const d = filters.digital === '' ? true : filters.digital === 'Digital' ? v.digital : !v.digital;
+    const museoTaller = !filters.filterMuseo && !filters.filterTaller
+      ? true
+      : filters.filterMuseo && filters.filterTaller
+        ? (v.museo || v.taller)
+        : filters.filterMuseo
+          ? v.museo
+          : v.taller;
+    return m && t && mo && d && museoTaller;
+  });
+};
 
 const VehicleList = () => {
   const navigate = useNavigate();
   const [vehicles, setVehicles] = useState([]);
+  const [allVehicles, setAllVehicles] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
@@ -32,6 +51,8 @@ const VehicleList = () => {
       return PAGE_SIZE_OPTIONS.includes(stored) ? stored : 25;
     } catch { return 25; }
   });
+
+  const hasActiveFilters = !!(filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.filterMuseo || filters.filterTaller);
 
   const loadVehicles = useCallback(async (page = 1, limit = pageSize) => {
     try {
@@ -48,9 +69,32 @@ const VehicleList = () => {
     }
   }, [pageSize]);
 
+  const loadAllVehicles = useCallback(async () => {
+    try {
+      const response = await api.get(`/vehicles?page=1&limit=${ALL_VEHICLES_LIMIT}`);
+      const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
+      setAllVehicles(vehiclesData);
+    } catch (error) {
+      console.error('Error al cargar vehículos:', error);
+      setAllVehicles([]);
+    }
+  }, []);
+
   useEffect(() => {
-    loadVehicles(currentPage, pageSize);
-  }, [currentPage, pageSize, loadVehicles]);
+    if (hasActiveFilters) {
+      setCurrentPage(1);
+      loadAllVehicles();
+    } else {
+      setAllVehicles([]);
+      setCurrentPage(1);
+    }
+  }, [hasActiveFilters, loadAllVehicles]);
+
+  useEffect(() => {
+    if (!hasActiveFilters) {
+      loadVehicles(currentPage, pageSize);
+    }
+  }, [currentPage, pageSize, hasActiveFilters, loadVehicles]);
 
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
@@ -65,29 +109,25 @@ const VehicleList = () => {
   };
 
   useEffect(() => {
-    const result = vehicles.filter(v => {
-      const m = filters.manufacturer ? v.manufacturer?.toLowerCase().includes(filters.manufacturer.toLowerCase()) : true;
-      const t = filters.type ? v.type === filters.type : true;
-      const mo = filters.modified === '' ? true : filters.modified === 'Sí' ? v.modified : !v.modified;
-      const d = filters.digital === '' ? true : filters.digital === 'Digital' ? v.digital : !v.digital;
-      const museoTaller = !filters.filterMuseo && !filters.filterTaller
-        ? true
-        : filters.filterMuseo && filters.filterTaller
-          ? (v.museo || v.taller)
-          : filters.filterMuseo
-            ? v.museo
-            : v.taller;
-      return m && t && mo && d && museoTaller;
-    });
+    const source = hasActiveFilters ? allVehicles : vehicles;
+    const result = applyFilters(source, filters);
     setFiltered(result);
-  }, [filters, vehicles]);
+    if (hasActiveFilters) setCurrentPage(1);
+  }, [filters, vehicles, allVehicles, hasActiveFilters]);
 
   const handleDeleteVehicle = (vehicleId) => {
     setVehicles(prev => prev.filter(v => v.id !== vehicleId));
     setFiltered(prev => prev.filter(v => v.id !== vehicleId));
+    if (hasActiveFilters) setAllVehicles(prev => prev.filter(v => v.id !== vehicleId));
   };
 
   const handlePageChange = (page) => setCurrentPage(page);
+
+  const filteredTotalPages = hasActiveFilters ? Math.ceil(filtered.length / pageSize) : pagination.totalPages;
+  const filteredTotal = hasActiveFilters ? filtered.length : pagination.total;
+  const displayVehicles = hasActiveFilters
+    ? filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : filtered;
 
   const exportToCSV = async () => {
     try {
@@ -125,8 +165,13 @@ const VehicleList = () => {
 
   const maxPages = 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
-  let endPage = Math.min(pagination.totalPages, startPage + maxPages - 1);
+  let endPage = Math.min(filteredTotalPages, startPage + maxPages - 1);
   if (endPage - startPage + 1 < maxPages) startPage = Math.max(1, endPage - maxPages + 1);
+
+  const rangeStart = filteredTotal > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+  const rangeEnd = hasActiveFilters
+    ? Math.min(currentPage * pageSize, filteredTotal)
+    : Math.min(currentPage * pagination.limit, filteredTotal);
 
   return (
     <div className="space-y-6">
@@ -210,32 +255,32 @@ const VehicleList = () => {
 
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filtered.map(vehicle => (
+          {displayVehicles.map(vehicle => (
             <VehicleCard key={vehicle.id} vehicle={vehicle} onDelete={handleDeleteVehicle} />
           ))}
         </div>
       ) : (
-        <VehicleTable vehicles={filtered} onDelete={handleDeleteVehicle} />
+        <VehicleTable vehicles={displayVehicles} onDelete={handleDeleteVehicle} />
       )}
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
         <div className="text-sm text-muted-foreground order-2 sm:order-1">
-          {pagination.total > 0 ? (
-            <>Mostrando {(currentPage - 1) * pagination.limit + 1}–{Math.min(currentPage * pagination.limit, pagination.total)} de {pagination.total} vehículos</>
+          {filteredTotal > 0 ? (
+            <>Mostrando {rangeStart}–{rangeEnd} de {filteredTotal} vehículos</>
           ) : (
             <>No hay vehículos</>
           )}
         </div>
         <div className="flex items-center gap-2 order-1 sm:order-2">
-          {pagination.totalPages > 1 && (
+          {filteredTotalPages > 1 && (
             <>
               <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Anterior</Button>
               {startPage > 1 && <Button variant="outline" size="sm" onClick={() => handlePageChange(1)}>1</Button>}
               {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(n => (
                 <Button key={n} variant={n === currentPage ? 'default' : 'outline'} size="sm" onClick={() => handlePageChange(n)}>{n}</Button>
               ))}
-              {endPage < pagination.totalPages && <Button variant="outline" size="sm" onClick={() => handlePageChange(pagination.totalPages)}>{pagination.totalPages}</Button>}
-              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === pagination.totalPages}>Siguiente</Button>
+              {endPage < filteredTotalPages && <Button variant="outline" size="sm" onClick={() => handlePageChange(filteredTotalPages)}>{filteredTotalPages}</Button>}
+              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === filteredTotalPages}>Siguiente</Button>
             </>
           )}
         </div>

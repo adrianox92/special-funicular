@@ -130,6 +130,7 @@ Si no ves el botón de instalación:
 - **View toggle**: Icons in the header to switch between Grid and Table; preference is saved in localStorage
 - **Configurable pagination**: Selector for items per page (10, 25, 50, 100); preference is saved in localStorage
 - **Pagination bar**: Shows "Showing X–Y of Z vehicles", page navigation buttons, and page size selector
+- **Filter pagination**: When any filter is active (manufacturer, type, modified, digital, Museo, Taller), all vehicles are loaded once and filtered client-side. Pagination applies to the filtered results with the same page size; if results fit in one page, pagination controls are hidden
 
 **Files modified**:
 - `frontend/src/pages/VehicleList.jsx` - View modes, toggle, pagination, page size selector
