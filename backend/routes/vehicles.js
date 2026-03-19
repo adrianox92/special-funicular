@@ -632,28 +632,17 @@ router.get('/:id/technical-specs', async (req, res) => {
   }
 });
 
-// Función auxiliar para recalcular el total_price de un vehículo
+// Función auxiliar para recalcular el total_price y el flag modified de un vehículo
 async function updateVehicleTotalPrice(vehicleId) {
-  // Obtener el vehículo y sus datos
   const { data: vehicle, error: vehicleError } = await supabase
     .from('vehicles')
-    .select('price, modified')
+    .select('price')
     .eq('id', vehicleId)
     .single();
   if (vehicleError) return;
 
-  // Si el vehículo no está modificado, el total_price será igual al price
-  if (!vehicle.modified) {
-    await supabase
-      .from('vehicles')
-      .update({ total_price: Number(vehicle.price) })
-      .eq('id', vehicleId);
-    return;
-  }
-
   const basePrice = vehicle && vehicle.price ? Number(vehicle.price) : 0;
 
-  // Obtener todas las especificaciones técnicas de modificación
   const { data: modSpecs, error: modSpecsError } = await supabase
     .from('technical_specs')
     .select('id')
@@ -663,22 +652,23 @@ async function updateVehicleTotalPrice(vehicleId) {
 
   const modSpecIds = modSpecs.map(s => s.id);
   let modsTotal = 0;
+  let comps = [];
 
   if (modSpecIds.length > 0) {
-    // Obtener todos los componentes de esas modificaciones
-    const { data: comps, error: compsError } = await supabase
+    const { data: compsData, error: compsError } = await supabase
       .from('components')
       .select('price')
       .in('tech_spec_id', modSpecIds);
     if (compsError) return;
-    // Sumar los precios (ignorando nulls)
+    comps = compsData || [];
     modsTotal = comps.reduce((sum, c) => sum + (c.price ? Number(c.price) : 0), 0);
   }
 
-  // Actualizar el vehículo con la suma del basePrice + modsTotal
+  const hasModificationComponents = modSpecIds.length > 0 && comps.length > 0;
+
   await supabase
     .from('vehicles')
-    .update({ total_price: basePrice + modsTotal })
+    .update({ total_price: basePrice + modsTotal, modified: hasModificationComponents })
     .eq('id', vehicleId);
 }
 

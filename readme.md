@@ -111,6 +111,17 @@ Si no ves el botón de instalación:
 
 **Database**: Run `backend/scripts/add-museo-taller-anotaciones-fields.sql` in Supabase SQL Editor to add the new columns.
 
+#### Auto-modified flag when adding modifications
+**Description**: The vehicle "Modificado" (modified) flag is now updated automatically based on modification components. No manual toggle required.
+
+**Features**:
+- **On add**: When you add a modification component to a vehicle (in the vehicle detail/edit form), the vehicle is automatically marked as modified (`modified = true`)
+- **On remove**: When you delete the last modification component, the vehicle is automatically marked as stock (`modified = false`)
+- **Derived from data**: The flag is derived from the actual modification components in the database, keeping it in sync with filters, badges, and dashboard statistics
+
+**Files modified**:
+- `backend/routes/vehicles.js` - `updateVehicleTotalPrice` now also updates the `modified` field based on modification components
+
 **Files modified**:
 - `backend/scripts/add-museo-taller-anotaciones-fields.sql` - Migration script
 - `backend/routes/vehicles.js` - POST and PUT routes
