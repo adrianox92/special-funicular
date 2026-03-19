@@ -135,12 +135,6 @@ const Navbar = () => {
 
           {user && (
             <>
-              <div className="relative">
-                <Badge variant="destructive" className="absolute -top-1 -right-1 size-5 flex items-center justify-center p-0 text-xs">
-                  3
-                </Badge>
-              </div>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-9 w-9 rounded-full">

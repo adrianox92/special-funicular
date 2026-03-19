@@ -1,14 +1,25 @@
 import React from 'react';
+import { useCookieConsent } from '../context/CookieConsentContext';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const { openSettings } = useCookieConsent();
 
   return (
     <footer className="border-t bg-muted/50 mt-auto">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <p className="text-center text-sm text-muted-foreground">
-          © {currentYear} Adrian Palomera Sanz. Todos los derechos reservados.
-        </p>
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-4">
+          <p className="text-center text-sm text-muted-foreground">
+            © {currentYear} Adrian Palomera Sanz. Todos los derechos reservados.
+          </p>
+          <button
+            type="button"
+            onClick={openSettings}
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          >
+            Gestionar cookies
+          </button>
+        </div>
       </div>
     </footer>
   );

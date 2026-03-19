@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/axios';
+import { vehicleComponentTypes } from '../data/componentTypes';
+import { formatModificationSnapshot, formatHistoryDate } from '../utils/formatUtils';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -42,19 +44,25 @@ const VehicleDetail = () => {
   const [deletingImage, setDeletingImage] = useState(null);
   const [deleteImageConfirm, setDeleteImageConfirm] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [modificationComponents, setModificationComponents] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await axios.get(`http://localhost:5001/api/vehicles/${id}`);
-        setVehicle(res.data);
-        const imgRes = await axios.get(`http://localhost:5001/api/vehicles/${id}/images`);
+        const [vRes, imgRes, specRes] = await Promise.all([
+          api.get(`/vehicles/${id}`),
+          api.get(`/vehicles/${id}/images`),
+          api.get(`/vehicles/${id}/technical-specs`)
+        ]);
+        setVehicle(vRes.data);
         const imgs = imgRes.data || [];
         const imagesObj = {};
         imgs.forEach(img => {
           imagesObj[img.view_type] = img.image_url;
         });
         setImages(imagesObj);
+        const modSpec = (specRes.data || []).find(s => s.is_modification);
+        setModificationComponents(modSpec?.components || []);
         setLoading(false);
       } catch {
         setError('Error al cargar el vehículo');
@@ -74,13 +82,13 @@ const VehicleDetail = () => {
     setDeleteImageConfirm(null);
     setDeletingImage(viewType);
     try {
-      await axios.delete(`http://localhost:5001/api/vehicles/${id}/images/${viewType}`);
+      await api.delete(`/vehicles/${id}/images/${viewType}`);
       setImages(prev => {
         const newImages = { ...prev };
         delete newImages[viewType];
         return newImages;
       });
-      const imgRes = await axios.get(`http://localhost:5001/api/vehicles/${id}/images`);
+      const imgRes = await api.get(`/vehicles/${id}/images`);
       const imgs = imgRes.data || [];
       const imagesObj = {};
       imgs.forEach(img => { imagesObj[img.view_type] = img.image_url; });
@@ -211,6 +219,35 @@ const VehicleDetail = () => {
             </div>
           </div>
         </div>
+        {modificationComponents.length > 0 && (
+          <div className="space-y-4 border-t pt-6">
+            <h3 className="text-lg font-semibold">Modificaciones</h3>
+            <ul className="space-y-4">
+              {modificationComponents.map((comp) => (
+                <li key={comp.id} className="rounded-lg border bg-muted/20 p-4 space-y-2">
+                  <p className="font-medium">
+                    {vehicleComponentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}
+                    {comp.element ? ` · ${comp.element}` : ''}
+                    {comp.manufacturer ? ` · ${comp.manufacturer}` : ''}
+                    {comp.price != null && comp.price !== '' ? ` · ${Number(comp.price).toFixed(2)} €` : ''}
+                  </p>
+                  {comp.change_history?.length > 0 && (
+                    <div className="text-sm text-muted-foreground pl-2 border-l-2 border-muted">
+                      <p className="text-xs font-medium uppercase tracking-wide mb-1">Historial</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {comp.change_history.map((h) => (
+                          <li key={h.id}>
+                            Desde el {formatHistoryDate(h.effective_date)}: {formatModificationSnapshot(h.previous_snapshot, vehicleComponentTypes)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => navigate('/vehicles')}>Volver al listado</Button>
           <Button asChild><Link to={`/edit/${id}`}>Editar</Link></Button>

@@ -4,6 +4,7 @@ import './index.css';
 import './styles/competitions.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { CookieConsentProvider } from './context/CookieConsentContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { register } from './serviceWorkerRegistration';
 register();
@@ -12,9 +13,11 @@ register();
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <CookieConsentProvider>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </CookieConsentProvider>
   </React.StrictMode>
 );
 

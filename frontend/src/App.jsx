@@ -20,6 +20,9 @@ import Profile from './pages/Profile';
 import Login from './components/Login';
 import LandingPage from './pages/LandingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { useCookieConsent } from './context/CookieConsentContext';
+import CookieBanner from './components/CookieBanner';
+import CookieSettingsDialog from './components/CookieSettingsDialog';
 import InstallPWAButton from './components/InstallPWAButton';
 import { logPWADiagnostics } from './utils/pwaDiagnostics';
 import { Spinner } from './components/ui/spinner';
@@ -158,16 +161,28 @@ const AppContent = () => {
   );
 };
 
+const ConsentAwareVercelMetrics = () => {
+  const { consent } = useCookieConsent();
+  if (!consent.analytics) return null;
+  return (
+    <>
+      <Analytics />
+      <SpeedInsights />
+    </>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <Router>
         <div>
+          <CookieBanner />
+          <CookieSettingsDialog />
           <InstallPWAButton />
           <AppContent />
           <Toaster richColors position="top-right" />
-          <Analytics />
-          <SpeedInsights />
+          <ConsentAwareVercelMetrics />
         </div>
       </Router>
     </AuthProvider>

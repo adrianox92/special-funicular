@@ -70,6 +70,25 @@ Si no ves el botón de instalación:
 
 ###🆕 Nuevas Funcionalidades
 
+#### Historial al cambiar una modificación (componente anterior)
+**Description**: When you **edit** an existing modification row (same component slot, e.g. swap crown A for crown B), the app stores a snapshot of the previous values plus an **effective change date** before applying the update.
+
+**Features**:
+- **Edit in place**: Use “Editar” on the modification row; do not delete and re-add if you want a continuous history for that slot.
+- **Date**: “Fecha del cambio” defaults to today; shown only when editing a modification. An informational alert explains that saving will record history when data actually changes.
+- **API**: `PUT /api/vehicles/:id/technical-specs/:specId/components/:componentId` accepts optional `change_effective_date` (`YYYY-MM-DD`). `GET /api/vehicles/:id/technical-specs` includes each modification component with `change_history` (newest first).
+- **UI**: Edit form (Modificaciones tab) and vehicle detail show prior values and dates.
+
+**Database**: Run `backend/scripts/create-component-modification-history.sql` in the Supabase SQL Editor before using this feature.
+
+**Files**:
+- `backend/scripts/create-component-modification-history.sql`
+- `backend/routes/vehicles.js`
+- `frontend/src/data/componentTypes.js`
+- `frontend/src/utils/formatUtils.js` — `formatModificationSnapshot`, `formatHistoryDate`
+- `frontend/src/components/EditVehicle.jsx`
+- `frontend/src/components/VehicleDetail.jsx`
+
 #### Add Vehicle Form Validation
 **Description**: Client-side validation for required fields when creating a new vehicle.
 

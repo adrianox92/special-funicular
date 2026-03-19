@@ -27,6 +27,55 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
 
+const COMPONENT_PAYLOAD_KEYS = [
+  'component_type', 'element', 'manufacturer', 'material', 'size', 'teeth',
+  'color', 'rpm', 'gaus', 'price', 'url', 'sku', 'description'
+];
+
+function pickComponentFields(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  const out = {};
+  for (const k of COMPONENT_PAYLOAD_KEYS) {
+    if (obj[k] !== undefined) out[k] = obj[k];
+  }
+  return out;
+}
+
+function modificationSnapshotFromRow(row) {
+  const o = {};
+  for (const k of COMPONENT_PAYLOAD_KEYS) {
+    o[k] = row[k] ?? null;
+  }
+  return o;
+}
+
+function normalizeComponentValue(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  if (typeof v === 'boolean') return v;
+  const n = Number(v);
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(n) && String(n) === String(Number(v))) return n;
+  return String(v);
+}
+
+function modificationSnapshotsDiffer(prev, next) {
+  for (const k of COMPONENT_PAYLOAD_KEYS) {
+    if (normalizeComponentValue(prev[k]) !== normalizeComponentValue(next[k])) return true;
+  }
+  return false;
+}
+
+function parseChangeEffectiveDate(raw) {
+  if (raw == null || raw === '') {
+    return new Date().toISOString().slice(0, 10);
+  }
+  const s = String(raw).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  return s;
+}
+
 /**
  * @swagger
  * /api/vehicles/export:
@@ -649,10 +698,44 @@ router.get('/:id/technical-specs', async (req, res) => {
       }
       components = comps;
     }
+    const modSpecIds = specs.filter(s => s.is_modification).map(s => s.id);
+    const modComponentIds = components
+      .filter(c => modSpecIds.includes(c.tech_spec_id))
+      .map(c => c.id);
+    let historyByComponentId = {};
+    if (modComponentIds.length > 0) {
+      const { data: histRows, error: histError } = await supabase
+        .from('component_modification_history')
+        .select('id, component_id, effective_date, previous_snapshot, created_at')
+        .eq('vehicle_id', id)
+        .eq('user_id', req.user.id)
+        .in('component_id', modComponentIds)
+        .order('effective_date', { ascending: false });
+      if (!histError && histRows) {
+        for (const row of histRows) {
+          if (!historyByComponentId[row.component_id]) {
+            historyByComponentId[row.component_id] = [];
+          }
+          historyByComponentId[row.component_id].push({
+            id: row.id,
+            effective_date: row.effective_date,
+            previous_snapshot: row.previous_snapshot,
+            created_at: row.created_at
+          });
+        }
+      }
+    }
     // Asociar componentes a cada especificación
     const specsWithComponents = specs.map(spec => ({
       ...spec,
-      components: components.filter(c => c.tech_spec_id === spec.id)
+      components: components
+        .filter(c => c.tech_spec_id === spec.id)
+        .map(c => ({
+          ...c,
+          change_history: spec.is_modification
+            ? (historyByComponentId[c.id] || [])
+            : undefined
+        }))
     }));
     res.json(specsWithComponents);
   } catch (err) {
@@ -803,12 +886,12 @@ router.post('/:id/technical-specs', async (req, res) => {
 router.put('/:id/technical-specs/:specId/components/:componentId', async (req, res) => {
   try {
     const { id, specId, componentId } = req.params;
-    const { is_modification, components } = req.body;
+    const { is_modification, components, change_effective_date } = req.body;
 
     // Verificar que el vehículo pertenece al usuario
     const { data: existingVehicle, error: checkError } = await supabase
       .from('vehicles')
-      .select('id')
+      .select('id, user_id')
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
@@ -841,17 +924,45 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
       return res.status(404).json({ error: 'Componente no encontrado' });
     }
 
-    // Actualizar el componente específico
-    const componentToUpdate = components[0];
+    const pickedUpdate = pickComponentFields(components && components[0]);
+    const prevSnap = modificationSnapshotFromRow(existingComponent);
+    const nextSnap = { ...prevSnap, ...pickedUpdate };
+    const shouldRecordHistory =
+      is_modification === true && modificationSnapshotsDiffer(prevSnap, nextSnap);
+
+    let insertedHistoryId = null;
+    if (shouldRecordHistory) {
+      const effectiveDate = parseChangeEffectiveDate(change_effective_date);
+      const { data: insertedHist, error: histInsertError } = await supabase
+        .from('component_modification_history')
+        .insert({
+          user_id: req.user.id,
+          vehicle_id: id,
+          component_id: componentId,
+          tech_spec_id: specId,
+          effective_date: effectiveDate,
+          previous_snapshot: prevSnap
+        })
+        .select('id')
+        .single();
+      if (histInsertError) {
+        return res.status(500).json({ error: histInsertError.message });
+      }
+      insertedHistoryId = insertedHist?.id;
+    }
+
     const { error: updateError } = await supabase
       .from('components')
       .update({
-        ...componentToUpdate,
+        ...pickedUpdate,
         updated_at: new Date().toISOString()
       })
       .eq('id', componentId);
-    
+
     if (updateError) {
+      if (insertedHistoryId) {
+        await supabase.from('component_modification_history').delete().eq('id', insertedHistoryId);
+      }
       return res.status(500).json({ error: updateError.message });
     }
 

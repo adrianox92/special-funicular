@@ -1,4 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  COOKIE_CONSENT_STORAGE_KEY,
+  useCookieConsent,
+} from "./CookieConsentContext";
 
 const ThemeContext = createContext({
   theme: "light",
@@ -6,22 +10,64 @@ const ThemeContext = createContext({
   toggleTheme: () => null,
 });
 
-export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState(() => {
-    if (typeof window !== "undefined") {
+function readSystemTheme() {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+/** Lee tema guardado solo si el consentimiento funcional ya está aceptado (evita flash). */
+function readInitialThemeFromStorage() {
+  if (typeof window === "undefined") return "light";
+  try {
+    const raw = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
+    if (!raw) return readSystemTheme();
+    const p = JSON.parse(raw);
+    if (p?.decided && p?.functional) {
       const stored = localStorage.getItem("theme");
-      if (stored) return stored;
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      if (stored === "dark" || stored === "light") return stored;
     }
-    return "light";
-  });
+  } catch {
+    /* ignore */
+  }
+  return readSystemTheme();
+}
+
+export function ThemeProvider({ children }) {
+  const { consent, hasDecided } = useCookieConsent();
+
+  const [theme, setThemeState] = useState(readInitialThemeFromStorage);
+
+  useEffect(() => {
+    if (!hasDecided || consent.functional) return;
+    try {
+      localStorage.removeItem("theme");
+    } catch {
+      /* ignore */
+    }
+    setThemeState(readSystemTheme());
+  }, [hasDecided, consent.functional]);
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+    if (!hasDecided) return;
+    if (consent.functional) {
+      try {
+        localStorage.setItem("theme", theme);
+      } catch {
+        /* ignore */
+      }
+    } else {
+      try {
+        localStorage.removeItem("theme");
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [theme, hasDecided, consent.functional]);
 
   const setTheme = (newTheme) => {
     setThemeState(newTheme);

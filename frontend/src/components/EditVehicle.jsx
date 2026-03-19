@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Pencil, Trash2, Wrench, BarChart3, AlertTriangle, CircleCheck } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2, Wrench, BarChart3, AlertTriangle, CircleCheck, Info } from 'lucide-react';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
 import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
@@ -12,7 +12,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
-import { Alert } from './ui/alert';
+import { Alert, AlertDescription } from './ui/alert';
 import { Spinner } from './ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import {
@@ -41,7 +41,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
-import { formatDistance } from '../utils/formatUtils';
+import { formatDistance, formatModificationSnapshot, formatHistoryDate } from '../utils/formatUtils';
+import { vehicleComponentTypes as componentTypes } from '../data/componentTypes';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -69,21 +70,6 @@ const viewTypeMap = {
   'chassis': 'chassis',
   'three_quarters': 'three_quarters',
 };
-
-const componentTypes = [
-  { value: 'pinion', label: 'Piñón' },
-  { value: 'crown', label: 'Corona' },
-  { value: 'front_wheel', label: 'Rueda Delantera' },
-  { value: 'rear_wheel', label: 'Rueda Trasera' },
-  { value: 'front_rim', label: 'Llanta Delantera' },
-  { value: 'rear_rim', label: 'Llanta Trasera' },
-  { value: 'chassis', label: 'Chasis' },
-  { value: 'other', label: 'Otros' },
-  { value: 'rear_axle', label: 'Eje Trasero' },
-  { value: 'front_axle', label: 'Eje Delantero' },
-  { value: 'guide', label: 'Guía' },
-  { value: 'motor', label: 'Motor' },
-];
 
 const vehicleTypes = ['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'];
 
@@ -379,7 +365,8 @@ const EditVehicle = () => {
       url: component.url || '',
       sku: component.sku || '',
       description: component.description || '',
-      is_modification: spec.is_modification
+      is_modification: spec.is_modification,
+      change_effective_date: new Date().toISOString().slice(0, 10)
     });
   };
 
@@ -432,6 +419,10 @@ const EditVehicle = () => {
           }
         ]
       };
+
+      if (editingSpec && isModificationTab) {
+        specData.change_effective_date = editingSpec.change_effective_date || undefined;
+      }
 
       if (editingSpec) {
         const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
@@ -752,6 +743,26 @@ const EditVehicle = () => {
       <div className="mt-4 space-y-4">
         <h4 className="text-lg font-semibold">{editingSpec ? 'Editar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación Técnica'}</h4>
         <form onSubmit={e => handleAddSpec(e, isModificationTab)}>
+          {editingSpec && isModificationTab && (
+            <>
+              <Alert className="mb-4">
+                <Info className="size-4 shrink-0" aria-hidden />
+                <AlertDescription>
+                  Al guardar, el componente actual quedará registrado en el historial con la fecha indicada (si cambias algún dato respecto al que había). Puedes revisar los valores anteriores en esta misma pestaña y en el detalle del vehículo.
+                </AlertDescription>
+              </Alert>
+              <div className="space-y-2 mb-4 max-w-xs">
+                <Label htmlFor="change_effective_date">Fecha del cambio</Label>
+                <Input
+                  id="change_effective_date"
+                  name="change_effective_date"
+                  type="date"
+                  value={specValue.change_effective_date || ''}
+                  onChange={handleSpecChange}
+                />
+              </div>
+            </>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="component_type">Tipo de Componente</Label>
@@ -893,35 +904,52 @@ const EditVehicle = () => {
                       </TableCell>
                     </TableRow>
                   )}
-                  {components.map((comp, idx) => (
-                    <TableRow key={currentSpec.id + '-' + idx}>
-                      <TableCell>{componentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}</TableCell>
-                      <TableCell>{comp.element}</TableCell>
-                      <TableCell>{comp.manufacturer}</TableCell>
-                      <TableCell>{comp.material}</TableCell>
-                      <TableCell>{comp.size}</TableCell>
-                      <TableCell>{comp.color}</TableCell>
-                      <TableCell>{comp.price ? `€${Number(comp.price).toFixed(2)}` : '-'}</TableCell>
-                      <TableCell>
-                        {comp.url ? (
-                          <a href={comp.url} target="_blank" rel="noopener noreferrer" title="Abrir enlace" className="text-primary hover:underline">
-                            <ExternalLink className="size-4 inline" />
-                          </a>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="default" size="sm" onClick={() => handleEditSpec(currentSpec, comp)} title="Editar">
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDeleteSpec(currentSpec.id, comp.id)} title="Eliminar">
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                  {components.map((comp) => (
+                    <React.Fragment key={comp.id}>
+                      <TableRow>
+                        <TableCell>{componentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}</TableCell>
+                        <TableCell>{comp.element}</TableCell>
+                        <TableCell>{comp.manufacturer}</TableCell>
+                        <TableCell>{comp.material}</TableCell>
+                        <TableCell>{comp.size}</TableCell>
+                        <TableCell>{comp.color}</TableCell>
+                        <TableCell>{comp.price ? `€${Number(comp.price).toFixed(2)}` : '-'}</TableCell>
+                        <TableCell>
+                          {comp.url ? (
+                            <a href={comp.url} target="_blank" rel="noopener noreferrer" title="Abrir enlace" className="text-primary hover:underline">
+                              <ExternalLink className="size-4 inline" />
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="default" size="sm" onClick={() => handleEditSpec(currentSpec, comp)} title="Editar">
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSpec(currentSpec.id, comp.id)} title="Eliminar">
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {isModificationTab && comp.change_history?.length > 0 && (
+                        <TableRow>
+                          <TableCell colSpan={9} className="bg-muted/40 align-top py-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Historial (componente anterior)</p>
+                            <ul className="text-sm space-y-1 list-disc list-inside">
+                              {comp.change_history.map((h) => (
+                                <li key={h.id}>
+                                  <span className="text-muted-foreground">Desde el {formatHistoryDate(h.effective_date)}: </span>
+                                  {formatModificationSnapshot(h.previous_snapshot, componentTypes)}
+                                </li>
+                              ))}
+                            </ul>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   ))}
                   {isModificationTab && components.length > 0 && (
                     <TableRow>
