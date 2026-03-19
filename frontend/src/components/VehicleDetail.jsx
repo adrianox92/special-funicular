@@ -144,12 +144,12 @@ const VehicleDetail = () => {
             ].map(({ name, label, type, value }) => (
               <div key={name} className="space-y-2">
                 <Label>{label}</Label>
-                <Input name={name} type={type || 'text'} value={value || ''} disabled readOnly />
+                <Input name={name} type={type || 'text'} value={value ?? ''} disabled readOnly />
               </div>
             ))}
             <div className="space-y-2">
               <Label>Tipo</Label>
-              <Input value={vehicle.type || ''} disabled readOnly />
+              <Input value={vehicle.type ?? ''} disabled readOnly />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
@@ -169,7 +169,7 @@ const VehicleDetail = () => {
                 <Label>Taller</Label>
               </div>
             </div>
-            {(vehicle.anotaciones != null && vehicle.anotaciones !== '') && (
+            {vehicle.anotaciones != null && vehicle.anotaciones !== '' && String(vehicle.anotaciones) !== 'null' && (
               <div className="space-y-2">
                 <Label>Anotaciones</Label>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap rounded-md border border-input bg-muted/30 p-3">{vehicle.anotaciones}</p>

@@ -1301,7 +1301,7 @@ const EditVehicle = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="reference">Referencia</Label>
-                  <Input id="reference" name="reference" value={vehicle.reference || ''} onChange={handleChange} />
+                  <Input id="reference" name="reference" value={vehicle.reference ?? ''} onChange={handleChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="manufacturer">Fabricante</Label>
@@ -1335,7 +1335,7 @@ const EditVehicle = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="purchase_place">Lugar de compra</Label>
-                  <Input id="purchase_place" name="purchase_place" value={vehicle.purchase_place || ''} onChange={handleChange} />
+                  <Input id="purchase_place" name="purchase_place" value={vehicle.purchase_place ?? ''} onChange={handleChange} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
@@ -1357,7 +1357,7 @@ const EditVehicle = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="anotaciones">Anotaciones</Label>
-                  <Textarea id="anotaciones" name="anotaciones" rows={3} value={vehicle.anotaciones || ''} onChange={handleChange} placeholder="Añade tus comentarios..." />
+                  <Textarea id="anotaciones" name="anotaciones" rows={3} value={vehicle.anotaciones ?? ''} onChange={handleChange} placeholder="Añade tus comentarios..." />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="scale_factor">Escala (1:X)</Label>

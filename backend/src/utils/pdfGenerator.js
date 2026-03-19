@@ -77,13 +77,18 @@ function drawSectionTitle(doc, text) {
   doc.y = y + 32;
 }
 
+function toDisplayString(value) {
+  if (value == null || value === '' || value === 'null' || value === 'undefined') return '-';
+  return String(value);
+}
+
 function drawInfoTable(doc, rows) {
   const col1Width = 140;
   const col2Width = CONTENT_WIDTH - col1Width;
   let y = doc.y;
 
   rows.forEach(([label, value], i) => {
-    if (!value && value !== 0) value = '-';
+    const displayValue = toDisplayString(value);
     const rowHeight = 18;
     if (i % 2 === 1) {
       doc.rect(MARGIN, y, CONTENT_WIDTH, rowHeight).fill(COLORS.rowAlt);
@@ -91,7 +96,7 @@ function drawInfoTable(doc, rows) {
     doc.fillColor(COLORS.textMuted).fontSize(10).font('Helvetica');
     doc.text(String(label), MARGIN + 8, y + 4, { width: col1Width - 16 });
     doc.fillColor(COLORS.text).font('Helvetica');
-    doc.text(String(value), MARGIN + col1Width + 8, y + 4, { width: col2Width - 16 });
+    doc.text(displayValue, MARGIN + col1Width + 8, y + 4, { width: col2Width - 16 });
     y += rowHeight;
   });
   doc.y = y + 12;
@@ -274,13 +279,15 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
 
       const dataWidth = imgX - MARGIN - 20;
       doc.fillColor(COLORS.text).fontSize(16).font('Helvetica-Bold');
-      doc.text(`${vehicle.manufacturer || ''} ${vehicle.model || ''}`.trim(), MARGIN, doc.y, {
+      doc.text(`${vehicle.manufacturer ?? ''} ${vehicle.model ?? ''}`.trim() || '-', MARGIN, doc.y, {
         width: dataWidth,
       });
       doc.moveDown(0.3);
       doc.fontSize(10).font('Helvetica').fillColor(COLORS.textMuted);
-      const ref = vehicle.reference ? ` · ${vehicle.reference}` : '';
-      doc.text(`${ref}`.trim() || '-', MARGIN, doc.y, { width: dataWidth });
+      const refVal = vehicle.reference != null && vehicle.reference !== '' && String(vehicle.reference) !== 'null'
+        ? ` · ${vehicle.reference}`
+        : '';
+      doc.text(refVal.trim() || '-', MARGIN, doc.y, { width: dataWidth });
       doc.moveDown(0.5);
 
       const scaleStr = vehicle.scale_factor ? `1:${vehicle.scale_factor}` : '-';
@@ -297,7 +304,7 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
       drawSectionTitle(doc, 'Información de compra');
       const purchaseRows = [
         ['Fecha de compra', vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString('es-ES') : '-'],
-        ['Lugar de compra', vehicle.purchase_place || '-'],
+        ['Lugar de compra', vehicle.purchase_place],
         ['Precio base', formatPrice(vehicle.price)],
         ['Precio total', formatPrice(vehicle.total_price || vehicle.price)],
       ];

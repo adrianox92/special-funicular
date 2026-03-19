@@ -136,7 +136,7 @@ const VehicleTableRow = ({ vehicle, onDelete }) => {
           <div className="font-medium">{vehicle.model}</div>
           <div className="text-xs text-muted-foreground">
             {vehicle.manufacturer}
-            {vehicle.reference && ` - ${vehicle.reference}`}
+            {vehicle.reference != null && vehicle.reference !== '' && String(vehicle.reference) !== 'null' && ` - ${vehicle.reference}`}
           </div>
         </TableCell>
         <TableCell>
@@ -156,7 +156,7 @@ const VehicleTableRow = ({ vehicle, onDelete }) => {
         <TableCell className="text-sm whitespace-nowrap">{formatPrice()}</TableCell>
         <TableCell className="text-xs text-muted-foreground">
           {vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString() : '-'}
-          {vehicle.purchase_place && (
+          {vehicle.purchase_place != null && vehicle.purchase_place !== '' && String(vehicle.purchase_place) !== 'null' && (
             <div className="truncate max-w-[100px]" title={vehicle.purchase_place}>{vehicle.purchase_place}</div>
           )}
         </TableCell>

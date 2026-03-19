@@ -4,6 +4,7 @@ import VehicleTable from '../components/VehicleTable';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { formatDistance } from '../utils/formatUtils';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '../components/ui/input';
@@ -16,6 +17,33 @@ import {
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const ALL_VEHICLES_LIMIT = 10000;
+const FILTERS_STORAGE_KEY = 'vehicleListFilters';
+
+const defaultFilters = { manufacturer: '', type: '', modified: '', digital: '', filterMuseo: false, filterTaller: false };
+
+const loadStoredFilters = () => {
+  try {
+    const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!stored) return defaultFilters;
+    const parsed = JSON.parse(stored);
+    return {
+      manufacturer: String(parsed.manufacturer ?? '').slice(0, 200),
+      type: typeof parsed.type === 'string' ? parsed.type : '',
+      modified: typeof parsed.modified === 'string' ? parsed.modified : '',
+      digital: typeof parsed.digital === 'string' ? parsed.digital : '',
+      filterMuseo: Boolean(parsed.filterMuseo),
+      filterTaller: Boolean(parsed.filterTaller),
+    };
+  } catch {
+    return defaultFilters;
+  }
+};
+
+const saveFilters = (filters) => {
+  try {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
+  } catch {}
+};
 
 const applyFilters = (list, filters) => {
   return list.filter(v => {
@@ -41,7 +69,14 @@ const VehicleList = () => {
   const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
-  const [filters, setFilters] = useState({ manufacturer: '', type: '', modified: '', digital: '', filterMuseo: false, filterTaller: false });
+  const [filters, setFiltersState] = useState(loadStoredFilters);
+  const setFilters = (updater) => {
+    setFiltersState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      saveFilters(next);
+      return next;
+    });
+  };
   const [viewMode, setViewMode] = useState(() => {
     try { return localStorage.getItem('vehicleViewMode') || 'grid'; } catch { return 'grid'; }
   });
@@ -131,9 +166,19 @@ const VehicleList = () => {
 
   const exportToCSV = async () => {
     try {
-      const response = await api.get('/vehicles/export');
+      const params = new URLSearchParams();
+      if (hasActiveFilters) {
+        if (filters.manufacturer) params.set('manufacturer', filters.manufacturer);
+        if (filters.type) params.set('type', filters.type);
+        if (filters.modified) params.set('modified', filters.modified);
+        if (filters.digital) params.set('digital', filters.digital);
+        if (filters.filterMuseo) params.set('filterMuseo', 'true');
+        if (filters.filterTaller) params.set('filterTaller', 'true');
+      }
+      const url = params.toString() ? `/vehicles/export?${params.toString()}` : '/vehicles/export';
+      const response = await api.get(url);
       const vehiclesData = response.data.vehicles;
-      const headers = ['ID', 'Modelo', 'Referencia', 'Fabricante', 'Tipo', 'Tracción', 'Precio Original (€)', 'Precio Total (€)', 'Fecha de Compra', 'Lugar de Compra', 'Modificado', 'Digital', 'Especificaciones Técnicas', 'Modificaciones'];
+      const headers = ['ID', 'Modelo', 'Referencia', 'Fabricante', 'Tipo', 'Tracción', 'Escala', 'Precio Original (€)', 'Precio Total (€)', 'Fecha de Compra', 'Lugar de Compra', 'Modificado', 'Digital', 'Museo', 'Taller', 'Odómetro', 'Anotaciones', 'Especificaciones Técnicas', 'Modificaciones'];
       const vehiclesWithDetails = await Promise.all(vehiclesData.map(async (vehicle) => {
         const [specsResponse, modsResponse] = await Promise.all([
           api.get(`/vehicles/${vehicle.id}/specs`),
@@ -141,12 +186,39 @@ const VehicleList = () => {
         ]);
         return { ...vehicle, specs: specsResponse.data, modifications: modsResponse.data };
       }));
+      const escapeCsv = (v) => {
+        const s = v == null || v === 'null' || v === 'undefined' ? '' : String(v);
+        return `"${s.replace(/"/g, '""')}"`;
+      };
       const csvContent = [
         headers.join(','),
         ...vehiclesWithDetails.map(vehicle => {
           const specs = vehicle.specs.map(s => `${s.component_type}: ${s.element} (${s.manufacturer})`).join('; ');
           const mods = vehicle.modifications.map(m => `${m.component_type}: ${m.element} (${m.manufacturer}) - ${m.price}€`).join('; ');
-          return [vehicle.id, `"${vehicle.model}"`, `"${vehicle.reference || ''}"`, `"${vehicle.manufacturer}"`, `"${vehicle.type}"`, `"${vehicle.traction || ''}"`, vehicle.price || '', vehicle.total_price || '', vehicle.purchase_date || '', `"${vehicle.purchase_place || ''}"`, vehicle.modified ? 'Sí' : 'No', vehicle.digital ? 'Sí' : 'No', `"${specs}"`, `"${mods}"`].join(',');
+          const scaleStr = vehicle.scale_factor ? `1:${vehicle.scale_factor}` : '';
+          const odometerStr = formatDistance(vehicle.total_distance_meters);
+          const anotaciones = vehicle.anotaciones != null && vehicle.anotaciones !== '' && String(vehicle.anotaciones) !== 'null' ? String(vehicle.anotaciones) : '';
+          return [
+            vehicle.id,
+            escapeCsv(vehicle.model),
+            escapeCsv(vehicle.reference),
+            escapeCsv(vehicle.manufacturer),
+            escapeCsv(vehicle.type),
+            escapeCsv(vehicle.traction),
+            escapeCsv(scaleStr),
+            vehicle.price ?? '',
+            vehicle.total_price ?? '',
+            vehicle.purchase_date || '',
+            escapeCsv(vehicle.purchase_place),
+            vehicle.modified ? 'Sí' : 'No',
+            vehicle.digital ? 'Sí' : 'No',
+            vehicle.museo ? 'Sí' : 'No',
+            vehicle.taller ? 'Sí' : 'No',
+            escapeCsv(odometerStr),
+            escapeCsv(anotaciones),
+            escapeCsv(specs),
+            escapeCsv(mods)
+          ].join(',');
         })
       ].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

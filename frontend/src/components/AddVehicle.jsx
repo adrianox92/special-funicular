@@ -130,7 +130,7 @@ const AddVehicle = () => {
             <CardHeader><CardTitle>Datos del vehículo</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2"><Label>Modelo</Label><Input name="model" value={vehicle.model} onChange={handleChange} className={error && !vehicle.model?.trim() ? 'border-destructive' : ''} /></div>
-              <div className="space-y-2"><Label>Referencia</Label><Input name="reference" value={vehicle.reference} onChange={handleChange} /></div>
+              <div className="space-y-2"><Label>Referencia</Label><Input name="reference" value={vehicle.reference ?? ''} onChange={handleChange} /></div>
               <div className="space-y-2"><Label>Fabricante</Label><Input name="manufacturer" value={vehicle.manufacturer} onChange={handleChange} className={error && !vehicle.manufacturer?.trim() ? 'border-destructive' : ''} /></div>
               <div className="space-y-2">
                 <Label>Tipo</Label>
@@ -142,7 +142,7 @@ const AddVehicle = () => {
               <div className="space-y-2"><Label>Tracción</Label><Input name="traction" value={vehicle.traction} onChange={handleChange} /></div>
               <div className="space-y-2"><Label>Precio original (€)</Label><Input name="price" type="number" step="0.01" value={vehicle.price} onChange={handleChange} /></div>
               <div className="space-y-2"><Label>Fecha de compra</Label><Input name="purchase_date" type="date" value={vehicle.purchase_date} onChange={handleChange} /></div>
-              <div className="space-y-2"><Label>Lugar de compra</Label><Input name="purchase_place" value={vehicle.purchase_place} onChange={handleChange} /></div>
+              <div className="space-y-2"><Label>Lugar de compra</Label><Input name="purchase_place" value={vehicle.purchase_place ?? ''} onChange={handleChange} /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2"><Switch name="modified" checked={vehicle.modified} onCheckedChange={v => setVehicle(prev => ({ ...prev, modified: v }))} /><Label>Modificado</Label></div>
                 <div className="flex items-center gap-2"><Switch name="digital" checked={vehicle.digital} onCheckedChange={v => setVehicle(prev => ({ ...prev, digital: v }))} /><Label>Digital</Label></div>
@@ -151,7 +151,7 @@ const AddVehicle = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="anotaciones">Anotaciones</Label>
-                <Textarea id="anotaciones" name="anotaciones" value={vehicle.anotaciones} onChange={e => setVehicle(prev => ({ ...prev, anotaciones: e.target.value }))} placeholder="Añade tus comentarios..." rows={3} />
+                <Textarea id="anotaciones" name="anotaciones" value={vehicle.anotaciones ?? ''} onChange={e => setVehicle(prev => ({ ...prev, anotaciones: e.target.value }))} placeholder="Añade tus comentarios..." rows={3} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="scale_factor">Escala (1:X)</Label>

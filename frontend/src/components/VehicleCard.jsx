@@ -103,7 +103,7 @@ const VehicleCard = ({ vehicle, onDelete }) => {
         <h3 className="font-semibold text-lg">{vehicle.model}</h3>
         <p className="text-sm text-muted-foreground">
           {vehicle.manufacturer}
-          {vehicle.reference && <span> - {vehicle.reference}</span>}
+          {vehicle.reference != null && vehicle.reference !== '' && String(vehicle.reference) !== 'null' && <span> - {vehicle.reference}</span>}
         </p>
         <div className="flex flex-wrap gap-1 mt-2">
           {vehicle.type && <Badge variant="secondary">{vehicle.type}</Badge>}
@@ -139,7 +139,7 @@ const VehicleCard = ({ vehicle, onDelete }) => {
               {new Date(vehicle.purchase_date).toLocaleDateString()}
             </div>
           )}
-          {vehicle.purchase_place && (
+          {vehicle.purchase_place != null && vehicle.purchase_place !== '' && String(vehicle.purchase_place) !== 'null' && (
             <div className="flex items-center gap-1">
               <MapPin className="size-3" />
               {vehicle.purchase_place}

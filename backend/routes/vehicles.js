@@ -153,15 +153,44 @@ router.use(authMiddleware);
  *             schema:
  *               type: object
  */
-// Endpoint para exportar todos los vehículos
+// Endpoint para exportar vehículos (opcionalmente filtrados)
 router.get('/export', async (req, res) => {
   try {
-    // Obtener todos los vehículos sin paginación
-    const { data: vehicles, error: vehiclesError } = await supabase
+    const { manufacturer, type, modified, digital, filterMuseo, filterTaller } = req.query;
+
+    let query = supabase
       .from('vehicles')
       .select('*')
       .eq('user_id', req.user.id)
       .order('purchase_date', { ascending: false });
+
+    if (manufacturer && String(manufacturer).trim()) {
+      query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
+    }
+    if (type && String(type).trim()) {
+      query = query.eq('type', String(type).trim());
+    }
+    if (modified === 'Sí' || modified === 'true') {
+      query = query.eq('modified', true);
+    } else if (modified === 'No' || modified === 'false') {
+      query = query.eq('modified', false);
+    }
+    if (digital === 'Digital' || digital === 'true') {
+      query = query.eq('digital', true);
+    } else if (digital === 'Analógico' || digital === 'false') {
+      query = query.eq('digital', false);
+    }
+    const museoFilter = filterMuseo === 'true' || filterMuseo === true;
+    const tallerFilter = filterTaller === 'true' || filterTaller === true;
+    if (museoFilter && tallerFilter) {
+      query = query.or('museo.eq.true,taller.eq.true');
+    } else if (museoFilter) {
+      query = query.eq('museo', true);
+    } else if (tallerFilter) {
+      query = query.eq('taller', true);
+    }
+
+    const { data: vehicles, error: vehiclesError } = await query;
 
     if (vehiclesError) throw vehiclesError;
 

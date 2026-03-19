@@ -86,6 +86,23 @@ Si no ves el botón de instalación:
 - `backend/routes/vehicles.js` - Sanitize empty strings to null for numeric/optional fields
 - `frontend/src/components/VehicleCard.jsx` - Show "Precio no disponible" when price is empty; hide labels (badges, date, place) when their values are empty
 
+#### Bug Fix: Empty fields showing "null" in frontend and PDF
+**Issue**: When fields like Anotaciones (notes), Referencia (reference), or Lugar de compra (purchase place) were empty, the frontend and PDF technical sheet displayed the literal text "null" instead of showing nothing or a dash.
+
+**Fix**: Normalized display of empty values across the app:
+- **Frontend**: Use `?? ''` for Input/Textarea values (reference, anotaciones, purchase_place) to avoid passing null to controlled components; added checks to hide reference/purchase_place when null or the string "null"
+- **PDF**: Added `toDisplayString()` helper that converts null, undefined, and the string "null" to "-" for display in the technical sheet
+- **Components updated**: VehicleDetail, EditVehicle, AddVehicle, VehicleCard, VehicleTable
+
+**Files modified**:
+- `frontend/src/components/VehicleDetail.jsx` - Input values, anotaciones visibility
+- `frontend/src/components/EditVehicle.jsx` - Input/Textarea values
+- `frontend/src/components/AddVehicle.jsx` - Input/Textarea values
+- `frontend/src/components/VehicleCard.jsx` - Reference and purchase_place display
+- `frontend/src/components/VehicleTable.jsx` - Reference and purchase_place display
+- `frontend/src/utils/formatUtils.js` - Added `toDisplayValue()` utility
+- `backend/src/utils/pdfGenerator.js` - `toDisplayString()` helper and drawInfoTable
+
 #### Bug Fix: Delete Image in Vehicle Detail/Edit
 **Issue**: When clicking the delete image icon in the vehicle detail or edit form, the confirmation dialog appeared briefly but the user was redirected to the vehicle list without being able to confirm the deletion.
 
@@ -142,10 +159,14 @@ Si no ves el botón de instalación:
 - **Configurable pagination**: Selector for items per page (10, 25, 50, 100); preference is saved in localStorage
 - **Pagination bar**: Shows "Showing X–Y of Z vehicles", page navigation buttons, and page size selector
 - **Filter pagination**: When any filter is active (manufacturer, type, modified, digital, Museo, Taller), all vehicles are loaded once and filtered client-side. Pagination applies to the filtered results with the same page size; if results fit in one page, pagination controls are hidden
+- **Filter persistence**: Active filters are saved in localStorage; when navigating away (e.g. to vehicle detail) and returning, the same filters remain applied
+- **CSV export**: Export vehicle collection to CSV with all fields; when filters are active, only filtered vehicles are exported
+- **CSV columns**: ID, Model, Reference, Manufacturer, Type, Traction, Scale (1:X), Base Price, Total Price, Purchase Date, Purchase Place, Modified, Digital, Museo, Taller, Odometer, Annotations, Technical Specs, Modifications
 
 **Files modified**:
-- `frontend/src/pages/VehicleList.jsx` - View modes, toggle, pagination, page size selector
+- `frontend/src/pages/VehicleList.jsx` - View modes, toggle, pagination, page size selector, CSV export with filters
 - `frontend/src/components/VehicleTable.jsx` - New compact table component for vehicle list
+- `backend/routes/vehicles.js` - Export endpoint accepts filter query params (manufacturer, type, modified, digital, filterMuseo, filterTaller)
 
 #### Vehicle Technical Sheet PDF - Redesign
 **Description**: The downloadable vehicle technical sheet PDF has been redesigned for a clean, professional look.
@@ -163,6 +184,18 @@ Si no ves el botón de instalación:
 
 **Files modified**:
 - `backend/src/utils/pdfGenerator.js` - Complete redesign with helpers for header, footer, sections, tables, badges, and price summary
+
+#### Vehicle List CSV Export - Extended Fields and Filtered Export
+**Description**: The CSV export from the vehicle list has been updated with new fields and now respects active filters.
+
+**Features**:
+- **New columns**: Escala (1:X), Museo, Taller, Odómetro, Anotaciones
+- **Filtered export**: When any filter is active (manufacturer, type, modified, digital, Museo, Taller), the CSV contains only the vehicles matching the current filters
+- **Safe CSV escaping**: Text fields are properly escaped to avoid issues with commas and quotes in Excel/Sheets
+
+**Files modified**:
+- `frontend/src/pages/VehicleList.jsx` - Extended CSV headers and row mapping, filter params passed to export API
+- `backend/routes/vehicles.js` - Export endpoint accepts filter query params
 
 #### Vehicle Types: Hypercar, Grupo 5, Road Car
 **Description**: Three new vehicle types added to the type selector when creating or editing a vehicle.
