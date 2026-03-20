@@ -157,8 +157,52 @@ const getBetterConfig = (key, configs) => {
   return bestIdx;
 };
 
+/** Agrega métricas de un conjunto de sesiones (misma lógica que por grupo de config). */
+const aggregateStats = (sessions) => {
+  const bestLaps = sessions
+    .map((s) => s.best_lap_timestamp ?? timeToSeconds(s.best_lap_time))
+    .filter((v) => v != null && !isNaN(v));
+  const avgTimes = sessions
+    .map((s) => s.average_time_timestamp ?? timeToSeconds(s.average_time))
+    .filter((v) => v != null && !isNaN(v));
+  const speeds = sessions.map((s) => s.avg_speed_kmh).filter((v) => v != null && !isNaN(v));
+  return {
+    best_lap_timestamp: bestLaps.length ? Math.min(...bestLaps) : null,
+    average_time_timestamp: avgTimes.length ? avgTimes.reduce((a, b) => a + b, 0) / avgTimes.length : null,
+    avg_speed_kmh: speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null,
+  };
+};
+
+const laneKeyForTiming = (t) => `${t.circuit_id || t.circuit || ''}::${t.lane}`;
+
+const hasLane = (t) => t.lane != null && String(t.lane).trim() !== '';
+
+/** Entre dos valores de una métrica: quién gana ('prev' | 'curr') o empate/null. */
+const getBetterBetween = (key, prevVal, currVal) => {
+  const lowerIsBetter = ['best_lap_timestamp', 'average_time_timestamp'];
+  const higherIsBetter = ['avg_speed_kmh'];
+  if (prevVal == null && currVal == null) return null;
+  if (prevVal == null) return 'curr';
+  if (currVal == null) return 'prev';
+  const numP = typeof prevVal === 'number' ? prevVal : timeToSeconds(prevVal);
+  const numC = typeof currVal === 'number' ? currVal : timeToSeconds(currVal);
+  if (numP == null || isNaN(numP)) return 'curr';
+  if (numC == null || isNaN(numC)) return 'prev';
+  if (lowerIsBetter.includes(key)) {
+    if (numP < numC) return 'prev';
+    if (numC < numP) return 'curr';
+    return null;
+  }
+  if (higherIsBetter.includes(key)) {
+    if (numP > numC) return 'prev';
+    if (numC > numP) return 'curr';
+    return null;
+  }
+  return null;
+};
+
 const SetupPerformanceAnalysis = ({ timings = [] }) => {
-  const { configGroups, barChartData, timelineData } = useMemo(() => {
+  const { configGroups, barChartData, timelineData, laneComparisons } = useMemo(() => {
     const withSnapshot = timings.filter((t) => t.setup_snapshot);
     const byFingerprint = {};
     withSnapshot.forEach((t) => {
@@ -172,7 +216,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
 
     const groups = Object.values(byFingerprint);
     if (groups.length < 2) {
-      return { configGroups: [], barChartData: [], timelineData: [] };
+      return { configGroups: [], barChartData: [], timelineData: [], laneComparisons: [] };
     }
 
     groups.forEach((g) => {
@@ -246,7 +290,43 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
       };
     });
 
-    return { configGroups, barChartData, timelineData };
+    const currentGroup = sortedGroups[sortedGroups.length - 1];
+    const laneComparisons = sortedGroups.slice(0, -1)
+      .map((prevG, idx) => {
+        const prevMap = {};
+        const currMap = {};
+        prevG.timings.filter(hasLane).forEach((t) => {
+          const k = laneKeyForTiming(t);
+          if (!prevMap[k]) prevMap[k] = [];
+          prevMap[k].push(t);
+        });
+        currentGroup.timings.filter(hasLane).forEach((t) => {
+          const k = laneKeyForTiming(t);
+          if (!currMap[k]) currMap[k] = [];
+          currMap[k].push(t);
+        });
+        const common = Object.keys(prevMap).filter((k) => currMap[k]);
+        common.sort((a, b) => a.localeCompare(b, 'es'));
+        const rows = common.map((k) => {
+          const sample = prevMap[k][0];
+          const circuitLabel = sample.circuit || k.split('::')[0] || '—';
+          return {
+            key: k,
+            circuitLabel,
+            lane: sample.lane,
+            prev: aggregateStats(prevMap[k]),
+            curr: aggregateStats(currMap[k]),
+          };
+        });
+        return {
+          prevLabel: `Config ${idx + 1}`,
+          currLabel: `Config ${sortedGroups.length} (actual)`,
+          rows,
+        };
+      })
+      .filter((c) => c.rows.length > 0);
+
+    return { configGroups, barChartData, timelineData, laneComparisons };
   }, [timings]);
 
   if (configGroups.length < 2) {
@@ -446,6 +526,107 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
           </CardContent>
         </Card>
       </div>
+
+      {laneComparisons.length > 0 && (
+        <div className="space-y-4">
+          <h4 className="text-lg font-semibold">Comparativa por carril entre reglajes</h4>
+          <p className="text-sm text-muted-foreground">
+            Solo se muestran circuito y carril donde hay sesiones en el reglaje anterior y en el actual. Métricas agregadas por carril dentro de cada configuración.
+          </p>
+          {laneComparisons.map((comparison) => (
+            <Card key={`${comparison.prevLabel}-${comparison.currLabel}`}>
+              <CardHeader>
+                <h5 className="font-semibold">
+                  {comparison.prevLabel} → {comparison.currLabel}
+                </h5>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead rowSpan={2} className="align-bottom">
+                          Circuito
+                        </TableHead>
+                        <TableHead rowSpan={2} className="align-bottom">
+                          Carril
+                        </TableHead>
+                        <TableHead colSpan={2} className="text-center border-l">
+                          Mejor vuelta
+                        </TableHead>
+                        <TableHead colSpan={2} className="text-center border-l">
+                          Promedio
+                        </TableHead>
+                        <TableHead colSpan={2} className="text-center border-l">
+                          Vel. media (km/h)
+                        </TableHead>
+                      </TableRow>
+                      <TableRow>
+                        <TableHead className="border-l text-xs font-normal">{comparison.prevLabel}</TableHead>
+                        <TableHead className="text-xs font-normal">{comparison.currLabel}</TableHead>
+                        <TableHead className="border-l text-xs font-normal">{comparison.prevLabel}</TableHead>
+                        <TableHead className="text-xs font-normal">{comparison.currLabel}</TableHead>
+                        <TableHead className="border-l text-xs font-normal">{comparison.prevLabel}</TableHead>
+                        <TableHead className="text-xs font-normal">{comparison.currLabel}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {comparison.rows.map((row) => {
+                        const bestBest = getBetterBetween('best_lap_timestamp', row.prev.best_lap_timestamp, row.curr.best_lap_timestamp);
+                        const bestAvg = getBetterBetween('average_time_timestamp', row.prev.average_time_timestamp, row.curr.average_time_timestamp);
+                        const bestSpd = getBetterBetween('avg_speed_kmh', row.prev.avg_speed_kmh, row.curr.avg_speed_kmh);
+                        const winClass = 'bg-green-100 dark:bg-green-950/50 font-medium';
+                        return (
+                          <TableRow key={row.key}>
+                            <TableCell>{row.circuitLabel}</TableCell>
+                            <TableCell>{row.lane}</TableCell>
+                            <TableCell className={`border-l ${bestBest === 'prev' ? winClass : ''}`}>
+                              <span className="font-mono">{formatTime(row.prev.best_lap_timestamp)}</span>
+                              {bestBest === 'prev' && (
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              )}
+                            </TableCell>
+                            <TableCell className={bestBest === 'curr' ? winClass : ''}>
+                              <span className="font-mono">{formatTime(row.curr.best_lap_timestamp)}</span>
+                              {bestBest === 'curr' && (
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              )}
+                            </TableCell>
+                            <TableCell className={`border-l ${bestAvg === 'prev' ? winClass : ''}`}>
+                              <span className="font-mono">{formatTime(row.prev.average_time_timestamp)}</span>
+                              {bestAvg === 'prev' && (
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              )}
+                            </TableCell>
+                            <TableCell className={bestAvg === 'curr' ? winClass : ''}>
+                              <span className="font-mono">{formatTime(row.curr.average_time_timestamp)}</span>
+                              {bestAvg === 'curr' && (
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              )}
+                            </TableCell>
+                            <TableCell className={`border-l ${bestSpd === 'prev' ? winClass : ''}`}>
+                              {row.prev.avg_speed_kmh != null ? Number(row.prev.avg_speed_kmh).toFixed(1) : '—'}
+                              {bestSpd === 'prev' && (
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              )}
+                            </TableCell>
+                            <TableCell className={bestSpd === 'curr' ? winClass : ''}>
+                              {row.curr.avg_speed_kmh != null ? Number(row.curr.avg_speed_kmh).toFixed(1) : '—'}
+                              {bestSpd === 'curr' && (
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

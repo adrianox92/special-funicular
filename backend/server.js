@@ -76,6 +76,7 @@ const competitionRulesRoute = require('./routes/competition-rules');
 const apiKeysRoute = require('./routes/api-keys');
 const syncRoute = require('./routes/sync');
 const circuitsRoute = require('./routes/circuits');
+const maintenanceRoute = require('./routes/maintenance');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
@@ -86,6 +87,7 @@ app.use('/api/auth', authRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
 app.use('/api/circuits', circuitsRoute);
+app.use('/api/maintenance', maintenanceRoute);
 
 // Montar las rutas protegidas DESPUÉS
 const competitionsRoute = require('./routes/competitions');

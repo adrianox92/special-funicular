@@ -58,3 +58,27 @@ export function formatHistoryDate(isoDate) {
   if (!y || !m || !day) return String(isoDate);
   return `${day}/${m}/${y}`;
 }
+
+/** Tipos de mantenimiento (etiquetas UI y validación alineada con backend). */
+export const MAINTENANCE_KINDS = [
+  { value: 'limpieza_general', label: 'Limpieza general' },
+  { value: 'guias', label: 'Guías' },
+  { value: 'escobillas', label: 'Escobillas' },
+  { value: 'engrase', label: 'Engrase' },
+  { value: 'iman', label: 'Imán' },
+  { value: 'contactos', label: 'Contactos' },
+  { value: 'neumaticos', label: 'Neumáticos' },
+  { value: 'cables', label: 'Cables' },
+  { value: 'suspension', label: 'Suspensión' },
+  { value: 'otro', label: 'Otro' },
+];
+
+/**
+ * @param {string|null|undefined} kind
+ * @returns {string}
+ */
+export function formatMaintenanceKind(kind) {
+  if (kind == null || kind === '') return '—';
+  const found = MAINTENANCE_KINDS.find((k) => k.value === kind);
+  return found ? found.label : String(kind);
+}

@@ -7,6 +7,8 @@ import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
 import TimingSpecsModal from './TimingSpecsModal';
 import SessionPerformanceModal from './SessionPerformanceModal';
 import SetupPerformanceAnalysis, { hasMultipleConfigs } from './SetupPerformanceAnalysis';
+import MaintenanceCorrelationChart from './charts/MaintenanceCorrelationChart';
+import MaintenanceLog from './MaintenanceLog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -132,6 +134,7 @@ const EditVehicle = () => {
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceTiming, setPerformanceTiming] = useState(null);
   const [timingHasLaps, setTimingHasLaps] = useState({});
+  const [maintenanceLogs, setMaintenanceLogs] = useState([]);
 
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
@@ -1307,7 +1310,12 @@ const EditVehicle = () => {
         </Button>
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={cn('mb-4 grid w-full', hasMultipleConfigs(timings) ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 lg:grid-cols-4')}>
+        <TabsList
+          className={cn(
+            'mb-4 grid w-full gap-1',
+            hasMultipleConfigs(timings) ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
+          )}
+        >
           <TabsTrigger value="general">Información General</TabsTrigger>
           <TabsTrigger value="technical">Especificaciones Técnicas</TabsTrigger>
           <TabsTrigger value="modifications">Modificaciones</TabsTrigger>
@@ -1315,6 +1323,7 @@ const EditVehicle = () => {
           {hasMultipleConfigs(timings) && (
             <TabsTrigger value="config-analysis">Análisis Config.</TabsTrigger>
           )}
+          <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -1502,6 +1511,10 @@ const EditVehicle = () => {
             <SetupPerformanceAnalysis timings={timings} />
           </TabsContent>
         )}
+        <TabsContent value="maintenance">
+          <MaintenanceCorrelationChart timings={timings} maintenanceLogs={maintenanceLogs} />
+          <MaintenanceLog vehicleId={id} onLogsChange={setMaintenanceLogs} />
+        </TabsContent>
       </Tabs>
 
       <TimingSpecsModal
