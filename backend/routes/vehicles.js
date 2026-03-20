@@ -8,6 +8,7 @@ const authMiddleware = require('../middleware/auth');
 const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
+const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -743,93 +744,6 @@ router.get('/:id/technical-specs', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// Función auxiliar para recalcular el total_price y el flag modified de un vehículo
-async function updateVehicleTotalPrice(vehicleId) {
-  const { data: vehicle, error: vehicleError } = await supabase
-    .from('vehicles')
-    .select('price')
-    .eq('id', vehicleId)
-    .single();
-  if (vehicleError) return;
-
-  const basePrice = vehicle && vehicle.price ? Number(vehicle.price) : 0;
-
-  const { data: modSpecs, error: modSpecsError } = await supabase
-    .from('technical_specs')
-    .select('id')
-    .eq('vehicle_id', vehicleId)
-    .eq('is_modification', true);
-  if (modSpecsError) return;
-
-  const modSpecIds = modSpecs.map(s => s.id);
-  let modsTotal = 0;
-  let comps = [];
-
-  if (modSpecIds.length > 0) {
-    const { data: compsData, error: compsError } = await supabase
-      .from('components')
-      .select('price')
-      .in('tech_spec_id', modSpecIds);
-    if (compsError) return;
-    comps = compsData || [];
-    modsTotal = comps.reduce((sum, c) => sum + (c.price ? Number(c.price) : 0), 0);
-  }
-
-  const hasModificationComponents = modSpecIds.length > 0 && comps.length > 0;
-
-  await supabase
-    .from('vehicles')
-    .update({ total_price: basePrice + modsTotal, modified: hasModificationComponents })
-    .eq('id', vehicleId);
-}
-
-// Función auxiliar para obtener o crear las especificaciones técnicas base
-async function getOrCreateBaseSpecs(vehicleId) {
-  // Buscar las especificaciones existentes
-  const { data: existingSpecs, error: fetchError } = await supabase
-    .from('technical_specs')
-    .select('*')
-    .eq('vehicle_id', vehicleId);
-
-  if (fetchError) throw fetchError;
-
-  let specs = {
-    modification: existingSpecs?.find(s => s.is_modification),
-    technical: existingSpecs?.find(s => !s.is_modification)
-  };
-
-  // Crear las que no existan
-  if (!specs.modification) {
-    const { data: newModSpec, error: modError } = await supabase
-      .from('technical_specs')
-      .insert([{
-        vehicle_id: vehicleId,
-        is_modification: true,
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
-    if (modError) throw modError;
-    specs.modification = newModSpec;
-  }
-
-  if (!specs.technical) {
-    const { data: newTechSpec, error: techError } = await supabase
-      .from('technical_specs')
-      .insert([{
-        vehicle_id: vehicleId,
-        is_modification: false,
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
-    if (techError) throw techError;
-    specs.technical = newTechSpec;
-  }
-
-  return specs;
-}
 
 // Crear un componente en una especificación técnica
 router.post('/:id/technical-specs', async (req, res) => {

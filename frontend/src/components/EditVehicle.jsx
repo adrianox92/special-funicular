@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Pencil, Trash2, Wrench, BarChart3, AlertTriangle, CircleCheck, Info } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2, Wrench, BarChart3, AlertTriangle, CircleCheck, Info, Package } from 'lucide-react';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
 import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
@@ -43,7 +43,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
-import { formatDistance, formatModificationSnapshot, formatHistoryDate } from '../utils/formatUtils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { toast } from 'sonner';
+import { formatDistance, formatModificationSnapshot, formatHistoryDate, formatInventoryCategory } from '../utils/formatUtils';
 import { vehicleComponentTypes as componentTypes } from '../data/componentTypes';
 
 const imageFields = [
@@ -74,6 +83,11 @@ const viewTypeMap = {
 };
 
 const vehicleTypes = ['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'];
+
+/** Categoría de inventario (`otro`) → tipo de componente del vehículo (`other`). */
+function inventoryCategoryToVehicleType(cat) {
+  return cat === 'otro' ? 'other' : cat;
+}
 
 const EditVehicle = () => {
   const { id } = useParams();
@@ -135,6 +149,11 @@ const EditVehicle = () => {
   const [performanceTiming, setPerformanceTiming] = useState(null);
   const [timingHasLaps, setTimingHasLaps] = useState({});
   const [maintenanceLogs, setMaintenanceLogs] = useState([]);
+  const [selectedInventoryItemId, setSelectedInventoryItemId] = useState(null);
+  const [selectedInventoryItemName, setSelectedInventoryItemName] = useState('');
+  const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
+  const [inventoryPickerLoading, setInventoryPickerLoading] = useState(false);
+  const [inventoryPickerItems, setInventoryPickerItems] = useState([]);
 
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
@@ -375,6 +394,8 @@ const EditVehicle = () => {
 
   const handleCancelEdit = () => {
     setEditingSpec(null);
+    setSelectedInventoryItemId(null);
+    setSelectedInventoryItemName('');
     setNewSpec({
       component_type: '',
       element: '',
@@ -393,45 +414,104 @@ const EditVehicle = () => {
     });
   };
 
+  const loadInventoryForPicker = async () => {
+    setInventoryPickerLoading(true);
+    try {
+      const params = {};
+      if (newSpec.component_type) {
+        params.category = newSpec.component_type === 'other' ? 'otro' : newSpec.component_type;
+      }
+      const { data } = await api.get('/inventory', { params });
+      const list = Array.isArray(data) ? data : [];
+      setInventoryPickerItems(list.filter((i) => Number(i.quantity) > 0));
+    } catch (e) {
+      console.error(e);
+      setInventoryPickerItems([]);
+    } finally {
+      setInventoryPickerLoading(false);
+    }
+  };
+
+  const handlePickInventoryItem = (item) => {
+    setNewSpec((prev) => ({
+      ...prev,
+      component_type: inventoryCategoryToVehicleType(item.category),
+      element: item.name || '',
+      sku: item.reference || '',
+      url: item.url || '',
+      price: item.purchase_price != null ? String(item.purchase_price) : '',
+    }));
+    setSelectedInventoryItemId(item.id);
+    setSelectedInventoryItemName(item.name || '');
+    setInventoryPickerOpen(false);
+  };
+
+  const clearInventoryLink = () => {
+    setSelectedInventoryItemId(null);
+    setSelectedInventoryItemName('');
+  };
+
   const handleAddSpec = async (e, isModificationTab = false) => {
     e.preventDefault();
+    const fromInventory = !editingSpec && selectedInventoryItemId && isModificationTab;
     const compType = editingSpec?.component_type || newSpec.component_type;
-    if (!compType) {
+    if (!compType && !fromInventory) {
       setError('El tipo de componente es requerido');
       return;
     }
     try {
-      const specData = {
-        is_modification: isModificationTab,
-        component_id: editingSpec?.component_id,
-        components: [
-          {
-            component_type: (editingSpec?.component_type || newSpec.component_type),
-            element: (editingSpec?.element || newSpec.element),
-            manufacturer: (editingSpec?.manufacturer || newSpec.manufacturer),
-            material: (editingSpec?.material || newSpec.material),
-            size: (editingSpec?.size || newSpec.size),
-            teeth: (editingSpec?.teeth || newSpec.teeth) === '' ? null : Number(editingSpec?.teeth || newSpec.teeth),
-            color: (editingSpec?.color || newSpec.color),
-            rpm: (editingSpec?.rpm || newSpec.rpm) === '' ? null : Number(editingSpec?.rpm || newSpec.rpm),
-            gaus: (editingSpec?.gaus || newSpec.gaus) === '' ? null : Number(editingSpec?.gaus || newSpec.gaus),
-            price: (editingSpec?.price || newSpec.price) === '' ? null : Number(editingSpec?.price || newSpec.price),
-            url: (editingSpec?.url || newSpec.url),
-            sku: (editingSpec?.sku || newSpec.sku),
-            description: (editingSpec?.description || newSpec.description)
-          }
-        ]
-      };
-
-      if (editingSpec && isModificationTab) {
-        specData.change_effective_date = editingSpec.change_effective_date || undefined;
-      }
-
-      if (editingSpec) {
-        const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
-        await api.put(`/vehicles/${id}/technical-specs/${currentSpec.id}/components/${editingSpec.component_id}`, specData);
+      setError(null);
+      if (fromInventory) {
+        if (!newSpec.manufacturer?.trim()) {
+          setError('La marca del fabricante es requerida');
+          return;
+        }
+        await api.post(`/inventory/${selectedInventoryItemId}/mount`, {
+          vehicle_id: id,
+          is_modification: isModificationTab,
+          manufacturer: newSpec.manufacturer.trim(),
+          material: newSpec.material?.trim() || undefined,
+          size: newSpec.size?.trim() || undefined,
+          color: newSpec.color?.trim() || undefined,
+          description: newSpec.description?.trim() || undefined,
+          teeth: newSpec.teeth === '' ? undefined : Number(newSpec.teeth),
+          rpm: newSpec.rpm === '' ? undefined : Number(newSpec.rpm),
+          gaus: newSpec.gaus === '' ? undefined : Number(newSpec.gaus),
+        });
+        toast.success('Pieza montada y stock actualizado');
       } else {
-        await api.post(`/vehicles/${id}/technical-specs`, specData);
+        const specData = {
+          is_modification: isModificationTab,
+          component_id: editingSpec?.component_id,
+          components: [
+            {
+              component_type: (editingSpec?.component_type || newSpec.component_type),
+              element: (editingSpec?.element || newSpec.element),
+              manufacturer: (editingSpec?.manufacturer || newSpec.manufacturer),
+              material: (editingSpec?.material || newSpec.material),
+              size: (editingSpec?.size || newSpec.size),
+              teeth: (editingSpec?.teeth || newSpec.teeth) === '' ? null : Number(editingSpec?.teeth || newSpec.teeth),
+              color: (editingSpec?.color || newSpec.color),
+              rpm: (editingSpec?.rpm || newSpec.rpm) === '' ? null : Number(editingSpec?.rpm || newSpec.rpm),
+              gaus: (editingSpec?.gaus || newSpec.gaus) === '' ? null : Number(editingSpec?.gaus || newSpec.gaus),
+              price: (editingSpec?.price || newSpec.price) === '' ? null : Number(editingSpec?.price || newSpec.price),
+              url: (editingSpec?.url || newSpec.url),
+              sku: (editingSpec?.sku || newSpec.sku),
+              description: (editingSpec?.description || newSpec.description)
+            }
+          ]
+        };
+
+        if (editingSpec && isModificationTab) {
+          specData.change_effective_date = editingSpec.change_effective_date || undefined;
+        }
+
+        if (editingSpec) {
+          const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
+          await api.put(`/vehicles/${id}/technical-specs/${currentSpec.id}/components/${editingSpec.component_id}`, specData);
+        } else {
+          await api.post(`/vehicles/${id}/technical-specs`, specData);
+        }
       }
 
       const response = await api.get(`/vehicles/${id}/technical-specs`);
@@ -443,7 +523,7 @@ const EditVehicle = () => {
       handleCancelEdit();
     } catch (error) {
       console.error('Error al guardar especificación:', error);
-      setError('Error al guardar la especificación técnica');
+      setError(error.response?.data?.error || 'Error al guardar la especificación técnica');
     }
   };
 
@@ -741,10 +821,44 @@ const EditVehicle = () => {
     const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
     const components = currentSpec?.components || [];
     const specValue = editingSpec || newSpec;
+    const fromInventory = !editingSpec && selectedInventoryItemId && isModificationTab;
 
     return (
       <div className="mt-4 space-y-4">
-        <h4 className="text-lg font-semibold">{editingSpec ? 'Editar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación Técnica'}</h4>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h4 className="text-lg font-semibold">
+            {editingSpec ? 'Editar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación Técnica'}
+          </h4>
+          {!editingSpec && isModificationTab && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                setInventoryPickerOpen(true);
+                loadInventoryForPicker();
+              }}
+            >
+              <Package className="size-4 mr-2" aria-hidden />
+              Desde inventario
+            </Button>
+          )}
+        </div>
+        {fromInventory && (
+          <Alert>
+            <Info className="size-4 shrink-0" aria-hidden />
+            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Usando ítem de inventario «{selectedInventoryItemName}». Al guardar se descontará 1 unidad del stock.
+                El tipo, nombre, referencia, enlace y precio los toma del ítem.
+              </span>
+              <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={clearInventoryLink}>
+                Quitar enlace
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={e => handleAddSpec(e, isModificationTab)}>
           {editingSpec && isModificationTab && (
             <>
@@ -769,21 +883,35 @@ const EditVehicle = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="component_type">Tipo de Componente</Label>
-              <Select
-                value={specValue.component_type || 'none'}
-                onValueChange={(v) => handleSpecChange({ target: { name: 'component_type', value: v === 'none' ? '' : v, type: 'select', checked: false } })}
-                required
-              >
-                <SelectTrigger id="component_type">
-                  <SelectValue placeholder="Seleccionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Seleccionar tipo</SelectItem>
-                  {componentTypes.map(type => (
-                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {fromInventory ? (
+                <Input
+                  id="component_type"
+                  readOnly
+                  value={
+                    componentTypes.find((t) => t.value === specValue.component_type)?.label
+                    || formatInventoryCategory(
+                      specValue.component_type === 'other' ? 'otro' : specValue.component_type,
+                    )
+                  }
+                  className="bg-muted"
+                />
+              ) : (
+                <Select
+                  value={specValue.component_type || 'none'}
+                  onValueChange={(v) => handleSpecChange({ target: { name: 'component_type', value: v === 'none' ? '' : v, type: 'select', checked: false } })}
+                  required
+                >
+                  <SelectTrigger id="component_type">
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Seleccionar tipo</SelectItem>
+                    {componentTypes.map(type => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="element">Elemento</Label>
@@ -793,6 +921,7 @@ const EditVehicle = () => {
                 value={specValue.element}
                 onChange={handleSpecChange}
                 required
+                disabled={fromInventory}
               />
             </div>
             <div className="space-y-2">
@@ -843,15 +972,15 @@ const EditVehicle = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="price">Precio (€)</Label>
-              <Input id="price" name="price" type="number" step="0.01" value={specValue.price} onChange={handleSpecChange} />
+              <Input id="price" name="price" type="number" step="0.01" value={specValue.price} onChange={handleSpecChange} disabled={fromInventory} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="url">URL</Label>
-              <Input id="url" name="url" type="url" value={specValue.url} onChange={handleSpecChange} />
+              <Input id="url" name="url" type="url" value={specValue.url} onChange={handleSpecChange} disabled={fromInventory} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="sku">SKU</Label>
-              <Input id="sku" name="sku" value={specValue.sku} onChange={handleSpecChange} />
+              <Input id="sku" name="sku" value={specValue.sku} onChange={handleSpecChange} disabled={fromInventory} />
             </div>
           </div>
           <div className="mt-4 space-y-2">
@@ -870,7 +999,9 @@ const EditVehicle = () => {
           )}
           <div className="flex gap-2 mt-4">
             <Button type="submit">
-              {editingSpec ? 'Actualizar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación'}
+              {fromInventory
+                ? 'Montar y descontar stock'
+                : `${editingSpec ? 'Actualizar' : 'Añadir'} ${isModificationTab ? 'Modificación' : 'Especificación'}`}
             </Button>
             {editingSpec && (
               <Button type="button" variant="secondary" onClick={handleCancelEdit}>
@@ -879,6 +1010,52 @@ const EditVehicle = () => {
             )}
           </div>
         </form>
+        {isModificationTab && (
+          <Dialog open={inventoryPickerOpen} onOpenChange={(open) => setInventoryPickerOpen(open)}>
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Elegir ítem de inventario</DialogTitle>
+                <DialogDescription>
+                  Solo se muestran piezas con stock. Si eliges un tipo de componente arriba, la lista se filtra por esa categoría.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto py-2">
+                {inventoryPickerLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner className="size-8" />
+                  </div>
+                ) : inventoryPickerItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No hay ítems con stock{newSpec.component_type ? ' para esta categoría' : ''}.
+                  </p>
+                ) : (
+                  inventoryPickerItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatInventoryCategory(item.category)} · Stock: {item.quantity}
+                          {item.purchase_price != null && ` · ${Number(item.purchase_price).toFixed(2)} €`}
+                        </p>
+                      </div>
+                      <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
+                        Usar este
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setInventoryPickerOpen(false)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
         <div className="mt-6">
           <h4 className="text-lg font-semibold mb-4">{isModificationTab ? 'Modificaciones Actuales' : 'Especificaciones Técnicas Actuales'}</h4>
           {loadingSpecs ? (

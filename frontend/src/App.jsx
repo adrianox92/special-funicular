@@ -11,6 +11,7 @@ import EditVehicle from './components/EditVehicle';
 import TimingsList from './components/TimingsList';
 import Competitions from './pages/Competitions';
 import Circuits from './pages/Circuits';
+import Inventory from './pages/Inventory';
 import CompetitionParticipants from './pages/CompetitionParticipants';
 import CompetitionTimings from './pages/CompetitionTimings';
 import CompetitionSignup from './pages/CompetitionSignup';
@@ -121,6 +122,14 @@ const AppContent = () => {
           <>
             <Navbar />
             <PageLayout><Circuits /></PageLayout>
+            <Footer />
+          </>
+        ) : <Navigate to="/" replace />} />
+
+        <Route path="/inventory" element={user ? (
+          <>
+            <Navbar />
+            <PageLayout><Inventory /></PageLayout>
             <Footer />
           </>
         ) : <Navigate to="/" replace />} />

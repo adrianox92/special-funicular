@@ -77,17 +77,21 @@ const apiKeysRoute = require('./routes/api-keys');
 const syncRoute = require('./routes/sync');
 const circuitsRoute = require('./routes/circuits');
 const maintenanceRoute = require('./routes/maintenance');
+const inventoryRoute = require('./routes/inventory');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
 app.use('/api/sync', syncRoute);  // ANTES de /api (insights): sync usa X-API-Key, no JWT
-app.use('/api', insightsRoute);
+// ANTES de app.use('/api', insights): insights aplica JWT a todo lo bajo /api; si auth va después,
+// POST /api/auth/login y POST /api/auth/api-key nunca llegan aquí (401 sin token).
 app.use('/api/auth', authRoute);
+app.use('/api', insightsRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
 app.use('/api/circuits', circuitsRoute);
 app.use('/api/maintenance', maintenanceRoute);
+app.use('/api/inventory', inventoryRoute);
 
 // Montar las rutas protegidas DESPUÉS
 const competitionsRoute = require('./routes/competitions');

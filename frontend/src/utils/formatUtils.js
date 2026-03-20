@@ -82,3 +82,44 @@ export function formatMaintenanceKind(kind) {
   const found = MAINTENANCE_KINDS.find((k) => k.value === kind);
   return found ? found.label : String(kind);
 }
+
+/** Categorías de inventario (alineadas con backend/routes/inventory.js). */
+export const INVENTORY_CATEGORIES = [
+  { value: 'pinion', label: 'Piñón' },
+  { value: 'crown', label: 'Corona' },
+  { value: 'motor', label: 'Motor' },
+  { value: 'guide', label: 'Guía' },
+  { value: 'chassis', label: 'Chasis' },
+  { value: 'front_wheel', label: 'Rueda delantera' },
+  { value: 'rear_wheel', label: 'Rueda trasera' },
+  { value: 'front_rim', label: 'Llanta delantera' },
+  { value: 'rear_rim', label: 'Llanta trasera' },
+  { value: 'front_axle', label: 'Eje delantero' },
+  { value: 'rear_axle', label: 'Eje trasero' },
+  { value: 'aceite', label: 'Aceite / lubricante' },
+  { value: 'limpiador', label: 'Limpiador' },
+  { value: 'electronica', label: 'Electrónica' },
+  { value: 'herramienta', label: 'Herramienta' },
+  { value: 'neumaticos', label: 'Neumáticos' },
+  { value: 'cables', label: 'Cables' },
+  { value: 'suspension', label: 'Suspensión' },
+  { value: 'otro', label: 'Otro' },
+];
+
+export const INVENTORY_UNITS = [
+  { value: 'uds', label: 'Unidades' },
+  { value: 'pares', label: 'Pares' },
+  { value: 'ml', label: 'ml' },
+  { value: 'metros', label: 'Metros' },
+  { value: 'juego', label: 'Juego' },
+];
+
+/**
+ * @param {string|null|undefined} cat
+ * @returns {string}
+ */
+export function formatInventoryCategory(cat) {
+  if (cat == null || cat === '') return '—';
+  const found = INVENTORY_CATEGORIES.find((c) => c.value === cat);
+  return found ? found.label : String(cat);
+}

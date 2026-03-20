@@ -7,6 +7,7 @@ import {
   Car,
   Clock,
   Flag,
+  Package,
   User,
   LogOut,
   Settings,
@@ -78,6 +79,7 @@ const Navbar = () => {
     { path: '/vehicles', label: 'Vehículos', icon: Car },
     { path: '/timings', label: 'Tiempos', icon: Clock },
     { path: '/circuits', label: 'Circuitos', icon: Flag },
+    { path: '/inventory', label: 'Inventario', icon: Package },
     { path: '/competitions', label: 'Competiciones', icon: Trophy },
   ];
 
