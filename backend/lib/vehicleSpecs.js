@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { modificationLineTotal } = require('./componentPricing');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -30,11 +31,11 @@ async function updateVehicleTotalPrice(vehicleId) {
   if (modSpecIds.length > 0) {
     const { data: compsData, error: compsError } = await supabase
       .from('components')
-      .select('price')
+      .select('price, mounted_qty')
       .in('tech_spec_id', modSpecIds);
     if (compsError) return;
     comps = compsData || [];
-    modsTotal = comps.reduce((sum, c) => sum + (c.price ? Number(c.price) : 0), 0);
+    modsTotal = comps.reduce((sum, c) => sum + modificationLineTotal(c.price, c.mounted_qty), 0);
   }
 
   const hasModificationComponents = modSpecIds.length > 0 && comps.length > 0;

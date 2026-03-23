@@ -52,7 +52,13 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { toast } from 'sonner';
-import { formatDistance, formatModificationSnapshot, formatHistoryDate, formatInventoryCategory } from '../utils/formatUtils';
+import {
+  formatDistance,
+  formatModificationSnapshot,
+  formatHistoryDate,
+  formatInventoryCategory,
+  modificationLineTotal,
+} from '../utils/formatUtils';
 import { vehicleComponentTypes as componentTypes } from '../data/componentTypes';
 
 const imageFields = [
@@ -89,6 +95,41 @@ function inventoryCategoryToVehicleType(cat) {
   return cat === 'otro' ? 'other' : cat;
 }
 
+/** Alineado con COMPONENT_PAYLOAD_KEYS del backend (cambio de modificación → historial). */
+const VEHICLE_SPEC_SNAPSHOT_KEYS = [
+  'component_type',
+  'element',
+  'manufacturer',
+  'material',
+  'size',
+  'teeth',
+  'color',
+  'rpm',
+  'gaus',
+  'price',
+  'url',
+  'sku',
+  'description',
+  'mounted_qty',
+];
+
+function normalizeSpecSnapshotValue(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  if (typeof v === 'boolean') return v;
+  const n = Number(v);
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(n) && String(n) === String(Number(v))) return n;
+  return String(v);
+}
+
+function vehicleSpecSnapshotsDiffer(prev, next) {
+  if (!prev || !next) return false;
+  for (const k of VEHICLE_SPEC_SNAPSHOT_KEYS) {
+    if (normalizeSpecSnapshotValue(prev[k]) !== normalizeSpecSnapshotValue(next[k])) return true;
+  }
+  return false;
+}
+
 const EditVehicle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -100,6 +141,10 @@ const EditVehicle = () => {
   const [loading, setLoading] = useState(true);
   const [deletingImage, setDeletingImage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [specEditBaseline, setSpecEditBaseline] = useState(null);
+  const [specReturnDialogOpen, setSpecReturnDialogOpen] = useState(false);
+  const [pendingSpecSave, setPendingSpecSave] = useState(null);
+  const [specDeleteReturnToInventory, setSpecDeleteReturnToInventory] = useState(false);
   const [draggingOver, setDraggingOver] = useState(null);
   const imageRefs = useRef({});
   const [activeTab, setActiveTab] = useState('general');
@@ -122,6 +167,7 @@ const EditVehicle = () => {
     url: '',
     sku: '',
     description: '',
+    mounted_qty: '1',
     is_modification: false
   });
   const [loadingSpecs, setLoadingSpecs] = useState(false);
@@ -151,6 +197,8 @@ const EditVehicle = () => {
   const [maintenanceLogs, setMaintenanceLogs] = useState([]);
   const [selectedInventoryItemId, setSelectedInventoryItemId] = useState(null);
   const [selectedInventoryItemName, setSelectedInventoryItemName] = useState('');
+  const [selectedInventoryMountQty, setSelectedInventoryMountQty] = useState('1');
+  const [selectedInventoryMaxQty, setSelectedInventoryMaxQty] = useState(null);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [inventoryPickerLoading, setInventoryPickerLoading] = useState(false);
   const [inventoryPickerItems, setInventoryPickerItems] = useState([]);
@@ -282,6 +330,12 @@ const EditVehicle = () => {
     setTimingHasLaps(map);
   }, [timings]);
 
+  useEffect(() => {
+    if (deleteConfirm?.type === 'spec') {
+      setSpecDeleteReturnToInventory(false);
+    }
+  }, [deleteConfirm]);
+
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     setVehicle({
@@ -371,6 +425,7 @@ const EditVehicle = () => {
   };
 
   const handleEditSpec = (spec, component) => {
+    const mountedQtyStr = component.mounted_qty != null ? String(component.mounted_qty) : '1';
     setEditingSpec({
       id: spec.id,
       component_id: component.id,
@@ -387,15 +442,39 @@ const EditVehicle = () => {
       url: component.url || '',
       sku: component.sku || '',
       description: component.description || '',
+      mounted_qty: mountedQtyStr,
       is_modification: spec.is_modification,
       change_effective_date: new Date().toISOString().slice(0, 10)
     });
+    setSpecEditBaseline({
+      component_type: component.component_type || '',
+      element: component.element || '',
+      manufacturer: component.manufacturer || '',
+      material: component.material || '',
+      size: component.size || '',
+      teeth: component.teeth ?? '',
+      color: component.color || '',
+      rpm: component.rpm ?? '',
+      gaus: component.gaus ?? '',
+      price: component.price ?? '',
+      url: component.url || '',
+      sku: component.sku || '',
+      description: component.description || '',
+      mounted_qty: mountedQtyStr,
+    });
+    setSelectedInventoryItemId(null);
+    setSelectedInventoryItemName('');
+    setSelectedInventoryMountQty('1');
+    setSelectedInventoryMaxQty(null);
   };
 
   const handleCancelEdit = () => {
     setEditingSpec(null);
+    setSpecEditBaseline(null);
     setSelectedInventoryItemId(null);
     setSelectedInventoryItemName('');
+    setSelectedInventoryMountQty('1');
+    setSelectedInventoryMaxQty(null);
     setNewSpec({
       component_type: '',
       element: '',
@@ -410,6 +489,7 @@ const EditVehicle = () => {
       url: '',
       sku: '',
       description: '',
+      mounted_qty: '1',
       is_modification: false
     });
   };
@@ -440,15 +520,105 @@ const EditVehicle = () => {
       sku: item.reference || '',
       url: item.url || '',
       price: item.purchase_price != null ? String(item.purchase_price) : '',
+      manufacturer: item.manufacturer || '',
+      material: item.material || '',
+      size: item.size || '',
+      color: item.color || '',
+      teeth: item.teeth != null ? String(item.teeth) : '',
+      rpm: item.rpm != null ? String(item.rpm) : '',
+      gaus: item.gaus != null ? String(item.gaus) : '',
+      description: item.description || '',
     }));
     setSelectedInventoryItemId(item.id);
     setSelectedInventoryItemName(item.name || '');
+    setSelectedInventoryMountQty('1');
+    setSelectedInventoryMaxQty(Number(item.quantity));
     setInventoryPickerOpen(false);
   };
 
   const clearInventoryLink = () => {
     setSelectedInventoryItemId(null);
     setSelectedInventoryItemName('');
+    setSelectedInventoryMountQty('1');
+    setSelectedInventoryMaxQty(null);
+  };
+
+  const persistVehicleSpec = async ({
+    fromInventory,
+    isModificationTab,
+    specData,
+    invMountPayload,
+    returnRemovedToInventory,
+  }) => {
+    if (fromInventory) {
+      await api.post(`/inventory/${invMountPayload.itemId}/mount`, {
+        vehicle_id: id,
+        is_modification: isModificationTab,
+        mount_qty: invMountPayload.mq,
+        manufacturer: invMountPayload.manufacturer,
+        material: invMountPayload.material,
+        size: invMountPayload.size,
+        color: invMountPayload.color,
+        description: invMountPayload.description,
+        teeth: invMountPayload.teeth,
+        rpm: invMountPayload.rpm,
+        gaus: invMountPayload.gaus,
+      });
+      toast.success('Pieza montada y stock actualizado');
+    } else if (editingSpec) {
+      const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
+      if (!currentSpec?.id) {
+        setError('No se encontró la especificación técnica');
+        return;
+      }
+      const putBody = { ...specData };
+      if (isModificationTab) {
+        putBody.return_removed_to_inventory = returnRemovedToInventory === true;
+      }
+      const res = await api.put(
+        `/vehicles/${id}/technical-specs/${currentSpec.id}/components/${editingSpec.component_id}`,
+        putBody,
+      );
+      if (res.data?.inventory_return_error) {
+        toast.warning(`Cambios guardados, pero no se pudo añadir al inventario: ${res.data.inventory_return_error}`);
+      } else if (isModificationTab && returnRemovedToInventory) {
+        toast.success('Modificación actualizada y pieza retirada añadida al inventario');
+      }
+    } else {
+      await api.post(`/vehicles/${id}/technical-specs`, specData);
+    }
+
+    const response = await api.get(`/vehicles/${id}/technical-specs`);
+    const updatedSpecs = {
+      modification: response.data.find((spec) => spec.is_modification),
+      technical: response.data.find((spec) => !spec.is_modification),
+    };
+    setTechnicalSpecs(updatedSpecs);
+    handleCancelEdit();
+  };
+
+  const cancelModificationReturnDialog = () => {
+    setSpecReturnDialogOpen(false);
+    setPendingSpecSave(null);
+  };
+
+  const resolveModificationReturnChoice = async (returnRemoved) => {
+    const pending = pendingSpecSave;
+    setSpecReturnDialogOpen(false);
+    setPendingSpecSave(null);
+    if (!pending) return;
+    try {
+      setError(null);
+      await persistVehicleSpec({
+        fromInventory: false,
+        isModificationTab: pending.isModificationTab,
+        specData: pending.specData,
+        returnRemovedToInventory: returnRemoved,
+      });
+    } catch (error) {
+      console.error('Error al guardar especificación:', error);
+      setError(error.response?.data?.error || 'Error al guardar la especificación técnica');
+    }
   };
 
   const handleAddSpec = async (e, isModificationTab = false) => {
@@ -466,61 +636,87 @@ const EditVehicle = () => {
           setError('La marca del fabricante es requerida');
           return;
         }
-        await api.post(`/inventory/${selectedInventoryItemId}/mount`, {
-          vehicle_id: id,
-          is_modification: isModificationTab,
-          manufacturer: newSpec.manufacturer.trim(),
-          material: newSpec.material?.trim() || undefined,
-          size: newSpec.size?.trim() || undefined,
-          color: newSpec.color?.trim() || undefined,
-          description: newSpec.description?.trim() || undefined,
-          teeth: newSpec.teeth === '' ? undefined : Number(newSpec.teeth),
-          rpm: newSpec.rpm === '' ? undefined : Number(newSpec.rpm),
-          gaus: newSpec.gaus === '' ? undefined : Number(newSpec.gaus),
+        const mq = parseInt(selectedInventoryMountQty, 10);
+        if (Number.isNaN(mq) || mq < 1) {
+          setError('La cantidad a descontar debe ser al menos 1');
+          return;
+        }
+        if (selectedInventoryMaxQty != null && mq > selectedInventoryMaxQty) {
+          setError(`No hay suficiente stock (disponible: ${selectedInventoryMaxQty})`);
+          return;
+        }
+        await persistVehicleSpec({
+          fromInventory: true,
+          isModificationTab,
+          invMountPayload: {
+            itemId: selectedInventoryItemId,
+            mq,
+            manufacturer: newSpec.manufacturer.trim(),
+            material: newSpec.material?.trim() || undefined,
+            size: newSpec.size?.trim() || undefined,
+            color: newSpec.color?.trim() || undefined,
+            description: newSpec.description?.trim() || undefined,
+            teeth: newSpec.teeth === '' ? undefined : Number(newSpec.teeth),
+            rpm: newSpec.rpm === '' ? undefined : Number(newSpec.rpm),
+            gaus: newSpec.gaus === '' ? undefined : Number(newSpec.gaus),
+          },
         });
-        toast.success('Pieza montada y stock actualizado');
-      } else {
-        const specData = {
-          is_modification: isModificationTab,
-          component_id: editingSpec?.component_id,
-          components: [
-            {
-              component_type: (editingSpec?.component_type || newSpec.component_type),
-              element: (editingSpec?.element || newSpec.element),
-              manufacturer: (editingSpec?.manufacturer || newSpec.manufacturer),
-              material: (editingSpec?.material || newSpec.material),
-              size: (editingSpec?.size || newSpec.size),
-              teeth: (editingSpec?.teeth || newSpec.teeth) === '' ? null : Number(editingSpec?.teeth || newSpec.teeth),
-              color: (editingSpec?.color || newSpec.color),
-              rpm: (editingSpec?.rpm || newSpec.rpm) === '' ? null : Number(editingSpec?.rpm || newSpec.rpm),
-              gaus: (editingSpec?.gaus || newSpec.gaus) === '' ? null : Number(editingSpec?.gaus || newSpec.gaus),
-              price: (editingSpec?.price || newSpec.price) === '' ? null : Number(editingSpec?.price || newSpec.price),
-              url: (editingSpec?.url || newSpec.url),
-              sku: (editingSpec?.sku || newSpec.sku),
-              description: (editingSpec?.description || newSpec.description)
-            }
-          ]
-        };
-
-        if (editingSpec && isModificationTab) {
-          specData.change_effective_date = editingSpec.change_effective_date || undefined;
-        }
-
-        if (editingSpec) {
-          const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
-          await api.put(`/vehicles/${id}/technical-specs/${currentSpec.id}/components/${editingSpec.component_id}`, specData);
-        } else {
-          await api.post(`/vehicles/${id}/technical-specs`, specData);
-        }
+        return;
       }
 
-      const response = await api.get(`/vehicles/${id}/technical-specs`);
-      const updatedSpecs = {
-        modification: response.data.find(spec => spec.is_modification),
-        technical: response.data.find(spec => !spec.is_modification)
+      const mountQtyVal = parseInt(editingSpec?.mounted_qty ?? newSpec.mounted_qty, 10);
+      const mountedQty = Number.isNaN(mountQtyVal) || mountQtyVal < 1 ? 1 : mountQtyVal;
+      const specData = {
+        is_modification: isModificationTab,
+        component_id: editingSpec?.component_id,
+        components: [
+          {
+            component_type: editingSpec?.component_type || newSpec.component_type,
+            element: editingSpec?.element || newSpec.element,
+            manufacturer: editingSpec?.manufacturer || newSpec.manufacturer,
+            material: editingSpec?.material || newSpec.material,
+            size: editingSpec?.size || newSpec.size,
+            teeth: (editingSpec?.teeth || newSpec.teeth) === '' ? null : Number(editingSpec?.teeth || newSpec.teeth),
+            color: editingSpec?.color || newSpec.color,
+            rpm: (editingSpec?.rpm || newSpec.rpm) === '' ? null : Number(editingSpec?.rpm || newSpec.rpm),
+            gaus: (editingSpec?.gaus || newSpec.gaus) === '' ? null : Number(editingSpec?.gaus || newSpec.gaus),
+            price: (editingSpec?.price || newSpec.price) === '' ? null : Number(editingSpec?.price || newSpec.price),
+            url: editingSpec?.url || newSpec.url,
+            sku: editingSpec?.sku || newSpec.sku,
+            description: editingSpec?.description || newSpec.description,
+            mounted_qty: mountedQty,
+          },
+        ],
       };
-      setTechnicalSpecs(updatedSpecs);
-      handleCancelEdit();
+
+      if (editingSpec && isModificationTab) {
+        specData.change_effective_date = editingSpec.change_effective_date || undefined;
+      }
+
+      if (editingSpec) {
+        const shouldAskReturn =
+          isModificationTab &&
+          specEditBaseline &&
+          vehicleSpecSnapshotsDiffer(specEditBaseline, editingSpec);
+        if (shouldAskReturn) {
+          const removedQty = Math.max(1, parseInt(specEditBaseline.mounted_qty, 10) || 1);
+          setPendingSpecSave({ specData, isModificationTab, removedQty });
+          setSpecReturnDialogOpen(true);
+          return;
+        }
+        await persistVehicleSpec({
+          fromInventory: false,
+          isModificationTab,
+          specData,
+          returnRemovedToInventory: false,
+        });
+      } else {
+        await persistVehicleSpec({
+          fromInventory: false,
+          isModificationTab,
+          specData,
+        });
+      }
     } catch (error) {
       console.error('Error al guardar especificación:', error);
       setError(error.response?.data?.error || 'Error al guardar la especificación técnica');
@@ -528,24 +724,41 @@ const EditVehicle = () => {
   };
 
   const handleDeleteSpec = (specId, componentId) => {
-    setDeleteConfirm({ type: 'spec', specId, componentId });
+    const mod = technicalSpecs?.modification;
+    const tech = technicalSpecs?.technical;
+    const spec = mod?.id === specId ? mod : tech?.id === specId ? tech : null;
+    const comp = spec?.components?.find((c) => c.id === componentId);
+    setDeleteConfirm({
+      type: 'spec',
+      specId,
+      componentId,
+      isModification: !!spec?.is_modification,
+      mountedQty: comp?.mounted_qty ?? 1,
+      elementLabel: comp?.element || '',
+    });
   };
 
   const confirmDeleteSpec = async () => {
     if (!deleteConfirm || deleteConfirm.type !== 'spec') return;
-    const { specId, componentId } = deleteConfirm;
+    const { specId, componentId, isModification } = deleteConfirm;
+    const returnInv = !!isModification && specDeleteReturnToInventory;
     setDeleteConfirm(null);
     try {
-      await api.delete(`/vehicles/${id}/technical-specs/${specId}/components/${componentId}`);
+      await api.delete(`/vehicles/${id}/technical-specs/${specId}/components/${componentId}`, {
+        data: returnInv ? { return_to_inventory: true } : {},
+      });
       const response = await api.get(`/vehicles/${id}/technical-specs`);
       const updatedSpecs = {
-        modification: response.data.find(spec => spec.is_modification),
-        technical: response.data.find(spec => !spec.is_modification)
+        modification: response.data.find((spec) => spec.is_modification),
+        technical: response.data.find((spec) => !spec.is_modification),
       };
       setTechnicalSpecs(updatedSpecs);
+      if (returnInv) {
+        toast.success('Modificación eliminada y pieza añadida al inventario');
+      }
     } catch (error) {
       console.error('Error al eliminar especificación:', error);
-      setError('Error al eliminar la especificación técnica');
+      setError(error.response?.data?.error || 'Error al eliminar la especificación técnica');
     }
   };
 
@@ -848,14 +1061,27 @@ const EditVehicle = () => {
         {fromInventory && (
           <Alert>
             <Info className="size-4 shrink-0" aria-hidden />
-            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                Usando ítem de inventario «{selectedInventoryItemName}». Al guardar se descontará 1 unidad del stock.
-                El tipo, nombre, referencia, enlace y precio los toma del ítem.
-              </span>
-              <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={clearInventoryLink}>
-                Quitar enlace
-              </Button>
+            <AlertDescription className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <span>
+                  Usando ítem de inventario «{selectedInventoryItemName}». El tipo, nombre, referencia, enlace y precio los toma del ítem.
+                  Al guardar se descontarán{' '}
+                  {(() => {
+                    const n = Math.min(
+                      Math.max(1, parseInt(selectedInventoryMountQty, 10) || 1),
+                      selectedInventoryMaxQty ?? 1,
+                    );
+                    return `${n} ${n === 1 ? 'unidad' : 'unidades'}`;
+                  })()}{' '}
+                  del stock (máx. {selectedInventoryMaxQty ?? '—'}).
+                </span>
+                <Button type="button" variant="ghost" size="sm" className="shrink-0 self-start" onClick={clearInventoryLink}>
+                  Quitar enlace
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                La cantidad se indica en el campo «Unidades» del formulario (debajo de marca). Ahí eliges cuántas se descuentan del stock y cuántas representa la pieza montada.
+              </p>
             </AlertDescription>
           </Alert>
         )}
@@ -936,6 +1162,37 @@ const EditVehicle = () => {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="space-y-2 max-w-xs">
+              <Label htmlFor={fromInventory ? 'inv-units-qty' : 'mounted_qty'}>
+                {fromInventory ? 'Unidades (stock y montaje)' : 'Unidades montadas'}
+              </Label>
+              {fromInventory ? (
+                <Input
+                  id="inv-units-qty"
+                  type="number"
+                  min={1}
+                  max={selectedInventoryMaxQty ?? undefined}
+                  value={selectedInventoryMountQty}
+                  onChange={(e) => setSelectedInventoryMountQty(e.target.value)}
+                />
+              ) : (
+                <Input
+                  id="mounted_qty"
+                  name="mounted_qty"
+                  type="number"
+                  min={1}
+                  value={specValue.mounted_qty ?? '1'}
+                  onChange={handleSpecChange}
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                {fromInventory
+                  ? `Se descontarán del inventario (máx. ${selectedInventoryMaxQty ?? '—'}) y quedarán como piezas montadas en esta línea.`
+                  : 'Cuántas piezas iguales representa esta línea (p. ej. 2 para un par de neumáticos).'}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="material">Material</Label>
               <Input id="material" name="material" value={specValue.material} onChange={handleSpecChange} />
@@ -971,8 +1228,13 @@ const EditVehicle = () => {
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="price">Precio (€)</Label>
+              <Label htmlFor="price">{isModificationTab ? 'Precio unitario (€)' : 'Precio (€)'}</Label>
               <Input id="price" name="price" type="number" step="0.01" value={specValue.price} onChange={handleSpecChange} disabled={fromInventory} />
+              {isModificationTab && (
+                <p className="text-xs text-muted-foreground">
+                  Por unidad; el coste en el coche es precio × unidades montadas.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="url">URL</Label>
@@ -1038,7 +1300,8 @@ const EditVehicle = () => {
                         <p className="font-medium truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {formatInventoryCategory(item.category)} · Stock: {item.quantity}
-                          {item.purchase_price != null && ` · ${Number(item.purchase_price).toFixed(2)} €`}
+                          {item.purchase_price != null &&
+                            ` · ${Number(item.purchase_price).toFixed(2)} €/ud (precio unitario)`}
                         </p>
                       </div>
                       <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
@@ -1067,11 +1330,13 @@ const EditVehicle = () => {
                   <TableRow>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Elemento</TableHead>
+                    <TableHead>Cant.</TableHead>
                     <TableHead>Marca</TableHead>
                     <TableHead>Material</TableHead>
                     <TableHead>Tamaño</TableHead>
                     <TableHead>Color</TableHead>
-                    <TableHead>Precio</TableHead>
+                    <TableHead>P. unit.</TableHead>
+                    <TableHead>Total línea</TableHead>
                     <TableHead>URL</TableHead>
                     <TableHead>Acciones</TableHead>
                   </TableRow>
@@ -1079,7 +1344,7 @@ const EditVehicle = () => {
                 <TableBody>
                   {components.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center text-muted-foreground">
                         No hay {isModificationTab ? 'modificaciones' : 'especificaciones técnicas'}
                       </TableCell>
                     </TableRow>
@@ -1089,11 +1354,17 @@ const EditVehicle = () => {
                       <TableRow>
                         <TableCell>{componentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}</TableCell>
                         <TableCell>{comp.element}</TableCell>
+                        <TableCell>{comp.mounted_qty ?? 1}</TableCell>
                         <TableCell>{comp.manufacturer}</TableCell>
                         <TableCell>{comp.material}</TableCell>
                         <TableCell>{comp.size}</TableCell>
                         <TableCell>{comp.color}</TableCell>
-                        <TableCell>{comp.price ? `€${Number(comp.price).toFixed(2)}` : '-'}</TableCell>
+                        <TableCell>{comp.price != null && comp.price !== '' ? `€${Number(comp.price).toFixed(2)}` : '-'}</TableCell>
+                        <TableCell>
+                          {comp.price != null && comp.price !== ''
+                            ? `€${modificationLineTotal(comp.price, comp.mounted_qty).toFixed(2)}`
+                            : '-'}
+                        </TableCell>
                         <TableCell>
                           {comp.url ? (
                             <a href={comp.url} target="_blank" rel="noopener noreferrer" title="Abrir enlace" className="text-primary hover:underline">
@@ -1116,7 +1387,7 @@ const EditVehicle = () => {
                       </TableRow>
                       {isModificationTab && comp.change_history?.length > 0 && (
                         <TableRow>
-                          <TableCell colSpan={9} className="bg-muted/40 align-top py-3">
+                          <TableCell colSpan={11} className="bg-muted/40 align-top py-3">
                             <p className="text-xs font-medium text-muted-foreground mb-2">Historial (componente anterior)</p>
                             <ul className="text-sm space-y-1 list-disc list-inside">
                               {comp.change_history.map((h) => (
@@ -1133,11 +1404,18 @@ const EditVehicle = () => {
                   ))}
                   {isModificationTab && components.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-right font-bold">Total modificaciones</TableCell>
-                      <TableCell className="font-bold">
-                        €{components.reduce((sum, comp) => sum + (comp.price ? Number(comp.price) : 0), 0).toFixed(2)}
+                      <TableCell colSpan={8} className="text-right font-bold">
+                        Total modificaciones
                       </TableCell>
-                      <TableCell></TableCell>
+                      <TableCell className="font-bold">—</TableCell>
+                      <TableCell className="font-bold">
+                        €
+                        {components
+                          .reduce((sum, comp) => sum + modificationLineTotal(comp.price, comp.mounted_qty), 0)
+                          .toFixed(2)}
+                      </TableCell>
+                      <TableCell />
+                      <TableCell />
                     </TableRow>
                   )}
                 </TableBody>
@@ -1431,21 +1709,38 @@ const EditVehicle = () => {
       return {
         title: '¿Eliminar imagen?',
         description: '¿Estás seguro de que quieres eliminar esta imagen? Esta acción no se puede deshacer.',
-        onConfirm: confirmDeleteImage
+        extra: null,
+        onConfirm: confirmDeleteImage,
       };
     }
     if (deleteConfirm.type === 'spec') {
       return {
-        title: '¿Eliminar especificación?',
-        description: '¿Estás seguro de que quieres eliminar esta especificación? Esta acción no se puede deshacer.',
-        onConfirm: confirmDeleteSpec
+        title: deleteConfirm.isModification ? '¿Eliminar modificación?' : '¿Eliminar especificación?',
+        description: deleteConfirm.isModification
+          ? `¿Eliminar «${deleteConfirm.elementLabel || 'esta pieza'}»? La línea desaparecerá del listado.`
+          : '¿Estás seguro de que quieres eliminar esta especificación? Esta acción no se puede deshacer.',
+        extra: deleteConfirm.isModification ? (
+          <div className="flex items-start gap-2 pt-4">
+            <Switch
+              id="spec-del-inv"
+              checked={specDeleteReturnToInventory}
+              onCheckedChange={setSpecDeleteReturnToInventory}
+            />
+            <Label htmlFor="spec-del-inv" className="text-sm font-normal leading-snug cursor-pointer">
+              Añadir al inventario la pieza retirada ({deleteConfirm.mountedQty}{' '}
+              {deleteConfirm.mountedQty === 1 ? 'unidad' : 'unidades'})
+            </Label>
+          </div>
+        ) : null,
+        onConfirm: confirmDeleteSpec,
       };
     }
     if (deleteConfirm.type === 'timing') {
       return {
         title: '¿Eliminar registro de tiempo?',
         description: '¿Estás seguro de que quieres eliminar este registro de tiempo? Esta acción no se puede deshacer.',
-        onConfirm: confirmDeleteTiming
+        extra: null,
+        onConfirm: confirmDeleteTiming,
       };
     }
     return null;
@@ -1455,6 +1750,40 @@ const EditVehicle = () => {
 
   return (
     <>
+      <AlertDialog
+        open={specReturnDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) cancelModificationReturnDialog();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Añadir al inventario la pieza retirada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Has modificado esta línea de modificación; la configuración anterior queda registrada en el historial.
+              {pendingSpecSave != null && (
+                <>
+                  {' '}
+                  ¿Quieres crear un ítem en inventario por las{' '}
+                  <strong>{pendingSpecSave.removedQty}</strong>{' '}
+                  {pendingSpecSave.removedQty === 1 ? 'unidad retirada' : 'unidades retiradas'} (estado previo al
+                  cambio)?
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <AlertDialogCancel type="button">Cancelar edición</AlertDialogCancel>
+            <Button type="button" variant="secondary" onClick={() => resolveModificationReturnChoice(false)}>
+              No, solo guardar
+            </Button>
+            <Button type="button" onClick={() => resolveModificationReturnChoice(true)}>
+              Sí, al inventario
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {confirmContent && (
         <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
           <AlertDialogContent>
@@ -1462,6 +1791,7 @@ const EditVehicle = () => {
               <AlertDialogTitle>{confirmContent.title}</AlertDialogTitle>
               <AlertDialogDescription>{confirmContent.description}</AlertDialogDescription>
             </AlertDialogHeader>
+            {confirmContent.extra}
             <AlertDialogFooter>
               <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
               <AlertDialogAction type="button" onClick={confirmContent.onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">

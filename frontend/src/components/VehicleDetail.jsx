@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { vehicleComponentTypes } from '../data/componentTypes';
-import { formatModificationSnapshot, formatHistoryDate } from '../utils/formatUtils';
+import { formatModificationSnapshot, formatHistoryDate, modificationLineTotal } from '../utils/formatUtils';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -223,13 +223,25 @@ const VehicleDetail = () => {
           <div className="space-y-4 border-t pt-6">
             <h3 className="text-lg font-semibold">Modificaciones</h3>
             <ul className="space-y-4">
-              {modificationComponents.map((comp) => (
+              {modificationComponents.map((comp) => {
+                const qtyRaw = parseInt(comp.mounted_qty, 10);
+                const qty = Number.isNaN(qtyRaw) || qtyRaw < 1 ? 1 : qtyRaw;
+                const hasPrice = comp.price != null && comp.price !== '' && !Number.isNaN(Number(comp.price));
+                const lineTotal = hasPrice ? modificationLineTotal(comp.price, comp.mounted_qty) : null;
+                return (
                 <li key={comp.id} className="rounded-lg border bg-muted/20 p-4 space-y-2">
                   <p className="font-medium">
                     {vehicleComponentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}
                     {comp.element ? ` · ${comp.element}` : ''}
                     {comp.manufacturer ? ` · ${comp.manufacturer}` : ''}
-                    {comp.price != null && comp.price !== '' ? ` · ${Number(comp.price).toFixed(2)} €` : ''}
+                    {hasPrice && (
+                      <>
+                        {' · '}
+                        {qty > 1
+                          ? `P. unit.: ${Number(comp.price).toFixed(2)} € × ${qty} = ${lineTotal.toFixed(2)} €`
+                          : `${Number(comp.price).toFixed(2)} €`}
+                      </>
+                    )}
                   </p>
                   {comp.change_history?.length > 0 && (
                     <div className="text-sm text-muted-foreground pl-2 border-l-2 border-muted">
@@ -244,7 +256,8 @@ const VehicleDetail = () => {
                     </div>
                   )}
                 </li>
-              ))}
+              );
+              })}
             </ul>
           </div>
         )}

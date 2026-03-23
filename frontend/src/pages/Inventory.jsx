@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
+import { Separator } from '../components/ui/separator';
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_UNITS,
@@ -56,6 +57,14 @@ const emptyForm = () => ({
   purchase_date: '',
   notes: '',
   vehicle_id: 'none',
+  manufacturer: '',
+  material: '',
+  size: '',
+  color: '',
+  teeth: '',
+  rpm: '',
+  gaus: '',
+  description: '',
 });
 
 const Inventory = () => {
@@ -135,6 +144,14 @@ const Inventory = () => {
         purchase_date: item.purchase_date ? String(item.purchase_date).slice(0, 10) : '',
         notes: item.notes ?? '',
         vehicle_id: item.vehicle_id || 'none',
+        manufacturer: item.manufacturer ?? '',
+        material: item.material ?? '',
+        size: item.size ?? '',
+        color: item.color ?? '',
+        teeth: item.teeth != null ? String(item.teeth) : '',
+        rpm: item.rpm != null ? String(item.rpm) : '',
+        gaus: item.gaus != null ? String(item.gaus) : '',
+        description: item.description ?? '',
       });
       setEditingItem(item);
     } else {
@@ -166,6 +183,31 @@ const Inventory = () => {
       return;
     }
 
+    let teethVal = null;
+    if (formData.teeth.trim() !== '') {
+      teethVal = parseInt(formData.teeth, 10);
+      if (Number.isNaN(teethVal)) {
+        setFormError('Dientes no válidos');
+        return;
+      }
+    }
+    let rpmVal = null;
+    if (formData.rpm.trim() !== '') {
+      rpmVal = Number(formData.rpm);
+      if (Number.isNaN(rpmVal)) {
+        setFormError('RPM no válidas');
+        return;
+      }
+    }
+    let gausVal = null;
+    if (formData.gaus.trim() !== '') {
+      gausVal = Number(formData.gaus);
+      if (Number.isNaN(gausVal)) {
+        setFormError('Gaus no válidos');
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setFormError(null);
@@ -182,6 +224,14 @@ const Inventory = () => {
         purchase_date: formData.purchase_date.trim() === '' ? null : formData.purchase_date,
         notes: formData.notes.trim() || null,
         vehicle_id: formData.vehicle_id === 'none' ? null : formData.vehicle_id,
+        manufacturer: formData.manufacturer.trim() || null,
+        material: formData.material.trim() || null,
+        size: formData.size.trim() || null,
+        color: formData.color.trim() || null,
+        teeth: teethVal,
+        rpm: rpmVal,
+        gaus: gausVal,
+        description: formData.description.trim() || null,
       };
 
       if (payload.min_stock != null && (Number.isNaN(payload.min_stock) || payload.min_stock < 0)) {
@@ -234,14 +284,15 @@ const Inventory = () => {
     setMountForm({
       vehicle_id: item.vehicle_id || 'none',
       is_modification: true,
-      manufacturer: '',
-      material: '',
-      size: '',
-      color: '',
-      teeth: '',
-      rpm: '',
-      gaus: '',
-      description: '',
+      mount_qty: '1',
+      manufacturer: item.manufacturer || '',
+      material: item.material || '',
+      size: item.size || '',
+      color: item.color || '',
+      teeth: item.teeth != null ? String(item.teeth) : '',
+      rpm: item.rpm != null ? String(item.rpm) : '',
+      gaus: item.gaus != null ? String(item.gaus) : '',
+      description: item.description || '',
     });
     setMountError(null);
   };
@@ -266,6 +317,16 @@ const Inventory = () => {
       setMountError('Selecciona un vehículo');
       return;
     }
+    const mq = parseInt(mountForm.mount_qty, 10);
+    const maxQ = Number(mountTarget.quantity);
+    if (Number.isNaN(mq) || mq < 1) {
+      setMountError('La cantidad a descontar debe ser al menos 1');
+      return;
+    }
+    if (mq > maxQ) {
+      setMountError(`No hay suficiente stock (disponible: ${maxQ})`);
+      return;
+    }
     const cat = mountTarget.category;
     if (mountCategoryIs(cat, 'pinion', 'crown')) {
       if (mountForm.teeth === '' || Number.isNaN(Number(mountForm.teeth))) {
@@ -285,6 +346,7 @@ const Inventory = () => {
       await api.post(`/inventory/${mountTarget.id}/mount`, {
         vehicle_id: mountForm.vehicle_id,
         is_modification: mountForm.is_modification,
+        mount_qty: mq,
         manufacturer: mountForm.manufacturer.trim(),
         material: mountForm.material.trim() || undefined,
         size: mountForm.size.trim() || undefined,
@@ -360,8 +422,15 @@ const Inventory = () => {
           <DialogHeader>
             <DialogTitle>Montar en vehículo</DialogTitle>
             <DialogDescription>
-              {mountTarget
-                ? `Se creará un componente a partir de «${mountTarget.name}» y se descontará 1 unidad (quedarán ${Math.max(0, Number(mountTarget.quantity) - 1)}).`
+              {mountTarget && mountForm
+                ? (() => {
+                    const n = Math.min(
+                      Math.max(1, parseInt(mountForm.mount_qty, 10) || 1),
+                      Number(mountTarget.quantity),
+                    );
+                    const left = Math.max(0, Number(mountTarget.quantity) - n);
+                    return `Se creará un componente a partir de «${mountTarget.name}». Se descontarán ${n} ${n === 1 ? 'unidad' : 'unidades'} del stock (quedarán ${left}).`;
+                  })()
                 : ''}
             </DialogDescription>
           </DialogHeader>
@@ -401,6 +470,20 @@ const Inventory = () => {
                   <Label htmlFor="mount-is-mod" className="cursor-pointer">
                     Registrar como modificación
                   </Label>
+                </div>
+                <div className="space-y-2 max-w-xs">
+                  <Label htmlFor="mount-qty">Unidades a descontar del inventario</Label>
+                  <Input
+                    id="mount-qty"
+                    type="number"
+                    min={1}
+                    max={Number(mountTarget.quantity)}
+                    value={mountForm.mount_qty}
+                    onChange={(e) => setMountForm({ ...mountForm, mount_qty: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Por ejemplo 2 para un par de neumáticos o llantas, o 1 si solo cambias uno.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mount-mfg">Marca (fabricante)</Label>
@@ -503,155 +586,280 @@ const Inventory = () => {
       </Dialog>
 
       <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingItem(null); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Editar ítem' : 'Nuevo ítem'}</DialogTitle>
             <DialogDescription>
-              Referencia y enlace ayudan a localizar el producto. Misma pieza en otra compra: nuevo registro.
+              Una fila por compra. La categoría define el tipo de pieza y qué campos técnicos aplica al montarla en un vehículo.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
-            <div className="space-y-4 py-2">
+            <div className="space-y-6 py-1">
               {formError && (
                 <Alert variant="destructive">
                   <AlertDescription>{formError}</AlertDescription>
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="inv-name">Nombre</Label>
-                <Input
-                  id="inv-name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  placeholder="Ej: Corona 26d Anglewinder"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="inv-ref">Referencia (opcional)</Label>
-                <Input
-                  id="inv-ref"
-                  value={formData.reference}
-                  onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                  placeholder="SKU / ref. fabricante"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="inv-url">Enlace (opcional)</Label>
-                <Input
-                  id="inv-url"
-                  type="url"
-                  value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  placeholder="https://…"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <section className="space-y-4" aria-labelledby="inv-modal-h-producto">
+                <h3 id="inv-modal-h-producto" className="text-sm font-semibold text-foreground">
+                  Producto
+                </h3>
                 <div className="space-y-2">
-                  <Label>Categoría</Label>
-                  <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INVENTORY_CATEGORIES.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Unidad</Label>
-                  <Select value={formData.unit} onValueChange={(v) => setFormData({ ...formData, unit: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INVENTORY_UNITS.map((u) => (
-                        <SelectItem key={u.value} value={u.value}>
-                          {u.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="inv-qty">Cantidad</Label>
+                  <Label htmlFor="inv-name">Nombre</Label>
                   <Input
-                    id="inv-qty"
-                    type="number"
-                    min="0"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    id="inv-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
+                    placeholder="Ej: Corona 26d Anglewinder"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Categoría</Label>
+                    <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INVENTORY_CATEGORIES.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unidad de stock</Label>
+                    <Select value={formData.unit} onValueChange={(v) => setFormData({ ...formData, unit: v })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INVENTORY_UNITS.map((u) => (
+                          <SelectItem key={u.value} value={u.value}>
+                            {u.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="inv-ref">Referencia</Label>
+                  <Input
+                    id="inv-ref"
+                    value={formData.reference}
+                    onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                    placeholder="SKU / ref. fabricante (opcional)"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inv-min">Stock mínimo (opcional)</Label>
+                  <Label htmlFor="inv-url">Enlace</Label>
                   <Input
-                    id="inv-min"
-                    type="number"
-                    min="0"
-                    value={formData.min_stock}
-                    onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
-                    placeholder="Alerta si cantidad ≤ mínimo"
+                    id="inv-url"
+                    type="url"
+                    value={formData.url}
+                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                    placeholder="https://… (opcional)"
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              </section>
+
+              <Separator />
+
+              <section className="space-y-4" aria-labelledby="inv-modal-h-stock">
+                <h3 id="inv-modal-h-stock" className="text-sm font-semibold text-foreground">
+                  Stock y compra
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="inv-qty">Cantidad en stock</Label>
+                    <Input
+                      id="inv-qty"
+                      type="number"
+                      min="0"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="inv-min">Alerta stock mínimo</Label>
+                    <Input
+                      id="inv-min"
+                      type="number"
+                      min="0"
+                      value={formData.min_stock}
+                      onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
+                      placeholder="Opcional"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="inv-price">Precio unitario de compra (€)</Label>
+                    <Input
+                      id="inv-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.purchase_price}
+                      onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
+                      placeholder="Opcional"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Por unidad. Si montas varias en un coche, el coste de la modificación será este precio × unidades.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="inv-pdate">Fecha de compra</Label>
+                    <Input
+                      id="inv-pdate"
+                      type="date"
+                      value={formData.purchase_date}
+                      onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <Separator />
+
+              <section
+                className="space-y-4 rounded-lg border border-border bg-muted/30 p-4 sm:p-5"
+                aria-labelledby="inv-modal-h-spec"
+              >
+                <div className="space-y-1">
+                  <h3 id="inv-modal-h-spec" className="text-sm font-semibold text-foreground">
+                    Especificación técnica
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Opcional. Misma información que al dar de alta un componente en el coche: se propone al montar desde inventario o al enlazar el ítem al editar un vehículo.
+                  </p>
+                </div>
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-2">
+                    <Label htmlFor="inv-mfg">Marca (fabricante)</Label>
+                    <Input
+                      id="inv-mfg"
+                      value={formData.manufacturer}
+                      onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                      placeholder="Puedes dejarlo vacío y rellenarlo al montar"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="inv-mat">Material</Label>
+                      <Input
+                        id="inv-mat"
+                        value={formData.material}
+                        onChange={(e) => setFormData({ ...formData, material: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="inv-size">Tamaño</Label>
+                      <Input
+                        id="inv-size"
+                        value={formData.size}
+                        onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="inv-color">Color</Label>
+                    <Input
+                      id="inv-color"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    />
+                  </div>
+                  {mountCategoryIs(formData.category, 'pinion', 'crown') && (
+                    <div className="space-y-2">
+                      <Label htmlFor="inv-teeth">Dientes</Label>
+                      <Input
+                        id="inv-teeth"
+                        type="number"
+                        value={formData.teeth}
+                        onChange={(e) => setFormData({ ...formData, teeth: e.target.value })}
+                        placeholder="Ej. 26"
+                      />
+                    </div>
+                  )}
+                  {mountCategoryIs(formData.category, 'motor') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="inv-rpm">RPM</Label>
+                        <Input
+                          id="inv-rpm"
+                          type="number"
+                          value={formData.rpm}
+                          onChange={(e) => setFormData({ ...formData, rpm: e.target.value })}
+                          placeholder="Ej. 20000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="inv-gaus">Gaus</Label>
+                        <Input
+                          id="inv-gaus"
+                          type="number"
+                          value={formData.gaus}
+                          onChange={(e) => setFormData({ ...formData, gaus: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="inv-spec-desc">Descripción técnica</Label>
+                    <Textarea
+                      id="inv-spec-desc"
+                      rows={2}
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Detalle del repuesto (no confundir con «Notas» de compra abajo)"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <Separator />
+
+              <section className="space-y-4" aria-labelledby="inv-modal-h-context">
+                <h3 id="inv-modal-h-context" className="text-sm font-semibold text-foreground">
+                  Ubicación y notas
+                </h3>
                 <div className="space-y-2">
-                  <Label htmlFor="inv-price">Precio compra (€, opcional)</Label>
-                  <Input
-                    id="inv-price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.purchase_price}
-                    onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
-                  />
+                  <Label>Vehículo donde está montado</Label>
+                  <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ninguno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Ninguno</SelectItem>
+                      {vehicles.map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.manufacturer} {v.model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Opcional. Indica si esta compra ya está puesta en un coche.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inv-pdate">Fecha compra (opcional)</Label>
-                  <Input
-                    id="inv-pdate"
-                    type="date"
-                    value={formData.purchase_date}
-                    onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                  <Label htmlFor="inv-notes">Notas de compra / almacén</Label>
+                  <Textarea
+                    id="inv-notes"
+                    rows={2}
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Tienda, ubicación en cajón, recordatorios…"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Vehículo montado (opcional)</Label>
-                <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Ninguno" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Ninguno</SelectItem>
-                    {vehicles.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.manufacturer} {v.model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="inv-notes">Notas</Label>
-                <Textarea
-                  id="inv-notes"
-                  rows={2}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                />
-              </div>
+              </section>
             </div>
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="gap-2 border-t pt-4 mt-2 sm:mt-0 sm:pt-4">
               <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
                 Cancelar
               </Button>
@@ -782,7 +990,7 @@ const Inventory = () => {
                   </p>
                   {item.purchase_price != null && (
                     <p>
-                      <span className="text-muted-foreground">Precio:</span>{' '}
+                      <span className="text-muted-foreground">Precio unitario:</span>{' '}
                       {Number(item.purchase_price).toFixed(2)} €
                     </p>
                   )}

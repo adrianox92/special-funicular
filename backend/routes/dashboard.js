@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
+const { modificationLineTotal } = require('../lib/componentPricing');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -222,7 +223,8 @@ router.get('/metrics', async (req, res) => {
           id,
           is_modification,
           components (
-            price
+            price,
+            mounted_qty
           )
         ),
         vehicle_timings (
@@ -251,7 +253,7 @@ router.get('/metrics', async (req, res) => {
           .filter(spec => spec.is_modification)
           .reduce((specSum, spec) => {
             const componentsCost = spec.components
-              .reduce((compSum, comp) => compSum + (comp.price || 0), 0);
+              .reduce((compSum, comp) => compSum + modificationLineTotal(comp.price, comp.mounted_qty), 0);
             return specSum + componentsCost;
           }, 0);
         return sum + modificationCost;
@@ -583,6 +585,7 @@ router.get('/charts', async (req, res) => {
           element,
           sku,
           price,
+          mounted_qty,
           component_type,
           url
         ),
@@ -627,7 +630,10 @@ router.get('/charts', async (req, res) => {
         }
         
         componentUsage[componentKey].usageCount++;
-        componentUsage[componentKey].totalInvestment += component.price;
+        componentUsage[componentKey].totalInvestment += modificationLineTotal(
+          component.price,
+          component.mounted_qty
+        );
         
         // Añadir vehículo si no está ya en la lista
         if (!componentUsage[componentKey].vehicles.some(v => v.id === vehicleInfo.id)) {

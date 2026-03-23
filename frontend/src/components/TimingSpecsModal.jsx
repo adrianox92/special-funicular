@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table';
-import { formatDistance } from '../utils/formatUtils';
+import { formatDistance, modificationLineTotal } from '../utils/formatUtils';
 import LapBreakdownChart from './charts/LapBreakdownChart';
 import api from '../lib/axios';
 
@@ -63,7 +63,7 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   };
 
   const getColumnsForType = (type) => {
-    const baseColumns = ['Componente', 'Fabricante', 'Referencia', 'Material', 'Tamaño', 'Precio'];
+    const baseColumns = ['Componente', 'Fabricante', 'Referencia', 'Material', 'Tamaño', 'Importe'];
     switch (type) {
       case 'motor':
         return [...baseColumns.slice(0, 5), 'RPM', 'Gaus', ...baseColumns.slice(5)];
@@ -87,8 +87,16 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
         return component.manufacturer || '-';
       case 'Referencia':
         return component.sku || '-';
-      case 'Precio':
-        return `€${component.price?.toFixed(2)}`;
+      case 'Importe': {
+        if (component.price == null || component.price === '') return '-';
+        const pu = Number(component.price);
+        if (Number.isNaN(pu)) return '-';
+        let q = parseInt(component.mounted_qty, 10);
+        if (Number.isNaN(q) || q < 1) q = 1;
+        const line = modificationLineTotal(component.price, component.mounted_qty);
+        if (q <= 1) return `€${pu.toFixed(2)} (u.)`;
+        return `${q} × €${pu.toFixed(2)} = €${line.toFixed(2)}`;
+      }
       case 'RPM':
         return component.rpm || '-';
       case 'Gaus':

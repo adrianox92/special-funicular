@@ -9,6 +9,7 @@ const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
+const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFromComponent');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -30,7 +31,7 @@ router.use(authMiddleware);
 
 const COMPONENT_PAYLOAD_KEYS = [
   'component_type', 'element', 'manufacturer', 'material', 'size', 'teeth',
-  'color', 'rpm', 'gaus', 'price', 'url', 'sku', 'description'
+  'color', 'rpm', 'gaus', 'price', 'url', 'sku', 'description', 'mounted_qty'
 ];
 
 function pickComponentFields(obj) {
@@ -805,13 +806,15 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     // Verificar que el vehículo pertenece al usuario
     const { data: existingVehicle, error: checkError } = await supabase
       .from('vehicles')
-      .select('id, user_id')
+      .select('id, user_id, model, manufacturer')
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
     if (checkError || !existingVehicle) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
+
+    const returnRemovedToInventory = req.body.return_removed_to_inventory === true;
 
     // Verificar que la especificación pertenece al vehículo y es del tipo correcto
     const { data: existingSpec, error: specCheckError } = await supabase
@@ -896,7 +899,26 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
       return res.status(500).json({ error: getUpdatedError.message });
     }
 
-    res.json({ ...existingSpec, components: [updatedComponent] });
+    let inventoryReturnError = null;
+    if (shouldRecordHistory && returnRemovedToInventory) {
+      const vehicleLabel =
+        [existingVehicle.manufacturer, existingVehicle.model].filter(Boolean).join(' ').trim() || null;
+      const invResult = await insertReturnedComponentToInventory(supabase, {
+        userId: req.user.id,
+        snapshot: prevSnap,
+        vehicleLabel,
+      });
+      if (!invResult.ok) {
+        inventoryReturnError = invResult.error;
+        console.error('insertReturnedComponentToInventory (PUT component):', invResult.error);
+      }
+    }
+
+    res.json({
+      ...existingSpec,
+      components: [updatedComponent],
+      ...(inventoryReturnError ? { inventory_return_error: inventoryReturnError } : {}),
+    });
   } catch (err) {
     console.error('Error al actualizar componente:', err);
     res.status(500).json({ error: err.message });
@@ -907,11 +929,16 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
 router.delete('/:id/technical-specs/:specId/components/:componentId', async (req, res) => {
   try {
     const { id, specId, componentId } = req.params;
-    
+
+    const returnToInventory =
+      req.body?.return_to_inventory === true ||
+      req.query.return_to_inventory === 'true' ||
+      req.query.return_to_inventory === '1';
+
     // Verificar que el vehículo pertenece al usuario
     const { data: existingVehicle, error: checkError } = await supabase
       .from('vehicles')
-      .select('id')
+      .select('id, model, manufacturer')
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
@@ -939,6 +966,23 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
       .single();
     if (compCheckError || !existingComponent) {
       return res.status(404).json({ error: 'Componente no encontrado' });
+    }
+
+    if (existingSpec.is_modification && returnToInventory) {
+      const prevSnap = modificationSnapshotFromRow(existingComponent);
+      const vehicleLabel =
+        [existingVehicle.manufacturer, existingVehicle.model].filter(Boolean).join(' ').trim() || null;
+      const invResult = await insertReturnedComponentToInventory(supabase, {
+        userId: req.user.id,
+        snapshot: prevSnap,
+        vehicleLabel,
+      });
+      if (!invResult.ok) {
+        console.error('insertReturnedComponentToInventory (DELETE component):', invResult.error);
+        return res.status(500).json({
+          error: `No se pudo añadir al inventario la pieza retirada: ${invResult.error}`,
+        });
+      }
     }
 
     // Eliminar solo el componente específico

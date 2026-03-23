@@ -25,6 +25,14 @@ export function formatDistance(meters) {
   return `${(m / 1000).toFixed(2)} km`;
 }
 
+/** Precio unitario × unidades montadas (mínimo 1 unidad). */
+export function modificationLineTotal(price, mountedQty) {
+  const unit = price != null && price !== '' && !Number.isNaN(Number(price)) ? Number(price) : 0;
+  let q = parseInt(mountedQty, 10);
+  if (Number.isNaN(q) || q < 1) q = 1;
+  return unit * q;
+}
+
 /**
  * Texto legible de un snapshot de modificación (historial).
  * @param {Record<string, unknown>|null|undefined} snap
@@ -46,6 +54,10 @@ export function formatModificationSnapshot(snap, componentTypes = []) {
   if (snap.price != null && snap.price !== '') {
     const p = Number(snap.price);
     if (!Number.isNaN(p)) parts.push(`${p.toFixed(2)} €`);
+  }
+  const mq = snap.mounted_qty != null ? Number(snap.mounted_qty) : null;
+  if (mq != null && !Number.isNaN(mq) && mq !== 1) {
+    parts.push(`${mq} uds montadas`);
   }
   return parts.length ? parts.join(' · ') : '—';
 }

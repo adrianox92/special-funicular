@@ -1,5 +1,6 @@
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
+const { modificationLineTotal } = require('../../lib/componentPricing');
 
 // Paleta de colores
 const COLORS = {
@@ -124,9 +125,19 @@ function drawBadges(doc, vehicle) {
   doc.y = y + 28;
 }
 
+function formatComponentPriceColumn(component) {
+  const pu = component.price != null && !isNaN(Number(component.price)) ? Number(component.price) : null;
+  if (pu == null) return '-';
+  let q = parseInt(component.mounted_qty, 10);
+  if (Number.isNaN(q) || q < 1) q = 1;
+  const line = modificationLineTotal(component.price, component.mounted_qty);
+  if (q <= 1) return `${pu.toFixed(2)} €`;
+  return `${q} × ${pu.toFixed(2)} € = ${line.toFixed(2)} €`;
+}
+
 function drawComponentsTable(doc, components, options = {}) {
   const { minYForNewPage = 150 } = options;
-  const colWidths = [120, 140, 140, 80];
+  const colWidths = [120, 140, 120, 100];
   const headerY = doc.y;
 
   doc.save();
@@ -155,14 +166,13 @@ function drawComponentsTable(doc, components, options = {}) {
     const compName = component.element || component.name || '-';
     const manufacturer = component.manufacturer || '-';
     const detail = [component.material, component.size, component.color].filter(Boolean).join(', ') || '-';
-    const price = component.price != null && !isNaN(Number(component.price))
-      ? `${Number(component.price).toFixed(2)} €`
-      : '-';
+    const price = formatComponentPriceColumn(component);
 
     const lineH = Math.max(
       doc.heightOfString(compName, { width: colWidths[0] - 16 }),
       doc.heightOfString(manufacturer, { width: colWidths[1] - 16 }),
       doc.heightOfString(detail, { width: colWidths[2] - 16 }),
+      doc.heightOfString(price, { width: colWidths[3] - 16 }),
       16
     );
 
@@ -226,7 +236,7 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
       if (modifications?.length) {
         modifications.forEach((mod) => {
           (mod.components || []).forEach((c) => {
-            if (c.price != null && !isNaN(Number(c.price))) totalModCost += Number(c.price);
+            totalModCost += modificationLineTotal(c.price, c.mounted_qty);
           });
         });
       }

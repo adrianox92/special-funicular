@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
   purchase_date date,
   notes text,
   vehicle_id uuid REFERENCES public.vehicles(id) ON DELETE SET NULL,
+  manufacturer text,
+  material text,
+  size text,
+  color text,
+  teeth integer,
+  rpm numeric,
+  gaus numeric,
+  description text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

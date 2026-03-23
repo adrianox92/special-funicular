@@ -45,6 +45,38 @@ function normalizeOptionalText(val) {
   return t === '' ? null : t;
 }
 
+/** Si el body trae texto no vacío, se usa; si no, el valor guardado en el ítem. */
+function mergeSpecText(bodyVal, itemVal) {
+  if (bodyVal !== undefined && bodyVal !== null && String(bodyVal).trim() !== '') {
+    return normalizeOptionalText(bodyVal);
+  }
+  return normalizeOptionalText(itemVal);
+}
+
+function mergeSpecNum(bodyVal, itemVal) {
+  if (bodyVal !== undefined && bodyVal !== null && String(bodyVal).trim() !== '') {
+    const n = Number(bodyVal);
+    return Number.isNaN(n) ? null : n;
+  }
+  if (itemVal !== undefined && itemVal !== null && String(itemVal).trim() !== '') {
+    const n = Number(itemVal);
+    return Number.isNaN(n) ? null : n;
+  }
+  return null;
+}
+
+function parseOptionalInt(val) {
+  if (val === undefined || val === null || String(val).trim() === '') return null;
+  const n = parseInt(val, 10);
+  return Number.isNaN(n) ? NaN : n;
+}
+
+function parseOptionalNumber(val) {
+  if (val === undefined || val === null || String(val).trim() === '') return null;
+  const n = Number(val);
+  return Number.isNaN(n) ? NaN : n;
+}
+
 function normalizeUrl(val) {
   const raw = normalizeOptionalText(val);
   if (raw == null) return null;
@@ -162,6 +194,14 @@ router.post('/', async (req, res) => {
       purchase_date: purchaseDate,
       notes,
       vehicle_id: vehicleId,
+      manufacturer,
+      material,
+      size,
+      color,
+      teeth: teethRaw,
+      rpm: rpmRaw,
+      gaus: gausRaw,
+      description: specDescription,
     } = req.body;
 
     if (!name || !String(name).trim()) {
@@ -204,6 +244,19 @@ router.post('/', async (req, res) => {
 
     const pDate = normalizeDate(purchaseDate);
 
+    const teethPost = parseOptionalInt(teethRaw);
+    if (teethRaw !== undefined && teethRaw !== null && String(teethRaw).trim() !== '' && Number.isNaN(teethPost)) {
+      return res.status(400).json({ error: 'teeth no válido' });
+    }
+    const rpmPost = parseOptionalNumber(rpmRaw);
+    if (rpmRaw !== undefined && rpmRaw !== null && String(rpmRaw).trim() !== '' && Number.isNaN(rpmPost)) {
+      return res.status(400).json({ error: 'rpm no válido' });
+    }
+    const gausPost = parseOptionalNumber(gausRaw);
+    if (gausRaw !== undefined && gausRaw !== null && String(gausRaw).trim() !== '' && Number.isNaN(gausPost)) {
+      return res.status(400).json({ error: 'gaus no válido' });
+    }
+
     let vId = null;
     if (vehicleId != null && String(vehicleId).trim() !== '' && String(vehicleId) !== 'none') {
       const owned = await assertVehicleOwned(String(vehicleId), req.user.id);
@@ -224,6 +277,14 @@ router.post('/', async (req, res) => {
       purchase_date: pDate,
       notes: normalizeOptionalText(notes),
       vehicle_id: vId,
+      manufacturer: normalizeOptionalText(manufacturer),
+      material: normalizeOptionalText(material),
+      size: normalizeOptionalText(size),
+      color: normalizeOptionalText(color),
+      teeth: teethPost,
+      rpm: rpmPost,
+      gaus: gausPost,
+      description: normalizeOptionalText(specDescription),
       updated_at: new Date().toISOString(),
     };
 
@@ -330,6 +391,54 @@ router.put('/:id', async (req, res) => {
     if (req.body.notes !== undefined) {
       updates.notes = normalizeOptionalText(req.body.notes);
     }
+    if (req.body.manufacturer !== undefined) {
+      updates.manufacturer = normalizeOptionalText(req.body.manufacturer);
+    }
+    if (req.body.material !== undefined) {
+      updates.material = normalizeOptionalText(req.body.material);
+    }
+    if (req.body.size !== undefined) {
+      updates.size = normalizeOptionalText(req.body.size);
+    }
+    if (req.body.color !== undefined) {
+      updates.color = normalizeOptionalText(req.body.color);
+    }
+    if (req.body.teeth !== undefined) {
+      if (req.body.teeth === null || String(req.body.teeth).trim() === '') {
+        updates.teeth = null;
+      } else {
+        const t = parseInt(req.body.teeth, 10);
+        if (Number.isNaN(t)) {
+          return res.status(400).json({ error: 'teeth no válido' });
+        }
+        updates.teeth = t;
+      }
+    }
+    if (req.body.rpm !== undefined) {
+      if (req.body.rpm === null || String(req.body.rpm).trim() === '') {
+        updates.rpm = null;
+      } else {
+        const r = Number(req.body.rpm);
+        if (Number.isNaN(r)) {
+          return res.status(400).json({ error: 'rpm no válido' });
+        }
+        updates.rpm = r;
+      }
+    }
+    if (req.body.gaus !== undefined) {
+      if (req.body.gaus === null || String(req.body.gaus).trim() === '') {
+        updates.gaus = null;
+      } else {
+        const g = Number(req.body.gaus);
+        if (Number.isNaN(g)) {
+          return res.status(400).json({ error: 'gaus no válido' });
+        }
+        updates.gaus = g;
+      }
+    }
+    if (req.body.description !== undefined) {
+      updates.description = normalizeOptionalText(req.body.description);
+    }
     if (req.body.vehicle_id !== undefined) {
       const vid = req.body.vehicle_id;
       if (vid == null || String(vid).trim() === '' || String(vid) === 'none') {
@@ -364,7 +473,7 @@ router.put('/:id', async (req, res) => {
 
 /**
  * POST /api/inventory/:id/mount
- * Crea un componente en el vehículo y descuenta 1 unidad de stock (atómico con bloqueo optimista).
+ * Crea un componente en el vehículo y descuenta mount_qty unidades de stock (atómico con bloqueo optimista).
  */
 router.post('/:id/mount', async (req, res) => {
   try {
@@ -372,6 +481,7 @@ router.post('/:id/mount', async (req, res) => {
     const {
       vehicle_id: bodyVehicleId,
       is_modification: isModificationBody,
+      mount_qty: mountQtyRaw,
       manufacturer,
       material,
       size,
@@ -384,8 +494,9 @@ router.post('/:id/mount', async (req, res) => {
 
     const isModification = isModificationBody !== false;
 
-    if (!manufacturer || !String(manufacturer).trim()) {
-      return res.status(400).json({ error: 'manufacturer es requerido' });
+    const mountQty = mountQtyRaw != null ? parseInt(mountQtyRaw, 10) : 1;
+    if (Number.isNaN(mountQty) || mountQty < 1) {
+      return res.status(400).json({ error: 'mount_qty debe ser un entero mayor o igual a 1' });
     }
 
     const { data: item, error: fetchErr } = await supabase
@@ -427,15 +538,22 @@ router.post('/:id/mount', async (req, res) => {
 
     const compType = inventoryCategoryToComponentType(item.category);
 
+    const manufacturerResolved = mergeSpecText(manufacturer, item.manufacturer);
+    if (!manufacturerResolved) {
+      return res.status(400).json({ error: 'manufacturer es requerido' });
+    }
+
+    const teethMerged = mergeSpecNum(teeth, item.teeth);
+    const rpmMerged = mergeSpecNum(rpm, item.rpm);
+    const gausMerged = mergeSpecNum(gaus, item.gaus);
+
     if (['pinion', 'crown'].includes(compType)) {
-      const t = teeth === '' || teeth == null ? NaN : Number(teeth);
-      if (Number.isNaN(t)) {
+      if (teethMerged == null || Number.isNaN(teethMerged)) {
         return res.status(400).json({ error: 'teeth es requerido para piñón/corona' });
       }
     }
     if (compType === 'motor') {
-      const r = rpm === '' || rpm == null ? NaN : Number(rpm);
-      if (Number.isNaN(r)) {
+      if (rpmMerged == null || Number.isNaN(rpmMerged)) {
         return res.status(400).json({ error: 'rpm es requerido para motor' });
       }
     }
@@ -443,31 +561,25 @@ router.post('/:id/mount', async (req, res) => {
     const specs = await getOrCreateBaseSpecs(vehicleId);
     const targetSpec = isModification ? specs.modification : specs.technical;
 
-    const teethNum =
-      teeth === '' || teeth == null || teeth === undefined ? null : Number(teeth);
-    const rpmNum =
-      rpm === '' || rpm == null || rpm === undefined ? null : Number(rpm);
-    const gausNum =
-      gaus === '' || gaus == null || gaus === undefined ? null : Number(gaus);
-
     const row = {
       tech_spec_id: targetSpec.id,
       component_type: compType,
       element: String(item.name).trim(),
-      manufacturer: String(manufacturer).trim(),
-      material: normalizeOptionalText(material),
-      size: normalizeOptionalText(size),
-      color: normalizeOptionalText(color),
-      teeth: ['pinion', 'crown'].includes(compType) ? teethNum : null,
-      rpm: compType === 'motor' ? rpmNum : null,
-      gaus: compType === 'motor' ? gausNum : null,
+      manufacturer: manufacturerResolved,
+      material: mergeSpecText(material, item.material),
+      size: mergeSpecText(size, item.size),
+      color: mergeSpecText(color, item.color),
+      teeth: ['pinion', 'crown'].includes(compType) ? teethMerged : null,
+      rpm: compType === 'motor' ? rpmMerged : null,
+      gaus: compType === 'motor' ? gausMerged : null,
       price:
         item.purchase_price != null && item.purchase_price !== ''
           ? Number(item.purchase_price)
           : null,
       url: item.url || null,
       sku: item.reference || null,
-      description: normalizeOptionalText(description),
+      description: mergeSpecText(description, item.description),
+      mounted_qty: mountQty,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -487,7 +599,7 @@ router.post('/:id/mount', async (req, res) => {
     const { data: updatedInv, error: updErr } = await supabase
       .from('inventory_items')
       .update({
-        quantity: prevQty - 1,
+        quantity: prevQty - mountQty,
         updated_at: new Date().toISOString(),
       })
       .eq('id', inventoryId)
