@@ -78,6 +78,7 @@ const syncRoute = require('./routes/sync');
 const circuitsRoute = require('./routes/circuits');
 const maintenanceRoute = require('./routes/maintenance');
 const inventoryRoute = require('./routes/inventory');
+const pushRoute = require('./routes/push');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
@@ -89,6 +90,7 @@ app.use('/api/auth', authRoute);
 app.use('/api', insightsRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
+app.use('/api/push', pushRoute);
 app.use('/api/circuits', circuitsRoute);
 app.use('/api/maintenance', maintenanceRoute);
 app.use('/api/inventory', inventoryRoute);
@@ -135,4 +137,8 @@ const swaggerSpec = swaggerJSDoc(options);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+}
+
+module.exports = app;

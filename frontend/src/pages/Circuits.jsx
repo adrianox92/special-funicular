@@ -341,7 +341,7 @@ const Circuits = () => {
                     {circuit.num_lanes} carril{circuit.num_lanes !== 1 ? 'es' : ''}
                   </div>
                   {Array.isArray(circuit.lane_lengths) && circuit.lane_lengths.length > 0 && (
-                    <div className="text-muted-foreground">
+                    <div className="text-muted-foreground min-w-0 break-words">
                       Longitudes: {circuit.lane_lengths.map((l, i) => `${i + 1}: ${l}m`).join(', ')}
                     </div>
                   )}

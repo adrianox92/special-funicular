@@ -26,8 +26,214 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table';
+import { Card, CardContent } from './ui/card';
 import './TimingsList.css';
 import { formatDistance } from '../utils/formatUtils';
+
+/** Vista móvil: una tarjeta por grupo (misma agrupación que la tabla desktop). */
+function TimingMobileGroupCard({
+  group,
+  expandedGroups,
+  toggleGroup,
+  getLaneBadgeVariant,
+  setSelectedTiming,
+  setShowSpecsModal,
+  setPerformanceTiming,
+  setShowPerformanceModal,
+  setComparisonSessions,
+  setShowComparisonModal,
+  getSeconds,
+  getTotalSeconds,
+}) {
+  const expanded = expandedGroups.has(group.key);
+  return (
+    <Card>
+      <CardContent className="space-y-3 pt-4">
+        <div className="flex items-start gap-2">
+          {group.sessions.length > 1 ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => toggleGroup(group.key)}
+              title={expanded ? 'Ocultar historial' : 'Ver historial'}
+            >
+              {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+            </Button>
+          ) : (
+            <span className="w-8 shrink-0" aria-hidden />
+          )}
+          <div className="min-w-0 flex-1 space-y-1">
+            <Link to={`/vehicles/${group.vehicle_id}`} className="text-primary hover:underline font-medium break-words">
+              {group.vehicle_manufacturer} {group.vehicle_model}
+            </Link>
+            <p className="text-sm text-muted-foreground break-words">{group.circuit}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={getLaneBadgeVariant(group.lane)}>Carril {group.lane}</Badge>
+              <Badge variant="secondary">{group.best_time.laps || 'N/A'} vueltas</Badge>
+              {group.circuit_ranking ? (
+                <Badge variant={group.circuit_ranking.position === 1 ? 'default' : 'secondary'}>
+                  P{group.circuit_ranking.position}
+                </Badge>
+              ) : null}
+              <Badge>{group.total_sessions} ses.</Badge>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <span className="text-muted-foreground block text-xs">Distancia</span>
+            {formatDistance(group.best_time.total_distance_meters)}
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-xs">Velocidad</span>
+            {group.best_time.avg_speed_kmh != null && group.best_time.avg_speed_scale_kmh != null
+              ? `${Number(group.best_time.avg_speed_kmh).toFixed(1)} km/h (${Number(group.best_time.avg_speed_scale_kmh).toFixed(0)} eq.)`
+              : '—'}
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-xs">Mejor vuelta</span>
+            <span className="font-mono font-medium">{group.best_time.best_lap_time}</span>
+            {group.circuit_ranking && group.circuit_ranking.position > 1 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                <span className="text-destructive">+{group.circuit_ranking.gap_to_leader}s líder</span>
+                <br />
+                <span className="text-amber-600">+{group.circuit_ranking.gap_to_previous}s ant.</span>
+              </div>
+            )}
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-xs">Total</span>
+            <span className="font-mono font-medium">{group.best_time.total_time}</span>
+          </div>
+          <div className="col-span-2">
+            <span className="text-muted-foreground block text-xs">Última sesión</span>
+            {new Date(group.last_session.timing_date).toLocaleDateString()}
+          </div>
+        </div>
+
+        {group.improvement ? (
+          <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-2">
+            <div>
+              <strong className="text-primary">Mejor vuelta:</strong>{' '}
+              <span className="text-green-600 font-medium">-{group.improvement.lap_time_diff}s</span>
+              <span className="text-muted-foreground"> ({group.improvement.lap_percentage}%)</span>
+            </div>
+            <div>
+              <strong className="text-primary">Mejor total:</strong>{' '}
+              <span className="text-green-600 font-medium">-{group.improvement.total_time_diff}s</span>
+              <span className="text-muted-foreground"> ({group.improvement.total_percentage}%)</span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Primera sesión</p>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {group.best_time.setup_snapshot && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedTiming(group.best_time);
+                setShowSpecsModal(true);
+              }}
+            >
+              <Wrench className="size-4 mr-1" />
+              Config.
+            </Button>
+          )}
+          {group.best_time?.has_laps && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPerformanceTiming(group.best_time);
+                setShowPerformanceModal(true);
+              }}
+            >
+              <BarChart3 className="size-4 mr-1" />
+              Rendimiento
+            </Button>
+          )}
+          {group.sessions.length >= 2 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setComparisonSessions(group.sessions);
+                setShowComparisonModal(true);
+              }}
+            >
+              <GitCompare className="size-4 mr-1" />
+              Comparar
+            </Button>
+          )}
+        </div>
+
+        {expanded && group.sessions.length > 1 && (
+          <div className="space-y-2 border-t pt-3">
+            <p className="text-xs font-medium text-muted-foreground">Historial de sesiones</p>
+            {group.sessions
+              .map((s) => ({ ...s, lapSeconds: getSeconds(s.best_lap_time), totalSeconds: getTotalSeconds(s.total_time) }))
+              .sort((a, b) => (a.lapSeconds !== b.lapSeconds ? a.lapSeconds - b.lapSeconds : a.totalSeconds - b.totalSeconds))
+              .map((session, index) => (
+                <div key={`${session.id}-${index}`} className="rounded-md border p-3 text-sm space-y-2 bg-muted/20">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className="text-muted-foreground">{new Date(session.timing_date).toLocaleDateString()}</span>
+                    <Badge variant={getLaneBadgeVariant(session.lane)}>Carril {session.lane}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                    <div>
+                      Mejor: {session.best_lap_time}
+                      {index === 0 && <Badge variant="secondary" className="ml-1 text-[10px]">MV</Badge>}
+                    </div>
+                    <div>
+                      Total: {session.total_time}
+                      {session.totalSeconds === group.improvement?.best_total_session?.totalSeconds && (
+                        <Badge variant="secondary" className="ml-1 text-[10px]">MT</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {session.setup_snapshot && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setSelectedTiming(session);
+                          setShowSpecsModal(true);
+                        }}
+                        title="Especificaciones"
+                      >
+                        <Wrench className="size-4" />
+                      </Button>
+                    )}
+                    {session.has_laps && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setPerformanceTiming(session);
+                          setShowPerformanceModal(true);
+                        }}
+                        title="Rendimiento"
+                      >
+                        <BarChart3 className="size-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 const TimingsList = () => {
   const [timings, setTimings] = useState([]);
@@ -327,7 +533,31 @@ const TimingsList = () => {
         </div>
       )}
 
-      <div className="rounded-md border timings-table-wrapper">
+      <div className="md:hidden space-y-3">
+        {filteredGroups.length === 0 ? (
+          <p className="text-center py-8 text-muted-foreground rounded-md border">No hay registros de tiempo</p>
+        ) : (
+          filteredGroups.map((group) => (
+            <TimingMobileGroupCard
+              key={group.key}
+              group={group}
+              expandedGroups={expandedGroups}
+              toggleGroup={toggleGroup}
+              getLaneBadgeVariant={getLaneBadgeVariant}
+              setSelectedTiming={setSelectedTiming}
+              setShowSpecsModal={setShowSpecsModal}
+              setPerformanceTiming={setPerformanceTiming}
+              setShowPerformanceModal={setShowPerformanceModal}
+              setComparisonSessions={setComparisonSessions}
+              setShowComparisonModal={setShowComparisonModal}
+              getSeconds={getSeconds}
+              getTotalSeconds={getTotalSeconds}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:block rounded-md border timings-table-wrapper">
         <Table>
           <TableHeader>
             <TableRow>

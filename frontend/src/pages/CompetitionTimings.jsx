@@ -724,12 +724,19 @@ const CompetitionTimings = () => {
 
         {/* Tabs para diferentes vistas */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="rounds">Vista por Rondas</TabsTrigger>
-            <TabsTrigger value="participants">
-              Vista por Participantes
+          <TabsList className="grid w-full grid-cols-3 gap-1">
+            <TabsTrigger value="rounds" className="text-xs sm:text-sm px-1 sm:px-3">
+              <span className="sm:hidden">Rondas</span>
+              <span className="hidden sm:inline">Vista por Rondas</span>
             </TabsTrigger>
-            <TabsTrigger value="aggregated">Tiempos Agregados</TabsTrigger>
+            <TabsTrigger value="participants" className="text-xs sm:text-sm px-1 sm:px-3">
+              <span className="sm:hidden">Pilotos</span>
+              <span className="hidden sm:inline">Vista por Participantes</span>
+            </TabsTrigger>
+            <TabsTrigger value="aggregated" className="text-xs sm:text-sm px-1 sm:px-3">
+              <span className="sm:hidden">Clasif.</span>
+              <span className="hidden sm:inline">Tiempos Agregados</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="rounds" className="mt-4">
@@ -1107,36 +1114,38 @@ const CompetitionTimings = () => {
                       </div>
 
                       {timingsByParticipant[participant.id]?.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Ronda</TableHead>
-                              <TableHead>Mejor</TableHead>
-                              <TableHead>Total</TableHead>
-                              <TableHead>Promedio</TableHead>
-                              <TableHead>Vueltas</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {timingsByParticipant[participant.id].map(
-                              (timing) => (
-                                <TableRow key={timing.id}>
-                                  <TableCell>{timing.round_number}</TableCell>
-                                  <TableCell>
-                                    {formatTime(timing.best_lap_time)}
-                                  </TableCell>
-                                  <TableCell>
-                                    {formatTime(timing.total_time)}
-                                  </TableCell>
-                                  <TableCell>
-                                    {formatTime(timing.average_time)}
-                                  </TableCell>
-                                  <TableCell>{timing.laps}</TableCell>
-                                </TableRow>
-                              )
-                            )}
-                          </TableBody>
-                        </Table>
+                        <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Ronda</TableHead>
+                                <TableHead>Mejor</TableHead>
+                                <TableHead>Total</TableHead>
+                                <TableHead>Promedio</TableHead>
+                                <TableHead>Vueltas</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {timingsByParticipant[participant.id].map(
+                                (timing) => (
+                                  <TableRow key={timing.id}>
+                                    <TableCell>{timing.round_number}</TableCell>
+                                    <TableCell>
+                                      {formatTime(timing.best_lap_time)}
+                                    </TableCell>
+                                    <TableCell>
+                                      {formatTime(timing.total_time)}
+                                    </TableCell>
+                                    <TableCell>
+                                      {formatTime(timing.average_time)}
+                                    </TableCell>
+                                    <TableCell>{timing.laps}</TableCell>
+                                  </TableRow>
+                                )
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
                       ) : (
                         <p className="text-muted-foreground text-sm">
                           Sin tiempos registrados

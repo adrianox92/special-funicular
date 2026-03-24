@@ -81,6 +81,9 @@ const VehicleList = () => {
   const [viewMode, setViewMode] = useState(() => {
     try { return localStorage.getItem('vehicleViewMode') || 'grid'; } catch { return 'grid'; }
   });
+  const [narrowPagination, setNarrowPagination] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false
+  );
   const [pageSize, setPageSize] = useState(() => {
     try {
       const stored = parseInt(localStorage.getItem('vehiclePageSize'), 10);
@@ -131,6 +134,14 @@ const VehicleList = () => {
       loadVehicles(currentPage, pageSize);
     }
   }, [currentPage, pageSize, hasActiveFilters, loadVehicles]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const onChange = () => setNarrowPagination(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
@@ -246,7 +257,7 @@ const VehicleList = () => {
     }
   };
 
-  const maxPages = 5;
+  const maxPages = narrowPagination ? 3 : 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
   let endPage = Math.min(filteredTotalPages, startPage + maxPages - 1);
   if (endPage - startPage + 1 < maxPages) startPage = Math.max(1, endPage - maxPages + 1);
@@ -260,7 +271,7 @@ const VehicleList = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold">Mi Colección</h1>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <div className="flex border rounded-md p-0.5" role="group" aria-label="Vista">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
@@ -343,7 +354,9 @@ const VehicleList = () => {
           ))}
         </div>
       ) : (
-        <VehicleTable vehicles={displayVehicles} onDelete={handleDeleteVehicle} />
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <VehicleTable vehicles={displayVehicles} onDelete={handleDeleteVehicle} />
+        </div>
       )}
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
@@ -354,7 +367,7 @@ const VehicleList = () => {
             <>No hay vehículos</>
           )}
         </div>
-        <div className="flex items-center gap-2 order-1 sm:order-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 order-1 sm:order-2">
           {filteredTotalPages > 1 && (
             <>
               <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Anterior</Button>

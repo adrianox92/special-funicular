@@ -10,7 +10,7 @@ Esta aplicación está configurada como una **Progressive Web App (PWA)**, lo qu
 
 - **Instalable**: Puedes instalar la app en tu dispositivo desde el navegador
 - **Funcionamiento offline**: La aplicación funciona sin conexión a internet
-- **Notificaciones push**: Recibe notificaciones de competiciones y actualizaciones
+- **Notificaciones push**: Tras activarlas en Mi Perfil (y configurar VAPID en el servidor), avisos al mejorar tu récord vía la API de sincronización y al subir en el ranking
 - **Experiencia nativa**: Se comporta como una aplicación móvil nativa
 - **Actualizaciones automáticas**: Se actualiza automáticamente cuando hay nuevas versiones
 
@@ -790,6 +790,30 @@ Estos endpoints permiten a proyectos externos leer vehículos y registrar tiempo
 GET /api/sync/vehicles HTTP/1.1
 X-API-Key: tu_api_key_aqui
 ```
+
+### Notificaciones push (récord personal vía sync)
+
+Si activas las notificaciones en **Mi Perfil**, el navegador puede mostrar avisos cuando:
+
+- Un tiempo creado con `POST /api/sync/timings` **mejora** tu mejor vuelta previa en el mismo contexto: mismo `vehicle_id`, `circuit_id`, `lane` y `laps` (solo si el timing lleva `circuit_id`; conviene usar `circuit_id` o nombre de circuito que resuelva a ID).
+- Tras actualizar el ranking, si **subes posiciones** en ese circuito.
+
+**Migración:** ejecuta en Supabase SQL Editor el contenido de `backend/scripts/add-push-subscriptions.sql` (tabla `push_subscriptions`).
+
+**Variables de entorno (backend):**
+
+- `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` — genera un par con `npx web-push generate-vapid-keys` en la carpeta `backend`.
+- `VAPID_SUBJECT` (opcional) — contacto del propietario, p. ej. `mailto:tu@email.com` (por defecto el backend usa un valor genérico si no está definido).
+
+**Frontend (opcional):** `REACT_APP_VAPID_PUBLIC_KEY` con la misma clave pública que en el backend. Si no la defines, la app intentará obtenerla con `GET /api/push/vapid-public-key` (requiere sesión).
+
+**Endpoints (JWT):**
+
+- `GET /api/push/vapid-public-key` — clave pública VAPID.
+- `POST /api/push/subscribe` — body `{ endpoint, keys: { p256dh, auth } }` (formato `PushSubscription.toJSON()`).
+- `DELETE /api/push/unsubscribe` — body `{ endpoint }`.
+
+El **service worker** (`frontend/public/service-worker.js`) muestra la notificación y al pulsar abre la URL enviada en el payload (p. ej. ficha del vehículo o `/timings`).
 
 ### Migración de base de datos
 

@@ -75,3 +75,58 @@ self.addEventListener("message", event => {
     event.ports[0].postMessage({ version: CACHE_NAME });
   }
 });
+
+// Web Push (récord personal / ranking vía API sync)
+self.addEventListener("push", (event) => {
+  let title = "Scalextric Collection";
+  let body = "";
+  let data = {};
+
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      title = parsed.title || title;
+      body = parsed.body || "";
+      data = parsed.data && typeof parsed.data === "object" ? parsed.data : {};
+    }
+  } catch (e) {
+    body = event.data ? event.data.text() : "";
+  }
+
+  const tag = data.type ? `scalextric-${data.type}` : "scalextric-push";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/logo192.png",
+      badge: "/logo192.png",
+      data,
+      tag,
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const d = event.notification.data || {};
+  const rel = d.url || "/timings";
+  const origin = self.location.origin;
+  const fullUrl =
+    rel.startsWith("http") ? rel : origin + (rel.startsWith("/") ? rel : "/" + rel);
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.startsWith(origin) && "focus" in client) {
+          if (typeof client.navigate === "function") {
+            client.navigate(fullUrl);
+          }
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(fullUrl);
+      }
+    })
+  );
+});

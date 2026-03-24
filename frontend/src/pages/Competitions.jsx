@@ -310,9 +310,9 @@ const Competitions = () => {
           {competitions.map((competition) => (
             <Card key={competition.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5">
               <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-4">
-                  <h5 className="font-semibold text-lg">{competition.name}</h5>
-                  <Badge variant={competition.participants_count >= competition.num_slots ? 'default' : 'secondary'}>
+                <div className="flex justify-between items-start gap-2 mb-4 min-w-0">
+                  <h5 className="font-semibold text-lg min-w-0 flex-1 truncate">{competition.name}</h5>
+                  <Badge variant={competition.participants_count >= competition.num_slots ? 'default' : 'secondary'} className="shrink-0">
                     {competition.participants_count}/{competition.num_slots}
                   </Badge>
                 </div>

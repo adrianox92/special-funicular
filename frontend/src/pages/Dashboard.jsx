@@ -25,6 +25,7 @@ import TopComponentsTable from '../components/tables/TopComponentsTable';
 import PerformanceByTypeChart from '../components/charts/PerformanceByTypeChart';
 import InvestmentTimelineChart from '../components/charts/InvestmentTimelineChart';
 import InsightsCarousel from '../components/InsightsCarousel';
+import DashboardActionBlocks from '../components/DashboardActionBlocks';
 import LaneComparisonChart from '../components/LaneComparisonChart';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
@@ -77,6 +78,8 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionItems, setActionItems] = useState(null);
+  const [actionItemsError, setActionItemsError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,6 +90,16 @@ const Dashboard = () => {
         ]);
         setMetrics(metricsResponse.data);
         setChartsData(chartsResponse.data);
+
+        try {
+          const actionResponse = await api.get('/dashboard/action-items');
+          setActionItems(actionResponse.data);
+          setActionItemsError(false);
+        } catch (actionErr) {
+          console.error('Error al cargar acciones del dashboard:', actionErr);
+          setActionItems(null);
+          setActionItemsError(true);
+        }
       } catch (err) {
         console.error('Error al cargar datos del dashboard:', err);
         setError('Error al cargar los datos del dashboard');
@@ -188,6 +201,8 @@ const Dashboard = () => {
           </div>
         </div>
 
+        <DashboardActionBlocks data={actionItems} loadError={actionItemsError} />
+
         <Card className="border-dashed bg-muted/30">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
             <div
@@ -254,6 +269,8 @@ const Dashboard = () => {
           </Button>
         </div>
       </div>
+
+      <DashboardActionBlocks data={actionItems} loadError={actionItemsError} />
 
       <InsightsCarousel />
 
@@ -409,8 +426,12 @@ const Dashboard = () => {
           description="Evolución del valor invertido y rankings de coste y componentes."
         />
         <InvestmentTimelineChart data={metrics.investmentHistory || []} />
-        <TopCostTable data={chartsData.topCostVehicles || []} />
-        <TopComponentsTable data={chartsData.topComponents || []} />
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TopCostTable data={chartsData.topCostVehicles || []} />
+        </div>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TopComponentsTable data={chartsData.topComponents || []} />
+        </div>
       </section>
     </div>
   );

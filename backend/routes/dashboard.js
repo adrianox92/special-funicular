@@ -3,8 +3,116 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
 const { modificationLineTotal } = require('../lib/componentPricing');
+const { resolveStaleDaysThreshold } = require('../lib/userPreferences');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+/** Categorías de inventario consideradas críticas para alertas en dashboard. */
+const CRITICAL_INVENTORY_CATEGORIES = new Set([
+  'motor',
+  'guide',
+  'pinion',
+  'crown',
+  'neumaticos',
+  'front_wheel',
+  'rear_wheel',
+  'front_axle',
+  'rear_axle',
+]);
+
+/**
+ * Progreso de tiempos por competición (misma lógica que GET /competitions/:id/progress).
+ * @returns {Promise<Array<{ id: string, name: string, rounds: number, circuit_name: string|null, created_at: string, participants_count: number, times_registered: number, total_required_times: number, times_remaining: number, is_completed: boolean }>>}
+ */
+async function getCompetitionProgressSummaries(organizerId) {
+  const { data: competitions, error: compErr } = await supabase
+    .from('competitions')
+    .select('id, name, rounds, circuit_name, created_at')
+    .eq('organizer', organizerId)
+    .order('created_at', { ascending: false });
+
+  if (compErr) {
+    console.error('getCompetitionProgressSummaries competitions:', compErr);
+    return [];
+  }
+  if (!competitions?.length) return [];
+
+  const compIds = competitions.map((c) => c.id);
+  const { data: participants, error: partErr } = await supabase
+    .from('competition_participants')
+    .select('id, competition_id')
+    .in('competition_id', compIds);
+
+  if (partErr) {
+    console.error('getCompetitionProgressSummaries participants:', partErr);
+    return [];
+  }
+
+  const participantToComp = new Map();
+  const partsByComp = new Map();
+  for (const p of participants || []) {
+    participantToComp.set(p.id, p.competition_id);
+    if (!partsByComp.has(p.competition_id)) partsByComp.set(p.competition_id, []);
+    partsByComp.get(p.competition_id).push(p.id);
+  }
+
+  const allPartIds = (participants || []).map((p) => p.id);
+  let timesPerComp = new Map();
+  if (allPartIds.length > 0) {
+    const { data: timings, error: timErr } = await supabase
+      .from('competition_timings')
+      .select('participant_id')
+      .in('participant_id', allPartIds);
+
+    if (timErr) {
+      console.error('getCompetitionProgressSummaries timings:', timErr);
+    } else {
+      for (const t of timings || []) {
+        const compId = participantToComp.get(t.participant_id);
+        if (!compId) continue;
+        timesPerComp.set(compId, (timesPerComp.get(compId) || 0) + 1);
+      }
+    }
+  }
+
+  return competitions.map((c) => {
+    const participantsCount = partsByComp.get(c.id)?.length || 0;
+    const timesRegistered = timesPerComp.get(c.id) || 0;
+    const totalRequiredTimes = participantsCount * (c.rounds || 0);
+    const isCompleted = totalRequiredTimes > 0 && timesRegistered >= totalRequiredTimes;
+    const timesRemaining = Math.max(0, totalRequiredTimes - timesRegistered);
+    return {
+      id: c.id,
+      name: c.name,
+      rounds: c.rounds,
+      circuit_name: c.circuit_name,
+      created_at: c.created_at,
+      participants_count: participantsCount,
+      times_registered: timesRegistered,
+      total_required_times: totalRequiredTimes,
+      times_remaining: timesRemaining,
+      is_completed: isCompleted,
+    };
+  });
+}
+
+function circuitSessionKey(row) {
+  if (row.circuit_id) return `id:${row.circuit_id}`;
+  const name = (row.circuit && String(row.circuit).trim()) || '';
+  return `n:${name}`;
+}
+
+function circuitLabelFromKey(key, rowsSample) {
+  if (!key) return null;
+  if (key.startsWith('id:')) {
+    const row = rowsSample.find((r) => r.circuit_id && `id:${r.circuit_id}` === key);
+    if (row?.circuits?.name) return row.circuits.name;
+  }
+  const row = rowsSample.find((r) => circuitSessionKey(r) === key);
+  if (row?.circuits?.name) return row.circuits.name;
+  if (key.startsWith('n:')) return key.slice(2) || null;
+  return key;
+}
 
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
@@ -26,7 +134,7 @@ const timeToSeconds = (timeStr) => {
 };
 
 // Función para calcular tendencias basadas en datos históricos
-const calculateTrends = async (userId) => {
+const calculateTrends = async (userId, options = {}) => {
   const now = new Date();
   const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
   const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
@@ -156,35 +264,30 @@ const calculateTrends = async (userId) => {
       }
     };
 
-    // Obtener datos de competiciones activas
+    // Competiciones: organizador + progreso de tiempos (sin depender de columnas user_id/status)
     try {
-      const { data: activeCompetitions, error: competitionsError } = await supabase
-        .from('competitions')
-        .select('id, name, status, created_at')
-        .eq('user_id', userId)
-        .in('status', ['en_curso', 'pendiente'])
-        .gte('created_at', oneWeekAgo.toISOString());
-
-      if (!competitionsError && activeCompetitions) {
-        const newCompetitions = activeCompetitions.filter(c => {
-          const createdDate = new Date(c.created_at);
-          return createdDate >= oneWeekAgo;
-        });
-
-        trends.activeCompetitions = {
-          trend: newCompetitions.length > 0 ? 'up' : 'stable',
-          value: newCompetitions.length > 0 ? `+${newCompetitions.length} esta semana` : `${activeCompetitions.length} activas`
-        };
-      } else {
-        trends.activeCompetitions = {
-          trend: 'stable',
-          value: 'Sin datos'
-        };
+      let summaries = options.competitionSummaries;
+      if (!Array.isArray(summaries)) {
+        summaries = await getCompetitionProgressSummaries(userId);
       }
+      const incomplete = summaries.filter(
+        (s) => s.participants_count > 0 && !s.is_completed,
+      ).length;
+      const newThisWeek = summaries.filter((s) => new Date(s.created_at) >= oneWeekAgo).length;
+
+      trends.activeCompetitions = {
+        trend: newThisWeek > 0 ? 'up' : 'stable',
+        value:
+          newThisWeek > 0
+            ? `+${newThisWeek} esta semana`
+            : incomplete > 0
+              ? `${incomplete} con tiempos pendientes`
+              : 'Al día',
+      };
     } catch (error) {
       trends.activeCompetitions = {
         trend: 'stable',
-        value: 'Sin datos'
+        value: 'Sin datos',
       };
     }
 
@@ -464,17 +567,18 @@ router.get('/metrics', async (req, res) => {
       lane: bestTimeVehicle.lane || 'No especificado'
     } : null;
 
-    // Calcular tendencias reales
-    const trends = await calculateTrends(req.user.id);
+    let competitionSummaries = [];
+    try {
+      competitionSummaries = await getCompetitionProgressSummaries(req.user.id);
+    } catch (e) {
+      console.error('Métricas: resumen de competiciones:', e);
+    }
 
-    // Obtener número de competiciones activas
-    const { data: activeCompetitions, error: competitionsError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('user_id', req.user.id)
-      .in('status', ['en_curso', 'pendiente']);
+    const trends = await calculateTrends(req.user.id, { competitionSummaries });
 
-    const activeCompetitionsCount = competitionsError ? 0 : (activeCompetitions?.length || 0);
+    const activeCompetitionsCount = competitionSummaries.filter(
+      (s) => s.participants_count > 0 && !s.is_completed,
+    ).length;
 
     res.json({
       totalVehicles,
@@ -731,6 +835,173 @@ router.get('/charts', async (req, res) => {
   } catch (error) {
     console.error('Error al obtener datos de gráficos:', error);
     res.status(500).json({ error: 'Error al obtener datos de gráficos' });
+  }
+});
+
+router.get('/action-items', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const staleDaysThreshold = resolveStaleDaysThreshold(req.user);
+    const generatedAt = new Date().toISOString();
+
+    const competitionSummaries = await getCompetitionProgressSummaries(userId);
+
+    const withParticipantsIncomplete = competitionSummaries.filter(
+      (s) => s.participants_count > 0 && !s.is_completed,
+    );
+
+    const sortedByRecent = [...withParticipantsIncomplete].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at),
+    );
+    const pickNext = sortedByRecent[0];
+    const nextCompetition = pickNext
+      ? {
+          id: pickNext.id,
+          name: pickNext.name,
+          circuit_name: pickNext.circuit_name,
+          times_remaining: pickNext.times_remaining,
+          times_registered: pickNext.times_registered,
+          total_required_times: pickNext.total_required_times,
+          progress_percentage:
+            pickNext.total_required_times > 0
+              ? Math.round((pickNext.times_registered / pickNext.total_required_times) * 100)
+              : 0,
+        }
+      : null;
+
+    const openCompetitionTimings = [...withParticipantsIncomplete]
+      .sort((a, b) => b.times_remaining - a.times_remaining)
+      .slice(0, 5)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        circuit_name: s.circuit_name,
+        times_remaining: s.times_remaining,
+        times_registered: s.times_registered,
+        total_required_times: s.total_required_times,
+        progress_percentage:
+          s.total_required_times > 0
+            ? Math.round((s.times_registered / s.total_required_times) * 100)
+            : 0,
+      }));
+
+    const { data: vehicles, error: vehErr } = await supabase
+      .from('vehicles')
+      .select('id, model, manufacturer')
+      .eq('user_id', userId);
+
+    if (vehErr) {
+      console.error('action-items vehicles:', vehErr);
+    }
+
+    const vehicleIds = (vehicles || []).map((v) => v.id);
+    let usualCircuit = null;
+    let staleVehiclesAtUsualCircuit = [];
+
+    if (vehicleIds.length > 0) {
+      const { data: vtRows, error: vtErr } = await supabase
+        .from('vehicle_timings')
+        .select('vehicle_id, timing_date, circuit_id, circuit, circuits(id, name)')
+        .in('vehicle_id', vehicleIds);
+
+      if (vtErr) {
+        console.error('action-items vehicle_timings:', vtErr);
+      } else if (vtRows?.length) {
+        const counts = new Map();
+        for (const row of vtRows) {
+          const k = circuitSessionKey(row);
+          counts.set(k, (counts.get(k) || 0) + 1);
+        }
+        let maxKey = null;
+        let maxCount = 0;
+        for (const [k, c] of counts) {
+          if (c > maxCount) {
+            maxCount = c;
+            maxKey = k;
+          }
+        }
+        if (maxKey) {
+          const label =
+            circuitLabelFromKey(maxKey, vtRows) || (maxKey.startsWith('n:') ? maxKey.slice(2) : 'Circuito habitual');
+          usualCircuit = {
+            key: maxKey,
+            name: label || 'Circuito habitual',
+            session_count: maxCount,
+          };
+
+          const thresholdMs = Date.now() - staleDaysThreshold * 24 * 60 * 60 * 1000;
+          const lastByVehicle = new Map();
+          for (const row of vtRows) {
+            if (circuitSessionKey(row) !== maxKey) continue;
+            const vid = row.vehicle_id;
+            const t = new Date(row.timing_date).getTime();
+            if (Number.isNaN(t)) continue;
+            if (!lastByVehicle.has(vid) || t > lastByVehicle.get(vid)) {
+              lastByVehicle.set(vid, t);
+            }
+          }
+
+          for (const v of vehicles || []) {
+            if (!lastByVehicle.has(v.id)) continue;
+            const last = lastByVehicle.get(v.id);
+            if (last < thresholdMs) {
+              staleVehiclesAtUsualCircuit.push({
+                id: v.id,
+                model: v.model,
+                manufacturer: v.manufacturer,
+                last_session_at: new Date(last).toISOString(),
+                days_since: Math.floor((Date.now() - last) / (24 * 60 * 60 * 1000)),
+              });
+            }
+          }
+          staleVehiclesAtUsualCircuit.sort((a, b) => b.days_since - a.days_since);
+          staleVehiclesAtUsualCircuit = staleVehiclesAtUsualCircuit.slice(0, 5);
+        }
+      }
+    }
+
+    const { data: invRows, error: invErr } = await supabase
+      .from('inventory_items')
+      .select('id, name, reference, category, quantity, min_stock')
+      .eq('user_id', userId);
+
+    if (invErr) {
+      console.error('action-items inventory:', invErr);
+    }
+
+    let lowStockCritical = [];
+    if (!invErr && invRows?.length) {
+      lowStockCritical = invRows
+        .filter(
+          (r) =>
+            r.min_stock != null &&
+            Number(r.quantity) <= Number(r.min_stock) &&
+            CRITICAL_INVENTORY_CATEGORIES.has(String(r.category)),
+        )
+        .sort((a, b) => Number(a.quantity) - Number(b.quantity))
+        .slice(0, 5)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          reference: r.reference,
+          category: r.category,
+          quantity: r.quantity,
+          min_stock: r.min_stock,
+        }));
+    }
+
+    res.json({
+      generatedAt,
+      staleDaysThreshold,
+      nextCompetition,
+      openCompetitionTimings,
+      usualCircuit,
+      staleVehiclesAtUsualCircuit,
+      lowStockCritical,
+    });
+  } catch (error) {
+    console.error('Error al obtener action-items del dashboard:', error);
+    res.status(500).json({ error: 'Error al obtener datos accionables del dashboard' });
   }
 });
 
