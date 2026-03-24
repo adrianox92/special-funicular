@@ -16,6 +16,7 @@ import {
   TableRow,
 } from './ui/table';
 import { formatDistance, modificationLineTotal } from '../utils/formatUtils';
+import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 import LapBreakdownChart from './charts/LapBreakdownChart';
 import api from '../lib/axios';
 
@@ -45,21 +46,6 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
       groups[spec.component_type].push(spec);
     });
     return groups;
-  };
-
-  const componentTypeLabels = {
-    chassis: 'Chasis',
-    motor: 'Motor',
-    crown: 'Corona',
-    pinion: 'Piñón',
-    guide: 'Guía',
-    front_axle: 'Eje Delantero',
-    rear_axle: 'Eje Trasero',
-    front_wheel: 'Rueda Delantera',
-    rear_wheel: 'Rueda Trasera',
-    front_rim: 'Llanta Delantera',
-    rear_rim: 'Llanta Trasera',
-    other: 'Otros'
   };
 
   const getColumnsForType = (type) => {
@@ -191,7 +177,7 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
           <h6 className="font-semibold">Componentes del Vehículo</h6>
           {Object.entries(groupedSpecs).map(([type, components]) => (
             <div key={type} className="space-y-2">
-              <h5 className="font-medium">{componentTypeLabels[type] || type}</h5>
+              <h5 className="font-medium">{getVehicleComponentTypeLabel(type)}</h5>
               <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>

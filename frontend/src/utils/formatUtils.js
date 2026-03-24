@@ -1,3 +1,8 @@
+import {
+  getVehicleComponentTypeLabel,
+  inventoryVehicleCategoryValues,
+} from '../data/componentTypes';
+
 /**
  * Convierte valores null/undefined o la cadena "null" a cadena vacía para mostrar en inputs.
  * Evita que se muestre el texto "null" cuando los campos están vacíos.
@@ -95,19 +100,12 @@ export function formatMaintenanceKind(kind) {
   return found ? found.label : String(kind);
 }
 
-/** Categorías de inventario (alineadas con backend/routes/inventory.js). */
+/** Categorías de inventario (alineadas con backend/routes/inventory.js). Etiquetas de piezas = componentTypes. */
 export const INVENTORY_CATEGORIES = [
-  { value: 'pinion', label: 'Piñón' },
-  { value: 'crown', label: 'Corona' },
-  { value: 'motor', label: 'Motor' },
-  { value: 'guide', label: 'Guía' },
-  { value: 'chassis', label: 'Chasis' },
-  { value: 'front_wheel', label: 'Rueda delantera' },
-  { value: 'rear_wheel', label: 'Rueda trasera' },
-  { value: 'front_rim', label: 'Llanta delantera' },
-  { value: 'rear_rim', label: 'Llanta trasera' },
-  { value: 'front_axle', label: 'Eje delantero' },
-  { value: 'rear_axle', label: 'Eje trasero' },
+  ...inventoryVehicleCategoryValues.map((value) => ({
+    value,
+    label: getVehicleComponentTypeLabel(value),
+  })),
   { value: 'aceite', label: 'Aceite / lubricante' },
   { value: 'limpiador', label: 'Limpiador' },
   { value: 'electronica', label: 'Electrónica' },

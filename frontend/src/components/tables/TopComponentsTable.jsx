@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
+import { getVehicleComponentTypeLabel } from '../../data/componentTypes';
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('es-ES', {
@@ -31,21 +32,6 @@ const formatCurrency = (value) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(value);
-};
-
-const componentTypeLabels = {
-  chassis: 'Chasis',
-  motor: 'Motor',
-  crown: 'Corona',
-  pinion: 'Piñón',
-  guide: 'Guía',
-  front_axle: 'Eje Delantero',
-  rear_axle: 'Eje Trasero',
-  front_wheel: 'Rueda Delantera',
-  rear_wheel: 'Rueda Trasera',
-  front_rim: 'Llanta Delantera',
-  rear_rim: 'Llanta Trasera',
-  other: 'Otros'
 };
 
 const TopComponentsTable = ({ data }) => {
@@ -148,7 +134,7 @@ const TopComponentsTable = ({ data }) => {
             <TableBody>
               {sortedData.map((component) => (
                 <TableRow key={component.id}>
-                  <TableCell>{componentTypeLabels[component.component_type] || component.component_type}</TableCell>
+                  <TableCell>{getVehicleComponentTypeLabel(component.component_type)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {renderComponentLinks(component)}

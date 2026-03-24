@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { formatDistance } from '../utils/formatUtils';
+import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '../components/ui/input';
@@ -193,8 +194,18 @@ const VehicleList = () => {
       const csvContent = [
         headers.join(','),
         ...vehiclesWithDetails.map(vehicle => {
-          const specs = vehicle.specs.map(s => `${s.component_type}: ${s.element} (${s.manufacturer})`).join('; ');
-          const mods = vehicle.modifications.map(m => `${m.component_type}: ${m.element} (${m.manufacturer}) - ${m.price}€`).join('; ');
+          const specs = vehicle.specs
+            .map(
+              (s) =>
+                `${getVehicleComponentTypeLabel(s.component_type)}: ${s.element} (${s.manufacturer})`,
+            )
+            .join('; ');
+          const mods = vehicle.modifications
+            .map(
+              (m) =>
+                `${getVehicleComponentTypeLabel(m.component_type)}: ${m.element} (${m.manufacturer}) - ${m.price}€`,
+            )
+            .join('; ');
           const scaleStr = vehicle.scale_factor ? `1:${vehicle.scale_factor}` : '';
           const odometerStr = formatDistance(vehicle.total_distance_meters);
           const anotaciones = vehicle.anotaciones != null && vehicle.anotaciones !== '' && String(vehicle.anotaciones) !== 'null' ? String(vehicle.anotaciones) : '';

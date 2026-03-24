@@ -24,6 +24,7 @@ import {
 } from 'recharts';
 import { Check } from 'lucide-react';
 import { formatDistance } from '../utils/formatUtils';
+import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 
 const formatTime = (seconds) => {
   if (seconds == null || seconds === 0) return '—';
@@ -40,21 +41,6 @@ const timeToSeconds = (val) => {
   if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + parseInt(m[3].padStart(3, '0'), 10) / 1000;
   const n = parseFloat(str.replace(',', '.'));
   return isNaN(n) ? null : n;
-};
-
-const componentTypeLabels = {
-  chassis: 'Chasis',
-  motor: 'Motor',
-  crown: 'Corona',
-  pinion: 'Piñón',
-  guide: 'Guía',
-  front_axle: 'Eje Delantero',
-  rear_axle: 'Eje Trasero',
-  front_wheel: 'Rueda Delantera',
-  rear_wheel: 'Rueda Trasera',
-  front_rim: 'Llanta Delantera',
-  rear_rim: 'Llanta Trasera',
-  other: 'Otros',
 };
 
 export const getConfigFingerprint = (snapshot) => {
@@ -106,7 +92,7 @@ const getKeyDiffs = (prevSpecs, currSpecs) => {
     const pStr = p.map((x) => `${x.element || ''}|${x.teeth ?? ''}|${x.rpm ?? ''}`).sort().join(';');
     const cStr = c.map((x) => `${x.element || ''}|${x.teeth ?? ''}|${x.rpm ?? ''}`).sort().join(';');
     if (pStr !== cStr) {
-      const label = componentTypeLabels[type] || type;
+      const label = getVehicleComponentTypeLabel(type);
       const pDesc = p.length ? p.map((x) => (x.teeth != null ? `${x.element || '-'} ${x.teeth}T` : x.rpm != null ? `${x.element || '-'} ${x.rpm}RPM` : x.element || '-')).join(', ') : '—';
       const cDesc = c.length ? c.map((x) => (x.teeth != null ? `${x.element || '-'} ${x.teeth}T` : x.rpm != null ? `${x.element || '-'} ${x.rpm}RPM` : x.element || '-')).join(', ') : '—';
       diffs.push(`${label}: ${pDesc} → ${cDesc}`);
