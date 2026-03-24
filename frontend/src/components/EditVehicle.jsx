@@ -130,6 +130,26 @@ function vehicleSpecSnapshotsDiffer(prev, next) {
   return false;
 }
 
+/** Solo sube cantidad (misma pieza): guardar directo y descontar stock en servidor si aplica. */
+function getModificationSaveDialogInfo(baseline, editing) {
+  if (!baseline || !editing || !vehicleSpecSnapshotsDiffer(baseline, editing)) {
+    return { mode: 'save_direct' };
+  }
+  const keysNoQty = VEHICLE_SPEC_SNAPSHOT_KEYS.filter((k) => k !== 'mounted_qty');
+  const othersChanged = keysNoQty.some(
+    (k) => normalizeSpecSnapshotValue(baseline[k]) !== normalizeSpecSnapshotValue(editing[k]),
+  );
+  const prevQ = Math.max(1, parseInt(baseline.mounted_qty, 10) || 1);
+  const nextQ = Math.max(1, parseInt(editing.mounted_qty, 10) || 1);
+  if (!othersChanged && nextQ > prevQ) {
+    return { mode: 'save_direct' };
+  }
+  if (!othersChanged && nextQ < prevQ) {
+    return { mode: 'ask_inventory_return', removedQty: prevQ - nextQ };
+  }
+  return { mode: 'ask_inventory_return', removedQty: prevQ };
+}
+
 const EditVehicle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -583,6 +603,10 @@ const EditVehicle = () => {
         toast.warning(`Cambios guardados, pero no se pudo añadir al inventario: ${res.data.inventory_return_error}`);
       } else if (isModificationTab && returnRemovedToInventory) {
         toast.success('Modificación actualizada y pieza retirada añadida al inventario');
+      } else if (isModificationTab && res.data?.inventory_deducted_qty) {
+        toast.success(
+          `Modificación guardada; se descontaron ${res.data.inventory_deducted_qty} ud(s) del inventario`,
+        );
       }
     } else {
       await api.post(`/vehicles/${id}/technical-specs`, specData);
@@ -694,15 +718,19 @@ const EditVehicle = () => {
       }
 
       if (editingSpec) {
-        const shouldAskReturn =
-          isModificationTab &&
-          specEditBaseline &&
-          vehicleSpecSnapshotsDiffer(specEditBaseline, editingSpec);
-        if (shouldAskReturn) {
-          const removedQty = Math.max(1, parseInt(specEditBaseline.mounted_qty, 10) || 1);
-          setPendingSpecSave({ specData, isModificationTab, removedQty });
-          setSpecReturnDialogOpen(true);
-          return;
+        const historyDiffers =
+          specEditBaseline && vehicleSpecSnapshotsDiffer(specEditBaseline, editingSpec);
+        if (isModificationTab && historyDiffers && specEditBaseline) {
+          const dialogInfo = getModificationSaveDialogInfo(specEditBaseline, editingSpec);
+          if (dialogInfo.mode === 'ask_inventory_return') {
+            setPendingSpecSave({
+              specData,
+              isModificationTab,
+              removedQty: dialogInfo.removedQty,
+            });
+            setSpecReturnDialogOpen(true);
+            return;
+          }
         }
         await persistVehicleSpec({
           fromInventory: false,

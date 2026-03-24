@@ -580,6 +580,7 @@ router.post('/:id/mount', async (req, res) => {
       sku: item.reference || null,
       description: mergeSpecText(description, item.description),
       mounted_qty: mountQty,
+      source_inventory_item_id: inventoryId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

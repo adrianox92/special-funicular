@@ -10,6 +10,7 @@ const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
 const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFromComponent');
+const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/inventoryStockOps');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -65,6 +66,12 @@ function modificationSnapshotsDiffer(prev, next) {
     if (normalizeComponentValue(prev[k]) !== normalizeComponentValue(next[k])) return true;
   }
   return false;
+}
+
+function listChangedSnapshotKeys(prev, next) {
+  return COMPONENT_PAYLOAD_KEYS.filter(
+    (k) => normalizeComponentValue(prev[k]) !== normalizeComponentValue(next[k])
+  );
 }
 
 function parseChangeEffectiveDate(raw) {
@@ -847,6 +854,34 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     const shouldRecordHistory =
       is_modification === true && modificationSnapshotsDiffer(prevSnap, nextSnap);
 
+    const changedKeys = listChangedSnapshotKeys(prevSnap, nextSnap);
+    const onlyMountedQtyChanged = changedKeys.length === 1 && changedKeys[0] === 'mounted_qty';
+    const oldQ = Math.max(1, parseInt(existingComponent.mounted_qty, 10) || 1);
+    const newQ = Math.max(1, parseInt(nextSnap.mounted_qty, 10) || 1);
+
+    let deductMeta = null;
+    if (
+      is_modification === true &&
+      onlyMountedQtyChanged &&
+      newQ > oldQ &&
+      existingComponent.source_inventory_item_id
+    ) {
+      const delta = newQ - oldQ;
+      const dres = await deductInventoryQuantity(supabase, {
+        userId: req.user.id,
+        itemId: existingComponent.source_inventory_item_id,
+        qty: delta,
+      });
+      if (!dres.ok) {
+        return res.status(409).json({ error: dres.error });
+      }
+      deductMeta = {
+        itemId: existingComponent.source_inventory_item_id,
+        qty: delta,
+        quantityAfter: dres.newQuantity,
+      };
+    }
+
     let insertedHistoryId = null;
     if (shouldRecordHistory) {
       const effectiveDate = parseChangeEffectiveDate(change_effective_date);
@@ -863,6 +898,14 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
         .select('id')
         .single();
       if (histInsertError) {
+        if (deductMeta) {
+          await restoreInventoryQuantity(supabase, {
+            userId: req.user.id,
+            itemId: deductMeta.itemId,
+            qty: deductMeta.qty,
+            quantityMustBe: deductMeta.quantityAfter,
+          });
+        }
         return res.status(500).json({ error: histInsertError.message });
       }
       insertedHistoryId = insertedHist?.id;
@@ -879,6 +922,14 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     if (updateError) {
       if (insertedHistoryId) {
         await supabase.from('component_modification_history').delete().eq('id', insertedHistoryId);
+      }
+      if (deductMeta) {
+        await restoreInventoryQuantity(supabase, {
+          userId: req.user.id,
+          itemId: deductMeta.itemId,
+          qty: deductMeta.qty,
+          quantityMustBe: deductMeta.quantityAfter,
+        });
       }
       return res.status(500).json({ error: updateError.message });
     }
@@ -900,12 +951,17 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     }
 
     let inventoryReturnError = null;
-    if (shouldRecordHistory && returnRemovedToInventory) {
+    const skipReturnBecauseQtyIncrease = onlyMountedQtyChanged && newQ > oldQ;
+    if (shouldRecordHistory && returnRemovedToInventory && !skipReturnBecauseQtyIncrease) {
       const vehicleLabel =
         [existingVehicle.manufacturer, existingVehicle.model].filter(Boolean).join(' ').trim() || null;
+      let returnSnap = prevSnap;
+      if (onlyMountedQtyChanged && newQ < oldQ) {
+        returnSnap = { ...prevSnap, mounted_qty: oldQ - newQ };
+      }
       const invResult = await insertReturnedComponentToInventory(supabase, {
         userId: req.user.id,
-        snapshot: prevSnap,
+        snapshot: returnSnap,
         vehicleLabel,
       });
       if (!invResult.ok) {
@@ -918,6 +974,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
       ...existingSpec,
       components: [updatedComponent],
       ...(inventoryReturnError ? { inventory_return_error: inventoryReturnError } : {}),
+      ...(deductMeta ? { inventory_deducted_qty: deductMeta.qty } : {}),
     });
   } catch (err) {
     console.error('Error al actualizar componente:', err);
