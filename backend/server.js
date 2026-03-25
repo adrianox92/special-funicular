@@ -78,7 +78,6 @@ const syncRoute = require('./routes/sync');
 const circuitsRoute = require('./routes/circuits');
 const maintenanceRoute = require('./routes/maintenance');
 const inventoryRoute = require('./routes/inventory');
-const pushRoute = require('./routes/push');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
@@ -90,7 +89,6 @@ app.use('/api/auth', authRoute);
 app.use('/api', insightsRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
-app.use('/api/push', pushRoute);
 app.use('/api/circuits', circuitsRoute);
 app.use('/api/maintenance', maintenanceRoute);
 app.use('/api/inventory', inventoryRoute);

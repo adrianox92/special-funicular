@@ -5,7 +5,6 @@ const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { findOrCreateCircuit } = require('../lib/circuitResolver');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { getPreviousBestLapSeconds } = require('../lib/personalBest');
-const { notifyAfterSyncTiming } = require('../lib/syncPushNotifications');
 
 const router = express.Router();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -309,26 +308,6 @@ router.post('/timings', async (req, res) => {
       } catch (positionError) {
         console.warn('Error al actualizar posiciones:', positionError);
       }
-    }
-
-    try {
-      await notifyAfterSyncTiming({
-        userId: req.user.id,
-        timingInput: {
-          vehicle_id,
-          best_lap_time,
-          best_lap_timestamp,
-          lane,
-          laps,
-        },
-        circuitIdToStore,
-        circuitNameToStore,
-        timingId: finalTiming.id,
-        vehicleInfo: existingVehicle,
-        previousBestLapSeconds,
-      });
-    } catch (pushErr) {
-      console.warn('[push] notifyAfterSyncTiming:', pushErr.message || pushErr);
     }
 
     res.status(201).json(finalTiming);

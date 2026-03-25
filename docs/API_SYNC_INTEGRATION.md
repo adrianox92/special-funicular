@@ -259,8 +259,6 @@ Content-Type: application/json
 - `404` - Vehículo no encontrado, o circuito no encontrado (si se envió `circuit_id` inválido)
 - `500` - Error interno del servidor
 
-**Notificaciones push:** Si el usuario activó Web Push en **Mi Perfil** y el servidor tiene claves VAPID configuradas, al registrar aquí un tiempo que **mejore** su mejor vuelta previa (mismo `vehicle_id`, `circuit_id`, `lane` y `laps`) puede recibir una notificación en el navegador. También es posible un aviso al **subir posiciones** en el ranking del circuito. Requiere `circuit_id` en el timing para la lógica de récord personal. Detalles: tabla `push_subscriptions`, variables `VAPID_*` y sección *Notificaciones push* en el readme del repositorio.
-
 ---
 
 ## 5. Endpoint find-or-create (JWT)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
@@ -9,8 +9,7 @@ import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Key, Copy, RefreshCw, Eye, EyeOff, User, Bell, BellOff, SlidersHorizontal } from 'lucide-react';
-import { isPushSupported, urlBase64ToUint8Array } from '../utils/webPush';
+import { Key, Copy, RefreshCw, Eye, EyeOff, User, SlidersHorizontal } from 'lucide-react';
 
 const STALE_DAYS_MIN = 1;
 const STALE_DAYS_MAX = 365;
@@ -26,14 +25,6 @@ const Profile = () => {
   const [success, setSuccess] = useState(null);
   const [showKey, setShowKey] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
-
-  const [pushSupported] = useState(() => isPushSupported());
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [pushPermission, setPushPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
-  const [vapidPublicKey, setVapidPublicKey] = useState(() => process.env.REACT_APP_VAPID_PUBLIC_KEY || null);
-  const [pushError, setPushError] = useState(null);
-  const [pushSuccess, setPushSuccess] = useState(null);
 
   const [staleDaysInput, setStaleDaysInput] = useState(String(STALE_DAYS_DEFAULT));
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -72,100 +63,6 @@ const Profile = () => {
       setSettingsError(err.message || 'No se pudo guardar la configuración');
     } finally {
       setSettingsSaving(false);
-    }
-  };
-
-  const refreshPushState = useCallback(async () => {
-    if (!pushSupported) return;
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      setPushSubscribed(!!sub);
-      setPushPermission(Notification.permission);
-    } catch {
-      setPushSubscribed(false);
-    }
-  }, [pushSupported]);
-
-  useEffect(() => {
-    refreshPushState();
-  }, [refreshPushState]);
-
-  useEffect(() => {
-    if (vapidPublicKey || !pushSupported) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await api.get('/push/vapid-public-key');
-        if (!cancelled && data?.publicKey) {
-          setVapidPublicKey(data.publicKey);
-        }
-      } catch {
-        /* sin clave en servidor: el usuario puede definir REACT_APP_VAPID_PUBLIC_KEY */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [pushSupported, vapidPublicKey]);
-
-  const handleEnablePush = async () => {
-    setPushLoading(true);
-    setPushError(null);
-    setPushSuccess(null);
-    try {
-      if (!vapidPublicKey) {
-        setPushError('No hay clave VAPID pública. Configura REACT_APP_VAPID_PUBLIC_KEY o VAPID en el backend.');
-        return;
-      }
-      const perm = await Notification.requestPermission();
-      setPushPermission(perm);
-      if (perm !== 'granted') {
-        setPushError('Permiso de notificaciones denegado.');
-        return;
-      }
-      const reg = await navigator.serviceWorker.ready;
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-        });
-      }
-      const json = sub.toJSON();
-      await api.post('/push/subscribe', {
-        endpoint: json.endpoint,
-        keys: json.keys,
-      });
-      setPushSubscribed(true);
-      setPushSuccess('Notificaciones activadas. Recibirás avisos al batir tu récord vía API de sincronización.');
-      setTimeout(() => setPushSuccess(null), 5000);
-    } catch (err) {
-      setPushError(err.response?.data?.error || err.message || 'Error al activar notificaciones');
-    } finally {
-      setPushLoading(false);
-    }
-  };
-
-  const handleDisablePush = async () => {
-    setPushLoading(true);
-    setPushError(null);
-    setPushSuccess(null);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        const endpoint = sub.endpoint;
-        await sub.unsubscribe();
-        await api.delete('/push/unsubscribe', { data: { endpoint } });
-      }
-      setPushSubscribed(false);
-      setPushSuccess('Notificaciones desactivadas en este dispositivo.');
-      setTimeout(() => setPushSuccess(null), 4000);
-    } catch (err) {
-      setPushError(err.response?.data?.error || err.message || 'Error al desactivar notificaciones');
-    } finally {
-      setPushLoading(false);
     }
   };
 
@@ -416,69 +313,6 @@ const Profile = () => {
               )}
             </CardContent>
           </Card>
-
-          {pushSupported && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="size-5" />
-                  Notificaciones push
-                </CardTitle>
-                <CardDescription>
-                  Avisos cuando sincronices un tiempo desde el cuenta vueltas (API) y mejores tu mejor vuelta en un
-                  circuito, o cuando subas posiciones en el ranking.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                  <p className="text-sm text-muted-foreground">
-                    Estado:{' '}
-                    {pushSubscribed ? (
-                      <span className="text-foreground font-medium">activas en este dispositivo</span>
-                    ) : (
-                      <span className="text-foreground font-medium">inactivas</span>
-                    )}
-                    {pushPermission === 'denied' && (
-                      <span className="block mt-1 text-destructive">
-                        El navegador bloqueó las notificaciones; actívalas en la configuración del sitio.
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleEnablePush} disabled={pushLoading || pushPermission === 'denied' || !vapidPublicKey}>
-                    {pushLoading ? <Spinner className="size-4 mr-2" /> : <Bell className="size-4 mr-2" />}
-                    Activar notificaciones
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleDisablePush}
-                    disabled={pushLoading || !pushSubscribed}
-                  >
-                    <BellOff className="size-4 mr-2" />
-                    Desactivar en este dispositivo
-                  </Button>
-                </div>
-                {!vapidPublicKey && (
-                  <p className="text-xs text-muted-foreground">
-                    El servidor debe exponer VAPID (variables <code className="rounded bg-muted px-1">VAPID_PUBLIC_KEY</code> /{' '}
-                    <code className="rounded bg-muted px-1">VAPID_PRIVATE_KEY</code>) o define{' '}
-                    <code className="rounded bg-muted px-1">REACT_APP_VAPID_PUBLIC_KEY</code> en el frontend.
-                  </p>
-                )}
-                {pushError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{pushError}</AlertDescription>
-                  </Alert>
-                )}
-                {pushSuccess && (
-                  <Alert>
-                    <AlertDescription>{pushSuccess}</AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
       </Tabs>
     </div>
