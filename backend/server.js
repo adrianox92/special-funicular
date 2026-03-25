@@ -9,6 +9,12 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   );
 }
 
+if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) {
+  console.warn(
+    '[INFO] TELEGRAM_BOT_TOKEN no definida: las notificaciones por Telegram estarán desactivadas hasta configurarla en backend/.env',
+  );
+}
+
 const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
 const { publicSignupLimiter, authSoftLimiter } = require('./middleware/rateLimits');

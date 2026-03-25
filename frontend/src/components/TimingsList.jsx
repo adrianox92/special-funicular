@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3 } from 'lucide-react';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
+import ImportTimingsModal from './ImportTimingsModal';
 import SessionComparisonModal from './SessionComparisonModal';
 import SessionPerformanceModal from './SessionPerformanceModal';
 import { Button } from './ui/button';
@@ -247,6 +248,7 @@ const TimingsList = () => {
   const [comparisonSessions, setComparisonSessions] = useState([]);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceTiming, setPerformanceTiming] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [filter, setFilter] = useState({
     vehicle: '',
@@ -470,7 +472,12 @@ const TimingsList = () => {
 
   return (
     <div className="space-y-6 py-6">
-      <h1 className="text-2xl font-bold">Tabla de Tiempos</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-bold">Tabla de Tiempos</h1>
+        <Button type="button" variant="outline" onClick={() => setShowImportModal(true)}>
+          Importar sesiones
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="space-y-2">
@@ -760,6 +767,13 @@ const TimingsList = () => {
       <TimingSpecsModal show={showSpecsModal} onHide={() => setShowSpecsModal(false)} setupSnapshot={selectedTiming?.setup_snapshot} timing={selectedTiming} />
       <SessionComparisonModal show={showComparisonModal} onHide={() => setShowComparisonModal(false)} sessions={comparisonSessions} />
       <SessionPerformanceModal show={showPerformanceModal} onHide={() => setShowPerformanceModal(false)} timing={performanceTiming} />
+      <ImportTimingsModal
+        open={showImportModal}
+        onOpenChange={setShowImportModal}
+        vehicles={Object.values(vehicles)}
+        defaultVehicleId={filter.vehicle || undefined}
+        onImported={loadData}
+      />
     </div>
   );
 };

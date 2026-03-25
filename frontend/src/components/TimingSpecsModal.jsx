@@ -8,6 +8,12 @@ import {
 } from './ui/dialog';
 import { Button } from './ui/button';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import {
   Table,
   TableBody,
   TableCell,
@@ -19,6 +25,22 @@ import { formatDistance, modificationLineTotal } from '../utils/formatUtils';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 import LapBreakdownChart from './charts/LapBreakdownChart';
 import api from '../lib/axios';
+import { Download } from 'lucide-react';
+
+function escapeCsvCell(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadBlob(filename, blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   const [laps, setLaps] = useState([]);
@@ -33,9 +55,14 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
     }
   }, [show, timing?.id]);
 
-  if (!setupSnapshot || !timing) return null;
+  if (!timing) return null;
 
-  const specs = JSON.parse(setupSnapshot);
+  let specs = [];
+  try {
+    if (setupSnapshot) specs = JSON.parse(setupSnapshot);
+  } catch {
+    specs = [];
+  }
 
   const groupByComponentType = (specs) => {
     const groups = {};
@@ -99,6 +126,75 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   };
 
   const groupedSpecs = groupByComponentType(specs);
+
+  const exportJson = () => {
+    let setup = [];
+    try {
+      if (timing.setup_snapshot) setup = JSON.parse(timing.setup_snapshot);
+    } catch {
+      setup = [];
+    }
+    const payload = {
+      session: { ...timing, setup_snapshot: undefined, circuits: undefined },
+      laps,
+      setup,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const safeDate = String(timing.timing_date || 'fecha').replace(/[^0-9-]/g, '');
+    downloadBlob(`sesion_${timing.id}_${safeDate}.json`, blob);
+  };
+
+  const exportCsv = () => {
+    const skipKeys = new Set([
+      'setup_snapshot',
+      'circuits',
+      'circuit_ranking',
+      'vehicle_model',
+      'vehicle_manufacturer',
+      'has_laps',
+      'previous_position',
+      'position_change',
+      'position_updated_at',
+    ]);
+    let lines = ['## session', 'key,value'];
+    Object.entries(timing).forEach(([k, v]) => {
+      if (skipKeys.has(k) || v == null || typeof v === 'object') return;
+      lines.push(`${escapeCsvCell(k)},${escapeCsvCell(v)}`);
+    });
+    lines.push('', '## laps', 'lap_number,lap_time_seconds,lap_time_text');
+    (laps || []).forEach((l) => {
+      lines.push(
+        `${escapeCsvCell(l.lap_number)},${escapeCsvCell(l.lap_time_seconds)},${escapeCsvCell(l.lap_time_text)}`,
+      );
+    });
+    lines.push('', '## setup');
+    if (specs.length === 0) {
+      lines.push('# sin_componentes,true');
+    } else {
+      const keys = [
+        'id',
+        'component_type',
+        'element',
+        'manufacturer',
+        'sku',
+        'material',
+        'size',
+        'price',
+        'mounted_qty',
+        'rpm',
+        'gaus',
+        'teeth',
+        'url',
+      ];
+      lines.push(keys.map(escapeCsvCell).join(','));
+      specs.forEach((c) => {
+        lines.push(keys.map((key) => escapeCsvCell(c[key])).join(','));
+      });
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const safeDate = String(timing.timing_date || 'fecha').replace(/[^0-9-]/g, '');
+    downloadBlob(`sesion_${timing.id}_${safeDate}.csv`, blob);
+  };
 
   return (
     <Dialog open={show} onOpenChange={(open) => !open && onHide()}>
@@ -175,6 +271,9 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
           )}
 
           <h6 className="font-semibold">Componentes del Vehículo</h6>
+          {Object.keys(groupedSpecs).length === 0 && (
+            <p className="text-sm text-muted-foreground">Sin snapshot de setup para esta sesión.</p>
+          )}
           {Object.entries(groupedSpecs).map(([type, components]) => (
             <div key={type} className="space-y-2">
               <h5 className="font-medium">{getVehicleComponentTypeLabel(type)}</h5>
@@ -204,7 +303,19 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
           ))}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" type="button">
+                <Download className="size-4 mr-2" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportCsv}>CSV (sesión + vueltas + setup)</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportJson}>JSON</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={onHide}>Cerrar</Button>
         </DialogFooter>
       </DialogContent>

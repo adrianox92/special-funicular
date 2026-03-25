@@ -3,11 +3,228 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
 const { getCircuitRanking } = require('../lib/positionTracker');
+const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
+const { formatSecondsToLapTime } = require('../lib/timingUtils');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
+
+function parseCsv(content) {
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!normalized.trim()) return [];
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < normalized.length; i++) {
+    const c = normalized[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (normalized[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field.trim());
+      field = '';
+    } else if (c === '\n') {
+      row.push(field.trim());
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += c;
+    }
+  }
+  row.push(field.trim());
+  if (row.length > 1 || (row.length === 1 && row[0] !== '')) {
+    rows.push(row);
+  }
+  return rows;
+}
+
+function csvToObjects(content) {
+  const rows = parseCsv(content);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((h) => String(h).trim().toLowerCase());
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const line = rows[r];
+    if (!line || line.every((c) => c === '' || c == null)) continue;
+    const obj = {};
+    headers.forEach((h, j) => {
+      obj[h] = line[j] != null ? String(line[j]) : '';
+    });
+    out.push(obj);
+  }
+  return out;
+}
+
+function parseNumber(val) {
+  if (val == null || val === '') return null;
+  const n = parseFloat(String(val).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+function csvRowToSyncBody(row, defaultVehicleId) {
+  const vid = (row.vehicle_id && String(row.vehicle_id).trim()) || defaultVehicleId;
+  if (!vid) {
+    throw new Error('vehicle_id requerido (columna o parámetro de la petición)');
+  }
+
+  const lapsRaw = row.laps;
+  const lapsN = parseInt(String(lapsRaw ?? '').replace(',', '.'), 10);
+  if (!Number.isFinite(lapsN) || lapsN < 0) {
+    throw new Error('laps inválido');
+  }
+
+  const bestTs = parseNumber(row.best_lap_timestamp);
+  const totalTs = parseNumber(row.total_time_timestamp);
+  const avgTs = parseNumber(row.average_time_timestamp);
+
+  let best_lap_time = row.best_lap_time ? String(row.best_lap_time).trim() : '';
+  let total_time = row.total_time ? String(row.total_time).trim() : '';
+  let average_time = row.average_time ? String(row.average_time).trim() : '';
+
+  if (!best_lap_time && bestTs != null) best_lap_time = formatSecondsToLapTime(bestTs);
+  if (!total_time && totalTs != null) total_time = formatSecondsToLapTime(totalTs);
+  if (!average_time && avgTs != null) average_time = formatSecondsToLapTime(avgTs);
+
+  if (!best_lap_time || !total_time || !average_time) {
+    throw new Error('Faltan best_lap_time/total_time/average_time (o sus *_timestamp)');
+  }
+
+  const lapKeys = Object.keys(row).filter((k) => /^lap_\d+$/i.test(k));
+  lapKeys.sort((a, b) => {
+    const ma = a.match(/\d+/);
+    const mb = b.match(/\d+/);
+    const na = ma ? parseInt(ma[0], 10) : 0;
+    const nb = mb ? parseInt(mb[0], 10) : 0;
+    return na - nb;
+  });
+
+  const lap_times = [];
+  for (const k of lapKeys) {
+    const numMatch = k.match(/\d+/);
+    const num = numMatch ? parseInt(numMatch[0], 10) : lap_times.length + 1;
+    const sec = parseNumber(row[k]);
+    if (sec != null && sec > 0) {
+      lap_times.push({ lap_number: num, time_seconds: sec, lap_time_seconds: sec });
+    }
+  }
+
+  const circuitId = row.circuit_id && String(row.circuit_id).trim() ? String(row.circuit_id).trim() : null;
+
+  return {
+    vehicle_id: vid,
+    best_lap_time,
+    total_time,
+    laps: lapsN,
+    average_time,
+    lane: row.lane && String(row.lane).trim() ? String(row.lane).trim() : null,
+    circuit: row.circuit && String(row.circuit).trim() ? String(row.circuit).trim() : null,
+    circuit_id: circuitId,
+    timing_date: row.timing_date && String(row.timing_date).trim() ? String(row.timing_date).trim() : null,
+    best_lap_timestamp: bestTs,
+    total_time_timestamp: totalTs,
+    average_time_timestamp: avgTs,
+    lap_times: lap_times.length ? lap_times : undefined,
+    scale_factor: row.scale_factor != null && String(row.scale_factor).trim() !== '' ? parseNumber(row.scale_factor) : undefined,
+  };
+}
+
+function normalizeJsonTimingRow(row) {
+  const o = { ...row };
+  if (!o.best_lap_time && o.best_lap_timestamp != null) {
+    o.best_lap_time = formatSecondsToLapTime(o.best_lap_timestamp);
+  }
+  if (!o.total_time && o.total_time_timestamp != null) {
+    o.total_time = formatSecondsToLapTime(o.total_time_timestamp);
+  }
+  if (!o.average_time && o.average_time_timestamp != null) {
+    o.average_time = formatSecondsToLapTime(o.average_time_timestamp);
+  }
+  return o;
+}
+
+/**
+ * POST /api/timings/import
+ * Body: { vehicle_id?, format: "csv"|"json", content: string }
+ * CSV: cabeceras timing_date, circuit, lane, laps, best_lap_time, total_time, average_time,
+ *      best_lap_timestamp?, total_time_timestamp?, average_time_timestamp?, circuit_id?, lap_1, lap_2, ...
+ * JSON: array de objetos (mismo esquema que POST /api/sync/timings); vehicle_id opcional si se envía arriba.
+ */
+router.post('/import', async (req, res) => {
+  try {
+    const { vehicle_id: defaultVehicleId, format, content } = req.body || {};
+    if (content == null || typeof content !== 'string') {
+      return res.status(400).json({ error: 'content (string) es requerido' });
+    }
+    if (!format || !['csv', 'json'].includes(format)) {
+      return res.status(400).json({ error: 'format debe ser "csv" o "json"' });
+    }
+
+    let items = [];
+    if (format === 'json') {
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return res.status(400).json({ error: 'JSON inválido' });
+      }
+      items = Array.isArray(parsed) ? parsed : [parsed];
+    } else {
+      items = csvToObjects(content);
+    }
+
+    if (items.length === 0) {
+      return res.status(400).json({ error: 'No hay filas para importar' });
+    }
+
+    const errors = [];
+    let imported = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      let body;
+      try {
+        if (format === 'json') {
+          const merged = normalizeJsonTimingRow(items[i]);
+          merged.vehicle_id = merged.vehicle_id || defaultVehicleId;
+          if (!merged.vehicle_id) {
+            throw new Error('vehicle_id requerido en cada objeto o en la petición');
+          }
+          body = merged;
+        } else {
+          body = csvRowToSyncBody(items[i], defaultVehicleId);
+        }
+      } catch (e) {
+        errors.push({ row: i + 1, error: e.message });
+        continue;
+      }
+
+      const result = await insertVehicleTimingFromSyncBody(supabase, req.user.id, body);
+      if (!result.success) {
+        errors.push({ row: i + 1, error: result.error });
+        continue;
+      }
+      imported += 1;
+    }
+
+    res.json({ imported, errors, total: items.length });
+  } catch (err) {
+    console.error('POST /api/timings/import:', err);
+    res.status(500).json({ error: err.message || 'Error al importar' });
+  }
+});
 
 /**
  * @swagger
