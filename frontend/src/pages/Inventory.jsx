@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Package, Trash2, Pen, ExternalLink, Wrench } from 'lucide-react';
+import { Plus, Package, Trash2, Pen, ExternalLink, Wrench, PackagePlus, History } from 'lucide-react';
 import api from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -83,6 +83,16 @@ const Inventory = () => {
   const [mountForm, setMountForm] = useState(null);
   const [mountError, setMountError] = useState(null);
   const [mountSaving, setMountSaving] = useState(false);
+
+  const [restockTarget, setRestockTarget] = useState(null);
+  const [restockForm, setRestockForm] = useState(null);
+  const [restockError, setRestockError] = useState(null);
+  const [restockSaving, setRestockSaving] = useState(false);
+
+  const [historyTarget, setHistoryTarget] = useState(null);
+  const [historyEntries, setHistoryEntries] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(null);
 
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -367,6 +377,95 @@ const Inventory = () => {
     }
   };
 
+  const todayIsoDate = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const openRestock = (item) => {
+    setRestockTarget(item);
+    setRestockForm({
+      quantity: '1',
+      purchase_price: item.purchase_price != null ? String(item.purchase_price) : '',
+      supplier: '',
+      purchase_date: todayIsoDate(),
+      notes: '',
+    });
+    setRestockError(null);
+  };
+
+  const closeRestock = () => {
+    setRestockTarget(null);
+    setRestockForm(null);
+    setRestockError(null);
+  };
+
+  const handleRestockSubmit = async (e) => {
+    e.preventDefault();
+    if (!restockTarget || !restockForm) return;
+    const addQty = parseInt(restockForm.quantity, 10);
+    if (Number.isNaN(addQty) || addQty < 1) {
+      setRestockError('Indica cuántas unidades añades (mínimo 1)');
+      return;
+    }
+    if (!restockForm.supplier?.trim()) {
+      setRestockError('Indica dónde lo has comprado (tienda o proveedor)');
+      return;
+    }
+    if (restockForm.purchase_price.trim() === '') {
+      setRestockError('Indica el precio de compra por unidad');
+      return;
+    }
+    const price = Number(restockForm.purchase_price);
+    if (Number.isNaN(price) || price < 0) {
+      setRestockError('Precio de compra no válido');
+      return;
+    }
+    try {
+      setRestockSaving(true);
+      setRestockError(null);
+      await api.post(`/inventory/${restockTarget.id}/restock`, {
+        quantity: addQty,
+        purchase_price: price,
+        supplier: restockForm.supplier.trim(),
+        purchase_date: restockForm.purchase_date.trim() || null,
+        notes: restockForm.notes.trim() || null,
+      });
+      toast.success('Stock actualizado y compra registrada');
+      closeRestock();
+      loadItems();
+    } catch (err) {
+      setRestockError(err.response?.data?.error || 'Error al reponer stock');
+    } finally {
+      setRestockSaving(false);
+    }
+  };
+
+  const openHistory = async (item) => {
+    setHistoryTarget(item);
+    setHistoryEntries([]);
+    setHistoryError(null);
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get(`/inventory/${item.id}/purchase-history`);
+      setHistoryEntries(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setHistoryError(err.response?.data?.error || 'Error al cargar el historial');
+      setHistoryEntries([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const closeHistory = () => {
+    setHistoryTarget(null);
+    setHistoryEntries([]);
+    setHistoryError(null);
+  };
+
   const isLowStock = (item) =>
     item.min_stock != null && Number(item.quantity) <= Number(item.min_stock);
 
@@ -386,7 +485,7 @@ const Inventory = () => {
         <div>
           <h1 className="text-2xl font-bold">Inventario</h1>
           <p className="text-muted-foreground">
-            Repuestos y consumibles. Cada fila es una compra concreta; para otra tienda o época, crea otro ítem.
+            Repuestos y consumibles. Para más unidades del mismo ítem con otro precio o tienda, usa «Reponer» y consulta el historial de compras.
           </p>
         </div>
         <Button className="flex items-center gap-2" onClick={handleOpenCreate}>
@@ -583,6 +682,172 @@ const Inventory = () => {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!restockTarget} onOpenChange={(open) => { if (!open) closeRestock(); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reponer stock</DialogTitle>
+            <DialogDescription>
+              {restockTarget
+                ? `Añade unidades a «${restockTarget.name}». Se registrará dónde compraste y el precio para el historial.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {restockTarget && restockForm && (
+            <form onSubmit={handleRestockSubmit}>
+              <div className="space-y-4 py-2">
+                {restockError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{restockError}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="space-y-2 max-w-xs">
+                  <Label htmlFor="restock-qty">Unidades que entran en stock</Label>
+                  <Input
+                    id="restock-qty"
+                    type="number"
+                    min={1}
+                    value={restockForm.quantity}
+                    onChange={(e) => setRestockForm({ ...restockForm, quantity: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="restock-supplier">Dónde lo has comprado</Label>
+                  <Input
+                    id="restock-supplier"
+                    value={restockForm.supplier}
+                    onChange={(e) => setRestockForm({ ...restockForm, supplier: e.target.value })}
+                    placeholder="Tienda, web, proveedor…"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="restock-price">Precio unitario de compra (€)</Label>
+                    <Input
+                      id="restock-price"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={restockForm.purchase_price}
+                      onChange={(e) => setRestockForm({ ...restockForm, purchase_price: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="restock-pdate">Fecha de compra</Label>
+                    <Input
+                      id="restock-pdate"
+                      type="date"
+                      value={restockForm.purchase_date}
+                      onChange={(e) => setRestockForm({ ...restockForm, purchase_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="restock-notes">Notas (opcional)</Label>
+                  <Textarea
+                    id="restock-notes"
+                    rows={2}
+                    value={restockForm.notes}
+                    onChange={(e) => setRestockForm({ ...restockForm, notes: e.target.value })}
+                    placeholder="Pedido, factura, observaciones…"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={closeRestock}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={restockSaving}>
+                  {restockSaving ? (
+                    <>
+                      <Spinner className="size-4 mr-2" />
+                      Guardando…
+                    </>
+                  ) : (
+                    'Registrar compra y sumar stock'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!historyTarget} onOpenChange={(open) => { if (!open) closeHistory(); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Historial de compras</DialogTitle>
+            <DialogDescription>
+              {historyTarget ? `Reposiciones registradas para «${historyTarget.name}».` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            {historyError && (
+              <Alert variant="destructive">
+                <AlertDescription>{historyError}</AlertDescription>
+              </Alert>
+            )}
+            {historyLoading && (
+              <div className="flex justify-center py-6">
+                <Spinner className="size-8" />
+              </div>
+            )}
+            {!historyLoading && !historyError && historyEntries.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Aún no hay compras registradas con «Reponer». La compra inicial del ítem no aparece aquí salvo que la registres con una reposición.
+              </p>
+            )}
+            {!historyLoading && historyEntries.length > 0 && (
+              <ul className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {historyEntries.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-1"
+                  >
+                    <div className="flex flex-wrap justify-between gap-2 font-medium">
+                      <span>
+                        +{entry.quantity}{' '}
+                        {unitLabel(historyTarget?.unit || 'uds')}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {formatHistoryDate(entry.created_at)}
+                      </span>
+                    </div>
+                    {entry.supplier && (
+                      <p>
+                        <span className="text-muted-foreground">Dónde:</span> {entry.supplier}
+                      </p>
+                    )}
+                    {entry.purchase_price != null && entry.purchase_price !== '' && (
+                      <p>
+                        <span className="text-muted-foreground">Precio unitario:</span>{' '}
+                        {Number(entry.purchase_price).toFixed(2)} €
+                      </p>
+                    )}
+                    {entry.purchase_date && (
+                      <p>
+                        <span className="text-muted-foreground">Fecha compra:</span>{' '}
+                        {formatHistoryDate(entry.purchase_date)}
+                      </p>
+                    )}
+                    {entry.notes && (
+                      <p className="text-xs text-muted-foreground pt-1 border-t border-border">{entry.notes}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeHistory}>
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -952,6 +1217,24 @@ const Inventory = () => {
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      title="Reponer stock"
+                      onClick={() => openRestock(item)}
+                    >
+                      <PackagePlus className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      title="Historial de compras"
+                      onClick={() => openHistory(item)}
+                    >
+                      <History className="size-4" />
+                    </Button>
                     {Number(item.quantity) > 0 && (
                       <Button
                         variant="ghost"

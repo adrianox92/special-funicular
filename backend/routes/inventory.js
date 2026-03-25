@@ -184,14 +184,169 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/inventory/:id/purchase-history
+ * Historial de reposiciones (más reciente primero).
+ */
+router.get('/:id/purchase-history', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: item, error: fetchErr } = await supabase
+      .from('inventory_items')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error('GET purchase-history fetch item:', fetchErr);
+      return res.status(500).json({ error: fetchErr.message });
+    }
+    if (!item) {
+      return res.status(404).json({ error: 'Item no encontrado' });
+    }
+
+    const { data, error } = await supabase
+      .from('inventory_purchase_history')
+      .select('*')
+      .eq('inventory_item_id', id)
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('GET purchase-history:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /inventory/:id/purchase-history:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/inventory/:id/restock
+ * Añade unidades al stock y registra la compra en el historial.
+ */
+router.post('/:id/restock', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      quantity: qtyRaw,
+      purchase_price: purchasePrice,
+      supplier: supplierRaw,
+      purchase_date: purchaseDate,
+      notes: notesRaw,
+    } = req.body;
+
+    const addQty =
+      qtyRaw === undefined || qtyRaw === null || String(qtyRaw).trim() === ''
+        ? NaN
+        : parseInt(qtyRaw, 10);
+    if (Number.isNaN(addQty) || addQty < 1) {
+      return res.status(400).json({ error: 'quantity debe ser un entero mayor o igual a 1' });
+    }
+
+    let price = null;
+    if (purchasePrice !== undefined && purchasePrice !== null && String(purchasePrice).trim() !== '') {
+      price = Number(purchasePrice);
+      if (Number.isNaN(price) || price < 0) {
+        return res.status(400).json({ error: 'purchase_price no válido' });
+      }
+    }
+
+    const supplier = normalizeOptionalText(supplierRaw);
+    const pDate = normalizeDate(purchaseDate);
+    const notes = normalizeOptionalText(notesRaw);
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error('restock fetch item:', fetchErr);
+      return res.status(500).json({ error: fetchErr.message });
+    }
+    if (!existing) {
+      return res.status(404).json({ error: 'Item no encontrado' });
+    }
+
+    const historyRow = {
+      inventory_item_id: id,
+      user_id: req.user.id,
+      quantity: addQty,
+      purchase_price: price,
+      supplier,
+      purchase_date: pDate,
+      notes,
+    };
+
+    const { data: insertedHist, error: histErr } = await supabase
+      .from('inventory_purchase_history')
+      .insert([historyRow])
+      .select('id')
+      .single();
+
+    if (histErr || !insertedHist) {
+      console.error('restock insert history:', histErr);
+      return res.status(500).json({ error: histErr?.message || 'Error al registrar la compra' });
+    }
+
+    const prevQty = Number(existing.quantity);
+    const newQty = prevQty + addQty;
+
+    const invUpdates = {
+      quantity: newQty,
+      updated_at: new Date().toISOString(),
+    };
+    if (price != null) {
+      invUpdates.purchase_price = price;
+    }
+    if (pDate != null) {
+      invUpdates.purchase_date = pDate;
+    }
+
+    const { data: updatedInv, error: updErr } = await supabase
+      .from('inventory_items')
+      .update(invUpdates)
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .eq('quantity', prevQty)
+      .select('*')
+      .maybeSingle();
+
+    if (updErr || !updatedInv) {
+      await supabase.from('inventory_purchase_history').delete().eq('id', insertedHist.id);
+      return res.status(409).json({
+        error:
+          'No se pudo actualizar el stock (posible condición de carrera). Recarga e inténtalo de nuevo.',
+      });
+    }
+
+    const [enriched] = await attachVehicles([updatedInv], req.user.id);
+    res.status(201).json({
+      inventory_item: enriched,
+      purchase_entry: { ...historyRow, id: insertedHist.id },
+    });
+  } catch (err) {
+    console.error('POST /inventory/:id/restock:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const inventoryCreateValidators = [
   body('name').trim().notEmpty().isLength({ max: 500 }),
   body('category').notEmpty().isIn([...ALLOWED_CATEGORIES]),
-  body('quantity').optional().isInt({ min: 0 }),
-  body('unit').optional().isIn([...ALLOWED_UNITS]),
-  body('reference').optional().isString().isLength({ max: 500 }),
-  body('url').optional().isString().isLength({ max: 2000 }),
-  body('notes').optional().isString().isLength({ max: 5000 }),
+  body('quantity').optional({ nullable: true }).isInt({ min: 0 }),
+  body('unit').optional({ nullable: true }).isIn([...ALLOWED_UNITS]),
+  body('reference').optional({ nullable: true }).isString().isLength({ max: 500 }),
+  body('url').optional({ nullable: true }).isString().isLength({ max: 2000 }),
+  body('notes').optional({ nullable: true }).isString().isLength({ max: 5000 }),
 ];
 
 /**
