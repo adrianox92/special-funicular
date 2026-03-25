@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { getTelegramBotTokenFromEnv } = require('./telegramEnv');
 
 function getAdminClient() {
   const url = process.env.SUPABASE_URL;
@@ -17,12 +18,6 @@ async function fetchUserMetadata(userId) {
   const { data, error } = await admin.auth.admin.getUserById(userId);
   if (error || !data?.user) return {};
   return data.user.user_metadata || {};
-}
-
-/** Token único del bot de la app (variable de entorno del servidor, no por usuario). */
-function getTelegramBotTokenFromEnv() {
-  const t = process.env.TELEGRAM_BOT_TOKEN;
-  return typeof t === 'string' ? t.trim() : '';
 }
 
 function formatDeltaVsPb(currentBest, previousBest) {
@@ -130,7 +125,7 @@ async function sendTestNotification(userId) {
       tgToken && !tgChat
         ? 'Configura tu Chat ID de Telegram en el perfil, o un webhook de Discord.'
         : !tgToken && tgChat
-          ? 'Telegram no está disponible: el administrador debe definir TELEGRAM_BOT_TOKEN en el servidor. Puedes usar Discord webhook.'
+          ? 'Telegram no está disponible: el servidor no ve TELEGRAM_BOT_TOKEN (en Render debe estar en el Web Service de la API, no en el sitio estático; redeploy tras guardar). Puedes usar Discord webhook.'
           : 'Configura al menos un webhook de Discord o tu Chat ID de Telegram (si el servidor tiene bot configurado).',
     );
     err.code = 'NO_CHANNELS';

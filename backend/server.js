@@ -3,15 +3,20 @@ const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
+const { getTelegramBotTokenFromEnv, isTelegramBotConfigured } = require('./lib/telegramEnv');
+
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.warn(
     '[WARN] SUPABASE_SERVICE_ROLE_KEY no está definida. Las operaciones de API keys y admin fallarán en tiempo de ejecución.',
   );
 }
 
-if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) {
+const _tgTokenLen = getTelegramBotTokenFromEnv().length;
+if (isTelegramBotConfigured()) {
+  console.log(`[CONFIG] Telegram: activo (token en env, ${_tgTokenLen} caracteres).`);
+} else {
   console.warn(
-    '[INFO] TELEGRAM_BOT_TOKEN no definida: las notificaciones por Telegram estarán desactivadas hasta configurarla en backend/.env',
+    '[CONFIG] Telegram: desactivado — process.env no tiene TELEGRAM_BOT_TOKEN (ni TELEGRAM_TOKEN). En Render: añade la clave al Web Service de la API (no al Static Site del frontend), redeploy; evita comillas en el valor.',
   );
 }
 
