@@ -16,6 +16,7 @@ yarn.lock
 .env.test
 .env.production
 backend/.env
+frontend/.env
 
 # Directorios de construcción
 dist/

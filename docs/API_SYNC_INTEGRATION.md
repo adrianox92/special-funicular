@@ -28,16 +28,30 @@ GET /api/api-keys/me
 Authorization: Bearer <tu_jwt_token>
 ```
 
-**Respuesta:**
+**Respuesta** (primera vez o justo después de regenerar — el texto completo solo se devuelve entonces):
 
 ```json
 {
-  "api_key": "sc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "api_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "key_exists": false,
   "created_at": "2025-03-13T12:00:00.000Z"
 }
 ```
 
-Si no tienes API key, se crea automáticamente en esta petición.
+Si ya existía una clave guardada solo como hash (no recuperable), la respuesta será:
+
+```json
+{
+  "api_key": null,
+  "key_exists": true,
+  "created_at": "2025-03-13T12:00:00.000Z",
+  "message": "La clave solo se muestra al crearla o al regenerarla. Usa «Regenerar» si necesitas una nueva."
+}
+```
+
+En ese caso debes abrir **Perfil** en la web y pulsar **Regenerar** para obtener un `api_key` nuevo, o seguir usando la clave que ya tenías guardada en tu app externa.
+
+Si no tienes fila en `user_api_keys`, se crea en esta petición y se devuelve el `api_key` en claro una vez.
 
 ### Opción C: Login con credenciales para obtener API Key
 
@@ -53,16 +67,14 @@ Content-Type: application/json
 }
 ```
 
-**Respuesta 200:**
+**Respuesta 200** (misma lógica que `GET /api/api-keys/me`):
 
-```json
-{
-  "api_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "created_at": "2025-03-16T12:00:00.000Z"
-}
-```
+- Si se acaba de crear la clave: `api_key` con el valor en texto plano y `created_at`.
+- Si la clave ya existía y solo está almacenada el hash: `api_key: null`, `key_exists: true` y `message` explicando que hay que regenerar desde Perfil o usar la clave ya guardada.
 
-Si el usuario no tiene API key, se crea automáticamente. Errores: `400` (campos faltantes), `401` (credenciales inválidas).
+Errores: `400` (campos faltantes), `401` (credenciales inválidas).
+
+**Migración de base de datos:** si tu proyecto tenía la tabla antigua con columna `api_key` en claro, ejecuta en Supabase el script `backend/scripts/migrate-user-api-keys-to-hash.sql`. Las instalaciones nuevas usan solo `backend/scripts/add-api-keys.sql` (columna `api_key_hash`).
 
 ---
 

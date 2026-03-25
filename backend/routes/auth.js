@@ -2,11 +2,20 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+const { hashApiKey } = require('../lib/apiKeyHash');
+
+const isProd = process.env.NODE_ENV === 'production';
+
+function serverConfigErrorResponse(res, status, logError, devDetail) {
+  if (logError) console.error(logError);
+  const message = isProd ? 'Error de configuración del servidor' : devDetail;
+  return res.status(status).json({ error: message });
+}
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
 function generateApiKey() {
@@ -52,7 +61,7 @@ router.post('/login', async (req, res) => {
   }
   res.json({
     access_token: data.session.access_token,
-    user: data.user
+    user: data.user,
   });
 });
 
@@ -68,7 +77,10 @@ router.post('/api-key', async (req, res) => {
       return res.status(400).json({ error: 'Se requieren email y password' });
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (authError) {
       return res.status(401).json({ error: authError.message });
     }
@@ -77,47 +89,65 @@ router.post('/api-key', async (req, res) => {
 
     let { data: existing, error: fetchError } = await supabaseAdmin
       .from('user_api_keys')
-      .select('api_key, created_at')
+      .select('api_key_hash, created_at')
       .eq('user_id', userId)
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('Error al obtener API key:', fetchError);
       if (fetchError.code === '42P01') {
-        return res.status(503).json({
-          error: 'La tabla user_api_keys no existe. Ejecuta la migración: backend/scripts/add-api-keys.sql'
-        });
+        return serverConfigErrorResponse(
+          res,
+          503,
+          fetchError,
+          'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
+        );
       }
-      return res.status(500).json({ error: 'Error al obtener la API key' });
+      return serverConfigErrorResponse(
+        res,
+        500,
+        fetchError,
+        `Error al obtener la API key: ${fetchError.message}`,
+      );
     }
 
     if (!existing) {
       const apiKey = generateApiKey();
+      const apiKeyHash = hashApiKey(apiKey);
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from('user_api_keys')
-        .insert([{ user_id: userId, api_key: apiKey }])
-        .select('api_key, created_at')
+        .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
+        .select('created_at')
         .single();
 
       if (insertError) {
-        console.error('Error al crear API key:', insertError);
         if (insertError.code === '42P01') {
-          return res.status(503).json({
-            error: 'La tabla user_api_keys no existe. Ejecuta la migración: backend/scripts/add-api-keys.sql'
-          });
+          return serverConfigErrorResponse(
+            res,
+            503,
+            insertError,
+            'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
+          );
         }
-        return res.status(500).json({ error: 'Error al crear la API key' });
+        return serverConfigErrorResponse(
+          res,
+          500,
+          insertError,
+          `Error al crear la API key: ${insertError.message}`,
+        );
       }
 
       return res.json({
-        api_key: inserted.api_key,
+        api_key: apiKey,
         created_at: inserted.created_at,
       });
     }
 
-    res.json({
-      api_key: existing.api_key,
+    return res.json({
+      api_key: null,
+      key_exists: true,
       created_at: existing.created_at,
+      message:
+        'Ya existe una API key. El texto completo no se puede recuperar. Regenera la clave desde Perfil en la web si la necesitas de nuevo.',
     });
   } catch (error) {
     console.error('Error en POST /api/auth/api-key:', error);
@@ -125,4 +155,4 @@ router.post('/api-key', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

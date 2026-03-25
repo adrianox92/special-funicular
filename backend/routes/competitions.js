@@ -1,7 +1,9 @@
 const express = require('express');
+const { body } = require('express-validator');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
+const { handleValidationErrors } = require('../middleware/validateRequest');
 const { v4: uuidv4 } = require('uuid');
 const { calculatePoints } = require('../lib/pointsCalculator');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
@@ -127,23 +129,25 @@ function generateSlug(name) {
   return `${baseSlug}-${uuid}`;
 }
 
+const competitionCreateValidators = [
+  body('name')
+    .trim()
+    .notEmpty()
+    .withMessage('El nombre de la competición es requerido')
+    .isLength({ max: 200 }),
+  body('num_slots').isInt({ min: 1 }).withMessage('El número de plazas debe ser un entero mayor a 0'),
+  body('rounds').isInt({ min: 1 }).withMessage('El número de rondas debe ser un entero mayor a 0'),
+  body('circuit_name').optional({ values: 'null' }).isString().trim().isLength({ max: 500 }),
+  body('circuit_id')
+    .optional({ values: 'falsy' })
+    .isUUID()
+    .withMessage('circuit_id inválido'),
+];
+
 // Crear una nueva competición
-router.post('/', async (req, res) => {
+router.post('/', competitionCreateValidators, handleValidationErrors, async (req, res) => {
   try {
     const { name, num_slots, rounds, circuit_name, circuit_id } = req.body;
-
-    // Validaciones
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'El nombre de la competición es requerido' });
-    }
-
-    if (!num_slots || num_slots <= 0) {
-      return res.status(400).json({ error: 'El número de plazas debe ser mayor a 0' });
-    }
-
-    if (!rounds || rounds <= 0) {
-      return res.status(400).json({ error: 'El número de rondas debe ser mayor a 0' });
-    }
 
     // Si circuit_id se proporciona, verificar que existe y pertenece al usuario
     let circuitNameToStore = circuit_name ? circuit_name.trim() : null;

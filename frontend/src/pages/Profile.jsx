@@ -18,6 +18,8 @@ const STALE_DAYS_DEFAULT = 60;
 const Profile = () => {
   const { user } = useAuth();
   const [apiKey, setApiKey] = useState(null);
+  const [keyExists, setKeyExists] = useState(false);
+  const [keyMessage, setKeyMessage] = useState(null);
   const [createdAt, setCreatedAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -70,7 +72,9 @@ const Profile = () => {
     try {
       setError(null);
       const { data } = await api.get('/api-keys/me');
-      setApiKey(data.api_key);
+      setApiKey(data.api_key ?? null);
+      setKeyExists(!!data.key_exists);
+      setKeyMessage(data.message || null);
       setCreatedAt(data.created_at);
     } catch (err) {
       setError(err.response?.data?.error || 'Error al obtener la API key');
@@ -101,6 +105,8 @@ const Profile = () => {
     try {
       const { data } = await api.post('/api-keys/regenerate');
       setApiKey(data.api_key);
+      setKeyExists(false);
+      setKeyMessage(null);
       setCreatedAt(data.created_at);
       setShowRegenerateConfirm(false);
       setSuccess('API key regenerada correctamente. Guarda la nueva clave de forma segura.');
@@ -169,6 +175,11 @@ const Profile = () => {
             </div>
           ) : (
             <>
+              {keyExists && !apiKey && keyMessage && (
+                <Alert>
+                  <AlertDescription>{keyMessage}</AlertDescription>
+                </Alert>
+              )}
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Input
@@ -201,7 +212,9 @@ const Profile = () => {
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => (apiKey ? setShowRegenerateConfirm(true) : handleRegenerate())}
+                  onClick={() =>
+                    apiKey || keyExists ? setShowRegenerateConfirm(true) : handleRegenerate()
+                  }
                   disabled={regenerating}
                 >
                   {regenerating ? (
@@ -209,7 +222,7 @@ const Profile = () => {
                   ) : (
                     <RefreshCw className="size-4 mr-2" />
                   )}
-                  {apiKey ? 'Regenerar' : 'Generar API key'}
+                  {apiKey || keyExists ? 'Regenerar' : 'Generar API key'}
                 </Button>
               </div>
 

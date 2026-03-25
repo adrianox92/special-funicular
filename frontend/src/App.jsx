@@ -4,6 +4,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import PrivateRoute from './components/PrivateRoute';
 import VehicleList from './pages/VehicleList';
 import Dashboard from './pages/Dashboard';
 import AddVehicle from './components/AddVehicle';
@@ -33,6 +34,14 @@ const PageLayout = ({ children }) => (
   <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
     {children}
   </div>
+);
+
+const AuthedShell = ({ children }) => (
+  <>
+    <Navbar />
+    <PageLayout>{children}</PageLayout>
+    <Footer />
+  </>
 );
 
 const AppContent = () => {
@@ -78,93 +87,126 @@ const AppContent = () => {
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
 
-        <Route path="/dashboard" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><Dashboard /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Dashboard />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/vehicles" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><VehicleList /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/vehicles"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <VehicleList />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/vehicles/new" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><AddVehicle /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/vehicles/new"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <AddVehicle />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/vehicles/:id" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><EditVehicle /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/vehicles/:id"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <EditVehicle />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/timings" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><TimingsList /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/timings"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <TimingsList />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/circuits" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><Circuits /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/circuits"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Circuits />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/inventory" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><Inventory /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/inventory"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Inventory />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/profile" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><Profile /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Profile />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/competitions" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><Competitions /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/competitions"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Competitions />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/competitions/:id/participants" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><CompetitionParticipants /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/competitions/:id/participants"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <CompetitionParticipants />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
-        <Route path="/competitions/:id/timings" element={user ? (
-          <>
-            <Navbar />
-            <PageLayout><CompetitionTimings /></PageLayout>
-            <Footer />
-          </>
-        ) : <Navigate to="/" replace />} />
+        <Route
+          path="/competitions/:id/timings"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <CompetitionTimings />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
       </Routes>
     </div>
   );

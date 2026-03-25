@@ -874,9 +874,9 @@ El sistema incluye **API keys por usuario** para conectar proyectos externos (po
 
 ### Endpoints de gestión de API keys
 
-- `GET /api/api-keys/me` - Obtiene la API key del usuario (requiere JWT). Si no existe, la crea automáticamente.
+- `GET /api/api-keys/me` - Obtiene la API key del usuario (requiere JWT). Si no existe, la crea y devuelve el texto una sola vez. Si ya existía solo el hash en BD, devuelve `api_key: null` y `key_exists: true` (hay que regenerar desde Perfil o usar la clave guardada).
 - `POST /api/api-keys/regenerate` - Regenera la API key (requiere JWT; la anterior deja de funcionar de inmediato).
-- `POST /api/auth/api-key` - **Público (CORS permisivo)**: Envía `{ email, password }` y devuelve la API key del usuario (la crea si no existe). Pensado para aplicaciones externas.
+- `POST /api/auth/api-key` - **Público (CORS permisivo)**: Envía `{ email, password }`. Misma lógica que `GET /api/api-keys/me` respecto a mostrar la clave solo al crear o si aún no migraste a hash.
 
 ### Endpoints de sincronización (API key)
 
@@ -904,6 +904,8 @@ node scripts/migrate-add-api-keys.js
 
 Si no tienes la función `exec_sql` en Supabase, ejecuta manualmente el SQL en `backend/scripts/add-api-keys.sql` desde el SQL Editor del dashboard.
 
+Si tu tabla ya existía con la columna `api_key` en texto plano, ejecuta después `backend/scripts/migrate-user-api-keys-to-hash.sql` para pasar a almacenar solo `api_key_hash` (SHA-256).
+
 ### Tabla `circuits` (circuitos)
 
 Si obtienes el error `relation "public.circuits" does not exist`, crea la tabla ejecutando en **Supabase SQL Editor**:
@@ -913,9 +915,7 @@ Si obtienes el error `relation "public.circuits" does not exist`, crea la tabla 
 3. (Opcional) `backend/scripts/migrate-circuit-references.sql` – añade `circuit_id` a otras tablas si lo necesitas
 4. (Opcional) `backend/scripts/populate-circuit-id-from-text.sql` – rellena `circuit_id` desde los circuitos en texto existentes (vehicle_timings, competitions, competition_timings)
 
-**Backend:** Para que la sección "Mi Perfil" pueda obtener y crear API keys, el backend debe usar la **service role key** de Supabase (para poder leer/escribir en `user_api_keys` cuando RLS está activo). Añade en tu `.env` del backend:
-
-- `SUPABASE_SERVICE_ROLE_KEY` – clave "service_role" del proyecto en Supabase (Dashboard → Settings → API). Si no está definida, se usará `SUPABASE_KEY` (puede fallar si la tabla tiene RLS).
+**Backend:** `SUPABASE_KEY` debe ser la clave **anon** (pública). La clave **service_role** es **obligatoria** en `SUPABASE_SERVICE_ROLE_KEY` (Dashboard → Settings → API): el servidor no arranca sin ella y se usa para gestionar `user_api_keys` y validar `X-API-Key` frente al hash almacenado.
 
 ## Personalización y UI
 

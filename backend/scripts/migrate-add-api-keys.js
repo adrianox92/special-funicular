@@ -34,7 +34,7 @@ async function migrateAddApiKeys() {
     console.log('[OK] Migración completada exitosamente');
     console.log('Cambios realizados:');
     console.log('   - Creada tabla user_api_keys');
-    console.log('   - Índice en api_key para búsquedas rápidas');
+    console.log('   - Índice único en api_key_hash para búsquedas rápidas');
   } catch (error) {
     console.error('[ERR] Error durante la migración:', error);
     process.exit(1);

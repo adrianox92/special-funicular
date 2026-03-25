@@ -12,6 +12,11 @@ export const vehicleComponentTypes = [
   { value: 'front_axle', label: 'Eje Delantero' },
   { value: 'guide', label: 'Guía' },
   { value: 'motor', label: 'Motor' },
+  { value: 'trencillas', label: 'Trencillas' },
+  { value: 'tornillos', label: 'Tornillos' },
+  { value: 'stoppers', label: 'Stoppers' },
+  { value: 'topes_y_centradores', label: 'Topes y centradores' },
+  { value: 'cojinetes', label: 'Cojinetes' },
 ];
 
 /** Única fuente de verdad: valor en BD → texto visible (inventario, exportaciones, dashboard). */

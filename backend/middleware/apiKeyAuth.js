@@ -1,6 +1,10 @@
 const { createClient } = require('@supabase/supabase-js');
+const { hashApiKey } = require('../lib/apiKeyHash');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 const apiKeyAuth = async (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
@@ -10,10 +14,11 @@ const apiKeyAuth = async (req, res, next) => {
   }
 
   try {
-    const { data, error } = await supabase
+    const apiKeyHash = hashApiKey(apiKey);
+    const { data, error } = await supabaseAdmin
       .from('user_api_keys')
       .select('user_id')
-      .eq('api_key', apiKey.trim())
+      .eq('api_key_hash', apiKeyHash)
       .single();
 
     if (error || !data) {
@@ -22,8 +27,8 @@ const apiKeyAuth = async (req, res, next) => {
 
     req.user = { id: data.user_id };
     next();
-  } catch (error) {
-    console.error('Error en middleware de API key:', error);
+  } catch (err) {
+    console.error('Error en middleware de API key:', err);
     return res.status(401).json({ error: 'Error de autenticación' });
   }
 };

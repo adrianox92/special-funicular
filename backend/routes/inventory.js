@@ -1,6 +1,8 @@
 const express = require('express');
+const { body } = require('express-validator');
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
+const { handleValidationErrors } = require('../middleware/validateRequest');
 const { getOrCreateBaseSpecs, updateVehicleTotalPrice } = require('../lib/vehicleSpecs');
 
 const router = express.Router();
@@ -25,6 +27,11 @@ const ALLOWED_CATEGORIES = new Set([
   'neumaticos',
   'cables',
   'suspension',
+  'trencillas',
+  'tornillos',
+  'stoppers',
+  'topes_y_centradores',
+  'cojinetes',
   'otro',
 ]);
 
@@ -177,10 +184,20 @@ router.get('/', async (req, res) => {
   }
 });
 
+const inventoryCreateValidators = [
+  body('name').trim().notEmpty().isLength({ max: 500 }),
+  body('category').notEmpty().isIn([...ALLOWED_CATEGORIES]),
+  body('quantity').optional().isInt({ min: 0 }),
+  body('unit').optional().isIn([...ALLOWED_UNITS]),
+  body('reference').optional().isString().isLength({ max: 500 }),
+  body('url').optional().isString().isLength({ max: 2000 }),
+  body('notes').optional().isString().isLength({ max: 5000 }),
+];
+
 /**
  * POST /api/inventory
  */
-router.post('/', async (req, res) => {
+router.post('/', inventoryCreateValidators, handleValidationErrors, async (req, res) => {
   try {
     const {
       name,
@@ -204,14 +221,10 @@ router.post('/', async (req, res) => {
       description: specDescription,
     } = req.body;
 
-    if (!name || !String(name).trim()) {
-      return res.status(400).json({ error: 'name es requerido' });
-    }
-    if (!category || !ALLOWED_CATEGORIES.has(String(category))) {
-      return res.status(400).json({ error: 'category no válida' });
-    }
-
-    const qty = parseInt(quantity, 10);
+    const qty =
+      quantity === undefined || quantity === null || String(quantity).trim() === ''
+        ? 0
+        : parseInt(quantity, 10);
     if (Number.isNaN(qty) || qty < 0) {
       return res.status(400).json({ error: 'quantity debe ser un entero mayor o igual a 0' });
     }

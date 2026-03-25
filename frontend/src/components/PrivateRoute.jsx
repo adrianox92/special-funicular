@@ -1,12 +1,18 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Spinner } from './ui/spinner';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return null; // o un spinner si lo prefieres
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Spinner className="size-8" />
+        <span className="sr-only">Cargando...</span>
+      </div>
+    );
   }
 
   if (!user) {
@@ -16,4 +22,4 @@ const PrivateRoute = ({ children }) => {
   return children;
 };
 
-export default PrivateRoute; 
+export default PrivateRoute;
