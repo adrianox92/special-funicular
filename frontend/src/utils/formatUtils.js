@@ -119,7 +119,7 @@ export const INVENTORY_CATEGORIES = [
   { value: 'topes_y_centradores', label: 'Topes y centradores' },
   { value: 'cojinetes', label: 'Cojinetes' },
   { value: 'otro', label: 'Otro' },
-];
+].sort((a, b) => a.label.localeCompare(b.label, 'es'));
 
 export const INVENTORY_UNITS = [
   { value: 'uds', label: 'Unidades' },

@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { Separator } from '../components/ui/separator';
+import { SearchableCategorySelect } from '../components/SearchableCategorySelect';
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_UNITS,
@@ -617,19 +618,16 @@ const Inventory = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Categoría</Label>
-                    <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INVENTORY_CATEGORIES.map((c) => (
-                          <SelectItem key={c.value} value={c.value}>
-                            {c.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label id="inv-category-label" htmlFor="inv-category">
+                      Categoría
+                    </Label>
+                    <SearchableCategorySelect
+                      id="inv-category"
+                      aria-labelledby="inv-category-label"
+                      value={formData.category}
+                      onValueChange={(v) => setFormData({ ...formData, category: v })}
+                      options={INVENTORY_CATEGORIES}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Unidad de stock</Label>
