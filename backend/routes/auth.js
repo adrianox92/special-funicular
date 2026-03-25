@@ -12,11 +12,22 @@ function serverConfigErrorResponse(res, status, logError, devDetail) {
   return res.status(status).json({ error: message });
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
+let _supabase = null;
+let _supabaseAdmin = null;
+
+function getSupabase() {
+  if (!_supabase) _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+  return _supabase;
+}
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin)
+    _supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    );
+  return _supabaseAdmin;
+}
 
 function generateApiKey() {
   return crypto.randomBytes(32).toString('hex');
@@ -55,7 +66,7 @@ function generateApiKey() {
  */
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
   if (error) {
     return res.status(401).json({ error: error.message });
   }
@@ -77,7 +88,7 @@ router.post('/api-key', async (req, res) => {
       return res.status(400).json({ error: 'Se requieren email y password' });
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await getSupabase().auth.signInWithPassword({
       email,
       password,
     });
@@ -87,7 +98,7 @@ router.post('/api-key', async (req, res) => {
 
     const userId = authData.user.id;
 
-    let { data: existing, error: fetchError } = await supabaseAdmin
+    let { data: existing, error: fetchError } = await getSupabaseAdmin()
       .from('user_api_keys')
       .select('api_key_hash, created_at')
       .eq('user_id', userId)
@@ -113,8 +124,8 @@ router.post('/api-key', async (req, res) => {
     if (!existing) {
       const apiKey = generateApiKey();
       const apiKeyHash = hashApiKey(apiKey);
-      const { data: inserted, error: insertError } = await supabaseAdmin
-        .from('user_api_keys')
+      const { data: inserted, error: insertError } = await getSupabaseAdmin()
+      .from('user_api_keys')
         .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
         .select('created_at')
         .single();

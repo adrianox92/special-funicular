@@ -13,7 +13,12 @@ function serverConfigError(res, status, logErr, devDetail) {
   return res.status(status).json({ error: message });
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+let _supabase = null;
+function getSupabase() {
+  if (!_supabase)
+    _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return _supabase;
+}
 
 router.use(authMiddleware);
 
@@ -29,7 +34,7 @@ router.get('/me', async (req, res) => {
   try {
     const userId = req.user.id;
 
-    let { data: existing, error: fetchError } = await supabase
+    let { data: existing, error: fetchError } = await getSupabase()
       .from('user_api_keys')
       .select('api_key_hash, created_at')
       .eq('user_id', userId)
@@ -55,7 +60,7 @@ router.get('/me', async (req, res) => {
     if (!existing) {
       const apiKey = generateApiKey();
       const apiKeyHash = hashApiKey(apiKey);
-      const { data: inserted, error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await getSupabase()
         .from('user_api_keys')
         .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
         .select('created_at')
@@ -105,7 +110,7 @@ router.post('/regenerate', async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const { error: deleteError } = await supabase.from('user_api_keys').delete().eq('user_id', userId);
+    const { error: deleteError } = await getSupabase().from('user_api_keys').delete().eq('user_id', userId);
 
     if (deleteError) {
       if (deleteError.code === '42P01') {
@@ -121,7 +126,7 @@ router.post('/regenerate', async (req, res) => {
 
     const apiKey = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
-    const { data: inserted, error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await getSupabase()
       .from('user_api_keys')
       .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
       .select('created_at')
