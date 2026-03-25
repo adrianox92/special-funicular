@@ -113,6 +113,11 @@ export const INVENTORY_CATEGORIES = [
   { value: 'neumaticos', label: 'Neumáticos' },
   { value: 'cables', label: 'Cables' },
   { value: 'suspension', label: 'Suspensión' },
+  { value: 'trencillas', label: 'Trencillas' },
+  { value: 'tornillos', label: 'Tornillos' },
+  { value: 'stoppers', label: 'Stoppers' },
+  { value: 'topes_y_centradores', label: 'Topes y centradores' },
+  { value: 'cojinetes', label: 'Cojinetes' },
   { value: 'otro', label: 'Otro' },
 ];
 

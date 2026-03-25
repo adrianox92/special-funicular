@@ -25,6 +25,11 @@ const ALLOWED_CATEGORIES = new Set([
   'neumaticos',
   'cables',
   'suspension',
+  'trencillas',
+  'tornillos',
+  'stoppers',
+  'topes_y_centradores',
+  'cojinetes',
   'otro',
 ]);
 
