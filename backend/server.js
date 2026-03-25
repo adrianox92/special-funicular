@@ -4,8 +4,8 @@ const helmet = require('helmet');
 require('dotenv').config();
 
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error(
-    'Falta SUPABASE_SERVICE_ROLE_KEY en el entorno. Es obligatoria para API keys y operaciones admin. Añádela en backend/.env',
+  console.warn(
+    '[WARN] SUPABASE_SERVICE_ROLE_KEY no está definida. Las operaciones de API keys y admin fallarán en tiempo de ejecución.',
   );
 }
 
