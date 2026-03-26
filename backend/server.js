@@ -70,10 +70,11 @@ const corsSyncOptions = {
 };
 
 app.use((req, res, next) => {
+  // /api/license-account/* empieza por el string "/api/license" pero usa JWT (PATCH, etc.): no usar corsSyncOptions.
   const isPublicApiRoute =
     req.path.startsWith('/api/sync') ||
     req.path === '/api/auth/api-key' ||
-    req.path.startsWith('/api/license');
+    (req.path.startsWith('/api/license') && !req.path.startsWith('/api/license-account'));
   cors(isPublicApiRoute ? corsSyncOptions : corsOptions)(req, res, next);
 });
 
