@@ -185,6 +185,14 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
   if (circuitNameToStore) {
     try {
       await updatePositionsAfterNewTiming(circuitNameToStore, timing.id);
+      const { data: posRow, error: posErr } = await supabase
+        .from('vehicle_timings')
+        .select('current_position, previous_position, position_change')
+        .eq('id', timing.id)
+        .single();
+      if (!posErr && posRow) {
+        finalTiming = { ...finalTiming, ...posRow };
+      }
     } catch (positionError) {
       console.warn('Error al actualizar posiciones:', positionError);
     }

@@ -1,5 +1,30 @@
 const { createClient } = require('@supabase/supabase-js');
 const { getTelegramBotTokenFromEnv } = require('./telegramEnv');
+const { formatSecondsToLapTime } = require('./timingUtils');
+
+function displaySessionTime(textVal, secVal) {
+  if (textVal != null && String(textVal).trim() !== '') return String(textVal).trim();
+  if (secVal != null && Number(secVal) > 0) {
+    const fmt = formatSecondsToLapTime(Number(secVal));
+    return fmt != null ? fmt : '—';
+  }
+  return '—';
+}
+
+/**
+ * Solo si el coche ha ganado puestos en el ranking del circuito (position_change > 0).
+ * Ignora el centinela 999 que usa positionTracker cuando no había posición previa en BD.
+ * @returns {string|null}
+ */
+function formatRankingGainLine(timing) {
+  const change = Number(timing.position_change);
+  const prev = timing.previous_position;
+  const curr = timing.current_position;
+  if (!Number.isFinite(change) || change <= 0) return null;
+  if (prev == null || Number(prev) >= 999) return null;
+  if (curr == null || !Number.isFinite(Number(curr))) return null;
+  return `Clasificación: +${change} puesto(s) — P${prev} → P${curr}`;
+}
 
 function getAdminClient() {
   const url = process.env.SUPABASE_URL;
@@ -63,7 +88,14 @@ async function sendTimingNotification(userId, timing, previousBestLapSeconds, su
       createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY);
     const vehicleLabel = await fetchVehicleLabel(supabase, timing.vehicle_id);
 
-    const best = timing.best_lap_time || timing.best_lap_timestamp;
+    const best =
+      timing.best_lap_time != null && String(timing.best_lap_time).trim() !== ''
+        ? String(timing.best_lap_time).trim()
+        : timing.best_lap_timestamp != null && Number(timing.best_lap_timestamp) > 0
+          ? formatSecondsToLapTime(Number(timing.best_lap_timestamp))
+          : '—';
+    const totalDisplay = displaySessionTime(timing.total_time, timing.total_time_timestamp);
+    const avgDisplay = displaySessionTime(timing.average_time, timing.average_time_timestamp);
     const circuit = timing.circuit || '—';
     const lane = timing.lane != null ? String(timing.lane) : '—';
     const laps = timing.laps != null ? String(timing.laps) : '—';
@@ -77,9 +109,15 @@ async function sendTimingNotification(userId, timing, previousBestLapSeconds, su
       `Circuito: ${circuit} (carril ${lane})`,
       `Vueltas: ${laps}`,
       `Mejor vuelta: ${best}`,
+      `Tiempo total sesión: ${totalDisplay}`,
+      `Tiempo medio por vuelta: ${avgDisplay}`,
       `Δ vs PB: ${delta}`,
       `Consistencia: ${cons}`,
     ];
+    const rankingLine = formatRankingGainLine(timing);
+    if (rankingLine) {
+      lines.push(`🏆 ${rankingLine}`);
+    }
     const textPlain = lines
       .map((l) => l.replace(/\*\*/g, ''))
       .join('\n');
