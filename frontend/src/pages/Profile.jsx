@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
@@ -19,6 +20,7 @@ import {
 } from '../components/ui/table';
 import { Switch } from '../components/ui/switch';
 import { Key, Copy, RefreshCw, Eye, EyeOff, User, SlidersHorizontal, Bell, CircleHelp, KeyRound } from 'lucide-react';
+import { isLicenseAdminUser } from '../lib/licenseAdmin';
 
 const STALE_DAYS_MIN = 1;
 const STALE_DAYS_MAX = 365;
@@ -61,12 +63,7 @@ const Profile = () => {
   const [licenseError, setLicenseError] = useState(null);
   const [adminPaidSaving, setAdminPaidSaving] = useState(false);
 
-  const licenseAdminEmails = (process.env.REACT_APP_LICENSE_ADMIN_EMAILS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  const isLicenseAdmin =
-    user?.email && licenseAdminEmails.includes(String(user.email).toLowerCase());
+  const isLicenseAdmin = isLicenseAdminUser(user);
 
   useEffect(() => {
     const raw = user?.user_metadata?.stale_days_threshold;
@@ -480,7 +477,11 @@ const Profile = () => {
                 <CardTitle>Administración (licencia de pago)</CardTitle>
                 <CardDescription>
                   Solo visible si tu email está en <code className="text-xs">LICENSE_ADMIN_EMAILS</code> del servidor y en{' '}
-                  <code className="text-xs">REACT_APP_LICENSE_ADMIN_EMAILS</code> del frontend.
+                  <code className="text-xs">REACT_APP_LICENSE_ADMIN_EMAILS</code> del frontend. Para{' '}
+                  <Link to="/admin/slot-race-licenses" className="text-primary underline-offset-4 hover:underline font-medium">
+                    buscar otras cuentas por email
+                  </Link>
+                  , usa la página de admin.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

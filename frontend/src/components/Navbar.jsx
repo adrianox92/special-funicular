@@ -15,7 +15,9 @@ import {
   Menu,
   Sun,
   Moon,
+  Shield,
 } from 'lucide-react';
+import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -73,6 +75,8 @@ const Navbar = () => {
     if (!user?.email) return 'U';
     return user.email.charAt(0).toUpperCase();
   };
+
+  const showLicenseAdmin = isLicenseAdminUser(user);
 
   const navItems = [
     { path: '/dashboard', label: 'Inicio', icon: Home },
@@ -161,6 +165,14 @@ const Navbar = () => {
                       Mi Perfil
                     </Link>
                   </DropdownMenuItem>
+                  {showLicenseAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/slot-race-licenses" className="flex items-center gap-2 cursor-pointer">
+                        <Shield className="size-4" />
+                        Admin licencias SRM
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
                       <Settings className="size-4" />
@@ -192,6 +204,15 @@ const Navbar = () => {
                 {navItems.map((item) => (
                   <NavLink key={item.path} item={item} />
                 ))}
+                {showLicenseAdmin && (
+                  <Link
+                    to="/admin/slot-race-licenses"
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Shield className="size-4" />
+                    Admin licencias SRM
+                  </Link>
+                )}
               </nav>
             </SheetContent>
           </Sheet>
