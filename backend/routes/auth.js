@@ -121,9 +121,10 @@ router.post('/api-key', async (req, res) => {
       );
     }
 
-    // Slot Race Manager (y otros clientes) necesitan el texto de la clave; si ya existía
-    // solo guardamos el hash en BD. Con contraseña válida se puede rotar y devolver una nueva.
-    if (existing && req.body.regenerate_if_exists) {
+    // Si ya había clave solo tenemos el hash: hay que rotar para devolver texto plano.
+    // Por defecto regeneramos (clientes viejos no envían regenerate_if_exists).
+    // Solo se mantiene la respuesta api_key: null si el cliente pide explícitamente regenerate_if_exists: false.
+    if (existing && req.body.regenerate_if_exists !== false) {
       const { error: deleteError } = await getSupabaseAdmin()
         .from('user_api_keys')
         .delete()
