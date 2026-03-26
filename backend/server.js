@@ -82,14 +82,15 @@ function pickCorsOptions(path) {
   return corsOptions;
 }
 
-// Responder preflights OPTIONS antes de llegar a cualquier middleware de auth.
-app.options('*', (req, res, next) => {
-  cors(pickCorsOptions(req.path))(req, res, next);
-});
-
-// Aplicar CORS a todas las demás peticiones.
+// Aplicar CORS a todas las peticiones. Para preflights OPTIONS responde directamente
+// antes de llegar a cualquier middleware de auth (que de lo contrario los bloquearía).
 app.use((req, res, next) => {
-  cors(pickCorsOptions(req.path))(req, res, next);
+  const corsMiddleware = cors(pickCorsOptions(req.path));
+  if (req.method === 'OPTIONS') {
+    corsMiddleware(req, res, () => res.sendStatus(204));
+  } else {
+    corsMiddleware(req, res, next);
+  }
 });
 
 if (process.env.NODE_ENV !== 'production') {
