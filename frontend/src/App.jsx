@@ -21,6 +21,7 @@ import CompetitionPresentation from './pages/CompetitionPresentation';
 import Profile from './pages/Profile';
 import Login from './components/Login';
 import LandingPage from './pages/LandingPage';
+import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useCookieConsent } from './context/CookieConsentContext';
 import CookieBanner from './components/CookieBanner';
@@ -47,7 +48,7 @@ const AuthedShell = ({ children }) => (
 const AppContent = () => {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const noNavbarRoutes = ['/', '/login', '/competitions/signup', '/competitions/status', '/competitions/presentation'];
+  const noNavbarRoutes = ['/', '/login', '/slot-race-manager', '/competitions/signup', '/competitions/status', '/competitions/presentation'];
   const hasNavbar = user && !noNavbarRoutes.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
 
   React.useEffect(() => {
@@ -83,6 +84,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+        <Route path="/slot-race-manager" element={<SlotRaceManagerPage />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />

@@ -240,6 +240,9 @@ const LandingPage = () => {
               {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
             <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link to="/slot-race-manager">Slot Race Manager</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
               <Link to="/login">Iniciar sesión</Link>
             </Button>
             <Button asChild size="sm">
