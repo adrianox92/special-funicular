@@ -40,26 +40,14 @@ const allowedOrigins = [
   'https://special-funicular-bmy5-4tra1w9ef-adrians-projects-63dd797c.vercel.app',
 ];
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (process.env.FRONTEND_URL && process.env.FRONTEND_URL === origin) return true;
+  return false;
+}
 
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.FRONTEND_URL === origin) {
-      callback(null, true);
-    } else {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Origen bloqueado por CORS:', origin);
-      }
-      callback(new Error('No permitido por CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-};
-
+// Rutas de sincronización (X-API-Key, solo GET/POST) — no necesitan PATCH ni DELETE.
 const corsSyncOptions = {
   origin: true,
   credentials: true,
@@ -69,13 +57,39 @@ const corsSyncOptions = {
   optionsSuccessStatus: 204,
 };
 
+// Rutas autenticadas con JWT: todos los métodos incluyendo PATCH/PUT/DELETE.
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production') console.log('Origen bloqueado por CORS:', origin);
+    callback(new Error('No permitido por CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
+
+function pickCorsOptions(path) {
+  // /api/license-account/* comparte prefijo con /api/license pero es JWT + PATCH → corsOptions.
+  if (path.startsWith('/api/license-account')) return corsOptions;
+  if (
+    path.startsWith('/api/sync') ||
+    path === '/api/auth/api-key' ||
+    path.startsWith('/api/license')
+  ) return corsSyncOptions;
+  return corsOptions;
+}
+
+// Responder preflights OPTIONS antes de llegar a cualquier middleware de auth.
+app.options('*', (req, res, next) => {
+  cors(pickCorsOptions(req.path))(req, res, next);
+});
+
+// Aplicar CORS a todas las demás peticiones.
 app.use((req, res, next) => {
-  // /api/license-account/* empieza por el string "/api/license" pero usa JWT (PATCH, etc.): no usar corsSyncOptions.
-  const isPublicApiRoute =
-    req.path.startsWith('/api/sync') ||
-    req.path === '/api/auth/api-key' ||
-    (req.path.startsWith('/api/license') && !req.path.startsWith('/api/license-account'));
-  cors(isPublicApiRoute ? corsSyncOptions : corsOptions)(req, res, next);
+  cors(pickCorsOptions(req.path))(req, res, next);
 });
 
 if (process.env.NODE_ENV !== 'production') {
