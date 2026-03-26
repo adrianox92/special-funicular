@@ -9,7 +9,16 @@ import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Key, Copy, RefreshCw, Eye, EyeOff, User, SlidersHorizontal, Bell, CircleHelp } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import { Switch } from '../components/ui/switch';
+import { Key, Copy, RefreshCw, Eye, EyeOff, User, SlidersHorizontal, Bell, CircleHelp, KeyRound } from 'lucide-react';
 
 const STALE_DAYS_MIN = 1;
 const STALE_DAYS_MAX = 365;
@@ -46,6 +55,18 @@ const Profile = () => {
   const [notifTestLoading, setNotifTestLoading] = useState(false);
   const [notifError, setNotifError] = useState(null);
   const [notifSuccess, setNotifSuccess] = useState(null);
+
+  const [licenseInfo, setLicenseInfo] = useState(null);
+  const [licenseLoading, setLicenseLoading] = useState(false);
+  const [licenseError, setLicenseError] = useState(null);
+  const [adminPaidSaving, setAdminPaidSaving] = useState(false);
+
+  const licenseAdminEmails = (process.env.REACT_APP_LICENSE_ADMIN_EMAILS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const isLicenseAdmin =
+    user?.email && licenseAdminEmails.includes(String(user.email).toLowerCase());
 
   useEffect(() => {
     const raw = user?.user_metadata?.stale_days_threshold;
@@ -149,6 +170,41 @@ const Profile = () => {
     fetchApiKey();
   }, []);
 
+  const fetchLicenseInfo = async () => {
+    setLicenseLoading(true);
+    setLicenseError(null);
+    try {
+      const { data } = await api.get('/license-account/me');
+      setLicenseInfo(data);
+    } catch (err) {
+      setLicenseError(err.response?.data?.error || err.message || 'Error al cargar licencia');
+      setLicenseInfo(null);
+    } finally {
+      setLicenseLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) fetchLicenseInfo();
+  }, [user?.id]);
+
+  const handleAdminTogglePaid = async (checked) => {
+    if (!user?.id) return;
+    setAdminPaidSaving(true);
+    setLicenseError(null);
+    try {
+      await api.patch('/license-account/admin/subscription', {
+        target_user_id: user.id,
+        is_paid: !!checked,
+      });
+      await fetchLicenseInfo();
+    } catch (err) {
+      setLicenseError(err.response?.data?.error || err.message || 'Error al actualizar');
+    } finally {
+      setAdminPaidSaving(false);
+    }
+  };
+
   const handleCopy = async () => {
     if (!apiKey) return;
     try {
@@ -196,8 +252,12 @@ const Profile = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3 sm:inline-flex sm:w-auto sm:max-w-none">
+        <TabsList className="grid w-full max-w-3xl grid-cols-2 sm:grid-cols-4 sm:inline-flex sm:w-auto sm:max-w-none">
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="license">
+            <KeyRound className="size-4 mr-1 inline" aria-hidden />
+            Licencia
+          </TabsTrigger>
           <TabsTrigger value="settings">Configuración</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
         </TabsList>
@@ -340,6 +400,110 @@ const Profile = () => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="license" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <KeyRound className="size-5" />
+                Slot Race Manager (DS200)
+              </CardTitle>
+              <CardDescription>
+                Instalaciones registradas de la app de escritorio. Máximo 3 ordenadores por cuenta con licencia. Para
+                liberar un dispositivo, contacta con soporte.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {licenseLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner className="size-4" />
+                  Cargando…
+                </div>
+              )}
+              {!licenseLoading && licenseInfo && (
+                <>
+                  <p className="text-sm">
+                    Estado:{' '}
+                    <strong className={licenseInfo.is_paid ? 'text-green-600' : 'text-amber-600'}>
+                      {licenseInfo.is_paid ? 'Licencia completa' : 'Versión de prueba (solo en la app)'}
+                    </strong>
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Instalaciones: {licenseInfo.installations_used ?? 0} / {licenseInfo.installations_max ?? 3}
+                  </p>
+                  {Array.isArray(licenseInfo.installations) && licenseInfo.installations.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ID instalación</TableHead>
+                          <TableHead>Registro</TableHead>
+                          <TableHead>Última conexión</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {licenseInfo.installations.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell className="font-mono text-xs max-w-[12rem] truncate" title={row.installation_id}>
+                              {row.installation_id}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {row.registered_at
+                                ? new Date(row.registered_at).toLocaleString('es-ES')
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {row.last_seen_at
+                                ? new Date(row.last_seen_at).toLocaleString('es-ES')
+                                : '—'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aún no hay instalaciones registradas.</p>
+                  )}
+                </>
+              )}
+              {licenseError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{licenseError}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {isLicenseAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Administración (licencia de pago)</CardTitle>
+                <CardDescription>
+                  Solo visible si tu email está en <code className="text-xs">LICENSE_ADMIN_EMAILS</code> del servidor y en{' '}
+                  <code className="text-xs">REACT_APP_LICENSE_ADMIN_EMAILS</code> del frontend.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="admin-paid"
+                    checked={!!licenseInfo?.is_paid}
+                    onCheckedChange={handleAdminTogglePaid}
+                    disabled={adminPaidSaving || !licenseInfo}
+                    aria-label="Licencia de pago Slot Race Manager"
+                  />
+                  <Label htmlFor="admin-paid" className="cursor-pointer">
+                    Marcar mi cuenta como licencia de pago (Slot Race Manager)
+                  </Label>
+                </div>
+                {adminPaidSaving && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Spinner className="size-4" /> Guardando…
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="settings" className="mt-6 space-y-6">

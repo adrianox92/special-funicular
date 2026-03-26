@@ -71,7 +71,9 @@ const corsSyncOptions = {
 
 app.use((req, res, next) => {
   const isPublicApiRoute =
-    req.path.startsWith('/api/sync') || req.path === '/api/auth/api-key';
+    req.path.startsWith('/api/sync') ||
+    req.path === '/api/auth/api-key' ||
+    req.path.startsWith('/api/license');
   cors(isPublicApiRoute ? corsSyncOptions : corsOptions)(req, res, next);
 });
 
@@ -104,6 +106,10 @@ const syncRoute = require('./routes/sync');
 const circuitsRoute = require('./routes/circuits');
 const maintenanceRoute = require('./routes/maintenance');
 const inventoryRoute = require('./routes/inventory');
+const apiKeyAuth = require('./middleware/apiKeyAuth');
+const authMiddleware = require('./middleware/auth');
+const licenseRoute = require('./routes/license');
+const licenseAccountRoute = require('./routes/licenseAccount');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
@@ -116,6 +122,9 @@ app.use('/api/api-keys', apiKeysRoute);
 app.use('/api/circuits', circuitsRoute);
 app.use('/api/maintenance', maintenanceRoute);
 app.use('/api/inventory', inventoryRoute);
+
+app.use('/api/license', apiKeyAuth, licenseRoute);
+app.use('/api/license-account', authMiddleware, licenseAccountRoute);
 
 const competitionsRoute = require('./routes/competitions');
 app.use('/api/competitions', competitionsRoute);

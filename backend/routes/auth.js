@@ -121,6 +121,63 @@ router.post('/api-key', async (req, res) => {
       );
     }
 
+    // Slot Race Manager (y otros clientes) necesitan el texto de la clave; si ya existía
+    // solo guardamos el hash en BD. Con contraseña válida se puede rotar y devolver una nueva.
+    if (existing && req.body.regenerate_if_exists) {
+      const { error: deleteError } = await getSupabaseAdmin()
+        .from('user_api_keys')
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteError) {
+        if (deleteError.code === '42P01') {
+          return serverConfigErrorResponse(
+            res,
+            503,
+            deleteError,
+            'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
+          );
+        }
+        return serverConfigErrorResponse(
+          res,
+          500,
+          deleteError,
+          `Error al regenerar la API key: ${deleteError.message}`,
+        );
+      }
+
+      const apiKey = generateApiKey();
+      const apiKeyHash = hashApiKey(apiKey);
+      const { data: inserted, error: insertError } = await getSupabaseAdmin()
+        .from('user_api_keys')
+        .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
+        .select('created_at')
+        .single();
+
+      if (insertError) {
+        if (insertError.code === '42P01') {
+          return serverConfigErrorResponse(
+            res,
+            503,
+            insertError,
+            'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
+          );
+        }
+        return serverConfigErrorResponse(
+          res,
+          500,
+          insertError,
+          `Error al crear la API key: ${insertError.message}`,
+        );
+      }
+
+      return res.json({
+        api_key: apiKey,
+        created_at: inserted.created_at,
+        regenerated: true,
+      });
+    }
+
     if (!existing) {
       const apiKey = generateApiKey();
       const apiKeyHash = hashApiKey(apiKey);
