@@ -16,6 +16,7 @@ import {
   Sun,
   Moon,
   Shield,
+  CircleHelp,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { Button } from './ui/button';
@@ -85,6 +86,7 @@ const Navbar = () => {
     { path: '/circuits', label: 'Circuitos', icon: Flag },
     { path: '/inventory', label: 'Inventario', icon: Package },
     { path: '/competitions', label: 'Competiciones', icon: Trophy },
+    { path: '/help', label: 'Ayuda', icon: CircleHelp },
   ];
 
   const NavLink = ({ item }) => {

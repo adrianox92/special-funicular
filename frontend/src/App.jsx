@@ -19,6 +19,8 @@ import CompetitionSignup from './pages/CompetitionSignup';
 import CompetitionStatus from './pages/CompetitionStatus';
 import CompetitionPresentation from './pages/CompetitionPresentation';
 import Profile from './pages/Profile';
+import SettingsPage from './pages/SettingsPage';
+import HelpPage from './pages/HelpPage';
 import Login from './components/Login';
 import LandingPage from './pages/LandingPage';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
@@ -173,6 +175,28 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <Profile />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <SettingsPage />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/help"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <HelpPage />
               </AuthedShell>
             </PrivateRoute>
           }

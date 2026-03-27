@@ -52,8 +52,8 @@ const DashboardActionBlocks = ({ data, loadError }) => {
         “sin sesión reciente” si llevas más de{' '}
         <span className="font-medium text-foreground">{staleDaysThreshold} días</span> sin rodar ahí
         (ajústalo en{' '}
-        <Link to="/profile" className="text-foreground underline underline-offset-2 hover:no-underline">
-          Mi Perfil → Configuración
+        <Link to="/settings" className="text-foreground underline underline-offset-2 hover:no-underline">
+          Configuración
         </Link>
         ).
       </p>
