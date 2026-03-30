@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
-import { vehicleComponentTypes } from '../data/componentTypes';
+import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 import { formatModificationSnapshot, formatHistoryDate, modificationLineTotal } from '../utils/formatUtils';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -231,7 +231,7 @@ const VehicleDetail = () => {
                 return (
                 <li key={comp.id} className="rounded-lg border bg-muted/20 p-4 space-y-2">
                   <p className="font-medium">
-                    {vehicleComponentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}
+                    {getVehicleComponentTypeLabel(comp.component_type)}
                     {comp.element ? ` · ${comp.element}` : ''}
                     {comp.manufacturer ? ` · ${comp.manufacturer}` : ''}
                     {hasPrice && (
@@ -249,7 +249,7 @@ const VehicleDetail = () => {
                       <ul className="list-disc list-inside space-y-1">
                         {comp.change_history.map((h) => (
                           <li key={h.id}>
-                            Desde el {formatHistoryDate(h.effective_date)}: {formatModificationSnapshot(h.previous_snapshot, vehicleComponentTypes)}
+                            Desde el {formatHistoryDate(h.effective_date)}: {formatModificationSnapshot(h.previous_snapshot)}
                           </li>
                         ))}
                       </ul>

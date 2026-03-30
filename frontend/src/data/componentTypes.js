@@ -35,6 +35,14 @@ export function getVehicleComponentTypeLabel(componentType) {
   return vehicleComponentTypeLabelMap[componentType] ?? String(componentType);
 }
 
+/** Convierte tipos de eje antiguos al tipo unificado `axle` (BD/UI). */
+export function normalizeVehicleComponentType(componentType) {
+  if (componentType == null || componentType === '') return '';
+  const s = String(componentType).trim();
+  if (s === 'front_axle' || s === 'rear_axle') return 'axle';
+  return s;
+}
+
 /** Orden de categorías de inventario alineadas con tipos de vehículo (mismas etiquetas que arriba). */
 export const inventoryVehicleCategoryValues = [
   'pinion',

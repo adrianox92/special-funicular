@@ -23,18 +23,20 @@ SET previous_snapshot = jsonb_set(
 )
 WHERE previous_snapshot->>'component_type' IN ('front_axle', 'rear_axle');
 
--- Snapshots de configuración (texto JSON o jsonb): normaliza espacios opcionales tras ':'.
+-- Snapshots de configuración (columna jsonb): regexp_replace devuelve text → cast a jsonb.
 UPDATE public.vehicle_timings
-SET setup_snapshot = regexp_replace(
+SET setup_snapshot = (
   regexp_replace(
-    setup_snapshot::text,
-    '"component_type"\s*:\s*"front_axle"',
+    regexp_replace(
+      setup_snapshot::text,
+      '"component_type"\s*:\s*"front_axle"',
+      '"component_type":"axle"',
+      'g'
+    ),
+    '"component_type"\s*:\s*"rear_axle"',
     '"component_type":"axle"',
     'g'
-  ),
-  '"component_type"\s*:\s*"rear_axle"',
-  '"component_type":"axle"',
-  'g'
+  )::jsonb
 )
 WHERE setup_snapshot IS NOT NULL
   AND (
@@ -43,16 +45,18 @@ WHERE setup_snapshot IS NOT NULL
   );
 
 UPDATE public.competition_timings
-SET setup_snapshot = regexp_replace(
+SET setup_snapshot = (
   regexp_replace(
-    setup_snapshot::text,
-    '"component_type"\s*:\s*"front_axle"',
+    regexp_replace(
+      setup_snapshot::text,
+      '"component_type"\s*:\s*"front_axle"',
+      '"component_type":"axle"',
+      'g'
+    ),
+    '"component_type"\s*:\s*"rear_axle"',
     '"component_type":"axle"',
     'g'
-  ),
-  '"component_type"\s*:\s*"rear_axle"',
-  '"component_type":"axle"',
-  'g'
+  )::jsonb
 )
 WHERE setup_snapshot IS NOT NULL
   AND (

@@ -40,27 +40,36 @@ export function modificationLineTotal(price, mountedQty) {
 
 /**
  * Texto legible de un snapshot de modificación (historial).
- * @param {Record<string, unknown>|null|undefined} snap
- * @param {{ value: string, label: string }[]} [componentTypes]
+ * @param {Record<string, unknown>|null|undefined|string} snap
  */
-export function formatModificationSnapshot(snap, componentTypes = []) {
-  if (!snap || typeof snap !== 'object') return '—';
-  const typeLabel =
-    componentTypes.find((t) => t.value === snap.component_type)?.label ||
-    snap.component_type ||
-    '—';
-  const parts = [typeLabel, snap.element, snap.manufacturer].filter(
-    (p) => p != null && String(p).trim() !== '' && String(p) !== 'null'
+export function formatModificationSnapshot(snap) {
+  if (snap == null) return '—';
+  let obj = snap;
+  if (typeof snap === 'string') {
+    try {
+      obj = JSON.parse(snap);
+    } catch {
+      return '—';
+    }
+  }
+  if (!obj || typeof obj !== 'object') return '—';
+  const typeLabel = getVehicleComponentTypeLabel(obj.component_type);
+  const parts = [typeLabel, obj.element, obj.manufacturer].filter(
+    (p) =>
+      p != null &&
+      String(p).trim() !== '' &&
+      String(p) !== 'null' &&
+      p !== '—',
   );
-  const ref = snap.reference ?? snap.sku;
+  const ref = obj.reference ?? obj.sku;
   if (ref != null && String(ref).trim() !== '' && String(ref) !== 'null') {
     parts.push(`Referencia: ${String(ref).trim()}`);
   }
-  if (snap.price != null && snap.price !== '') {
-    const p = Number(snap.price);
+  if (obj.price != null && obj.price !== '') {
+    const p = Number(obj.price);
     if (!Number.isNaN(p)) parts.push(`${p.toFixed(2)} €`);
   }
-  const mq = snap.mounted_qty != null ? Number(snap.mounted_qty) : null;
+  const mq = obj.mounted_qty != null ? Number(obj.mounted_qty) : null;
   if (mq != null && !Number.isNaN(mq) && mq !== 1) {
     parts.push(`${mq} uds montadas`);
   }

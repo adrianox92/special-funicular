@@ -59,7 +59,11 @@ import {
   formatInventoryCategory,
   modificationLineTotal,
 } from '../utils/formatUtils';
-import { vehicleComponentTypes as componentTypes } from '../data/componentTypes';
+import {
+  vehicleComponentTypes as componentTypes,
+  normalizeVehicleComponentType,
+  getVehicleComponentTypeLabel,
+} from '../data/componentTypes';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -288,9 +292,16 @@ const EditVehicle = () => {
       setLoadingSpecs(true);
       try {
         const response = await api.get(`/vehicles/${id}/technical-specs`);
+        const normalized = (response.data || []).map((spec) => ({
+          ...spec,
+          components: (spec.components || []).map((c) => ({
+            ...c,
+            component_type: normalizeVehicleComponentType(c.component_type),
+          })),
+        }));
         const specs = {
-          modification: response.data.find(spec => spec.is_modification),
-          technical: response.data.find(spec => !spec.is_modification)
+          modification: normalized.find((spec) => spec.is_modification),
+          technical: normalized.find((spec) => !spec.is_modification),
         };
         setTechnicalSpecs(specs);
       } catch (error) {
@@ -449,7 +460,7 @@ const EditVehicle = () => {
     setEditingSpec({
       id: spec.id,
       component_id: component.id,
-      component_type: component.component_type || '',
+      component_type: normalizeVehicleComponentType(component.component_type || ''),
       element: component.element || '',
       manufacturer: component.manufacturer || '',
       material: component.material || '',
@@ -467,7 +478,7 @@ const EditVehicle = () => {
       change_effective_date: new Date().toISOString().slice(0, 10)
     });
     setSpecEditBaseline({
-      component_type: component.component_type || '',
+      component_type: normalizeVehicleComponentType(component.component_type || ''),
       element: component.element || '',
       manufacturer: component.manufacturer || '',
       material: component.material || '',
@@ -535,7 +546,7 @@ const EditVehicle = () => {
   const handlePickInventoryItem = (item) => {
     setNewSpec((prev) => ({
       ...prev,
-      component_type: inventoryCategoryToVehicleType(item.category),
+      component_type: normalizeVehicleComponentType(inventoryCategoryToVehicleType(item.category)),
       element: item.name || '',
       sku: item.reference || '',
       url: item.url || '',
@@ -613,9 +624,16 @@ const EditVehicle = () => {
     }
 
     const response = await api.get(`/vehicles/${id}/technical-specs`);
+    const normalizedAfterSave = (response.data || []).map((spec) => ({
+      ...spec,
+      components: (spec.components || []).map((c) => ({
+        ...c,
+        component_type: normalizeVehicleComponentType(c.component_type),
+      })),
+    }));
     const updatedSpecs = {
-      modification: response.data.find((spec) => spec.is_modification),
-      technical: response.data.find((spec) => !spec.is_modification),
+      modification: normalizedAfterSave.find((spec) => spec.is_modification),
+      technical: normalizedAfterSave.find((spec) => !spec.is_modification),
     };
     setTechnicalSpecs(updatedSpecs);
     handleCancelEdit();
@@ -695,7 +713,9 @@ const EditVehicle = () => {
         component_id: editingSpec?.component_id,
         components: [
           {
-            component_type: editingSpec?.component_type || newSpec.component_type,
+            component_type: normalizeVehicleComponentType(
+              editingSpec?.component_type || newSpec.component_type,
+            ),
             element: editingSpec?.element || newSpec.element,
             manufacturer: editingSpec?.manufacturer || newSpec.manufacturer,
             material: editingSpec?.material || newSpec.material,
@@ -1141,12 +1161,12 @@ const EditVehicle = () => {
                 <Input
                   id="component_type"
                   readOnly
-                  value={
-                    componentTypes.find((t) => t.value === specValue.component_type)?.label
-                    || formatInventoryCategory(
-                      specValue.component_type === 'other' ? 'otro' : specValue.component_type,
-                    )
-                  }
+                  value={(() => {
+                    const ct = specValue.component_type;
+                    const lbl = getVehicleComponentTypeLabel(ct);
+                    if (lbl !== '—') return lbl;
+                    return formatInventoryCategory(ct === 'other' ? 'otro' : ct);
+                  })()}
                   className="bg-muted"
                 />
               ) : (
@@ -1380,7 +1400,7 @@ const EditVehicle = () => {
                   {components.map((comp) => (
                     <React.Fragment key={comp.id}>
                       <TableRow>
-                        <TableCell>{componentTypes.find(t => t.value === comp.component_type)?.label || comp.component_type}</TableCell>
+                        <TableCell>{getVehicleComponentTypeLabel(comp.component_type)}</TableCell>
                         <TableCell>{comp.element}</TableCell>
                         <TableCell>{comp.mounted_qty ?? 1}</TableCell>
                         <TableCell>{comp.manufacturer}</TableCell>
@@ -1421,7 +1441,7 @@ const EditVehicle = () => {
                               {comp.change_history.map((h) => (
                                 <li key={h.id}>
                                   <span className="text-muted-foreground">Desde el {formatHistoryDate(h.effective_date)}: </span>
-                                  {formatModificationSnapshot(h.previous_snapshot, componentTypes)}
+                                  {formatModificationSnapshot(h.previous_snapshot)}
                                 </li>
                               ))}
                             </ul>
