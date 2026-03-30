@@ -3,7 +3,7 @@ import VehicleCard from '../components/VehicleCard';
 import VehicleTable from '../components/VehicleTable';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
-import { Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { ArrowDownUp, Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon, SlidersHorizontal } from 'lucide-react';
 import { formatDistance } from '../utils/formatUtils';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 import { Button } from '../components/ui/button';
@@ -19,6 +19,33 @@ import {
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const ALL_VEHICLES_LIMIT = 10000;
 const FILTERS_STORAGE_KEY = 'vehicleListFilters';
+const SORT_STORAGE_KEY = 'vehicleListSort';
+
+const SORT_KEYS = new Set([
+  'purchase_date',
+  'created_at',
+  'total_distance_meters',
+  'updated_at',
+]);
+
+const loadStoredSort = () => {
+  try {
+    const raw = localStorage.getItem(SORT_STORAGE_KEY);
+    if (!raw) return { sort: 'purchase_date', dir: 'desc' };
+    const parsed = JSON.parse(raw);
+    const sort = SORT_KEYS.has(parsed.sort) ? parsed.sort : 'purchase_date';
+    const dir = parsed.dir === 'asc' || parsed.dir === 'desc' ? parsed.dir : 'desc';
+    return { sort, dir };
+  } catch {
+    return { sort: 'purchase_date', dir: 'desc' };
+  }
+};
+
+const saveSort = (next) => {
+  try {
+    localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(next));
+  } catch {}
+};
 
 const defaultFilters = { manufacturer: '', type: '', modified: '', digital: '', filterMuseo: false, filterTaller: false };
 
@@ -90,12 +117,22 @@ const VehicleList = () => {
       return PAGE_SIZE_OPTIONS.includes(stored) ? stored : 25;
     } catch { return 25; }
   });
+  const [listSort, setListSortState] = useState(loadStoredSort);
+  const setListSort = (next) => {
+    setListSortState((prev) => {
+      const n = typeof next === 'function' ? next(prev) : next;
+      saveSort(n);
+      return n;
+    });
+  };
 
   const hasActiveFilters = !!(filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.filterMuseo || filters.filterTaller);
 
+  const sortQuery = `sort=${encodeURIComponent(listSort.sort)}&dir=${encodeURIComponent(listSort.dir)}`;
+
   const loadVehicles = useCallback(async (page = 1, limit = pageSize) => {
     try {
-      const response = await api.get(`/vehicles?page=${page}&limit=${limit}`);
+      const response = await api.get(`/vehicles?page=${page}&limit=${limit}&${sortQuery}`);
       const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
       setVehicles(vehiclesData);
       setFiltered(vehiclesData);
@@ -106,18 +143,18 @@ const VehicleList = () => {
       setFiltered([]);
       setPagination({ total: 0, page: 1, limit, totalPages: 0 });
     }
-  }, [pageSize]);
+  }, [pageSize, sortQuery]);
 
   const loadAllVehicles = useCallback(async () => {
     try {
-      const response = await api.get(`/vehicles?page=1&limit=${ALL_VEHICLES_LIMIT}`);
+      const response = await api.get(`/vehicles?page=1&limit=${ALL_VEHICLES_LIMIT}&${sortQuery}`);
       const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
       setAllVehicles(vehiclesData);
     } catch (error) {
       console.error('Error al cargar vehículos:', error);
       setAllVehicles([]);
     }
-  }, []);
+  }, [sortQuery]);
 
   useEffect(() => {
     if (hasActiveFilters) {
@@ -187,7 +224,9 @@ const VehicleList = () => {
         if (filters.filterMuseo) params.set('filterMuseo', 'true');
         if (filters.filterTaller) params.set('filterTaller', 'true');
       }
-      const url = params.toString() ? `/vehicles/export?${params.toString()}` : '/vehicles/export';
+      params.set('sort', listSort.sort);
+      params.set('dir', listSort.dir);
+      const url = `/vehicles/export?${params.toString()}`;
       const response = await api.get(url);
       const vehiclesData = response.data.vehicles;
       const headers = ['ID', 'Modelo', 'Referencia', 'Fabricante', 'Tipo', 'Tracción', 'Escala', 'Precio Original (€)', 'Precio Total (€)', 'Fecha de Compra', 'Lugar de Compra', 'Modificado', 'Digital', 'Museo', 'Taller', 'Odómetro', 'Anotaciones', 'Especificaciones Técnicas', 'Modificaciones'];
@@ -303,48 +342,141 @@ const VehicleList = () => {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        <Input placeholder="Buscar por fabricante..." value={filters.manufacturer} onChange={e => setFilters({ ...filters, manufacturer: e.target.value })} className="min-w-[140px] flex-1" />
-        <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}>
-          <option value="">Todos los tipos</option>
-          {['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.modified} onChange={e => setFilters({ ...filters, modified: e.target.value })}>
-          <option value="">Modificado/Serie</option>
-          <option value="Sí">Modificado</option>
-          <option value="No">Serie</option>
-        </select>
-        <select className="flex h-9 min-w-[140px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" value={filters.digital} onChange={e => setFilters({ ...filters, digital: e.target.value })}>
-          <option value="">Digital/Analógico</option>
-          <option value="Digital">Digital</option>
-          <option value="Analógico">Analógico</option>
-        </select>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="h-9 min-w-[140px] flex-1 justify-between px-3 text-sm font-normal">
-              <span className="truncate">
-                {!filters.filterMuseo && !filters.filterTaller
-                  ? 'Museo / Taller'
-                  : [filters.filterMuseo && 'Museo', filters.filterTaller && 'Taller'].filter(Boolean).join(', ')}
-              </span>
-              <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
-            <DropdownMenuCheckboxItem
-              checked={filters.filterMuseo}
-              onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterMuseo: !!checked }))}
+      {/* Filtros y ordenación */}
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <SlidersHorizontal className="size-3.5" aria-hidden />
+          Filtros y ordenación
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+
+          {/* Fabricante */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="filter-manufacturer" className="text-xs font-medium text-muted-foreground">
+              Fabricante
+            </label>
+            <Input
+              id="filter-manufacturer"
+              placeholder="Buscar fabricante..."
+              value={filters.manufacturer}
+              onChange={e => setFilters({ ...filters, manufacturer: e.target.value })}
+              className="h-9"
+            />
+          </div>
+
+          {/* Tipo */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="filter-type" className="text-xs font-medium text-muted-foreground">
+              Tipo
+            </label>
+            <select
+              id="filter-type"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={filters.type}
+              onChange={e => setFilters({ ...filters, type: e.target.value })}
             >
-              Museo
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={filters.filterTaller}
-              onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterTaller: !!checked }))}
+              <option value="">Todos los tipos</option>
+              {['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Estado */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="filter-modified" className="text-xs font-medium text-muted-foreground">
+              Estado
+            </label>
+            <select
+              id="filter-modified"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={filters.modified}
+              onChange={e => setFilters({ ...filters, modified: e.target.value })}
             >
-              Taller
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <option value="">Todos</option>
+              <option value="Sí">Modificado</option>
+              <option value="No">Serie</option>
+            </select>
+          </div>
+
+          {/* Sistema */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="filter-digital" className="text-xs font-medium text-muted-foreground">
+              Sistema
+            </label>
+            <select
+              id="filter-digital"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={filters.digital}
+              onChange={e => setFilters({ ...filters, digital: e.target.value })}
+            >
+              <option value="">Todos</option>
+              <option value="Digital">Digital</option>
+              <option value="Analógico">Analógico</option>
+            </select>
+          </div>
+
+          {/* Estado museo/taller */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Estado (museo/taller)</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-9 w-full justify-between px-3 text-sm font-normal">
+                  <span className="truncate text-left">
+                    {!filters.filterMuseo && !filters.filterTaller
+                      ? 'Todos'
+                      : [filters.filterMuseo && 'Museo', filters.filterTaller && 'Taller'].filter(Boolean).join(', ')}
+                  </span>
+                  <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                <DropdownMenuCheckboxItem
+                  checked={filters.filterMuseo}
+                  onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterMuseo: !!checked }))}
+                >
+                  Museo
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filters.filterTaller}
+                  onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterTaller: !!checked }))}
+                >
+                  Taller
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Ordenar por */}
+          <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-1 xl:col-span-2">
+            <label htmlFor="vehicle-list-sort" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <ArrowDownUp className="size-3.5" aria-hidden />
+              Ordenar por
+            </label>
+            <select
+              id="vehicle-list-sort"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={`${listSort.sort}|${listSort.dir}`}
+              onChange={(e) => {
+                const pipe = e.target.value.indexOf('|');
+                const sort = e.target.value.slice(0, pipe);
+                const dir = e.target.value.slice(pipe + 1);
+                setListSort({ sort, dir });
+                setCurrentPage(1);
+              }}
+            >
+              <option value="purchase_date|desc">Fecha de compra — reciente primero</option>
+              <option value="purchase_date|asc">Fecha de compra — antigua primero</option>
+              <option value="created_at|desc">Fecha de creación — reciente primero</option>
+              <option value="created_at|asc">Fecha de creación — antigua primero</option>
+              <option value="total_distance_meters|asc">Odómetro — menor a mayor</option>
+              <option value="total_distance_meters|desc">Odómetro — mayor a menor</option>
+              <option value="updated_at|desc">Última modificación — reciente primero</option>
+              <option value="updated_at|asc">Última modificación — antigua primero</option>
+            </select>
+          </div>
+
+        </div>
       </div>
 
       {viewMode === 'grid' ? (

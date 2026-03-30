@@ -1751,8 +1751,16 @@ const EditVehicle = () => {
     );
   }
 
-  const vehicleTabsTriggerClass =
-    'max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-2 max-sm:text-xs sm:px-3 sm:text-sm';
+  const vehicleTabOptions = [
+    { value: 'general', label: 'Información General' },
+    { value: 'technical', label: 'Especificaciones Técnicas' },
+    { value: 'modifications', label: 'Modificaciones' },
+    { value: 'timings', label: 'Tabla de Tiempos' },
+    ...(hasMultipleConfigs(timings) ? [{ value: 'config-analysis', label: 'Análisis Config.' }] : []),
+    { value: 'maintenance', label: 'Mantenimiento' },
+  ];
+
+  const vehicleTabsTriggerClass = 'sm:px-3 sm:text-sm';
 
   const getConfirmDialogContent = () => {
     if (!deleteConfirm) return null;
@@ -1868,13 +1876,29 @@ const EditVehicle = () => {
         </Button>
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="mb-4 space-y-2 sm:hidden">
+          <Label htmlFor="vehicle-edit-section" className="text-sm font-medium">
+            Sección del vehículo
+          </Label>
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger id="vehicle-edit-section" className="w-full h-11 text-base">
+              <SelectValue placeholder="Elige una sección" />
+            </SelectTrigger>
+            <SelectContent position="popper" className="max-h-[min(24rem,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)]">
+              {vehicleTabOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <TabsList
           className={cn(
-            'mb-4 h-auto min-h-9 w-full gap-1',
-            'max-sm:!flex max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:[scrollbar-width:none] max-sm:[-ms-overflow-style:none] max-sm:[&::-webkit-scrollbar]:hidden',
+            'mb-4 hidden h-auto min-h-9 w-full gap-1 sm:grid',
             hasMultipleConfigs(timings)
-              ? 'sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-              : 'sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+              ? 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+              : 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
           )}
         >
           <TabsTrigger value="general" className={vehicleTabsTriggerClass}>

@@ -14,6 +14,30 @@ const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/in
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+/** Columnas permitidas para GET /vehicles y /vehicles/export (ordenación). */
+const VEHICLE_SORT_COLUMNS = {
+  purchase_date: 'purchase_date',
+  created_at: 'created_at',
+  total_distance_meters: 'total_distance_meters',
+  updated_at: 'updated_at',
+};
+
+function parseVehicleSort(req) {
+  const raw = String(req.query.sort || 'purchase_date').toLowerCase();
+  const sortKey = Object.prototype.hasOwnProperty.call(VEHICLE_SORT_COLUMNS, raw) ? raw : 'purchase_date';
+  const dirRaw = String(req.query.dir || 'desc').toLowerCase();
+  const ascending = dirRaw === 'asc';
+  return { column: VEHICLE_SORT_COLUMNS[sortKey], ascending };
+}
+
+/** Nulos al final en ASC y al principio en DESC para odómetro y última modificación. */
+function orderOptsForVehicleSort(column, ascending) {
+  if (column === 'total_distance_meters' || column === 'updated_at') {
+    return { ascending, nullsFirst: !ascending };
+  }
+  return { ascending, nullsFirst: false };
+}
+
 // Configuración de multer para guardar imágenes localmente (puedes adaptar a S3/Supabase Storage si lo necesitas)
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -215,12 +239,14 @@ function parseChangeEffectiveDate(raw) {
 router.get('/export', async (req, res) => {
   try {
     const { manufacturer, type, modified, digital, filterMuseo, filterTaller } = req.query;
+    const { column: sortColumn, ascending } = parseVehicleSort(req);
+    const orderOpts = orderOptsForVehicleSort(sortColumn, ascending);
 
     let query = supabase
       .from('vehicles')
       .select('*')
       .eq('user_id', req.user.id)
-      .order('purchase_date', { ascending: false });
+      .order(sortColumn, orderOpts);
 
     if (manufacturer && String(manufacturer).trim()) {
       query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
@@ -330,6 +356,8 @@ router.get('/', async (req, res) => {
     const limit = parseInt(req.query.limit) || 25;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
+    const { column: sortColumn, ascending } = parseVehicleSort(req);
+    const orderOpts = orderOptsForVehicleSort(sortColumn, ascending);
 
     // Obtener el total de vehículos para la paginación
     const { count, error: countError } = await supabase
@@ -344,7 +372,7 @@ router.get('/', async (req, res) => {
       .from('vehicles')
       .select('*')
       .eq('user_id', req.user.id)
-      .order('purchase_date', { ascending: false })
+      .order(sortColumn, orderOpts)
       .range(from, to);
 
     if (vehiclesError) throw vehiclesError;
@@ -460,6 +488,11 @@ router.put('/:id', upload.array('images'), async (req, res) => {
       const sf = parseInt(req.body.scale_factor, 10);
       updateData.scale_factor = !isNaN(sf) ? sf : DEFAULT_SCALE_FACTOR;
     }
+
+    delete updateData.created_at;
+    delete updateData.updated_at;
+    delete updateData.last_timing_created_at;
+    updateData.updated_at = new Date().toISOString();
 
     // Si no está modificado, el total_price será igual al price
     if (updateData.modified === false) {
