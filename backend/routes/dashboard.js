@@ -16,8 +16,7 @@ const CRITICAL_INVENTORY_CATEGORIES = new Set([
   'neumaticos',
   'front_wheel',
   'rear_wheel',
-  'front_axle',
-  'rear_axle',
+  'axle',
 ]);
 
 /**

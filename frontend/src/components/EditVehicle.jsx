@@ -1731,6 +1731,9 @@ const EditVehicle = () => {
     );
   }
 
+  const vehicleTabsTriggerClass =
+    'max-sm:shrink-0 max-sm:whitespace-nowrap max-sm:px-2.5 max-sm:py-2 max-sm:text-xs sm:px-3 sm:text-sm';
+
   const getConfirmDialogContent = () => {
     if (!deleteConfirm) return null;
     if (deleteConfirm.type === 'image') {
@@ -1847,18 +1850,33 @@ const EditVehicle = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList
           className={cn(
-            'mb-4 grid w-full gap-1',
-            hasMultipleConfigs(timings) ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5',
+            'mb-4 h-auto min-h-9 w-full gap-1',
+            'max-sm:!flex max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:[scrollbar-width:none] max-sm:[-ms-overflow-style:none] max-sm:[&::-webkit-scrollbar]:hidden',
+            hasMultipleConfigs(timings)
+              ? 'sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+              : 'sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
           )}
         >
-          <TabsTrigger value="general">Información General</TabsTrigger>
-          <TabsTrigger value="technical">Especificaciones Técnicas</TabsTrigger>
-          <TabsTrigger value="modifications">Modificaciones</TabsTrigger>
-          <TabsTrigger value="timings">Tabla de Tiempos</TabsTrigger>
+          <TabsTrigger value="general" className={vehicleTabsTriggerClass}>
+            Información General
+          </TabsTrigger>
+          <TabsTrigger value="technical" className={vehicleTabsTriggerClass}>
+            Especificaciones Técnicas
+          </TabsTrigger>
+          <TabsTrigger value="modifications" className={vehicleTabsTriggerClass}>
+            Modificaciones
+          </TabsTrigger>
+          <TabsTrigger value="timings" className={vehicleTabsTriggerClass}>
+            Tabla de Tiempos
+          </TabsTrigger>
           {hasMultipleConfigs(timings) && (
-            <TabsTrigger value="config-analysis">Análisis Config.</TabsTrigger>
+            <TabsTrigger value="config-analysis" className={vehicleTabsTriggerClass}>
+              Análisis Config.
+            </TabsTrigger>
           )}
-          <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
+          <TabsTrigger value="maintenance" className={vehicleTabsTriggerClass}>
+            Mantenimiento
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">

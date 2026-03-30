@@ -6,10 +6,9 @@ export const vehicleComponentTypes = [
   { value: 'rear_wheel', label: 'Neumático Trasero' },
   { value: 'front_rim', label: 'Llanta Delantera' },
   { value: 'rear_rim', label: 'Llanta Trasera' },
+  { value: 'axle', label: 'Ejes' },
   { value: 'chassis', label: 'Chasis' },
   { value: 'other', label: 'Otros' },
-  { value: 'rear_axle', label: 'Eje Trasero' },
-  { value: 'front_axle', label: 'Eje Delantero' },
   { value: 'guide', label: 'Guía' },
   { value: 'motor', label: 'Motor' },
   { value: 'trencillas', label: 'Trencillas' },
@@ -30,6 +29,9 @@ export const vehicleComponentTypeLabelMap = Object.fromEntries(
  */
 export function getVehicleComponentTypeLabel(componentType) {
   if (componentType == null || componentType === '') return '—';
+  if (componentType === 'front_axle' || componentType === 'rear_axle') {
+    return vehicleComponentTypeLabelMap.axle;
+  }
   return vehicleComponentTypeLabelMap[componentType] ?? String(componentType);
 }
 
@@ -44,6 +46,5 @@ export const inventoryVehicleCategoryValues = [
   'rear_wheel',
   'front_rim',
   'rear_rim',
-  'front_axle',
-  'rear_axle',
+  'axle',
 ];
