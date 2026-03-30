@@ -1,6 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Pencil, Trash2, Wrench, BarChart3, AlertTriangle, CircleCheck, Info, Package } from 'lucide-react';
+import {
+  ExternalLink,
+  Pencil,
+  Trash2,
+  Wrench,
+  BarChart3,
+  AlertTriangle,
+  CircleCheck,
+  Info,
+  Package,
+  LayoutPanelLeft,
+} from 'lucide-react';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
 import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
@@ -1876,22 +1887,43 @@ const EditVehicle = () => {
         </Button>
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="mb-4 space-y-2 sm:hidden">
-          <Label htmlFor="vehicle-edit-section" className="text-sm font-medium">
-            Sección del vehículo
-          </Label>
-          <Select value={activeTab} onValueChange={setActiveTab}>
-            <SelectTrigger id="vehicle-edit-section" className="w-full h-11 text-base">
-              <SelectValue placeholder="Elige una sección" />
-            </SelectTrigger>
-            <SelectContent position="popper" className="max-h-[min(24rem,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)]">
-              {vehicleTabOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="mb-6 sm:hidden">
+          <div
+            className={cn(
+              'rounded-xl border-2 border-primary/25 bg-muted/50 p-4 shadow-sm',
+              'ring-1 ring-border/60',
+            )}
+          >
+            <div className="mb-3 flex items-center gap-2 border-b border-border/80 pb-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <LayoutPanelLeft className="size-4" aria-hidden />
+              </span>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Navegación
+                </p>
+                <p className="text-sm font-medium leading-tight text-foreground">Sección del vehículo</p>
+              </div>
+            </div>
+            <Label htmlFor="vehicle-edit-section" className="sr-only">
+              Sección del vehículo
+            </Label>
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger
+                id="vehicle-edit-section"
+                className="h-11 w-full border-2 border-input bg-background text-base font-medium shadow-sm"
+              >
+                <SelectValue placeholder="Elige una sección" />
+              </SelectTrigger>
+              <SelectContent position="popper" className="max-h-[min(24rem,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)]">
+                {vehicleTabOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <TabsList
           className={cn(
