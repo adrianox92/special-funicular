@@ -30,6 +30,68 @@ export function formatDistance(meters) {
   return `${(m / 1000).toFixed(2)} km`;
 }
 
+/**
+ * Importe en euros (es-ES).
+ * @param {number|null|undefined} value
+ * @param {{ minimumFractionDigits?: number; maximumFractionDigits?: number }} [opts]
+ */
+export function formatCurrencyEur(value, opts = {}) {
+  const min = opts.minimumFractionDigits ?? 2;
+  const max = opts.maximumFractionDigits ?? 2;
+  const n = Number(value);
+  if (value == null || Number.isNaN(n)) {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: min,
+      maximumFractionDigits: max,
+    }).format(0);
+  }
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: min,
+    maximumFractionDigits: max,
+  }).format(n);
+}
+
+/**
+ * Porcentaje para mostrar en UI. `value` es el número “humano” del backend (ej. 12.5 = 12,5 %).
+ * @param {number|null|undefined} value
+ */
+export function formatPercentEs(value) {
+  const n = Number(value);
+  if (value == null || Number.isNaN(n)) {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'percent',
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(0);
+  }
+  return new Intl.NumberFormat('es-ES', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(n / 100);
+}
+
+/**
+ * Tiempo de vuelta para tarjetas y tablas: acepta mm:ss.ms o segundos numéricos.
+ * @param {string|number|null|undefined} timeStr
+ * @returns {string}
+ */
+export function formatLapTimeDisplay(timeStr) {
+  if (timeStr == null || timeStr === '') return 'N/A';
+  if (typeof timeStr === 'string' && /^\d{2}:\d{2}\.\d{3}$/.test(timeStr)) return timeStr;
+  const seconds = Number(timeStr);
+  if (!Number.isNaN(seconds)) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = (seconds % 60).toFixed(3);
+    return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
+  }
+  return 'N/A';
+}
+
 /** Precio unitario × unidades montadas (mínimo 1 unidad). */
 export function modificationLineTotal(price, mountedQty) {
   const unit = price != null && price !== '' && !Number.isNaN(Number(price)) ? Number(price) : 0;
@@ -74,6 +136,31 @@ export function formatModificationSnapshot(snap) {
     parts.push(`${mq} uds montadas`);
   }
   return parts.length ? parts.join(' · ') : '—';
+}
+
+/**
+ * Muestra una fecha para tarjetas del dashboard: acepta ISO, Date o texto dd/mm/aaaa ya formateado por la API.
+ * @param {string|Date|null|undefined} raw
+ * @returns {string}
+ */
+export function formatDashboardMetricDate(raw) {
+  if (raw == null || raw === '') return 'N/A';
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return raw.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  const s = String(raw).trim();
+  const parsed = new Date(s);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  const dmY = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmY) {
+    const d = new Date(parseInt(dmY[3], 10), parseInt(dmY[2], 10) - 1, parseInt(dmY[1], 10));
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+  }
+  return s;
 }
 
 /** Fecha ISO YYYY-MM-DD o date a texto dd/mm/aaaa */

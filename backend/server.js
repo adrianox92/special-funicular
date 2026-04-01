@@ -121,6 +121,7 @@ const apiKeysRoute = require('./routes/api-keys');
 const syncRoute = require('./routes/sync');
 const circuitsRoute = require('./routes/circuits');
 const maintenanceRoute = require('./routes/maintenance');
+const searchRoute = require('./routes/search');
 const inventoryRoute = require('./routes/inventory');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
 const authMiddleware = require('./middleware/auth');
@@ -141,6 +142,7 @@ app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
 app.use('/api/circuits', circuitsRoute);
 app.use('/api/maintenance', maintenanceRoute);
+app.use('/api/search', searchRoute);
 app.use('/api/inventory', inventoryRoute);
 
 const competitionsRoute = require('./routes/competitions');

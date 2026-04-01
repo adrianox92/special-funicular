@@ -24,15 +24,10 @@ import {
 } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { getVehicleComponentTypeLabel } from '../../data/componentTypes';
+import { formatCurrencyEur } from '../../utils/formatUtils';
 
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-};
+const formatCurrency = (value) =>
+  formatCurrencyEur(value, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const TopComponentsTable = ({ data }) => {
   const [sortConfig, setSortConfig] = useState({

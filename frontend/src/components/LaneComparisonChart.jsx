@@ -46,13 +46,33 @@ const LaneComparisonChart = () => {
     loadCircuits();
   }, []);
 
-  // Cargar datos de carriles cuando se selecciona un circuito
-  useEffect(() => {
-    if (selectedCircuit) {
-      loadLaneData(selectedCircuit);
+  /** Segundos numéricos para ordenar; acepta mm:ss.ms o segundos en número/string. */
+  const getSeconds = (timeVal) => {
+    if (timeVal == null || timeVal === '') return Infinity;
+    if (typeof timeVal === 'number' && Number.isFinite(timeVal)) return timeVal;
+    const timeStr = String(timeVal).trim();
+    if (timeStr.includes(':')) {
+      const parts = timeStr.split(':');
+      const minutes = parseInt(parts[0], 10);
+      const rest = parts[1];
+      if (!Number.isFinite(minutes) || rest == null) return Infinity;
+      const [secsPart, msPart] = rest.split('.');
+      const secs = parseInt(secsPart, 10) || 0;
+      const ms = parseInt((msPart || '0').padEnd(3, '0').slice(0, 3), 10) || 0;
+      return minutes * 60 + secs + ms / 1000;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCircuit]);
+    const n = parseFloat(timeStr.replace(',', '.'));
+    return Number.isFinite(n) ? n : Infinity;
+  };
+
+  const calculateAverageTime = (vehicles) => {
+    if (vehicles.length === 0) return 'N/A';
+    const totalSeconds = vehicles.reduce((sum, v) => sum + getSeconds(v.best_lap_time), 0);
+    const avgSeconds = totalSeconds / vehicles.length;
+    const minutes = Math.floor(avgSeconds / 60);
+    const remainingSeconds = (avgSeconds % 60).toFixed(3);
+    return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
+  };
 
   const loadLaneData = async (circuit) => {
     setLoading(true);
@@ -61,54 +81,70 @@ const LaneComparisonChart = () => {
     try {
       const response = await api.get('/timings');
       const circuitTimings = response.data.filter(t => t.circuit === circuit);
-      
-      // Agrupar por vehículo + vueltas para tener todos los tiempos de cada vehículo
-      const vehicleAllTimes = {};
-      circuitTimings.forEach(timing => {
-        const vehicleKey = `${timing.vehicle_id}-${timing.laps || 'sin-vueltas'}`;
-        if (!vehicleAllTimes[vehicleKey]) {
-          vehicleAllTimes[vehicleKey] = [];
-        }
-        vehicleAllTimes[vehicleKey].push(timing);
+
+      const normalizeLaneKey = (timing) => {
+        const l = timing?.lane;
+        if (l == null || String(l).trim() === '') return 'Sin carril';
+        return String(l).trim();
+      };
+
+      const vehicleLapsKey = (t) => `${t.vehicle_id}-${t.laps ?? 'sin-vueltas'}`;
+
+      // Por vehículo+vueltas: mejor fila por carril (para comparativas entre carriles del mismo coche)
+      const byVehicleLaps = {};
+      circuitTimings.forEach((t) => {
+        const vk = vehicleLapsKey(t);
+        if (!byVehicleLaps[vk]) byVehicleLaps[vk] = [];
+        byVehicleLaps[vk].push(t);
       });
 
-      // Para cada vehículo, encontrar su mejor tiempo y asignarlo al carril correspondiente
-      const lanes = {};
-      Object.values(vehicleAllTimes).forEach(vehicleTimings => {
-        // Ordenar por mejor tiempo
-        const sortedTimings = vehicleTimings.sort((a, b) => 
-          getSeconds(a.best_lap_time) - getSeconds(b.best_lap_time)
-        );
-        
-        const bestTiming = sortedTimings[0];
-        const lane = bestTiming.lane || 'Sin carril';
-        
-        if (!lanes[lane]) {
-          lanes[lane] = [];
-        }
-        
-        // Añadir el mejor tiempo del vehículo, pero guardar también todos los tiempos para comparativas
-        lanes[lane].push({
-          ...bestTiming,
-          allLaneTimes: sortedTimings // Guardar todos los tiempos para comparativas
+      const crossLaneBestByVehicleLaps = {};
+      Object.entries(byVehicleLaps).forEach(([vk, rows]) => {
+        const perLane = {};
+        rows.forEach((t) => {
+          const lk = normalizeLaneKey(t);
+          const sec = getSeconds(t.best_lap_time);
+          const prev = perLane[lk];
+          if (!prev || sec < getSeconds(prev.best_lap_time)) perLane[lk] = t;
         });
+        crossLaneBestByVehicleLaps[vk] = perLane;
       });
 
-      // Procesar cada carril
+      // Por cada carril: mejor sesión por combinación vehículo+vueltas (solo tiempos rodados en ESE carril)
+      const laneKeys = [...new Set(circuitTimings.map(normalizeLaneKey))];
       const processedLanes = {};
-      Object.keys(lanes).forEach(lane => {
-        const laneTimings = lanes[lane];
-        
-        // Ordenar por mejor tiempo
-        const sortedVehicles = laneTimings
-          .sort((a, b) => getSeconds(a.best_lap_time) - getSeconds(b.best_lap_time));
 
-        processedLanes[lane] = {
+      laneKeys.forEach((laneKey) => {
+        const onThisLane = circuitTimings.filter((t) => normalizeLaneKey(t) === laneKey);
+        const groups = {};
+        onThisLane.forEach((t) => {
+          const gk = vehicleLapsKey(t);
+          if (!groups[gk]) groups[gk] = [];
+          groups[gk].push(t);
+        });
+
+        const laneTimings = Object.values(groups).map((groupRows) => {
+          const best = groupRows.reduce((bestRow, row) =>
+            getSeconds(row.best_lap_time) < getSeconds(bestRow.best_lap_time) ? row : bestRow,
+          );
+          const vk = vehicleLapsKey(best);
+          return {
+            ...best,
+            crossLaneByLane: crossLaneBestByVehicleLaps[vk] || {},
+            vehicleLapsKey: vk,
+          };
+        });
+
+        const sortedVehicles = laneTimings.sort(
+          (a, b) => getSeconds(a.best_lap_time) - getSeconds(b.best_lap_time),
+        );
+
+        processedLanes[laneKey] = {
           vehicles: sortedVehicles,
           totalVehicles: sortedVehicles.length,
-          bestTime: sortedVehicles[0]?.best_lap_time || 'N/A',
+          bestTime: sortedVehicles[0]?.best_lap_time ?? 'N/A',
           averageTime: calculateAverageTime(sortedVehicles),
-          fastestVehicle: sortedVehicles[0]
+          fastestVehicle: sortedVehicles[0],
         };
       });
 
@@ -121,23 +157,13 @@ const LaneComparisonChart = () => {
     }
   };
 
-  const getSeconds = (timeStr) => {
-    if (!timeStr) return Infinity;
-    const [minutes, seconds] = timeStr.split(':');
-    const [secs, ms] = seconds.split('.');
-    return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
-  };
-
-  const calculateAverageTime = (vehicles) => {
-    if (vehicles.length === 0) return 'N/A';
-    
-    const totalSeconds = vehicles.reduce((sum, v) => sum + getSeconds(v.best_lap_time), 0);
-    const avgSeconds = totalSeconds / vehicles.length;
-    
-    const minutes = Math.floor(avgSeconds / 60);
-    const remainingSeconds = (avgSeconds % 60).toFixed(3);
-    return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
-  };
+  // Cargar datos de carriles cuando se selecciona un circuito
+  useEffect(() => {
+    if (selectedCircuit) {
+      loadLaneData(selectedCircuit);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCircuit]);
 
   const formatTime = (timeStr) => {
     if (!timeStr) return 'N/A';
@@ -181,58 +207,47 @@ const LaneComparisonChart = () => {
     return differences;
   };
 
-  // Función para obtener la diferencia de tiempo del mismo vehículo entre carriles
+  /** Comparativa mismo vehículo + mismas vueltas entre carriles (mejor tiempo por carril). */
   const getVehicleLaneDifference = (vehicle, currentLane) => {
-    if (!vehicle.allLaneTimes || vehicle.allLaneTimes.length < 2) return null;
-    
-    // Determinar el carril de referencia (carril 1 si existe, sino el primero disponible)
+    const map = vehicle.crossLaneByLane || {};
     const allLanes = Object.keys(laneData).sort();
-    const referenceLane = allLanes.find(l => l === '1') || allLanes[0];
-    
-    // Si solo hay un carril disponible, no hay diferencia
     if (allLanes.length < 2) return null;
-    
-    // Si estamos en el carril de referencia, buscar el tiempo en otro carril para comparar
+
+    const referenceLane = allLanes.find((l) => l === '1') || allLanes[0];
+    const currentTiming = map[currentLane];
+    if (!currentTiming) return null;
+
     if (currentLane === referenceLane) {
-      // Buscar un carril alternativo para comparar
-      const alternativeLane = allLanes.find(l => l !== referenceLane);
+      const alternativeLane = allLanes.find((l) => l !== referenceLane);
       if (!alternativeLane) return null;
-      
-      const alternativeTiming = vehicle.allLaneTimes.find(t => t.lane === alternativeLane);
+      const alternativeTiming = map[alternativeLane];
       if (!alternativeTiming) return null;
-      
       const altTime = getSeconds(alternativeTiming.best_lap_time);
-      const currentTime = getSeconds(vehicle.best_lap_time);
-      
+      const currentTime = getSeconds(currentTiming.best_lap_time);
       if (altTime === Infinity || currentTime === Infinity) return null;
-      
       const diff = currentTime - altTime;
       return {
         seconds: diff,
         isSlower: diff > 0,
         isFaster: diff < 0,
         referenceTime: alternativeTiming.best_lap_time,
-        referenceLane: alternativeLane
+        referenceLane: alternativeLane,
       };
     }
-    
-    // Buscar el tiempo del mismo vehículo en el carril de referencia
-    const referenceTiming = vehicle.allLaneTimes.find(t => t.lane === referenceLane);
-    
+
+    const referenceTiming = map[referenceLane];
     if (!referenceTiming) return null;
-    
+
     const refTime = getSeconds(referenceTiming.best_lap_time);
-    const currentTime = getSeconds(vehicle.best_lap_time);
-    
+    const currentTime = getSeconds(currentTiming.best_lap_time);
     if (refTime === Infinity || currentTime === Infinity) return null;
-    
     const diff = currentTime - refTime;
     return {
       seconds: diff,
       isSlower: diff > 0,
       isFaster: diff < 0,
       referenceTime: referenceTiming.best_lap_time,
-      referenceLane: referenceLane
+      referenceLane: referenceLane,
     };
   };
 
@@ -278,9 +293,10 @@ const LaneComparisonChart = () => {
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            <strong>Nota:</strong> Cada vehículo aparece solo en el carril donde hizo su mejor tiempo.
+            <strong>Nota:</strong> En cada carril se usa el mejor tiempo de cada vehículo rodado en ese carril
+            (mismo número de vueltas por fila). Un coche puede aparecer en varios carriles con tiempos distintos.
             <br />
-            <strong>Comparativa:</strong> La diferencia muestra cuánto más rápido/lento es el mismo vehículo en este carril vs otro carril disponible.
+            <strong>Comparativa:</strong> La columna “Diferencia” compara el mismo coche y vueltas entre este carril y el de referencia.
           </p>
         </div>
 
@@ -420,7 +436,7 @@ const LaneComparisonChart = () => {
                         {laneData[lane].vehicles.map((vehicle, index) => {
                           const timeDifference = getVehicleLaneDifference(vehicle, lane);
                           return (
-                            <TableRow key={`${lane}-${vehicle.id}`}>
+                            <TableRow key={`${lane}-${vehicle.vehicleLapsKey || vehicle.id}`}>
                               <TableCell>
                                 <Badge variant={index === 0 ? 'default' : 'secondary'} className="flex items-center gap-1 w-fit">
                                   {index === 0 && <Trophy className="size-3" />}

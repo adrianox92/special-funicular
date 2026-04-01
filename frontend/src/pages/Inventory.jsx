@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Package, Trash2, Pen, ExternalLink, Wrench, PackagePlus, History } from 'lucide-react';
 import api from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -69,6 +69,9 @@ const emptyForm = () => ({
 });
 
 const Inventory = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -181,6 +184,54 @@ const Inventory = () => {
     initForm(item);
     setShowModal(true);
   };
+
+  const openInventoryTargetId =
+    location.state?.openInventoryEditId ?? searchParams.get('edit') ?? null;
+
+  useEffect(() => {
+    if (!openInventoryTargetId) return;
+    let cancelled = false;
+
+    const clearOpenIntent = () => {
+      const qs = new URLSearchParams(searchParams);
+      qs.delete('edit');
+      const search = qs.toString();
+      navigate(
+        { pathname: location.pathname, search: search ? `?${search}` : '' },
+        { replace: true, state: {} },
+      );
+    };
+
+    (async () => {
+      try {
+        let item = items.find((i) => String(i.id) === String(openInventoryTargetId));
+        if (!item) {
+          const { data } = await api.get(`/inventory/${openInventoryTargetId}`);
+          item = data;
+        }
+        if (cancelled) return;
+        if (!item) {
+          toast.error('Ítem no encontrado.');
+          clearOpenIntent();
+          return;
+        }
+        handleOpenEdit(item);
+        clearOpenIntent();
+      } catch (e) {
+        if (!cancelled) {
+          console.error(e);
+          toast.error('No se pudo abrir el ítem del inventario.');
+        }
+        if (!cancelled) clearOpenIntent();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Abrir desde búsqueda (state o ?edit=); items puede estar vacío en el primer render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openInventoryTargetId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

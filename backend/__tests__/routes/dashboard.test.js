@@ -48,9 +48,36 @@ describe('Dashboard Routes', () => {
     test('devuelve métricas correctamente', async () => {
       // Mock de datos de vehículos
       const mockVehicles = [
-        { id: 1, type: 'Hot Wheels', modified: true, price: 100, total_price: 150 },
-        { id: 2, type: 'Hot Wheels', modified: false, price: 100, total_price: 100 },
-        { id: 3, type: 'Matchbox', modified: true, price: 200, total_price: 300 }
+        {
+          id: 1,
+          type: 'Hot Wheels',
+          modified: true,
+          price: 100,
+          total_price: 150,
+          digital: true,
+          museo: true,
+          taller: false,
+        },
+        {
+          id: 2,
+          type: 'Hot Wheels',
+          modified: false,
+          price: 100,
+          total_price: 100,
+          digital: false,
+          museo: false,
+          taller: false,
+        },
+        {
+          id: 3,
+          type: 'Matchbox',
+          modified: true,
+          price: 200,
+          total_price: 300,
+          digital: true,
+          museo: false,
+          taller: true,
+        },
       ];
 
       // Mock de datos de tiempos
@@ -108,6 +135,9 @@ describe('Dashboard Routes', () => {
       expect(response.body).toHaveProperty('highestIncrementVehicle');
       expect(response.body).toHaveProperty('bestTimeVehicle');
       expect(response.body).toHaveProperty('activeCompetitions', 0);
+      expect(response.body).toHaveProperty('digitalVehicles', 2);
+      expect(response.body).toHaveProperty('museoVehicles', 1);
+      expect(response.body).toHaveProperty('tallerVehicles', 1);
     });
 
     test('maneja errores de base de datos correctamente', async () => {

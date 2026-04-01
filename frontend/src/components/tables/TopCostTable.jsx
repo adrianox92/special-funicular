@@ -17,15 +17,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../ui/tooltip';
+import { formatCurrencyEur } from '../../utils/formatUtils';
 
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-};
+const formatCurrency = (value) =>
+  formatCurrencyEur(value, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const formatPercentage = (value) => {
   return new Intl.NumberFormat('es-ES', {

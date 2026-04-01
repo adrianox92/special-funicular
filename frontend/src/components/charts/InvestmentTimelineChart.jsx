@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
+import { formatCurrencyEur } from '../../utils/formatUtils';
 
 const InvestmentTimelineChart = ({ data }) => {
   if (!Array.isArray(data) || data.length === 0) {
@@ -29,14 +30,8 @@ const InvestmentTimelineChart = ({ data }) => {
     return `T${quarter} ${date.getFullYear()}`;
   };
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value);
-  };
+  const formatCurrency = (value) =>
+    formatCurrencyEur(value, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {

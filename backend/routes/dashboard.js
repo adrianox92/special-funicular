@@ -144,7 +144,9 @@ const calculateTrends = async (userId, options = {}) => {
     // Obtener vehículos con fechas de compra
     const { data: vehicles, error: vehiclesError } = await supabase
       .from('vehicles')
-      .select('id, model, manufacturer, price, total_price, modified, purchase_date, created_at')
+      .select(
+        'id, model, manufacturer, price, total_price, modified, digital, museo, taller, purchase_date, created_at',
+      )
       .eq('user_id', userId);
 
     if (vehiclesError) throw vehiclesError;
@@ -159,6 +161,10 @@ const calculateTrends = async (userId, options = {}) => {
       const purchaseDate = new Date(v.purchase_date || v.created_at);
       return purchaseDate >= oneMonthAgo;
     });
+
+    const lastMonthDigital = lastMonthVehicles.filter((v) => v.digital).length;
+    const lastMonthMuseo = lastMonthVehicles.filter((v) => v.museo).length;
+    const lastMonthTaller = lastMonthVehicles.filter((v) => v.taller).length;
 
     // Vehículos modificados en el último mes (aproximado por created_at)
     const lastMonthModified = vehicles.filter(v => {
@@ -260,7 +266,19 @@ const calculateTrends = async (userId, options = {}) => {
       lastUpdate: {
         trend: 'stable',
         value: 'Sistema activo'
-      }
+      },
+      digitalVehicles: {
+        trend: lastMonthDigital > 0 ? 'up' : 'stable',
+        value: lastMonthDigital > 0 ? `+${lastMonthDigital} este mes` : 'Sin cambios',
+      },
+      museoVehicles: {
+        trend: lastMonthMuseo > 0 ? 'up' : 'stable',
+        value: lastMonthMuseo > 0 ? `+${lastMonthMuseo} este mes` : 'Sin cambios',
+      },
+      tallerVehicles: {
+        trend: lastMonthTaller > 0 ? 'up' : 'stable',
+        value: lastMonthTaller > 0 ? `+${lastMonthTaller} este mes` : 'Sin cambios',
+      },
     };
 
     // Competiciones: organizador + progreso de tiempos (sin depender de columnas user_id/status)
@@ -303,7 +321,10 @@ const calculateTrends = async (userId, options = {}) => {
       averagePriceIncrement: { trend: 'stable', value: 'Sin datos' },
       bestTime: { trend: 'stable', value: 'Sin datos' },
       lastUpdate: { trend: 'stable', value: 'Sistema activo' },
-      activeCompetitions: { trend: 'stable', value: 'Sin datos' }
+      activeCompetitions: { trend: 'stable', value: 'Sin datos' },
+      digitalVehicles: { trend: 'stable', value: 'Sin datos' },
+      museoVehicles: { trend: 'stable', value: 'Sin datos' },
+      tallerVehicles: { trend: 'stable', value: 'Sin datos' },
     };
   }
 };
@@ -320,6 +341,9 @@ router.get('/metrics', async (req, res) => {
         price,
         total_price,
         modified,
+        digital,
+        museo,
+        taller,
         purchase_date,
         technical_specs (
           id,
@@ -345,6 +369,9 @@ router.get('/metrics', async (req, res) => {
     const totalVehicles = vehicles.length;
     const modifiedVehicles = vehicles.filter(v => v.modified).length;
     const stockVehicles = totalVehicles - modifiedVehicles;
+    const digitalVehicles = vehicles.filter((v) => v.digital).length;
+    const museoVehicles = vehicles.filter((v) => v.museo).length;
+    const tallerVehicles = vehicles.filter((v) => v.taller).length;
     
     // Calcular inversión total solo en modificaciones
     const totalInvestment = Number(vehicles
@@ -583,6 +610,9 @@ router.get('/metrics', async (req, res) => {
       totalVehicles,
       modifiedVehicles,
       stockVehicles,
+      digitalVehicles,
+      museoVehicles,
+      tallerVehicles,
       totalInvestment,
       averageInvestmentPerVehicle,
       averagePriceIncrement,
@@ -1001,6 +1031,90 @@ router.get('/action-items', async (req, res) => {
   } catch (error) {
     console.error('Error al obtener action-items del dashboard:', error);
     res.status(500).json({ error: 'Error al obtener datos accionables del dashboard' });
+  }
+});
+
+/**
+ * Últimos mantenimientos y vehículos sin revisión reciente (umbral = stale_days del perfil).
+ */
+router.get('/maintenance-summary', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const staleDays = resolveStaleDaysThreshold(req.user);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - staleDays);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+    const { data: recentRows, error: recentErr } = await supabase
+      .from('vehicle_maintenance_log')
+      .select(
+        `
+        id,
+        performed_at,
+        kind,
+        vehicle_id,
+        vehicles ( id, model, manufacturer )
+      `,
+      )
+      .eq('user_id', userId)
+      .order('performed_at', { ascending: false })
+      .limit(12);
+
+    if (recentErr) throw recentErr;
+
+    const recent = (recentRows || []).map((row) => ({
+      id: row.id,
+      performed_at: row.performed_at,
+      kind: row.kind,
+      vehicle_id: row.vehicle_id,
+      model: row.vehicles?.model,
+      manufacturer: row.vehicles?.manufacturer,
+    }));
+
+    const { data: allVehicles, error: vErr } = await supabase
+      .from('vehicles')
+      .select('id, model, manufacturer')
+      .eq('user_id', userId);
+
+    if (vErr) throw vErr;
+
+    const { data: allLogs, error: lErr } = await supabase
+      .from('vehicle_maintenance_log')
+      .select('vehicle_id, performed_at')
+      .eq('user_id', userId);
+
+    if (lErr) throw lErr;
+
+    const lastByVehicle = new Map();
+    for (const log of allLogs || []) {
+      const vid = log.vehicle_id;
+      const d = log.performed_at;
+      const prev = lastByVehicle.get(vid);
+      if (!prev || String(d) > String(prev)) lastByVehicle.set(vid, d);
+    }
+
+    const staleList = [];
+    for (const v of allVehicles || []) {
+      const last = lastByVehicle.get(v.id);
+      if (last == null || String(last) < cutoffStr) {
+        staleList.push({
+          id: v.id,
+          model: v.model,
+          manufacturer: v.manufacturer,
+          last_maintenance_at: last || null,
+        });
+      }
+    }
+
+    res.json({
+      recent,
+      vehiclesWithoutRecentMaintenance: staleList.slice(0, 50),
+      vehiclesWithoutRecentMaintenanceTotal: staleList.length,
+      staleDaysThreshold: staleDays,
+    });
+  } catch (e) {
+    console.error('maintenance-summary:', e);
+    res.status(500).json({ error: 'Error al obtener resumen de mantenimiento' });
   }
 });
 

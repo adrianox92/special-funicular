@@ -112,8 +112,8 @@ export const hasMultipleConfigs = (timings = []) => {
 };
 
 const getBetterConfig = (key, configs) => {
-  const lowerIsBetter = ['best_lap_timestamp', 'average_time_timestamp', 'worst_lap_timestamp'];
-  const higherIsBetter = ['laps', 'total_distance_meters', 'avg_speed_kmh', 'avg_speed_scale_kmh', 'best_lap_speed_kmh', 'consistency_score'];
+  const lowerIsBetter = ['best_lap_timestamp', 'average_time_timestamp', 'worst_lap_timestamp', 'consistency_score'];
+  const higherIsBetter = ['laps', 'total_distance_meters', 'avg_speed_kmh', 'avg_speed_scale_kmh', 'best_lap_speed_kmh'];
   let bestIdx = 0;
   let bestVal = configs[0]?.stats?.[key];
   for (let i = 1; i < configs.length; i++) {

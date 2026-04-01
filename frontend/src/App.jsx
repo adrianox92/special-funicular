@@ -33,6 +33,8 @@ import InstallPWAButton from './components/InstallPWAButton';
 import { logPWADiagnostics } from './utils/pwaDiagnostics';
 import { Spinner } from './components/ui/spinner';
 import { Toaster } from './components/ui/sonner';
+import GlobalCommandPalette from './components/GlobalCommandPalette';
+import { CommandPaletteProvider } from './context/CommandPaletteContext';
 
 const PageLayout = ({ children }) => (
   <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
@@ -41,11 +43,12 @@ const PageLayout = ({ children }) => (
 );
 
 const AuthedShell = ({ children }) => (
-  <>
+  <CommandPaletteProvider>
     <Navbar />
     <PageLayout>{children}</PageLayout>
     <Footer />
-  </>
+    <GlobalCommandPalette />
+  </CommandPaletteProvider>
 );
 
 const AppContent = () => {

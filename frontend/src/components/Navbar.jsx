@@ -17,6 +17,7 @@ import {
   Moon,
   Shield,
   CircleHelp,
+  Search,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { Button } from './ui/button';
@@ -38,9 +39,44 @@ import {
   SheetTrigger,
 } from './ui/sheet';
 import { cn } from '../lib/utils';
+import { useCommandPalette } from '../context/CommandPaletteContext';
+
+function NavbarSearchTrigger({ className, onOpen }) {
+  const [modKey, setModKey] = React.useState('Ctrl');
+
+  useEffect(() => {
+    setModKey(/Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? '⌘' : 'Ctrl');
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        'flex h-9 w-full max-w-md items-center gap-2 rounded-md border border-input bg-background/90 px-3 text-left text-sm text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-accent/60 hover:text-accent-foreground',
+        className,
+      )}
+      aria-label="Abrir búsqueda rápida"
+    >
+      <Search className="size-4 shrink-0 opacity-60" aria-hidden />
+      <span className="min-w-0 flex-1 truncate">
+        Buscar vehículos, circuitos, inventario…
+      </span>
+      <span className="pointer-events-none hidden shrink-0 items-center gap-0.5 sm:inline-flex" aria-hidden>
+        <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+          {modKey}
+        </kbd>
+        <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+          K
+        </kbd>
+      </span>
+    </button>
+  );
+}
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { setOpen: openCommandPalette } = useCommandPalette();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -115,28 +151,42 @@ const Navbar = () => {
         isScrolled && 'shadow-sm'
       )}
     >
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full min-w-0 items-center gap-2 px-4 sm:px-6 lg:gap-3 lg:px-8">
         <Link
           to={user ? '/dashboard' : '/'}
           onClick={(e) => {
             e.preventDefault();
             navigate(user ? '/dashboard' : '/');
           }}
-          className="flex items-center gap-2"
+          className="flex shrink-0 items-center gap-2"
         >
           <Trophy className="size-6 text-primary" />
           <span className="font-bold text-lg">Slot</span>
           <Badge variant="secondary" className="text-xs">Pro</Badge>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex">
           {navItems.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <NavbarSearchTrigger
+          onOpen={() => openCommandPalette(true)}
+          className="hidden shrink-0 md:flex md:w-[min(18rem,28vw)] lg:w-72"
+        />
+
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => openCommandPalette(true)}
+            aria-label="Abrir búsqueda rápida"
+          >
+            <Search className="size-5" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>

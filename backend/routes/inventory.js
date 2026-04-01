@@ -226,6 +226,40 @@ router.get('/:id/purchase-history', async (req, res) => {
 });
 
 /**
+ * GET /api/inventory/:id
+ * Detalle de un ítem (p. ej. búsqueda global). Tras rutas más específicas como /:id/purchase-history.
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id || id === 'purchase-history') {
+      return res.status(400).json({ error: 'id no válido' });
+    }
+
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('GET /inventory/:id:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    if (!data) {
+      return res.status(404).json({ error: 'Item no encontrado' });
+    }
+
+    const [enriched] = await attachVehicles([data], req.user.id);
+    res.json(enriched);
+  } catch (err) {
+    console.error('GET /inventory/:id:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/inventory/:id/restock
  * Añade unidades al stock y registra la compra en el historial.
  */

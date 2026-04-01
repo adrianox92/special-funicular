@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import {
@@ -25,19 +26,37 @@ const trendColorClasses = {
   secondary: 'text-muted-foreground',
 };
 
+/** @param {{ label: string, value: unknown }} */
+function formatDetailValue({ label, value }) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    if (label.toLowerCase().includes('vuelta')) {
+      return Number.isInteger(value) ? String(value) : value.toLocaleString('es-ES', { maximumFractionDigits: 2 });
+    }
+    return value.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+  return String(value);
+}
+
 const MetricCard = ({
   title,
   value,
   subtitle,
   icon,
   details,
+  /** 'inline' | 'tooltip-only' — tooltip-only evita apilar mucho texto en la tarjeta */
+  detailsMode = 'inline',
   valueColor,
   threshold,
   formatValue,
   formatSubtitle,
   trend,
-  trendValue
+  trendValue,
+  /** Ruta interna (react-router); la tarjeta completa es clicable */
+  to,
 }) => {
+  const linkClassName =
+    'block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
   const getValueColor = () => {
     if (valueColor) return valueColor;
     if (threshold && typeof value === 'number') {
@@ -89,38 +108,56 @@ const MetricCard = ({
     return formatSubtitle ? formatSubtitle(subtitle) : subtitle;
   };
 
-  const hasDetails = details && Object.values(details).some(v => v !== undefined && v !== null);
+  const hasDetails = details && Object.values(details).some((v) => v !== undefined && v !== null);
+  const showInlineDetails = hasDetails && detailsMode === 'inline';
 
   const cardContent = (
-    <CardContent className="p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground [&>svg]:size-5">
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h5 className="text-sm font-medium text-muted-foreground">{title}</h5>
-            {trend && (
-              <span className={cn('inline-flex items-center gap-1 text-xs', trendColorClasses[getTrendColor()])}>
-                {getTrendIcon()}
-                {trendValue}
-              </span>
-            )}
+    <CardContent className="flex min-h-[132px] flex-col p-5">
+      <div className="flex flex-1 flex-col gap-3">
+        <div className="flex items-start justify-between gap-2">
+          <div
+            className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/10 dark:bg-primary/15 dark:ring-primary/20 [&>svg]:size-5"
+            aria-hidden
+          >
+            {icon}
           </div>
-          <div className={cn('mt-1 text-2xl font-bold', valueColorClasses[getValueColor()] || 'text-foreground')}>
+          {trend && trendValue ? (
+            <span
+              className={cn(
+                'inline-flex max-w-[58%] shrink-0 items-center gap-1 rounded-full border border-border/80 bg-muted/50 px-2.5 py-1 text-[11px] font-medium leading-tight text-foreground/90 dark:bg-muted/30',
+                trendColorClasses[getTrendColor()],
+              )}
+            >
+              {getTrendIcon()}
+              <span className="line-clamp-2 text-end">{trendValue}</span>
+            </span>
+          ) : null}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h5>
+          <div
+            className={cn(
+              'mt-1.5 text-2xl font-bold tabular-nums tracking-tight sm:text-[1.65rem]',
+              valueColorClasses[getValueColor()] || 'text-foreground',
+            )}
+          >
             {renderValue()}
           </div>
           {renderSubtitle() && (
-            <p className="mt-1 text-sm text-muted-foreground">{renderSubtitle()}</p>
+            <p className="mt-2 line-clamp-2 text-sm leading-snug text-muted-foreground">{renderSubtitle()}</p>
           )}
-          {hasDetails && (
-            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+          {hasDetails && detailsMode === 'tooltip-only' && (
+            <p className="mt-2 text-xs text-muted-foreground">Pasa el cursor para ver circuito, fecha y carril.</p>
+          )}
+          {showInlineDetails && (
+            <div className="mt-3 space-y-1.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground dark:bg-muted/20">
               {Object.entries(details).map(([key, val]) => {
                 if (val === undefined || val === null) return null;
+                const text = formatDetailValue({ label: key, value: val });
                 return (
-                  <div key={key} className="flex justify-between gap-2">
-                    <span>{key}:</span>
-                    <span>{typeof val === 'number' ? val.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(val)}</span>
+                  <div key={key} className="flex justify-between gap-3">
+                    <span className="shrink-0 text-muted-foreground/90">{key}</span>
+                    <span className="min-w-0 text-end font-medium text-foreground/90">{text}</span>
                   </div>
                 );
               })}
@@ -132,26 +169,33 @@ const MetricCard = ({
   );
 
   const card = (
-    <Card className="h-full overflow-hidden">
+    <Card className="group h-full overflow-hidden border-border/70 bg-card/90 shadow-sm ring-0 transition-[box-shadow,transform] duration-200 hover:border-border hover:shadow-md dark:bg-card/95">
       {cardContent}
     </Card>
   );
 
-  if (hasDetails) {
+  if (hasDetails && detailsMode === 'tooltip-only') {
     return (
-      <TooltipProvider>
+      <TooltipProvider delayDuration={300}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="h-full cursor-help">{card}</div>
+            {to ? (
+              <Link to={to} className={cn(linkClassName, 'h-full cursor-help')}>
+                {card}
+              </Link>
+            ) : (
+              <div className="h-full cursor-help">{card}</div>
+            )}
           </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="space-y-2">
+          <TooltipContent side="top" className="max-w-sm border-border/80">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+            <div className="space-y-2 text-sm">
               {Object.entries(details).map(([key, val]) => {
                 if (val === undefined || val === null) return null;
                 return (
-                  <div key={key} className="flex justify-between gap-4">
-                    <span className="font-medium">{key}:</span>
-                    <span>{typeof val === 'number' ? val.toLocaleString('es-ES') : String(val)}</span>
+                  <div key={key} className="flex justify-between gap-6">
+                    <span className="text-muted-foreground">{key}</span>
+                    <span className="max-w-[12rem] text-end font-medium">{formatDetailValue({ label: key, value: val })}</span>
                   </div>
                 );
               })}
@@ -159,6 +203,14 @@ const MetricCard = ({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+    );
+  }
+
+  if (to) {
+    return (
+      <Link to={to} className={linkClassName}>
+        {card}
+      </Link>
     );
   }
 

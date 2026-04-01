@@ -24,44 +24,13 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Check } from 'lucide-react';
 import api from '../lib/axios';
 import { formatDistance } from '../utils/formatUtils';
+import { getBetterSide as defaultGetBetterSide } from '../utils/sessionComparison';
 
 const formatTime = (seconds) => {
   if (seconds == null || seconds === 0) return '—';
   const mins = Math.floor(seconds / 60);
   const secs = (seconds % 60).toFixed(3);
   return `${String(mins).padStart(2, '0')}:${secs.padStart(6, '0')}`;
-};
-
-const timeToSeconds = (val) => {
-  if (val == null || val === '') return null;
-  if (typeof val === 'number' && !isNaN(val)) return val;
-  const str = String(val).trim();
-  const m = str.match(/^(\d{1,2}):(\d{2})\.(\d{1,3})$/);
-  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + parseInt(m[3].padStart(3, '0'), 10) / 1000;
-  const n = parseFloat(str.replace(',', '.'));
-  return isNaN(n) ? null : n;
-};
-
-const getBetterSide = (key, sessionA, sessionB) => {
-  const timestampKey = { best_lap_time: 'best_lap_timestamp', average_time: 'average_time_timestamp', total_time: 'total_time_timestamp' }[key];
-  const a = timestampKey ? (sessionA?.[timestampKey] ?? sessionA?.[key]) : sessionA?.[key];
-  const b = timestampKey ? (sessionB?.[timestampKey] ?? sessionB?.[key]) : sessionB?.[key];
-  if (a == null && b == null) return null;
-  if (a == null) return 'B';
-  if (b == null) return 'A';
-
-  const lowerIsBetter = ['best_lap_time', 'worst_lap_timestamp', 'average_time', 'total_time'];
-  const higherIsBetter = ['laps', 'total_distance_meters', 'avg_speed_kmh', 'avg_speed_scale_kmh', 'best_lap_speed_kmh', 'consistency_score'];
-
-  if (!lowerIsBetter.includes(key) && !higherIsBetter.includes(key)) return null;
-
-  const numA = lowerIsBetter.includes(key) || key === 'worst_lap_timestamp' ? timeToSeconds(a) : (typeof a === 'number' ? a : parseFloat(String(a).replace(',', '.')));
-  const numB = lowerIsBetter.includes(key) || key === 'worst_lap_timestamp' ? timeToSeconds(b) : (typeof b === 'number' ? b : parseFloat(String(b).replace(',', '.')));
-  if (numA == null || isNaN(numA)) return 'B';
-  if (numB == null || isNaN(numB)) return 'A';
-  if (numA === numB) return null;
-  if (lowerIsBetter.includes(key)) return numA < numB ? 'A' : 'B';
-  return numA > numB ? 'A' : 'B';
 };
 
 const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
@@ -195,7 +164,7 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                   </TableHeader>
                   <TableBody>
                     {comparisonRows.map((row) => {
-                      const better = getBetterSide(row.key, sessionA, sessionB);
+                      const better = defaultGetBetterSide(row.key, sessionA, sessionB);
                       return (
                         <TableRow key={row.key}>
                           <TableCell className="font-medium">{row.label}</TableCell>

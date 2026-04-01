@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import VehicleCard from '../components/VehicleCard';
 import VehicleTable from '../components/VehicleTable';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
 import { ArrowDownUp, Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon, SlidersHorizontal } from 'lucide-react';
 import { formatDistance } from '../utils/formatUtils';
@@ -49,6 +49,24 @@ const saveSort = (next) => {
 
 const defaultFilters = { manufacturer: '', type: '', modified: '', digital: '', filterMuseo: false, filterTaller: false };
 
+/** @param {URLSearchParams} searchParams */
+function parseFiltersFromSearchParams(searchParams) {
+  const patches = {};
+  const mod = searchParams.get('modified');
+  if (mod === 'Sí' || mod === 'No') patches.modified = mod;
+  const dig = searchParams.get('digital');
+  if (dig === 'Digital' || dig === 'Analógico') patches.digital = dig;
+  const fm = searchParams.get('filterMuseo');
+  if (fm === 'true' || fm === '1') patches.filterMuseo = true;
+  const ft = searchParams.get('filterTaller');
+  if (ft === 'true' || ft === '1') patches.filterTaller = true;
+  const man = searchParams.get('manufacturer');
+  if (man != null && String(man).trim() !== '') patches.manufacturer = String(man).slice(0, 200);
+  const typ = searchParams.get('type');
+  if (typ != null && String(typ).trim() !== '') patches.type = typ;
+  return Object.keys(patches).length ? { ...defaultFilters, ...patches } : null;
+}
+
 const loadStoredFilters = () => {
   try {
     const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
@@ -92,12 +110,27 @@ const applyFilters = (list, filters) => {
 
 const VehicleList = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
-  const [filters, setFiltersState] = useState(loadStoredFilters);
+  const [filters, setFiltersState] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const fromUrl = parseFiltersFromSearchParams(params);
+        if (fromUrl) {
+          saveFilters(fromUrl);
+          return fromUrl;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return loadStoredFilters();
+  });
   const setFilters = (updater) => {
     setFiltersState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -125,6 +158,13 @@ const VehicleList = () => {
       return n;
     });
   };
+
+  useEffect(() => {
+    const fromUrl = parseFiltersFromSearchParams(searchParams);
+    if (!fromUrl) return;
+    setFiltersState(fromUrl);
+    saveFilters(fromUrl);
+  }, [searchParams]);
 
   const hasActiveFilters = !!(filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.filterMuseo || filters.filterTaller);
 
