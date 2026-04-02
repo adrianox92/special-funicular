@@ -10,7 +10,7 @@ import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { SlidersHorizontal, Bell, CircleHelp } from 'lucide-react';
+import { SlidersHorizontal, Bell, CircleHelp, KeyRound } from 'lucide-react';
 
 const STALE_DAYS_MIN = 1;
 const STALE_DAYS_MAX = 365;
@@ -23,7 +23,9 @@ const TELEGRAM_APP_BOT = {
   webUrl: 'https://web.telegram.org/k/#@tiempos_slot_bot',
 };
 
-const VALID_TABS = new Set(['dashboard', 'notifications']);
+const VALID_TABS = new Set(['dashboard', 'notifications', 'cuenta']);
+
+const PASSWORD_MIN_LEN = 6;
 
 const SettingsPage = () => {
   const { user } = useAuth();
@@ -43,6 +45,12 @@ const SettingsPage = () => {
   const [notifTestLoading, setNotifTestLoading] = useState(false);
   const [notifError, setNotifError] = useState(null);
   const [notifSuccess, setNotifSuccess] = useState(null);
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdError, setPwdError] = useState(null);
+  const [pwdSuccess, setPwdSuccess] = useState(null);
 
   useEffect(() => {
     const raw = user?.user_metadata?.stale_days_threshold;
@@ -135,19 +143,50 @@ const SettingsPage = () => {
     }
   };
 
+  const handleChangePassword = async () => {
+    setPwdSaving(true);
+    setPwdError(null);
+    setPwdSuccess(null);
+    try {
+      if (!user) {
+        setPwdError('No hay sesión activa.');
+        return;
+      }
+      if (newPassword.length < PASSWORD_MIN_LEN) {
+        setPwdError(`La nueva contraseña debe tener al menos ${PASSWORD_MIN_LEN} caracteres.`);
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setPwdError('La confirmación no coincide con la nueva contraseña.');
+        return;
+      }
+      const { error: updErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updErr) throw updErr;
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setPwdSuccess('Contraseña actualizada correctamente.');
+      setTimeout(() => setPwdSuccess(null), 6000);
+    } catch (err) {
+      setPwdError(err.message || 'No se pudo cambiar la contraseña.');
+    } finally {
+      setPwdSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
         <p className="text-muted-foreground">
-          Preferencias del dashboard y notificaciones (Discord y Telegram)
+          Preferencias del dashboard, notificaciones y seguridad de la cuenta
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
+          <TabsTrigger value="cuenta">Cuenta</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6 space-y-6">
@@ -364,6 +403,61 @@ const SettingsPage = () => {
               {notifSuccess && (
                 <Alert>
                   <AlertDescription>{notifSuccess}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cuenta" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <KeyRound className="size-5" />
+                Contraseña
+              </CardTitle>
+              <CardDescription>
+                Con la sesión iniciada puedes establecer una nueva contraseña (también si antes usabas solo Google). Quien
+                tenga acceso a tu sesión abierta podría cambiarla desde aquí; cierra sesión en dispositivos que no sean
+                tuyos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-md">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nueva contraseña</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Mínimo {PASSWORD_MIN_LEN} caracteres (límite de Supabase).
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-new-password">Confirmar nueva contraseña</Label>
+                <Input
+                  id="confirm-new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                />
+              </div>
+              <Button type="button" onClick={handleChangePassword} disabled={pwdSaving}>
+                {pwdSaving ? <Spinner className="size-4 mr-2" /> : null}
+                Guardar contraseña
+              </Button>
+              {pwdError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{pwdError}</AlertDescription>
+                </Alert>
+              )}
+              {pwdSuccess && (
+                <Alert>
+                  <AlertDescription>{pwdSuccess}</AlertDescription>
                 </Alert>
               )}
             </CardContent>

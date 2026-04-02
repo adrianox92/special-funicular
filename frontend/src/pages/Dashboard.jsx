@@ -45,7 +45,6 @@ const PerformanceByTypeChart = lazy(() => import('../components/charts/Performan
 const InvestmentTimelineChart = lazy(() => import('../components/charts/InvestmentTimelineChart'));
 const TopCostTable = lazy(() => import('../components/tables/TopCostTable'));
 const TopComponentsTable = lazy(() => import('../components/tables/TopComponentsTable'));
-const InsightsCarousel = lazy(() => import('../components/InsightsCarousel'));
 const LaneComparisonChart = lazy(() => import('../components/LaneComparisonChart'));
 
 const ChartFallback = () => (
@@ -142,8 +141,8 @@ const Dashboard = () => {
             </h1>
             <p className="mt-1 capitalize text-muted-foreground">{todayLabel}</p>
             <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-              Aún no tienes vehículos registrados. Añade tu primer coche para ver métricas, gráficos e
-              insights de tu colección.
+              Aún no tienes vehículos registrados. Añade tu primer coche para ver métricas y gráficos de
+              tu colección.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -185,9 +184,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Suspense fallback={<ChartFallback />}>
-          <InsightsCarousel />
-        </Suspense>
       </div>
     );
   }
@@ -320,10 +316,6 @@ const Dashboard = () => {
           </section>
         ) : null}
       </div>
-
-      <Suspense fallback={<ChartFallback />}>
-        <InsightsCarousel />
-      </Suspense>
 
       <section aria-labelledby="dash-metrics-heading">
         <Card className="overflow-hidden border-border/80 shadow-sm">

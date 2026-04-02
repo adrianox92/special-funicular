@@ -946,7 +946,6 @@ Los estilos están organizados en:
 
 - `frontend/src/index.css` - Tailwind directives + shadcn CSS variables
 - `frontend/src/styles/competitions.css` - Estilos de competiciones (variables CSS, compatible con dark mode)
-- `frontend/src/styles/InsightsCarousel.css` - Carousel (legacy, being migrated)
 
 ### Temas y Colores
 
@@ -1059,7 +1058,7 @@ Si no tienes `exec_sql` en Supabase, ejecuta manualmente en el SQL Editor:
 
 - **Nuevo sistema de UI**: Migración de Bootstrap 5 a shadcn/ui + Tailwind CSS
 - **Dark/Light mode**: Toggle de tema con persistencia en localStorage
-- **Componentes migrados**: Navbar, Footer, LandingPage, Login, Dashboard, VehicleList, VehicleCard, AddVehicle, MetricCard, InsightsCarousel
+- **Componentes migrados**: Navbar, Footer, LandingPage, Login, Dashboard, VehicleList, VehicleCard, AddVehicle, MetricCard
 - **Layout responsive**: Sheet para menú móvil, NavigationMenu para desktop
 - **CRACO**: Path alias `@/` configurado para imports limpios
 - **Iconos**: lucide-react para iconografía consistente

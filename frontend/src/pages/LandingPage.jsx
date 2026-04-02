@@ -12,7 +12,6 @@ import {
   Check,
   FileText,
   Smartphone,
-  Bot,
   Gauge,
   Monitor,
   LayoutGrid,
@@ -23,6 +22,7 @@ import {
   BarChart3,
   Zap,
   Banknote,
+  PieChart,
 } from 'lucide-react';
 import Footer from '../components/Footer';
 import { useTheme } from '../context/ThemeContext';
@@ -33,7 +33,6 @@ import { cn } from '../lib/utils';
 
 const heroHighlights = [
   { label: 'PWA instalable', variant: 'secondary' },
-  { label: 'Insights IA', variant: 'secondary' },
   { label: 'PDF exportable', variant: 'secondary' },
   { label: 'API de sincronización', variant: 'secondary' },
 ];
@@ -77,11 +76,6 @@ const keyStats = [
     icon: Monitor,
     title: 'Competiciones pro',
     text: 'Ranking en vivo y modo presentación tipo TV para tu evento.',
-  },
-  {
-    icon: Bot,
-    title: 'Insights IA',
-    text: 'Resúmenes inteligentes sobre tu colección y tendencias.',
   },
 ];
 
@@ -144,9 +138,8 @@ const featureBlocks = [
       'Gráficos por marca, tipo, tienda y modificaciones',
       'Evolución de la inversión en el tiempo',
       'Top vehículos por coste y componentes más usados',
-      'Insights generados por IA con opción de regenerar',
     ],
-    visualIcons: [BarChart3, TrendingUp, Banknote, Bot],
+    visualIcons: [BarChart3, TrendingUp, Banknote, PieChart],
     reverse: true,
   },
 ];

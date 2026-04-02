@@ -114,7 +114,6 @@ app.use('/api/public-signup', publicSignupLimiter, publicCompetitionsRoute);
 const vehiclesRoute = require('./routes/vehicles');
 const timingsRoute = require('./routes/timings');
 const dashboardRoute = require('./routes/dashboard');
-const insightsRoute = require('./routes/insights');
 const authRoute = require('./routes/auth');
 const competitionRulesRoute = require('./routes/competition-rules');
 const apiKeysRoute = require('./routes/api-keys');
@@ -133,11 +132,8 @@ app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
 app.use('/api/sync', syncRoute);
 app.use('/api/auth', authSoftLimiter, authRoute);
-// Antes que app.use('/api', insightsRoute): ese montaje aplica JWT a *toda* /api/* y
-// interceptaba /api/license/* antes de llegar a apiKeyAuth.
 app.use('/api/license', apiKeyAuth, licenseRoute);
 app.use('/api/license-account', authMiddleware, licenseAccountRoute);
-app.use('/api', insightsRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
 app.use('/api/circuits', circuitsRoute);

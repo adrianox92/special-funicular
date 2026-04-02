@@ -305,19 +305,23 @@ const HelpPage = () => {
             <Badge variant="secondary">/settings</Badge>
           </div>
           <CardDescription>
-            Preferencias del dashboard y notificaciones tras sincronizar tiempos.
+            Preferencias del dashboard, notificaciones y cambio de contraseña.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <p>
             Umbral de días sin sesión en tu circuito habitual (para el bloque “Pendientes y alertas” del inicio), webhook de
-            Discord y Chat ID de Telegram. Puedes usar <code className="rounded bg-muted px-1 py-0.5 text-xs">?tab=notifications</code> en la URL para abrir directamente la pestaña de notificaciones.
+            Discord y Chat ID de Telegram. La pestaña Cuenta permite cambiar la contraseña sin escribir la anterior (sesión
+            iniciada), o definirla si solo usas Google.
+            Puedes usar <code className="rounded bg-muted px-1 py-0.5 text-xs">?tab=notifications</code> o{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">?tab=cuenta</code> en la URL para abrir la pestaña deseada.
           </p>
           <div>
             <p className="font-medium text-foreground mb-2">Qué tener en cuenta</p>
             <BulletList
               items={[
                 'Tras cambiar el umbral de días, recarga el dashboard para ver el nuevo criterio en alertas.',
+                'El cambio de contraseña en Cuenta no pide la anterior: basta con tener la sesión iniciada.',
                 'Regenerar API key no se hace aquí: la clave de integración está en Mi perfil.',
               ]}
             />

@@ -12,7 +12,7 @@ function displaySessionTime(textVal, secVal) {
 }
 
 /**
- * Solo si el coche ha ganado puestos en el ranking del circuito (position_change > 0).
+ * Solo si el coche ha ganado puestos en la clasificación general (position_change > 0).
  * Ignora el centinela 999 que usa positionTracker cuando no había posición previa en BD.
  * @returns {string|null}
  */
@@ -23,7 +23,7 @@ function formatRankingGainLine(timing) {
   if (!Number.isFinite(change) || change <= 0) return null;
   if (prev == null || Number(prev) >= 999) return null;
   if (curr == null || !Number.isFinite(Number(curr))) return null;
-  return `Clasificación: +${change} puesto(s) — P${prev} → P${curr}`;
+  return `Clasificación general: P${prev} → P${curr} (+${change})`;
 }
 
 function getAdminClient() {

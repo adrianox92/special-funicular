@@ -58,11 +58,6 @@ jest.mock('../../components/tables/TopComponentsTable', () => {
   };
 });
 
-jest.mock('../../components/InsightsCarousel', () => {
-  return function MockInsightsCarousel() {
-    return <div data-testid="insights-carousel">Insights Carousel</div>;
-  };
-});
 
 const mockMetricsData = {
   totalVehicles: 10,
@@ -136,7 +131,6 @@ describe('Dashboard Component', () => {
     
     // Verificar que los componentes principales están presentes
     await waitFor(() => {
-      expect(screen.getByTestId('insights-carousel')).toBeInTheDocument();
       expect(screen.getByTestId('vehicles-by-type-chart')).toBeInTheDocument();
       expect(screen.getByTestId('modification-pie-chart')).toBeInTheDocument();
       expect(screen.getByTestId('brand-distribution-chart')).toBeInTheDocument();
