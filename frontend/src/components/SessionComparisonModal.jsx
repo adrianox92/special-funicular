@@ -92,6 +92,11 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
     { key: 'avg_speed_scale_kmh', label: 'Velocidad media escala (km/h eq.)', fmt: (t) => (t.avg_speed_scale_kmh != null ? Number(t.avg_speed_scale_kmh).toFixed(0) : '—') },
     { key: 'best_lap_speed_kmh', label: 'Velocidad mejor vuelta (km/h)', fmt: (t) => (t.best_lap_speed_kmh != null ? Number(t.best_lap_speed_kmh).toFixed(1) : '—') },
     { key: 'consistency_score', label: 'Consistencia (%)', fmt: (t) => (t.consistency_score != null ? `${Number(t.consistency_score).toFixed(2)}%` : '—') },
+    {
+      key: 'supply_voltage_volts',
+      label: 'Voltaje (V)',
+      fmt: (t) => (t.supply_voltage_volts != null && t.supply_voltage_volts !== '' ? `${Number(t.supply_voltage_volts).toFixed(2)} V` : '—'),
+    },
   ];
 
   return (

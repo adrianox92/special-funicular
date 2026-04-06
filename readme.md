@@ -326,6 +326,8 @@ Si no ves el botón de instalación:
 
 **Database**: Run `backend/scripts/add-timing-laps-table.sql` in Supabase SQL Editor to create `timing_laps` table and add `consistency_score`, `worst_lap_timestamp` to `vehicle_timings`.
 
+**Pilot public profile & supply voltage**: Run `backend/scripts/add-pilot-profile-voltage.sql` in Supabase SQL Editor to add `vehicle_timings.supply_voltage_volts`, table `pilot_public_profiles`, and RLS. Public URL: `/piloto/:slug`. API: `GET/PATCH /api/pilot-profile` (JWT), `GET /api/public/pilot/:slug` (public).
+
 **Files**:
 
 - `backend/scripts/add-timing-laps-table.sql` — Migration

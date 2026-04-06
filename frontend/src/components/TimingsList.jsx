@@ -31,6 +31,12 @@ import { Card, CardContent } from './ui/card';
 import './TimingsList.css';
 import { formatDistance } from '../utils/formatUtils';
 
+function formatVoltageVolts(v) {
+  if (v == null || v === '') return '—';
+  const n = Number(v);
+  return Number.isFinite(n) ? `${n.toFixed(2)} V` : '—';
+}
+
 /** Vista móvil: una tarjeta por grupo (misma agrupación que la tabla desktop). */
 function TimingMobileGroupCard({
   group,
@@ -109,27 +115,14 @@ function TimingMobileGroupCard({
             <span className="font-mono font-medium">{group.best_time.total_time}</span>
           </div>
           <div className="col-span-2">
+            <span className="text-muted-foreground block text-xs">Voltaje</span>
+            <span>{formatVoltageVolts(group.best_time.supply_voltage_volts)}</span>
+          </div>
+          <div className="col-span-2">
             <span className="text-muted-foreground block text-xs">Última sesión</span>
             {new Date(group.last_session.timing_date).toLocaleDateString()}
           </div>
         </div>
-
-        {group.improvement ? (
-          <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-2">
-            <div>
-              <strong className="text-primary">Mejor vuelta:</strong>{' '}
-              <span className="text-green-600 font-medium">-{group.improvement.lap_time_diff}s</span>
-              <span className="text-muted-foreground"> ({group.improvement.lap_percentage}%)</span>
-            </div>
-            <div>
-              <strong className="text-primary">Mejor total:</strong>{' '}
-              <span className="text-green-600 font-medium">-{group.improvement.total_time_diff}s</span>
-              <span className="text-muted-foreground"> ({group.improvement.total_percentage}%)</span>
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Primera sesión</p>
-        )}
 
         <div className="flex flex-wrap gap-2">
           {group.best_time.setup_snapshot && (
@@ -195,6 +188,10 @@ function TimingMobileGroupCard({
                       {session.totalSeconds === group.improvement?.best_total_session?.totalSeconds && (
                         <Badge variant="secondary" className="ml-1 text-[10px]">MT</Badge>
                       )}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">V: </span>
+                      {formatVoltageVolts(session.supply_voltage_volts)}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1">
@@ -577,8 +574,8 @@ const TimingsList = () => {
               <TableHead>Pos.</TableHead>
               <TableHead>Mejor</TableHead>
               <TableHead>Total</TableHead>
+              <TableHead>V (V)</TableHead>
               <TableHead>Ses.</TableHead>
-              <TableHead>Mejora</TableHead>
               <TableHead>Última</TableHead>
               <TableHead className="text-center w-[80px]">Acciones</TableHead>
             </TableRow>
@@ -635,29 +632,8 @@ const TimingsList = () => {
                       )}
                     </TableCell>
                     <TableCell className="font-mono font-medium">{group.best_time.total_time}</TableCell>
+                    <TableCell className="font-mono text-sm">{formatVoltageVolts(group.best_time.supply_voltage_volts)}</TableCell>
                     <TableCell><Badge>{group.total_sessions}</Badge></TableCell>
-                    <TableCell>
-                      {group.improvement ? (
-                        <div className="text-sm">
-                          <div className="mb-1">
-                            <strong className="text-primary">Mejor Vuelta:</strong>
-                            <br />
-                            <span className="text-green-600 font-medium">-{group.improvement.lap_time_diff}s</span>
-                            <br />
-                            <span className="text-muted-foreground">{group.improvement.lap_percentage}% mejor</span>
-                          </div>
-                          <div>
-                            <strong className="text-primary">Mejor Total:</strong>
-                            <br />
-                            <span className="text-green-600 font-medium">-{group.improvement.total_time_diff}s</span>
-                            <br />
-                            <span className="text-muted-foreground">{group.improvement.total_percentage}% mejor</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Primera sesión</span>
-                      )}
-                    </TableCell>
                     <TableCell>{new Date(group.last_session.timing_date).toLocaleDateString()}</TableCell>
                     <TableCell className="text-center w-[80px]">
                       <div className="flex items-center justify-center gap-1">
@@ -731,7 +707,7 @@ const TimingsList = () => {
                               <Badge variant="secondary" className="ml-2">Mejor Total</Badge>
                             )}
                           </TableCell>
-                          <TableCell></TableCell>
+                          <TableCell className="font-mono text-xs">{formatVoltageVolts(session.supply_voltage_volts)}</TableCell>
                           <TableCell></TableCell>
                           <TableCell></TableCell>
                           <TableCell className="text-center">

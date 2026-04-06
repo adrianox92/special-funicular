@@ -19,6 +19,7 @@ import CompetitionSignup from './pages/CompetitionSignup';
 import CompetitionStatus from './pages/CompetitionStatus';
 import CompetitionPresentation from './pages/CompetitionPresentation';
 import Profile from './pages/Profile';
+import PublicPilotProfile from './pages/PublicPilotProfile';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
 import Login from './components/Login';
@@ -54,7 +55,7 @@ const AuthedShell = ({ children }) => (
 const AppContent = () => {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const noNavbarRoutes = ['/', '/login', '/slot-race-manager', '/competitions/signup', '/competitions/status', '/competitions/presentation'];
+  const noNavbarRoutes = ['/', '/login', '/slot-race-manager', '/competitions/signup', '/competitions/status', '/competitions/presentation', '/piloto'];
   const hasNavbar = user && !noNavbarRoutes.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
 
   React.useEffect(() => {
@@ -94,6 +95,7 @@ const AppContent = () => {
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
+        <Route path="/piloto/:slug" element={<PublicPilotProfile />} />
 
         <Route
           path="/dashboard"

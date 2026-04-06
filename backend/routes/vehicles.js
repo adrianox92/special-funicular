@@ -11,6 +11,7 @@ const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR }
 const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
 const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFromComponent');
 const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/inventoryStockOps');
+const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -1162,7 +1163,8 @@ router.post('/:id/timings', async (req, res) => {
       total_time_timestamp,
       average_time_timestamp,
       circuit,
-      circuit_id
+      circuit_id,
+      supply_voltage_volts,
     } = req.body;
 
     // Verificar que el vehículo pertenece al usuario y obtener scale_factor
@@ -1197,7 +1199,7 @@ router.post('/:id/timings', async (req, res) => {
     }
 
     // Resolver circuito: circuit_id tiene prioridad
-    let circuitToStore = circuit;
+  let circuitToStore = circuit;
     let circuitIdToStore = null;
     let circuitLaneLengths = [];
     if (circuit_id) {
@@ -1241,6 +1243,13 @@ router.post('/:id/timings', async (req, res) => {
       setup_snapshot: JSON.stringify(componentsSnapshot),
       created_at: new Date().toISOString()
     };
+    if (supply_voltage_volts !== undefined) {
+      const pv = parseSupplyVoltageVolts(supply_voltage_volts);
+      if (!pv.ok) {
+        return res.status(400).json({ error: pv.error });
+      }
+      if (pv.volts != null) insertData.supply_voltage_volts = pv.volts;
+    }
     if (distanceSpeed) {
       Object.assign(insertData, distanceSpeed);
     }
@@ -1311,7 +1320,8 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       total_time_timestamp,
       average_time_timestamp,
       circuit,
-      circuit_id
+      circuit_id,
+      supply_voltage_volts,
     } = req.body;
 
     // Verificar que el vehículo pertenece al usuario y obtener scale_factor
@@ -1323,6 +1333,13 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       .single();
     if (checkError || !existingVehicle) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    if (supply_voltage_volts !== undefined) {
+      const pv = parseSupplyVoltageVolts(supply_voltage_volts);
+      if (!pv.ok) {
+        return res.status(400).json({ error: pv.error });
+      }
     }
 
     // Verificar que el tiempo existe y pertenece al vehículo
@@ -1430,6 +1447,10 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       circuit: circuitToStore,
       circuit_id: circuitIdToStore
     };
+    if (supply_voltage_volts !== undefined) {
+      const pv = parseSupplyVoltageVolts(supply_voltage_volts);
+      updatePayload.supply_voltage_volts = pv.volts;
+    }
     if (distanceSpeed) {
       Object.assign(updatePayload, distanceSpeed);
     } else {

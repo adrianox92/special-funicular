@@ -148,7 +148,7 @@ router.post('/circuits', async (req, res) => {
 /**
  * POST /api/sync/timings
  * Create a new timing record for a vehicle.
- * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date?, session_type?: 'HEAT'|'TRAINING', lap_times?: [{ lap_number, time_seconds|lap_time_seconds, time_text? }] }
+ * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date?, session_type?: 'HEAT'|'TRAINING', supply_voltage_volts?: number (0-30), voltage? (alias), lap_times?: [{ lap_number, time_seconds|lap_time_seconds, time_text? }] }
  */
 router.post('/timings', async (req, res) => {
   try {

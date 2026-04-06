@@ -108,7 +108,10 @@ app.use(express.json({ limit: '1mb' }));
 
 // ==================== RUTAS PÚBLICAS (SIN AUTENTICACIÓN) ====================
 const publicCompetitionsRoute = require('./routes/publicCompetitions');
+const publicPilotRoute = require('./routes/publicPilot');
+const pilotProfileRoute = require('./routes/pilotProfile');
 app.use('/api/public-signup', publicSignupLimiter, publicCompetitionsRoute);
+app.use('/api/public/pilot', publicSignupLimiter, publicPilotRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');
@@ -140,6 +143,7 @@ app.use('/api/circuits', circuitsRoute);
 app.use('/api/maintenance', maintenanceRoute);
 app.use('/api/search', searchRoute);
 app.use('/api/inventory', inventoryRoute);
+app.use('/api/pilot-profile', pilotProfileRoute);
 
 const competitionsRoute = require('./routes/competitions');
 app.use('/api/competitions', competitionsRoute);

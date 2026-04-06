@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Switch } from '../components/ui/switch';
-import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound } from 'lucide-react';
+import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 
 const Profile = () => {
@@ -38,6 +38,12 @@ const Profile = () => {
   const [licenseLoading, setLicenseLoading] = useState(false);
   const [licenseError, setLicenseError] = useState(null);
   const [adminPaidSaving, setAdminPaidSaving] = useState(false);
+
+  const [pilotLoading, setPilotLoading] = useState(true);
+  const [pilotSaving, setPilotSaving] = useState(false);
+  const [pilotError, setPilotError] = useState(null);
+  const [pilotSuccess, setPilotSuccess] = useState(null);
+  const [pilotForm, setPilotForm] = useState({ slug: '', display_name: '', enabled: false });
 
   const isLicenseAdmin = isLicenseAdminUser(user);
 
@@ -59,6 +65,64 @@ const Profile = () => {
   useEffect(() => {
     fetchApiKey();
   }, []);
+
+  const fetchPilotProfile = async () => {
+    setPilotLoading(true);
+    setPilotError(null);
+    try {
+      const { data } = await api.get('/pilot-profile');
+      setPilotForm({
+        slug: data.slug || '',
+        display_name: data.display_name || '',
+        enabled: !!data.enabled,
+      });
+    } catch (err) {
+      setPilotError(err.response?.data?.error || 'Error al cargar el perfil público');
+    } finally {
+      setPilotLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPilotProfile();
+  }, []);
+
+  const savePilotProfile = async () => {
+    setPilotSaving(true);
+    setPilotError(null);
+    setPilotSuccess(null);
+    try {
+      const { data } = await api.patch('/pilot-profile', {
+        slug: pilotForm.slug.trim() || null,
+        display_name: pilotForm.display_name.trim() || null,
+        enabled: pilotForm.enabled,
+      });
+      setPilotForm({
+        slug: data.slug || '',
+        display_name: data.display_name || '',
+        enabled: !!data.enabled,
+      });
+      setPilotSuccess('Perfil público guardado.');
+      setTimeout(() => setPilotSuccess(null), 4000);
+    } catch (err) {
+      setPilotError(err.response?.data?.error || 'Error al guardar');
+    } finally {
+      setPilotSaving(false);
+    }
+  };
+
+  const copyPilotUrl = async () => {
+    const s = pilotForm.slug?.trim();
+    if (!s || !pilotForm.enabled) return;
+    const url = `${window.location.origin}/piloto/${encodeURIComponent(s)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setPilotSuccess('Enlace copiado al portapapeles');
+      setTimeout(() => setPilotSuccess(null), 3000);
+    } catch {
+      setPilotError('No se pudo copiar el enlace');
+    }
+  };
 
   const fetchLicenseInfo = async () => {
     setLicenseLoading(true);
@@ -168,6 +232,87 @@ const Profile = () => {
             <label className="text-sm font-medium text-muted-foreground">Email</label>
             <p className="text-base">{user?.email || '—'}</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="size-5" />
+            Perfil público de piloto
+          </CardTitle>
+          <CardDescription>
+            Página agregada con tus mejores tiempos por circuito e historial de competiciones. Solo se muestra si
+            activas la visibilidad y defines un slug único.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {pilotLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner className="size-4" />
+              Cargando…
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <Switch
+                  id="pilot-enabled"
+                  checked={pilotForm.enabled}
+                  onCheckedChange={(v) => setPilotForm((prev) => ({ ...prev, enabled: !!v }))}
+                  disabled={pilotSaving}
+                />
+                <Label htmlFor="pilot-enabled" className="cursor-pointer">
+                  Mostrar perfil público
+                </Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pilot-slug">Slug (URL)</Label>
+                <Input
+                  id="pilot-slug"
+                  placeholder="ej. mi-nick"
+                  value={pilotForm.slug}
+                  onChange={(e) => setPilotForm((prev) => ({ ...prev, slug: e.target.value }))}
+                  disabled={pilotSaving}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Solo minúsculas, números y guiones (3–40 caracteres). URL:{' '}
+                  <code className="rounded bg-muted px-1">
+                    /piloto/{pilotForm.slug?.trim() || 'tu-slug'}
+                  </code>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pilot-display">Nombre para mostrar</Label>
+                <Input
+                  id="pilot-display"
+                  placeholder="Nombre público (opcional)"
+                  value={pilotForm.display_name}
+                  onChange={(e) => setPilotForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                  disabled={pilotSaving}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={savePilotProfile} disabled={pilotSaving}>
+                  {pilotSaving ? <Spinner className="size-4 mr-2" /> : null}
+                  Guardar
+                </Button>
+                <Button type="button" variant="outline" onClick={copyPilotUrl} disabled={pilotSaving || !pilotForm.enabled || !pilotForm.slug?.trim()}>
+                  <Copy className="size-4 mr-2" />
+                  Copiar enlace público
+                </Button>
+              </div>
+              {pilotError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{pilotError}</AlertDescription>
+                </Alert>
+              )}
+              {pilotSuccess && (
+                <Alert>
+                  <AlertDescription>{pilotSuccess}</AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 

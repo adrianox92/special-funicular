@@ -220,7 +220,8 @@ const EditVehicle = () => {
     timing_date: new Date().toISOString().split('T')[0],
     best_lap_timestamp: null,
     total_time_timestamp: null,
-    average_time_timestamp: null
+    average_time_timestamp: null,
+    supply_voltage_volts: '',
   });
   const [loadingTimings, setLoadingTimings] = useState(false);
   const [timingNotice, setTimingNotice] = useState(null);
@@ -914,8 +915,10 @@ const EditVehicle = () => {
     const updatedTiming = {
       ...targetTiming,
       [name]: value,
-      [`${name}_timestamp`]: timestamp
     };
+    if (['best_lap_time', 'total_time', 'average_time'].includes(name)) {
+      updatedTiming[`${name}_timestamp`] = timestamp;
+    }
 
     if (name === 'total_time' || name === 'laps' || name === 'best_lap_time') {
       const totalTime = name === 'total_time' ? value : targetTiming.total_time;
@@ -960,7 +963,11 @@ const EditVehicle = () => {
       timing_date: timing.timing_date,
       best_lap_timestamp: timing.best_lap_timestamp,
       total_time_timestamp: timing.total_time_timestamp,
-      average_time_timestamp: average_time_timestamp || timing.average_time_timestamp
+      average_time_timestamp: average_time_timestamp || timing.average_time_timestamp,
+      supply_voltage_volts:
+        timing.supply_voltage_volts != null && timing.supply_voltage_volts !== ''
+          ? String(timing.supply_voltage_volts)
+          : '',
     });
   };
 
@@ -977,8 +984,33 @@ const EditVehicle = () => {
       timing_date: new Date().toISOString().split('T')[0],
       best_lap_timestamp: null,
       total_time_timestamp: null,
-      average_time_timestamp: null
+      average_time_timestamp: null,
+      supply_voltage_volts: '',
     });
+  };
+
+  const handleTimingVoltageBlur = async (timingId, raw) => {
+    const trimmed = (raw ?? '').trim();
+    const payload =
+      trimmed === ''
+        ? { supply_voltage_volts: null }
+        : { supply_voltage_volts: parseFloat(trimmed.replace(',', '.')) };
+    if (trimmed !== '' && !Number.isFinite(payload.supply_voltage_volts)) {
+      setTimingNotice({ variant: 'warning', message: 'Voltaje no válido' });
+      setTimeout(() => setTimingNotice(null), 3000);
+      return;
+    }
+    try {
+      const { data } = await api.patch(`/timings/${timingId}`, payload);
+      setTimings((prev) => prev.map((t) => (t.id === data.id ? { ...t, ...data } : t)));
+    } catch (err) {
+      console.error(err);
+      setTimingNotice({
+        variant: 'warning',
+        message: err.response?.data?.error || 'No se pudo guardar el voltaje',
+      });
+      setTimeout(() => setTimingNotice(null), 4000);
+    }
   };
 
   const handleAddTiming = async (e) => {
@@ -1600,6 +1632,18 @@ const EditVehicle = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="supply_voltage_volts">Voltaje pista (V)</Label>
+              <Input
+                id="supply_voltage_volts"
+                name="supply_voltage_volts"
+                value={editingTiming?.supply_voltage_volts ?? newTiming.supply_voltage_volts ?? ''}
+                onChange={handleTimingChange}
+                placeholder="Opcional, 0–30"
+                inputMode="decimal"
+              />
+              <p className="text-xs text-muted-foreground">También puedes editarlo en la tabla de registros.</p>
+            </div>
           </div>
           <div className="flex gap-2 mt-4">
             <Button type="submit">
@@ -1631,6 +1675,7 @@ const EditVehicle = () => {
                       <TableHead>Velocidad</TableHead>
                       <TableHead>Carril</TableHead>
                       <TableHead>Circuito</TableHead>
+                      <TableHead className="w-[100px]">V (V)</TableHead>
                       <TableHead className="text-center">Configuración</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
@@ -1638,7 +1683,7 @@ const EditVehicle = () => {
                   <TableBody>
                     {timings.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center text-muted-foreground">No hay registros de tiempo</TableCell>
+                        <TableCell colSpan={12} className="text-center text-muted-foreground">No hay registros de tiempo</TableCell>
                       </TableRow>
                     )}
                     {timings.map((timing) => (
@@ -1658,6 +1703,17 @@ const EditVehicle = () => {
                         </TableCell>
                         <TableCell>{timing.lane || '-'}</TableCell>
                         <TableCell>{timing.circuit || '-'}</TableCell>
+                        <TableCell>
+                          <Input
+                            key={`v-${timing.id}-${timing.supply_voltage_volts ?? ''}`}
+                            className="h-8 font-mono text-xs px-2"
+                            defaultValue={timing.supply_voltage_volts != null && timing.supply_voltage_volts !== '' ? String(timing.supply_voltage_volts) : ''}
+                            placeholder="—"
+                            inputMode="decimal"
+                            onBlur={(e) => handleTimingVoltageBlur(timing.id, e.target.value)}
+                            aria-label="Voltaje de la sesión en voltios"
+                          />
+                        </TableCell>
                         <TableCell className="text-center">
                           {timing.setup_snapshot ? (
                             <Button

@@ -224,6 +224,8 @@ Content-Type: application/json
 | `average_time_timestamp` | number | No | Tiempo promedio en segundos (float) |
 | `scale_factor` | number | No | Escala del coche para velocidad equivalente (32 = 1:32). Si no se envía, se usa el del vehículo |
 | `lap_times` | array | No | Array de vueltas individuales. Cada elemento: `{ lap_number?, time_seconds|lap_time_seconds, time_text? }`. Si se envía con ≥3 vueltas válidas, se calcula `consistency_score` y `worst_lap_timestamp` |
+| `session_type` | string | No | `HEAT` (manga/campeonato) o `TRAINING` (entrenamiento) |
+| `supply_voltage_volts` | number | No | Voltaje de alimentación en pista (0–30 V). Alias: `voltage` |
 
 
 **Resolución de circuito:**
@@ -270,6 +272,12 @@ Content-Type: application/json
 - `401` - API key inválida
 - `404` - Vehículo no encontrado, o circuito no encontrado (si se envió `circuit_id` inválido)
 - `500` - Error interno del servidor
+
+## Perfil público de piloto (solo lectura)
+
+- Tras activar el perfil en la web (cuenta → **Mi Perfil**), la URL pública es:  
+  `{FRONTEND_ORIGIN}/piloto/{slug}`  
+  Los datos se sirven con `GET /api/public/pilot/:slug` (sin autenticación, rate limit).
 
 ---
 

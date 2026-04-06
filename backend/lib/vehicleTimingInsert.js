@@ -3,6 +3,7 @@ const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR }
 const { getPreviousBestLapSeconds } = require('./personalBest');
 const { updatePositionsAfterNewTiming } = require('./positionTracker');
 const { calculateConsistencyFromLaps } = require('./timingUtils');
+const { parseSupplyVoltageVolts } = require('./pilotProfileUtils');
 
 /**
  * Inserta una sesión de cronometraje (misma lógica que POST /api/sync/timings).
@@ -28,6 +29,8 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     lap_times,
     scale_factor: bodyScaleFactor,
     session_type,
+    supply_voltage_volts,
+    voltage,
   } = body;
 
   if (!vehicle_id || !best_lap_time || !total_time || laps == null || !average_time) {
@@ -136,6 +139,18 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
   if (sessionTypeToStore) {
     timingData.session_type = sessionTypeToStore;
   }
+
+  const voltRaw = supply_voltage_volts !== undefined ? supply_voltage_volts : voltage;
+  if (voltRaw !== undefined && voltRaw !== null && voltRaw !== '') {
+    const voltParsed = parseSupplyVoltageVolts(voltRaw);
+    if (!voltParsed.ok) {
+      return { success: false, error: voltParsed.error, status: 400 };
+    }
+    if (voltParsed.volts != null) {
+      timingData.supply_voltage_volts = voltParsed.volts;
+    }
+  }
+
   if (distanceSpeed) {
     Object.assign(timingData, distanceSpeed);
   }

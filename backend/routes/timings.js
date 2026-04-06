@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/auth');
 const { getCircuitRanking } = require('../lib/positionTracker');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
+const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -139,6 +140,12 @@ function csvRowToSyncBody(row, defaultVehicleId) {
     average_time_timestamp: avgTs,
     lap_times: lap_times.length ? lap_times : undefined,
     scale_factor: row.scale_factor != null && String(row.scale_factor).trim() !== '' ? parseNumber(row.scale_factor) : undefined,
+    supply_voltage_volts:
+      row.supply_voltage_volts != null && String(row.supply_voltage_volts).trim() !== ''
+        ? row.supply_voltage_volts
+        : row.voltage != null && String(row.voltage).trim() !== ''
+          ? row.voltage
+          : undefined,
   };
 }
 
@@ -160,7 +167,7 @@ function normalizeJsonTimingRow(row) {
  * POST /api/timings/import
  * Body: { vehicle_id?, format: "csv"|"json", content: string }
  * CSV: cabeceras timing_date, circuit, lane, laps, best_lap_time, total_time, average_time,
- *      best_lap_timestamp?, total_time_timestamp?, average_time_timestamp?, circuit_id?, lap_1, lap_2, ...
+ *      best_lap_timestamp?, total_time_timestamp?, average_time_timestamp?, circuit_id?, supply_voltage_volts|voltage?, lap_1, lap_2, ...
  * JSON: array de objetos (mismo esquema que POST /api/sync/timings); vehicle_id opcional si se envía arriba.
  */
 router.post('/import', async (req, res) => {
@@ -400,6 +407,63 @@ router.get('/', async (req, res) => {
     res.json(enrichedTimings);
   } catch (err) {
     console.error('Error al obtener tiempos:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/timings/:id
+ * Actualizar metadatos de una sesión (solo supply_voltage_volts por ahora).
+ */
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supply_voltage_volts } = req.body || {};
+
+    if (supply_voltage_volts === undefined) {
+      return res.status(400).json({ error: 'supply_voltage_volts es requerido (o null para borrar)' });
+    }
+
+    const parsed = parseSupplyVoltageVolts(supply_voltage_volts);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error });
+    }
+
+    const { data: timing, error: timingError } = await supabase
+      .from('vehicle_timings')
+      .select('id, vehicle_id')
+      .eq('id', id)
+      .single();
+
+    if (timingError || !timing) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    const { data: vehicle } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', timing.vehicle_id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (!vehicle) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('vehicle_timings')
+      .update({ supply_voltage_volts: parsed.volts })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return res.status(500).json({ error: updateErr.message });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Error en PATCH /timings/:id:', err);
     res.status(500).json({ error: err.message });
   }
 });
