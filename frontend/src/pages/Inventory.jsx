@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Package, Trash2, Pen, ExternalLink, Wrench, PackagePlus, History } from 'lucide-react';
+import {
+  Plus,
+  Package,
+  Trash2,
+  Pen,
+  ExternalLink,
+  Wrench,
+  PackagePlus,
+  History,
+  Copy,
+  Calendar,
+  Car,
+} from 'lucide-react';
 import api from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -182,6 +194,33 @@ const Inventory = () => {
 
   const handleOpenEdit = (item) => {
     initForm(item);
+    setShowModal(true);
+  };
+
+  const handleDuplicate = (item) => {
+    setFormData({
+      name: `${(item.name || '').trim()} (copia)`,
+      reference: item.reference ?? '',
+      url: item.url ?? '',
+      category: item.category || 'otro',
+      quantity: '0',
+      unit: item.unit || 'uds',
+      min_stock: item.min_stock != null ? String(item.min_stock) : '',
+      purchase_price: item.purchase_price != null ? String(item.purchase_price) : '',
+      purchase_date: item.purchase_date ? String(item.purchase_date).slice(0, 10) : '',
+      notes: item.notes ?? '',
+      vehicle_id: 'none',
+      manufacturer: item.manufacturer ?? '',
+      material: item.material ?? '',
+      size: item.size ?? '',
+      color: item.color ?? '',
+      teeth: item.teeth != null ? String(item.teeth) : '',
+      rpm: item.rpm != null ? String(item.rpm) : '',
+      gaus: item.gaus != null ? String(item.gaus) : '',
+      description: item.description ?? '',
+    });
+    setEditingItem(null);
+    setFormError(null);
     setShowModal(true);
   };
 
@@ -1253,109 +1292,144 @@ const Inventory = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {items.map((item) => (
             <Card
               key={item.id}
-              className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
+              className="relative flex h-full flex-col overflow-hidden hover:shadow-lg transition-shadow"
             >
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start gap-2 mb-3">
-                  <div className="min-w-0">
-                    <h5 className="font-semibold text-lg leading-tight">{item.name}</h5>
-                    {item.reference && (
-                      <p className="text-sm text-muted-foreground mt-1">Ref: {item.reference}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      type="button"
-                      title="Reponer stock"
-                      onClick={() => openRestock(item)}
-                    >
-                      <PackagePlus className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      type="button"
-                      title="Historial de compras"
-                      onClick={() => openHistory(item)}
-                    >
-                      <History className="size-4" />
-                    </Button>
-                    {Number(item.quantity) > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        type="button"
-                        title="Montar en vehículo"
-                        onClick={() => openMount(item)}
-                      >
-                        <Wrench className="size-4" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" type="button" onClick={() => handleOpenEdit(item)}>
-                      <Pen className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" type="button" className="text-destructive" onClick={() => handleDelete(item)}>
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <Badge variant="secondary">{formatInventoryCategory(item.category)}</Badge>
-                  {isLowStock(item) && (
-                    <Badge variant="destructive">Stock bajo</Badge>
-                  )}
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">Cantidad:</span>{' '}
-                    <span className="font-medium">
-                      {item.quantity} {unitLabel(item.unit)}
-                    </span>
+              <CardContent className="flex flex-1 flex-col p-4">
+                <h3 className="font-semibold text-lg leading-tight break-words">{item.name}</h3>
+                {item.reference && (
+                  <p className="text-sm text-muted-foreground">
+                    Ref: <span className="font-mono text-foreground/90">{item.reference}</span>
                   </p>
-                  {item.purchase_price != null && (
-                    <p>
-                      <span className="text-muted-foreground">Precio unitario:</span>{' '}
-                      {Number(item.purchase_price).toFixed(2)} €
-                    </p>
-                  )}
+                )}
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <Badge variant="secondary">{formatInventoryCategory(item.category)}</Badge>
+                  {isLowStock(item) && <Badge variant="destructive">Stock bajo</Badge>}
+                </div>
+
+                <div className="mt-3 text-sm">
+                  <span className="text-muted-foreground">Cantidad:</span>{' '}
+                  <span className="font-medium">
+                    {item.quantity} {unitLabel(item.unit)}
+                  </span>
+                </div>
+                {item.purchase_price != null && (
+                  <div className="mt-1 text-sm">
+                    <span className="text-muted-foreground">Precio unitario:</span>{' '}
+                    <span className="font-medium">{Number(item.purchase_price).toFixed(2)} €</span>
+                  </div>
+                )}
+
+                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                   {item.purchase_date && (
-                    <p>
-                      <span className="text-muted-foreground">Compra:</span>{' '}
-                      {formatHistoryDate(item.purchase_date)}
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="size-3 shrink-0" aria-hidden />
+                      <span>Compra: {formatHistoryDate(item.purchase_date)}</span>
+                    </div>
                   )}
                   {item.url && (
-                    <p>
+                    <div className="flex items-start gap-1 pt-0.5">
+                      <ExternalLink className="size-3 shrink-0 mt-0.5" aria-hidden />
                       <a
                         href={item.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                        className="min-w-0 break-all text-primary hover:underline"
                       >
-                        <ExternalLink className="size-3.5" />
                         Abrir enlace
                       </a>
-                    </p>
+                    </div>
                   )}
                   {item.vehicle && (
-                    <p>
-                      <span className="text-muted-foreground">Montado en:</span>{' '}
-                      <Link to={`/vehicles/${item.vehicle.id}`} className="text-primary hover:underline font-medium">
-                        {item.vehicle.manufacturer} {item.vehicle.model}
-                      </Link>
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <Car className="size-3 shrink-0" aria-hidden />
+                      <span>
+                        Montado en{' '}
+                        <Link
+                          to={`/vehicles/${item.vehicle.id}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {item.vehicle.manufacturer} {item.vehicle.model}
+                        </Link>
+                      </span>
+                    </div>
                   )}
-                  {item.notes && (
-                    <p className="text-muted-foreground text-xs pt-1 border-t">{item.notes}</p>
+                </div>
+
+                {item.notes && (
+                  <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">{item.notes}</p>
+                )}
+
+                <div
+                  className="mt-auto flex w-full min-w-0 flex-nowrap items-center justify-end gap-0.5 overflow-x-auto border-t border-border pt-3"
+                  role="toolbar"
+                  aria-label="Acciones del ítem"
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    className="h-8 w-8 shrink-0"
+                    title="Reponer stock"
+                    onClick={() => openRestock(item)}
+                  >
+                    <PackagePlus className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    className="h-8 w-8 shrink-0"
+                    title="Historial de compras"
+                    onClick={() => openHistory(item)}
+                  >
+                    <History className="size-4" />
+                  </Button>
+                  {Number(item.quantity) > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      className="h-8 w-8 shrink-0"
+                      title="Montar en vehículo"
+                      onClick={() => openMount(item)}
+                    >
+                      <Wrench className="size-4" />
+                    </Button>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    className="h-8 w-8 shrink-0"
+                    title="Editar"
+                    onClick={() => handleOpenEdit(item)}
+                  >
+                    <Pen className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    className="h-8 w-8 shrink-0"
+                    title="Duplicar"
+                    onClick={() => handleDuplicate(item)}
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    className="h-8 w-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    title="Eliminar"
+                    onClick={() => handleDelete(item)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
