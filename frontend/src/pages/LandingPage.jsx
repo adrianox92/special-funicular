@@ -30,6 +30,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent } from '../components/ui/card';
 import { cn } from '../lib/utils';
+import { applyLandingPageSeo } from '../utils/landingSeo';
 
 const heroHighlights = [
   { label: 'PWA instalable', variant: 'secondary' },
@@ -84,7 +85,7 @@ const featureBlocks = [
     id: 'collection',
     title: 'Gestión de colección',
     description:
-      'Catálogo profesional para cada coche: imágenes, datos de compra, reglaje y documentación lista para compartir.',
+      'Catálogo profesional para coches de slot (Scalextric, Ninco, Avant Slot y más): imágenes, datos de compra, reglaje y documentación lista para compartir.',
     bullets: [
       'Fotos por 6 vistas (frontal, perfiles, trasera, superior, chasis, 3/4)',
       'Especificaciones técnicas con componentes (motor, piñón, corona, guía, ejes…)',
@@ -206,6 +207,10 @@ const FeatureSection = ({ block }) => {
 const LandingPage = () => {
   const { theme, toggleTheme } = useTheme();
 
+  React.useEffect(() => {
+    applyLandingPageSeo();
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-muted/50 to-background">
       <header
@@ -264,13 +269,16 @@ const LandingPage = () => {
               className="text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl"
             >
               <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
-                Tu colección y tus tiempos, al nivel que mereces
+                Slot Collection Pro
+              </span>
+              <span className="mt-3 block text-2xl font-bold tracking-tight text-foreground md:text-3xl lg:text-4xl">
+                Tu base de datos de slot: Scalextric, Ninco, Avant Slot y más
               </span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
-              Gestiona coches de slot con fichas completas, cronometra por vuelta, compara reglajes y
-              organiza competiciones con inscripción pública y ranking en vivo — todo en una sola
-              plataforma.
+              También conocida como Slot Database: gestiona coches de slot con fichas completas,
+              cronometra por vuelta, compara reglajes y organiza competiciones con inscripción pública
+              y ranking en vivo — todo en una sola plataforma.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start" role="list">
               {heroHighlights.map((h) => (

@@ -38,6 +38,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://special-funicular-bmy5.vercel.app',
   'https://special-funicular-bmy5-4tra1w9ef-adrians-projects-63dd797c.vercel.app',
+  'https://slotdatabase.es',
+  'https://www.slotdatabase.es',
 ];
 
 function isAllowedOrigin(origin) {

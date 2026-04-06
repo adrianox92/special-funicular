@@ -1,7 +1,7 @@
 {
-  "short_name": "Scalextric",
-  "name": "Scalextric Collection",
-  "description": "Gestión de colección de Scalextric y competiciones",
+  "short_name": "Slot Collection Pro",
+  "name": "Slot Collection Pro — Slot Database",
+  "description": "Base de datos y gestión de coches slot Scalextric, Ninco y Avant Slot: colección, tiempos y competiciones.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -29,4 +29,3 @@
   "scope": "/",
   "lang": "es"
 }
-  
