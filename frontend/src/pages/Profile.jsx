@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -18,11 +18,12 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Switch } from '../components/ui/switch';
-import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe } from 'lucide-react';
+import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 
 const Profile = () => {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [apiKey, setApiKey] = useState(null);
   const [keyExists, setKeyExists] = useState(false);
   const [keyMessage, setKeyMessage] = useState(null);
@@ -44,6 +45,12 @@ const Profile = () => {
   const [pilotError, setPilotError] = useState(null);
   const [pilotSuccess, setPilotSuccess] = useState(null);
   const [pilotForm, setPilotForm] = useState({ slug: '', display_name: '', enabled: false });
+
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [showDeleteAccountPassword, setShowDeleteAccountPassword] = useState(false);
+  const [accountDeleting, setAccountDeleting] = useState(false);
+  const [accountDeleteError, setAccountDeleteError] = useState(null);
 
   const isLicenseAdmin = isLicenseAdminUser(user);
 
@@ -196,6 +203,26 @@ const Profile = () => {
     return key.slice(0, 4) + '•'.repeat(key.length - 8) + key.slice(-4);
   };
 
+  const cancelDeleteAccount = () => {
+    setShowDeleteAccountConfirm(false);
+    setDeleteAccountPassword('');
+    setAccountDeleteError(null);
+  };
+
+  const handleDeleteAccount = async () => {
+    setAccountDeleteError(null);
+    setAccountDeleting(true);
+    try {
+      await api.post('/auth/account/delete', { password: deleteAccountPassword });
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      setAccountDeleteError(err.response?.data?.error || 'No se pudo eliminar la cuenta');
+    } finally {
+      setAccountDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -232,6 +259,80 @@ const Profile = () => {
             <label className="text-sm font-medium text-muted-foreground">Email</label>
             <p className="text-base">{user?.email || '—'}</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="size-5" aria-hidden />
+            Zona peligrosa
+          </CardTitle>
+          <CardDescription>Eliminar tu cuenta y todos los datos asociados de forma permanente.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!showDeleteAccountConfirm ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setShowDeleteAccountConfirm(true);
+                setAccountDeleteError(null);
+                setDeleteAccountPassword('');
+              }}
+            >
+              Eliminar mi cuenta
+            </Button>
+          ) : (
+            <Alert variant="destructive">
+              <AlertDescription>
+                <span className="block mb-3">¿Estás seguro? Esta acción no se puede deshacer.</span>
+                <div className="space-y-2 mb-3">
+                  <Label htmlFor="delete-account-password">Contraseña</Label>
+                  <div className="relative">
+                    <Input
+                      id="delete-account-password"
+                      type={showDeleteAccountPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      value={deleteAccountPassword}
+                      onChange={(e) => setDeleteAccountPassword(e.target.value)}
+                      disabled={accountDeleting}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 size-8"
+                      onClick={() => setShowDeleteAccountPassword((v) => !v)}
+                      disabled={accountDeleting}
+                      aria-label={showDeleteAccountPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showDeleteAccountPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleDeleteAccount}
+                    disabled={accountDeleting || !deleteAccountPassword.trim()}
+                  >
+                    {accountDeleting ? <Spinner className="size-4 mr-2" /> : null}
+                    Sí, eliminar
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={cancelDeleteAccount} disabled={accountDeleting}>
+                    Cancelar
+                  </Button>
+                </div>
+                {accountDeleteError && (
+                  <p className="mt-3 text-sm font-medium text-foreground">{accountDeleteError}</p>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 

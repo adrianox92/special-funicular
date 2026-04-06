@@ -23,6 +23,7 @@ import {
   Zap,
   Banknote,
   PieChart,
+  Package,
 } from 'lucide-react';
 import Footer from '../components/Footer';
 import { useTheme } from '../context/ThemeContext';
@@ -43,22 +44,29 @@ const heroCards = [
     icon: Car,
     title: 'Colección',
     blurb: 'Fichas, fotos y reglajes en un solo lugar.',
-    className: 'border-violet-500/20 bg-card/80',
-    iconClass: 'text-violet-600 dark:text-violet-400',
+    className: 'border-primary/20 bg-card/80',
+    iconClass: 'text-primary',
   },
   {
     icon: Gauge,
     title: 'Tiempos',
     blurb: 'Vueltas al milisegundo y análisis por sesión.',
-    className: 'border-cyan-500/20 bg-card/80',
-    iconClass: 'text-cyan-600 dark:text-cyan-400',
+    className: 'border-border bg-card/80',
+    iconClass: 'text-primary',
   },
   {
     icon: Trophy,
     title: 'Competiciones',
     blurb: 'Inscripciones, reglas y ranking en vivo.',
-    className: 'border-amber-500/20 bg-card/80',
-    iconClass: 'text-amber-600 dark:text-amber-400',
+    className: 'border-border bg-card/80',
+    iconClass: 'text-primary',
+  },
+  {
+    icon: Package,
+    title: 'Inventario',
+    blurb: 'Stock de piezas, alertas y montaje en coches.',
+    className: 'border-border bg-card/80',
+    iconClass: 'text-primary',
   },
 ];
 
@@ -77,6 +85,11 @@ const keyStats = [
     icon: Monitor,
     title: 'Competiciones pro',
     text: 'Ranking en vivo y modo presentación tipo TV para tu evento.',
+  },
+  {
+    icon: Package,
+    title: 'Inventario de piezas',
+    text: 'Stock, categorías, reposición y vínculo con montajes en vehículos.',
   },
 ];
 
@@ -98,6 +111,22 @@ const featureBlocks = [
     reverse: false,
   },
   {
+    id: 'inventory',
+    title: 'Inventario de piezas',
+    description:
+      'Piezas y consumibles con el mismo rigor que tu colección: stock, precios y trazabilidad hasta el coche donde las montas.',
+    bullets: [
+      'Categorías, unidades, precio de compra, fechas y notas por ítem',
+      'Stock mínimo, alertas y reposición cuando toca reponer',
+      'Filtros por categoría, búsqueda y piezas con stock bajo',
+      'Montaje en vehículos desde inventario (descuenta stock automáticamente)',
+      'Historial de movimientos y enlace con modificaciones del coche',
+      'Campos específicos según tipo de pieza (material, piñonería, etc.)',
+    ],
+    visualIcons: [Package, Banknote, Layers, FileText],
+    reverse: true,
+  },
+  {
     id: 'timing',
     title: 'Cronometraje y rendimiento',
     description:
@@ -111,7 +140,7 @@ const featureBlocks = [
       'Gráficos de evolución de tiempos y velocidad',
     ],
     visualIcons: [Clock, Gauge, BarChart3, TrendingUp],
-    reverse: true,
+    reverse: false,
   },
   {
     id: 'competitions',
@@ -127,7 +156,7 @@ const featureBlocks = [
       'Exportación CSV y PDF de resultados',
     ],
     visualIcons: [Trophy, Users, Settings, Monitor],
-    reverse: false,
+    reverse: true,
   },
   {
     id: 'analytics',
@@ -141,7 +170,7 @@ const featureBlocks = [
       'Top vehículos por coste y componentes más usados',
     ],
     visualIcons: [BarChart3, TrendingUp, Banknote, PieChart],
-    reverse: true,
+    reverse: false,
   },
 ];
 
@@ -223,9 +252,7 @@ const LandingPage = () => {
             className="text-lg font-bold tracking-tight"
             aria-label="Slot Collection Pro, inicio"
           >
-            <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
-              Slot Collection Pro
-            </span>
+            <span className="font-bold text-foreground">Slot Collection Pro</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
@@ -255,11 +282,11 @@ const LandingPage = () => {
         aria-labelledby="landing-hero-heading"
       >
         <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(120,119,198,0.12)_0%,transparent_50%)]"
+          className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-muted/50 blur-3xl dark:bg-muted/30"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(99,102,241,0.1)_0%,transparent_50%)]"
+          className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-muted/40 blur-3xl dark:bg-muted/25"
           aria-hidden
         />
         <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-12 lg:flex-row lg:items-center lg:justify-between">
@@ -268,17 +295,15 @@ const LandingPage = () => {
               id="landing-hero-heading"
               className="text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl"
             >
-              <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
-                Slot Collection Pro
-              </span>
+              <span className="text-foreground">Slot Collection Pro</span>
               <span className="mt-3 block text-2xl font-bold tracking-tight text-foreground md:text-3xl lg:text-4xl">
-                Tu base de datos de slot: Scalextric, Ninco, Avant Slot y más
+                Tu base de datos de slot: Coches, recambios, reglajes y más
               </span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
               También conocida como Slot Database: gestiona coches de slot con fichas completas,
-              cronometra por vuelta, compara reglajes y organiza competiciones con inscripción pública
-              y ranking en vivo — todo en una sola plataforma.
+              inventario de piezas y consumibles, cronometra por vuelta, compara reglajes y organiza
+              competiciones con inscripción pública y ranking en vivo — todo en una sola plataforma.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start" role="list">
               {heroHighlights.map((h) => (
@@ -382,7 +407,7 @@ const LandingPage = () => {
         aria-labelledby="cta-final-heading"
       >
         <div
-          className="absolute inset-0 bg-gradient-to-br from-violet-600/10 via-indigo-600/5 to-transparent dark:from-violet-500/15"
+          className="absolute inset-0 bg-gradient-to-br from-primary/5 via-muted/40 to-transparent dark:from-primary/10 dark:via-muted/20"
           aria-hidden
         />
         <div className="relative z-10 mx-auto max-w-3xl text-center">

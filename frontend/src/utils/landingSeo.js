@@ -1,7 +1,7 @@
 /** SEO del landing público: palabras clave slot, Scalextric, Ninco, Avant Slot. */
 
 export const LANDING_PAGE_TITLE =
-  'Slot Collection Pro | Base de datos Scalextric, Ninco y Avant Slot';
+  'Slot Collection Pro | Lleva la gestión de tu colección a otro nivel';
 
 export const LANDING_PAGE_DESCRIPTION =
   'Slot Collection Pro (Slot Database): gestiona coches de slot Scalextric, Ninco y Avant Slot. Fichas técnicas, cronometraje al milisegundo, competiciones y sincronización en la nube.';

@@ -1,0 +1,13 @@
+-- Verificación recomendada antes de usar POST /api/auth/account/delete en producción:
+-- La tabla public.vehicles debe tener user_id → auth.users(id) con ON DELETE CASCADE
+-- para que auth.admin.deleteUser elimine en cascada los vehículos y datos relacionados.
+--
+-- Comprueba el nombre exacto de la restricción en Supabase: Table Editor → vehicles → Constraints.
+-- Si ya existe CASCADE, no ejecutes nada aquí.
+--
+-- Ejemplo (ajusta el nombre de la restricción si difiere):
+
+-- ALTER TABLE public.vehicles DROP CONSTRAINT IF EXISTS vehicles_user_id_fkey;
+-- ALTER TABLE public.vehicles
+--   ADD CONSTRAINT vehicles_user_id_fkey
+--   FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;

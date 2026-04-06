@@ -3,8 +3,38 @@ const crypto = require('crypto');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const { hashApiKey } = require('../lib/apiKeyHash');
+const authMiddleware = require('../middleware/auth');
 
 const isProd = process.env.NODE_ENV === 'production';
+
+const VEHICLE_IMAGES_BUCKET = 'vehicle-images';
+
+/**
+ * Elimina todos los objetos en vehicle-images bajo vehicles/{vehicleId}/ (servicio con permisos de service role).
+ */
+async function removeVehicleImagesFolder(admin, vehicleId) {
+  const folder = `vehicles/${vehicleId}`;
+  const limit = 100;
+  let offset = 0;
+  for (;;) {
+    const { data: files, error } = await admin.storage.from(VEHICLE_IMAGES_BUCKET).list(folder, {
+      limit,
+      offset,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!files || files.length === 0) break;
+    const paths = files.map((f) => `${folder}/${f.name}`);
+    const { error: removeError } = await admin.storage.from(VEHICLE_IMAGES_BUCKET).remove(paths);
+    if (removeError) {
+      throw new Error(removeError.message);
+    }
+    if (files.length < limit) break;
+    offset += limit;
+  }
+}
 
 function serverConfigErrorResponse(res, status, logError, devDetail) {
   if (logError) console.error(logError);
@@ -223,5 +253,82 @@ router.post('/api-key', async (req, res) => {
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
+
+/**
+ * POST /api/auth/account/delete
+ * Baja definitiva: valida contraseña, limpia imágenes en Storage y elimina el usuario en Auth (CASCADE en BD).
+ * Usa 403 si la contraseña no coincide (evita que el cliente interprete 401 como token JWT inválido y reintente refresh).
+ */
+async function deleteAccountHandler(req, res) {
+  try {
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!password) {
+      return res.status(400).json({ error: 'Se requiere la contraseña' });
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return serverConfigErrorResponse(
+        res,
+        503,
+        null,
+        'SUPABASE_SERVICE_ROLE_KEY no está definida',
+      );
+    }
+
+    const admin = getSupabaseAdmin();
+    const { data: fullUser, error: guErr } = await admin.auth.admin.getUserById(req.user.id);
+    if (guErr || !fullUser?.user) {
+      return res.status(401).json({ error: 'No se pudo verificar la cuenta' });
+    }
+
+    const identities = fullUser.user.identities || [];
+    const hasEmailProvider = identities.some((i) => i.provider === 'email');
+    if (!hasEmailProvider) {
+      return res.status(422).json({
+        error:
+          'Esta cuenta usa solo inicio de sesión social (por ejemplo Google). La eliminación con contraseña no está disponible. Contacta con soporte si necesitas borrar la cuenta.',
+      });
+    }
+
+    const email = fullUser.user.email || req.user.email;
+    if (!email) {
+      return res.status(400).json({ error: 'La cuenta no tiene email asociado' });
+    }
+
+    const { error: signErr } = await getSupabase().auth.signInWithPassword({ email, password });
+    if (signErr) {
+      return res.status(403).json({ error: 'Contraseña incorrecta' });
+    }
+
+    const { data: vehicles, error: vErr } = await admin.from('vehicles').select('id').eq('user_id', req.user.id);
+    if (vErr) {
+      console.error(vErr);
+      return res.status(500).json({ error: isProd ? 'Error al borrar la cuenta' : vErr.message });
+    }
+
+    for (const row of vehicles || []) {
+      try {
+        await removeVehicleImagesFolder(admin, row.id);
+      } catch (storageErr) {
+        console.error('Storage cleanup:', storageErr);
+        return res.status(500).json({
+          error: isProd ? 'Error al borrar archivos' : String(storageErr.message || storageErr),
+        });
+      }
+    }
+
+    const { error: delErr } = await admin.auth.admin.deleteUser(req.user.id);
+    if (delErr) {
+      console.error(delErr);
+      return res.status(500).json({ error: isProd ? 'Error al borrar la cuenta' : delErr.message });
+    }
+
+    return res.status(204).send();
+  } catch (e) {
+    console.error('POST /api/auth/account/delete:', e);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
+router.post('/account/delete', authMiddleware, deleteAccountHandler);
 
 module.exports = router;

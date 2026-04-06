@@ -24,6 +24,9 @@ import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
 import Login from './components/Login';
 import LandingPage from './pages/LandingPage';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import Contact from './pages/Contact';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -55,7 +58,18 @@ const AuthedShell = ({ children }) => (
 const AppContent = () => {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const noNavbarRoutes = ['/', '/login', '/slot-race-manager', '/competitions/signup', '/competitions/status', '/competitions/presentation', '/piloto'];
+  const noNavbarRoutes = [
+    '/',
+    '/login',
+    '/slot-race-manager',
+    '/competitions/signup',
+    '/competitions/status',
+    '/competitions/presentation',
+    '/piloto',
+    '/privacidad',
+    '/terminos',
+    '/contacto',
+  ];
   const hasNavbar = user && !noNavbarRoutes.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
 
   React.useEffect(() => {
@@ -91,6 +105,9 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+        <Route path="/privacidad" element={<PrivacyPolicy />} />
+        <Route path="/terminos" element={<TermsOfService />} />
+        <Route path="/contacto" element={<Contact />} />
         <Route path="/slot-race-manager" element={<SlotRaceManagerPage />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />

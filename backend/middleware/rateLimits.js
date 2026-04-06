@@ -32,4 +32,13 @@ const authSoftLimiter = rateLimit({
   skip: () => authMax === 0,
 });
 
-module.exports = { publicSignupLimiter, authSoftLimiter };
+/** Formulario de contacto público: límite estricto por IP */
+const contactLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados envíos desde esta dirección. Inténtalo más tarde.' },
+});
+
+module.exports = { publicSignupLimiter, authSoftLimiter, contactLimiter };
