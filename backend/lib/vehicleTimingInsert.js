@@ -27,6 +27,7 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     average_time_timestamp,
     lap_times,
     scale_factor: bodyScaleFactor,
+    session_type,
   } = body;
 
   if (!vehicle_id || !best_lap_time || !total_time || laps == null || !average_time) {
@@ -84,6 +85,19 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     }
   }
 
+  let sessionTypeToStore = null;
+  if (session_type !== undefined && session_type !== null && session_type !== '') {
+    const st = String(session_type).trim().toUpperCase();
+    if (st !== 'HEAT' && st !== 'TRAINING') {
+      return {
+        success: false,
+        error: 'session_type debe ser HEAT o TRAINING',
+        status: 400,
+      };
+    }
+    sessionTypeToStore = st;
+  }
+
   const { data: specs } = await supabase.from('technical_specs').select('id').eq('vehicle_id', vehicle_id);
 
   const specIds = (specs || []).map((s) => s.id);
@@ -119,6 +133,9 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     total_time_timestamp: total_time_timestamp || null,
     average_time_timestamp: average_time_timestamp || null,
   };
+  if (sessionTypeToStore) {
+    timingData.session_type = sessionTypeToStore;
+  }
   if (distanceSpeed) {
     Object.assign(timingData, distanceSpeed);
   }

@@ -10,14 +10,10 @@ import {
   User,
   Settings,
   BookOpen,
-  Shield,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
 import { Badge } from '../components/ui/badge';
-import { isLicenseAdminUser } from '../lib/licenseAdmin';
-import { useAuth } from '../context/AuthContext';
-
 const toc = [
   { id: 'inicio', label: 'Inicio', icon: Home },
   { id: 'vehiculos', label: 'Vehículos', icon: Car },
@@ -27,7 +23,6 @@ const toc = [
   { id: 'competiciones', label: 'Competiciones', icon: Trophy },
   { id: 'configuracion', label: 'Configuración', icon: Settings },
   { id: 'perfil', label: 'Perfil', icon: User },
-  { id: 'admin-licencias', label: 'Admin licencias SRM', icon: Shield, adminOnly: true },
 ];
 
 const BulletList = ({ items }) => (
@@ -38,11 +33,7 @@ const BulletList = ({ items }) => (
   </ul>
 );
 
-const HelpPage = () => {
-  const { user } = useAuth();
-  const showAdminSection = isLicenseAdminUser(user);
-
-  return (
+const HelpPage = () => (
   <div className="space-y-8 max-w-3xl">
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-primary">
@@ -61,9 +52,7 @@ const HelpPage = () => {
       </CardHeader>
       <CardContent>
         <nav aria-label="Índice de ayuda" className="flex flex-wrap gap-2">
-          {toc
-            .filter((item) => !item.adminOnly || showAdminSection)
-            .map(({ id, label, icon: Icon }) => (
+          {toc.map(({ id, label, icon: Icon }) => (
               <a
                 key={id}
                 href={`#${id}`}
@@ -369,41 +358,12 @@ const HelpPage = () => {
       </Card>
     </section>
 
-    {showAdminSection ? (
-      <section id="admin-licencias" className="scroll-mt-24">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Shield className="size-5 text-primary" aria-hidden />
-                Admin licencias SRM
-              </CardTitle>
-              <Badge variant="secondary">/admin/slot-race-licenses</Badge>
-            </div>
-            <CardDescription>
-              Solo para administradores de licencias de Slot Race Manager.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <p>
-              Herramientas para gestionar licencias del ecosistema SRM. Si no ves esta entrada en el menú, tu cuenta no tiene
-              permisos de administrador de licencias.
-            </p>
-            <Link to="/admin/slot-race-licenses" className="text-primary text-sm font-medium hover:underline inline-flex">
-              Ir a Admin licencias →
-            </Link>
-          </CardContent>
-        </Card>
-      </section>
-    ) : null}
-
     <Separator />
 
     <p className="text-xs text-muted-foreground">
       ¿Algo no cuadra con lo que ves en pantalla? Comprueba que estás en la última versión de la app y vuelve a cargar la página.
     </p>
   </div>
-  );
-};
+);
 
 export default HelpPage;

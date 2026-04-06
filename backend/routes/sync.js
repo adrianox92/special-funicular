@@ -3,6 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
 const authMiddleware = require('../middleware/auth');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
+const { findOrCreateCircuit } = require('../lib/circuitResolver');
 const { sendTimingNotification, sendTestNotification } = require('../lib/notifier');
 
 const router = express.Router();
@@ -122,9 +123,32 @@ router.get('/circuits', async (req, res) => {
 });
 
 /**
+ * POST /api/sync/circuits
+ * Busca un circuito por nombre o lo crea (misma semántica que al enviar timings solo con nombre).
+ * Body: { name, description?, num_lanes?, lane_lengths? }
+ */
+router.post('/circuits', async (req, res) => {
+  try {
+    const { name, description, num_lanes, lane_lengths } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+    const { circuit, created } = await findOrCreateCircuit(supabase, req.user.id, String(name).trim(), {
+      description,
+      num_lanes,
+      lane_lengths,
+    });
+    res.status(created ? 201 : 200).json(circuit);
+  } catch (error) {
+    console.error('Error en POST /api/sync/circuits:', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+});
+
+/**
  * POST /api/sync/timings
  * Create a new timing record for a vehicle.
- * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, timing_date?, lap_times?: [{ lap_number, time_seconds|lap_time_seconds, time_text? }] }
+ * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date?, session_type?: 'HEAT'|'TRAINING', lap_times?: [{ lap_number, time_seconds|lap_time_seconds, time_text? }] }
  */
 router.post('/timings', async (req, res) => {
   try {

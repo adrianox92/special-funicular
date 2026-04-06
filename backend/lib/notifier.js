@@ -16,6 +16,16 @@ function displaySessionTime(textVal, secVal) {
  * Ignora el centinela 999 que usa positionTracker cuando no había posición previa en BD.
  * @returns {string|null}
  */
+/**
+ * @param {string|null|undefined} sessionType
+ * @returns {string}
+ */
+function formatSessionTypeLine(sessionType) {
+  if (sessionType === 'HEAT') return 'Sesión: manga (campeonato)';
+  if (sessionType === 'TRAINING') return 'Sesión: entrenamiento';
+  return 'Sesión: no indicada';
+}
+
 function formatRankingGainLine(timing) {
   const change = Number(timing.position_change);
   const prev = timing.previous_position;
@@ -106,6 +116,7 @@ async function sendTimingNotification(userId, timing, previousBestLapSeconds, su
     const lines = [
       '🏁 **Nueva sesión registrada**',
       `Coche: ${vehicleLabel}`,
+      formatSessionTypeLine(timing.session_type),
       `Circuito: ${circuit} (carril ${lane})`,
       `Vueltas: ${laps}`,
       `Mejor vuelta: ${best}`,
