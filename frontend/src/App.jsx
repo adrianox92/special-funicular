@@ -23,7 +23,6 @@ import PublicPilotProfile from './pages/PublicPilotProfile';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
 import Login from './components/Login';
-import LandingPage from './pages/LandingPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
@@ -38,6 +37,7 @@ import { logPWADiagnostics } from './utils/pwaDiagnostics';
 import { Spinner } from './components/ui/spinner';
 import { Toaster } from './components/ui/sonner';
 import GlobalCommandPalette from './components/GlobalCommandPalette';
+import HomeRoute from './components/HomeRoute';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 
 const PageLayout = ({ children }) => (
@@ -103,7 +103,7 @@ const AppContent = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <Routes>
-        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/privacidad" element={<PrivacyPolicy />} />
         <Route path="/terminos" element={<TermsOfService />} />
