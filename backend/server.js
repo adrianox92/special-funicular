@@ -26,7 +26,10 @@ const { publicSignupLimiter, authSoftLimiter, contactLimiter } = require('./midd
 
 const app = express();
 
+// Render (y otros reverse proxies) envían X-Forwarded-For; sin esto express-rate-limit
+// lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR y req.ip no refleja al cliente real.
 if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
   app.use(helmet());
 } else {
   app.use(helmet({ contentSecurityPolicy: false }));
