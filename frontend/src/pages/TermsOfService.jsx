@@ -7,7 +7,7 @@ const Section = ({ children }) => <div className="space-y-3">{children}</div>;
 const TermsOfService = () => {
   return (
     <LegalDocumentLayout title="Términos de servicio">
-      <p className="text-sm text-muted-foreground">Última actualización: 6 de abril de 2026</p>
+      <p className="text-sm text-muted-foreground">Última actualización: 8 de abril de 2026</p>
 
       <Section>
         <h2 className="text-xl font-semibold text-foreground">Aceptación</h2>
@@ -49,6 +49,27 @@ const TermsOfService = () => {
           Te comprometes a no cargar información ilegal, que vulnere derechos de terceros o que infrinja la normativa
           aplicable. Podemos retirar contenido o restringir el acceso si existe indicio razonable de incumplimiento
           o si una autoridad así lo exige.
+        </p>
+      </Section>
+
+      <Section>
+        <h2 className="text-xl font-semibold text-foreground">Propiedad intelectual del servicio</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          El software, el diseño, la estructura, la documentación, las marcas, los nombres comerciales
+          y demás elementos distintivos del servicio (incluido el nombre «Slot Collection Pro» cuando
+          se use como signo del servicio) son titularidad del responsable del servicio o de sus
+          licenciantes y están protegidos por la legislación aplicable. Quedan reservados todos los
+          derechos no concedidos expresamente en estos términos.
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          No se te otorga licencia para copiar, modificar, distribuir, descompilar, realizar
+          ingeniería inversa, crear obras derivadas ni explotar el código o los activos del servicio
+          fuera del uso permitido como usuario final a través de la aplicación y la API según lo
+          previsto expresamente. Cualquier uso distinto requiere acuerdo previo por escrito.
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Lo anterior no limita los derechos que te asistan como titular de los contenidos que
+          introduzcas en el servicio, conforme a la sección «Contenido y datos del usuario».
         </p>
       </Section>
 

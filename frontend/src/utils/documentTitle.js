@@ -17,6 +17,7 @@ export function getDocumentTitle(pathname) {
   if (p === '/') return LANDING_PAGE_TITLE;
 
   if (p === '/login') return withBrand('Iniciar sesión');
+  if (p === '/reset-password') return withBrand('Restablecer contraseña');
 
   if (p === '/dashboard') return withBrand('Inicio');
 

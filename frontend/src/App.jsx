@@ -23,6 +23,7 @@ import PublicPilotProfile from './pages/PublicPilotProfile';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
 import Login from './components/Login';
+import ResetPassword from './components/ResetPassword';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
@@ -62,6 +63,7 @@ const AppContent = () => {
   const noNavbarRoutes = [
     '/',
     '/login',
+    '/reset-password',
     '/slot-race-manager',
     '/competitions/signup',
     '/competitions/status',
@@ -110,6 +112,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacidad" element={<PrivacyPolicy />} />
         <Route path="/terminos" element={<TermsOfService />} />
         <Route path="/contacto" element={<Contact />} />

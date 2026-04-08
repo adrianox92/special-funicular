@@ -965,15 +965,18 @@ Si el build falla por memoria, añade en Vercel → Settings → Environment Var
 
 ## Contribución
 
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+El código **no** se distribuye como software libre ni de código abierto. La
+colaboración, el acceso al repositorio o la cesión de derechos solo son posibles
+con **autorización previa y por escrito** del titular. No se aceptan pull
+requests ni contribuciones públicas salvo acuerdo expreso.
 
 ## Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+Copyright © Adrian Palomera Sanz. Todos los derechos reservados. El uso,
+reproducción, modificación y distribución del código y de los activos del
+proyecto están restringidos; consulta el archivo [`LICENSE`](LICENSE) en la raíz
+del repositorio. El uso del servicio en línea se rige además por los **Términos
+de servicio** publicados en la aplicación.
 
 ## Soporte
 

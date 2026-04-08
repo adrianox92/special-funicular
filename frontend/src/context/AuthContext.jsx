@@ -52,12 +52,21 @@ export const AuthProvider = ({ children }) => {
     if (error) throw error;
   };
 
+  /** Envía un correo con enlace para establecer una contraseña nueva (Supabase Auth). */
+  const requestPasswordReset = async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+  };
+
   const value = {
     user,
     loading,
     login,
     loginWithGoogle,
-    logout
+    logout,
+    requestPasswordReset,
   };
 
   return (
