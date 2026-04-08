@@ -5,10 +5,6 @@ import LegalDocumentLayout from '../components/LegalDocumentLayout';
 const Section = ({ children }) => <div className="space-y-3">{children}</div>;
 
 const TermsOfService = () => {
-  React.useEffect(() => {
-    document.title = 'Términos de servicio | Slot Collection Pro';
-  }, []);
-
   return (
     <LegalDocumentLayout title="Términos de servicio">
       <p className="text-sm text-muted-foreground">Última actualización: 6 de abril de 2026</p>

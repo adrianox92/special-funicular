@@ -16,10 +16,6 @@ const Contact = () => {
   const [honeypot, setHoneypot] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  React.useEffect(() => {
-    document.title = 'Contacto | Slot Collection Pro';
-  }, []);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);

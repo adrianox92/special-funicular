@@ -5,10 +5,6 @@ import LegalDocumentLayout from '../components/LegalDocumentLayout';
 const Section = ({ children }) => <div className="space-y-3">{children}</div>;
 
 const PrivacyPolicy = () => {
-  React.useEffect(() => {
-    document.title = 'Política de privacidad | Slot Collection Pro';
-  }, []);
-
   return (
     <LegalDocumentLayout title="Política de privacidad">
       <p className="text-sm text-muted-foreground">Última actualización: 6 de abril de 2026</p>
