@@ -53,7 +53,7 @@ function NavbarSearchTrigger({ className, onOpen }) {
       type="button"
       onClick={onOpen}
       className={cn(
-        'flex h-9 w-full max-w-md items-center gap-2 rounded-md border border-input bg-background/90 px-3 text-left text-sm text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-accent/60 hover:text-accent-foreground',
+        'flex h-9 w-full max-w-full min-w-0 items-center gap-2 rounded-md border border-input bg-background/90 px-3 text-left text-sm text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-accent/60 hover:text-accent-foreground',
         className,
       )}
       aria-label="Abrir búsqueda rápida"
@@ -173,10 +173,10 @@ const Navbar = () => {
 
         <NavbarSearchTrigger
           onOpen={() => openCommandPalette(true)}
-          className="hidden shrink-0 md:flex md:w-[min(18rem,28vw)] lg:w-72"
+          className="hidden shrink-0 md:flex md:w-[clamp(9.5rem,min(18vw,18rem),18rem)] lg:w-[clamp(10rem,min(15vw,18rem),18rem)] 2xl:w-72"
         />
 
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2 md:ml-0">
           <Button
             type="button"
             variant="ghost"
