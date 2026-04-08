@@ -1,10 +1,15 @@
+/**
+ * Imágenes de vehículo (Supabase Storage): ver ../lib/processVehicleImageBuffer.js,
+ * ../lib/vehicleImageStorage.js — VEHICLE_IMAGE_MAX_UPLOAD_BYTES (default 12MB),
+ * VEHICLE_IMAGE_MAX_EDGE_PX, VEHICLE_IMAGE_OUTPUT_FORMAT (webp|jpeg), etc.
+ */
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
+const { removeObjectByPublicUrl, removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
+const { saveVehicleImagesFromMultipart } = require('../lib/vehicleImageUpload');
 const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
@@ -39,18 +44,42 @@ function orderOptsForVehicleSort(column, ascending) {
   return { ascending, nullsFirst: false };
 }
 
-// Configuración de multer para guardar imágenes localmente (puedes adaptar a S3/Supabase Storage si lo necesitas)
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const dir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-    cb(null, dir);
+const VEHICLE_IMAGE_MAX_UPLOAD_BYTES =
+  Number(process.env.VEHICLE_IMAGE_MAX_UPLOAD_BYTES) > 0
+    ? Number(process.env.VEHICLE_IMAGE_MAX_UPLOAD_BYTES)
+    : 12 * 1024 * 1024;
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: VEHICLE_IMAGE_MAX_UPLOAD_BYTES },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      const err = new Error('Solo se permiten archivos de imagen.');
+      err.code = 'INVALID_IMAGE_TYPE';
+      cb(err);
+    }
   },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
 });
-const upload = multer({ storage: multer.memoryStorage() });
+
+/** multipart field `images`; respuestas 413/400 para límites y tipo */
+function runVehicleImageUpload(req, res, next) {
+  upload.array('images')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({
+          error: 'La imagen supera el tamaño máximo permitido.',
+        });
+      }
+    }
+    if (err.code === 'INVALID_IMAGE_TYPE') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  });
+}
 
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
@@ -462,7 +491,7 @@ router.get('/:id/images', async (req, res) => {
 });
 
 // Actualizar un vehículo por ID y sus imágenes
-router.put('/:id', upload.array('images'), async (req, res) => {
+router.put('/:id', runVehicleImageUpload, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -509,32 +538,15 @@ router.put('/:id', upload.array('images'), async (req, res) => {
       .single();
     if (error) return res.status(500).json({ error: error.message });
 
-    // Subir nuevas imágenes si las hay
     if (req.files && req.files.length > 0) {
-      const validViewTypes = [
-        'front', 'left', 'right', 'rear', 'top', 'chassis', 'three_quarters'
-      ];
-      for (const file of req.files) {
-        let view_type = file.originalname;
-        if (!validViewTypes.includes(view_type)) {
-          // Si viene un texto libre, puedes ignorar o mapear aquí si lo deseas
-          continue; // o haz un mapeo si lo necesitas
+      try {
+        await saveVehicleImagesFromMultipart(supabase, id, req.files, { replacePerView: true });
+      } catch (e) {
+        if (e.code === 'INVALID_IMAGE') {
+          return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
         }
-        const ext = path.extname(file.originalname) || '.jpg';
-        const filePath = `vehicles/${id}/${Date.now()}-${view_type}${ext}`;
-        const { data: storageData, error: storageError } = await supabase.storage
-          .from('vehicle-images')
-          .upload(filePath, file.buffer, { contentType: file.mimetype, upsert: true });
-        if (storageError) return res.status(500).json({ error: storageError.message });
-        const { data: publicUrlData } = supabase.storage.from('vehicle-images').getPublicUrl(filePath);
-        const imageUrl = publicUrlData.publicUrl;
-        // Eliminar imagen anterior de ese tipo (opcional, si quieres solo una por tipo)
-        await supabase.from('vehicle_images').delete().eq('vehicle_id', id).eq('view_type', view_type);
-        // Insertar la nueva
-        const { error: imgError } = await supabase
-          .from('vehicle_images')
-          .insert([{ vehicle_id: id, image_url: imageUrl, view_type }]);
-        if (imgError) return res.status(500).json({ error: imgError.message });
+        console.error('saveVehicleImagesFromMultipart (PUT)', e);
+        return res.status(500).json({ error: e.message || 'Error al subir imágenes' });
       }
     }
 
@@ -545,7 +557,7 @@ router.put('/:id', upload.array('images'), async (req, res) => {
 });
 
 // Crear un vehículo
-router.post('/', upload.array('images'), async (req, res) => {
+router.post('/', runVehicleImageUpload, async (req, res) => {
   try {
     const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, museo, taller, anotaciones, reference, scale_factor } = req.body;
     
@@ -581,31 +593,15 @@ router.post('/', upload.array('images'), async (req, res) => {
       .single();
     if (error) return res.status(500).json({ error: error.message });
 
-    // Subir imágenes a Supabase Storage y registrar en vehicle_images
     if (req.files && req.files.length > 0) {
-      const validViewTypes = [
-        'front', 'left', 'right', 'rear', 'top', 'chassis', 'three_quarters'
-      ];
-      for (const file of req.files) {
-        let view_type = file.originalname;
-        if (!validViewTypes.includes(view_type)) {
-          // Si viene un texto libre, puedes ignorar o mapear aquí si lo deseas
-          continue; // o haz un mapeo si lo necesitas
+      try {
+        await saveVehicleImagesFromMultipart(supabase, data.id, req.files, { replacePerView: false });
+      } catch (e) {
+        if (e.code === 'INVALID_IMAGE') {
+          return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
         }
-        const ext = path.extname(file.originalname) || '.jpg';
-        const filePath = `vehicles/${data.id}/${Date.now()}-${view_type}${ext}`;
-        const { data: storageData, error: storageError } = await supabase.storage
-          .from('vehicle-images')
-          .upload(filePath, file.buffer, { contentType: file.mimetype });
-        if (storageError) return res.status(500).json({ error: storageError.message });
-        // Obtener la URL pública
-        const { data: publicUrlData } = supabase.storage.from('vehicle-images').getPublicUrl(filePath);
-        const imageUrl = publicUrlData.publicUrl;
-        // Guardar en la tabla vehicle_images
-        const { error: imgError } = await supabase
-          .from('vehicle_images')
-          .insert([{ vehicle_id: data.id, image_url: imageUrl, view_type }]);
-        if (imgError) return res.status(500).json({ error: imgError.message });
+        console.error('saveVehicleImagesFromMultipart (POST)', e);
+        return res.status(500).json({ error: e.message || 'Error al subir imágenes' });
       }
     }
 
@@ -628,19 +624,10 @@ router.delete('/:id/images/:viewType', async (req, res) => {
       .eq('view_type', viewType)
       .single();
 
-    // Si encontramos la imagen, intentamos eliminarla del storage
     if (imageData && imageData.image_url) {
-      const imageUrl = imageData.image_url;
-      const storagePath = imageUrl.split('/vehicle-images/')[1];
-
-      // Eliminar del storage de Supabase
-      const { error: storageError } = await supabase.storage
-        .from('vehicle-images')
-        .remove([storagePath]);
-
+      const { error: storageError } = await removeObjectByPublicUrl(supabase, imageData.image_url);
       if (storageError) {
         console.error('Error al eliminar del storage:', storageError);
-        // Continuamos aunque falle el storage
       }
     }
 
@@ -668,8 +655,7 @@ router.delete('/:id/images/:viewType', async (req, res) => {
 // Eliminar un vehículo por ID
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
-  
-  // Verificar que el vehículo pertenece al usuario
+
   const { data: existingVehicle, error: checkError } = await supabase
     .from('vehicles')
     .select('id')
@@ -681,22 +667,22 @@ router.delete('/:id', async (req, res) => {
     return res.status(404).json({ error: 'Vehículo no encontrado' });
   }
 
-  // Primero eliminamos las imágenes asociadas
-  const { error: imagesError } = await supabase
-    .from('vehicle_images')
-    .delete()
-    .eq('vehicle_id', id);
-    
+  try {
+    await removeAllObjectsInVehicleFolder(supabase, id);
+  } catch (storageErr) {
+    console.error('removeAllObjectsInVehicleFolder', storageErr);
+    return res.status(500).json({
+      error: storageErr.message || 'Error al eliminar archivos del almacenamiento',
+    });
+  }
+
+  const { error: imagesError } = await supabase.from('vehicle_images').delete().eq('vehicle_id', id);
+
   if (imagesError) {
     return res.status(500).json({ error: 'Error al eliminar las imágenes del vehículo' });
   }
 
-  // Luego eliminamos el vehículo
-  const { error } = await supabase
-    .from('vehicles')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', req.user.id);
+  const { error } = await supabase.from('vehicles').delete().eq('id', id).eq('user_id', req.user.id);
 
   if (error) {
     return res.status(500).json({ error: error.message });

@@ -3,38 +3,10 @@ const crypto = require('crypto');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const { hashApiKey } = require('../lib/apiKeyHash');
+const { removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const authMiddleware = require('../middleware/auth');
 
 const isProd = process.env.NODE_ENV === 'production';
-
-const VEHICLE_IMAGES_BUCKET = 'vehicle-images';
-
-/**
- * Elimina todos los objetos en vehicle-images bajo vehicles/{vehicleId}/ (servicio con permisos de service role).
- */
-async function removeVehicleImagesFolder(admin, vehicleId) {
-  const folder = `vehicles/${vehicleId}`;
-  const limit = 100;
-  let offset = 0;
-  for (;;) {
-    const { data: files, error } = await admin.storage.from(VEHICLE_IMAGES_BUCKET).list(folder, {
-      limit,
-      offset,
-      sortBy: { column: 'name', order: 'asc' },
-    });
-    if (error) {
-      throw new Error(error.message);
-    }
-    if (!files || files.length === 0) break;
-    const paths = files.map((f) => `${folder}/${f.name}`);
-    const { error: removeError } = await admin.storage.from(VEHICLE_IMAGES_BUCKET).remove(paths);
-    if (removeError) {
-      throw new Error(removeError.message);
-    }
-    if (files.length < limit) break;
-    offset += limit;
-  }
-}
 
 function serverConfigErrorResponse(res, status, logError, devDetail) {
   if (logError) console.error(logError);
@@ -307,7 +279,7 @@ async function deleteAccountHandler(req, res) {
 
     for (const row of vehicles || []) {
       try {
-        await removeVehicleImagesFolder(admin, row.id);
+        await removeAllObjectsInVehicleFolder(admin, row.id);
       } catch (storageErr) {
         console.error('Storage cleanup:', storageErr);
         return res.status(500).json({
