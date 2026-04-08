@@ -104,11 +104,14 @@ const AddVehicle = () => {
     setSaving(true);
     try {
       const formData = new FormData();
-      Object.entries(vehicle).forEach(([key, value]) => formData.append(key, value));
+      Object.entries(vehicle).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        formData.append(key, value);
+      });
       imageFields.forEach(({ name }) => {
         if (images[name]) formData.append('images', images[name], name);
       });
-      await api.post('/vehicles', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post('/vehicles', formData);
       navigate('/vehicles');
     } catch (err) {
       const apiError = err.response?.data?.error;

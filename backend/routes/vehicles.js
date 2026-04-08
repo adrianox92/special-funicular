@@ -36,6 +36,52 @@ function parseVehicleSort(req) {
   return { column: VEHICLE_SORT_COLUMNS[sortKey], ascending };
 }
 
+/** Solo campos editables del formulario; evita enviar id, user_id, odómetro, etc. desde multipart mal parseado. */
+const VEHICLE_PUT_BODY_KEYS = [
+  'model',
+  'manufacturer',
+  'type',
+  'traction',
+  'price',
+  'purchase_date',
+  'purchase_place',
+  'anotaciones',
+  'reference',
+  'total_price',
+];
+
+/** Evita cadenas "null"/"undefined" o vacíos mal interpretados por Postgres (date, numeric, etc.) */
+function normalizeFormScalar(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    const t = value.trim();
+    if (t === '' || t === 'null' || t === 'undefined') return null;
+    return value;
+  }
+  return value;
+}
+
+function vehicleScalarFieldsFromBody(body) {
+  const o = {};
+  for (const k of VEHICLE_PUT_BODY_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(body, k)) continue;
+    let v = body[k];
+    v = normalizeFormScalar(v);
+    if (k === 'purchase_date') {
+      o[k] = v;
+    } else if (k === 'price' || k === 'total_price') {
+      if (v == null) o[k] = null;
+      else {
+        const n = Number(v);
+        o[k] = Number.isNaN(n) ? null : n;
+      }
+    } else {
+      o[k] = v;
+    }
+  }
+  return o;
+}
+
 /** Nulos al final en ASC y al principio en DESC para odómetro y última modificación. */
 function orderOptsForVehicleSort(column, ascending) {
   if (column === 'total_distance_meters' || column === 'updated_at') {
@@ -508,11 +554,11 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
     }
 
     const updateData = {
-      ...req.body,
+      ...vehicleScalarFieldsFromBody(req.body),
       modified: req.body.modified === 'true',
       digital: req.body.digital === 'true',
       museo: req.body.museo === 'true',
-      taller: req.body.taller === 'true'
+      taller: req.body.taller === 'true',
     };
     if (req.body.scale_factor != null) {
       const sf = parseInt(req.body.scale_factor, 10);

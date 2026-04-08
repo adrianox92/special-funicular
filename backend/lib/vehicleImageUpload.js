@@ -29,20 +29,20 @@ async function saveVehicleImagesFromMultipart(supabase, vehicleId, files, option
     if (!VALID_VIEW_TYPES.includes(view_type)) continue;
 
     if (replacePerView) {
-      const { data: existing, error: selErr } = await supabase
+      const { data: existingRows, error: selErr } = await supabase
         .from('vehicle_images')
         .select('image_url')
         .eq('vehicle_id', vehicleId)
         .eq('view_type', view_type)
-        .maybeSingle();
+        .limit(1);
 
       if (selErr) throw new Error(selErr.message);
 
+      const existing = existingRows?.[0];
       if (existing?.image_url) {
         const { error: remErr } = await removeObjectByPublicUrl(supabase, existing.image_url);
         if (remErr) {
-          const err = new Error(remErr.message || 'Error al eliminar la imagen anterior');
-          throw err;
+          console.warn('[vehicleImageUpload] No se pudo borrar objeto anterior en Storage:', remErr.message);
         }
       }
 

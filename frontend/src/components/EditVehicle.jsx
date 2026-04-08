@@ -839,7 +839,8 @@ const EditVehicle = () => {
       };
 
       Object.entries(processedVehicle).forEach(([key, value]) => {
-        if (value !== undefined) {
+        // FormData convierte null en la cadena "null" → Postgres rechaza fechas y tipos
+        if (value !== undefined && value !== null) {
           formData.append(key, value);
         }
       });
@@ -850,9 +851,8 @@ const EditVehicle = () => {
         }
       });
 
-      await api.put(`/vehicles/${id}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      // No fijar Content-Type: axios debe añadir multipart/form-data con boundary automáticamente
+      await api.put(`/vehicles/${id}`, formData);
       navigate('/vehicles');
     } catch (error) {
       console.error('Error al actualizar vehículo:', error);
