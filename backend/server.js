@@ -136,6 +136,7 @@ const apiKeyAuth = require('./middleware/apiKeyAuth');
 const authMiddleware = require('./middleware/auth');
 const licenseRoute = require('./routes/license');
 const licenseAccountRoute = require('./routes/licenseAccount');
+const helpRoute = require('./routes/help');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
@@ -151,6 +152,7 @@ app.use('/api/maintenance', maintenanceRoute);
 app.use('/api/search', searchRoute);
 app.use('/api/inventory', inventoryRoute);
 app.use('/api/pilot-profile', pilotProfileRoute);
+app.use('/api/help', helpRoute);
 
 const competitionsRoute = require('./routes/competitions');
 app.use('/api/competitions', competitionsRoute);

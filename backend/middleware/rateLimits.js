@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 /** Inscripciones públicas: límite por IP */
 const publicSignupLimiter = rateLimit({
@@ -41,4 +41,17 @@ const contactLimiter = rateLimit({
   message: { error: 'Demasiados envíos desde esta dirección. Inténtalo más tarde.' },
 });
 
-module.exports = { publicSignupLimiter, authSoftLimiter, contactLimiter };
+/** Preguntas al asistente de ayuda: por usuario autenticado; IP con ipKeyGenerator (IPv6) */
+const helpAskLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Has superado el límite de preguntas al asistente. Inténtalo más tarde.' },
+  keyGenerator: (req) => {
+    if (req.user?.id) return `user:${req.user.id}`;
+    return ipKeyGenerator(req.ip);
+  },
+});
+
+module.exports = { publicSignupLimiter, authSoftLimiter, contactLimiter, helpAskLimiter };

@@ -1,0 +1,457 @@
+{
+  "primerosPasos": {
+    "title": "Primeros pasos",
+    "intro": "Orden recomendado para empezar a usar Slot Collection Pro sin perderte. Puedes adaptarlo a tu caso (por ejemplo, si solo quieres catalogar coches sin tiempos).",
+    "steps": [
+      {
+        "title": "Revisa el panel de Inicio",
+        "body": "Te da una foto global de inversión, tipos de vehículo y accesos rápidos. Cuanto más datos registres, más útil será.",
+        "linkTo": "/dashboard",
+        "linkLabel": "Ir a Inicio"
+      },
+      {
+        "title": "Da de alta tus circuitos (si vas a registrar tiempos o competiciones)",
+        "body": "Los tiempos y muchas competiciones referencian un circuito existente. Créalos antes o justo cuando los necesites.",
+        "linkTo": "/circuits",
+        "linkLabel": "Ir a Circuitos"
+      },
+      {
+        "title": "Añade tus vehículos",
+        "body": "Desde Vehículos puedes crear fichas con fotos, tipo, modificaciones y más. Una ficha completa mejora métricas e informes.",
+        "linkTo": "/vehicles/new",
+        "linkLabel": "Añadir vehículo"
+      },
+      {
+        "title": "Registra tiempos de sesión",
+        "body": "Asocia cada sesión a vehículo, circuito y carril. Así podrás comparar y ver evolución.",
+        "linkTo": "/timings",
+        "linkLabel": "Ir a Tiempos"
+      },
+      {
+        "title": "Opcional: inventario de piezas",
+        "body": "Si llevas stock de repuestos, regístralos aquí y podrás montarlos en vehículos cuando corresponda.",
+        "linkTo": "/inventory",
+        "linkLabel": "Ir a Inventario"
+      },
+      {
+        "title": "Opcional: competiciones",
+        "body": "Crea un evento, gestiona participantes y tiempos. Hay URLs públicas para inscripción y seguimiento.",
+        "linkTo": "/competitions",
+        "linkLabel": "Ir a Competiciones"
+      },
+      {
+        "title": "Configura alertas y cuenta",
+        "body": "En Configuración ajusta alertas del dashboard y notificaciones; en Perfil, la API de integración y la licencia Slot Race Manager.",
+        "linkTo": "/settings",
+        "linkLabel": "Configuración"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "inicio",
+      "title": "Inicio",
+      "pathBadge": "/dashboard",
+      "description": "Resumen de tu colección: números clave, gráficos y sugerencias de acción.",
+      "intro": "Aquí ves inversión total, reparto por tipo de vehículo, marcas, tiendas, componentes con más coste y tendencias. También aparecen competiciones activas y bloques de acceso rápido al resto del sitio.",
+      "steps": [
+        "Abre Inicio desde el menú lateral para cargar el dashboard.",
+        "Revisa los gráficos y tarjetas: se alimentan de vehículos, componentes y tiempos que hayas registrado.",
+        "Usa los enlaces rápidos para saltar a Vehículos, Tiempos u otras secciones sin volver al menú."
+      ],
+      "tips": [
+        "Los datos dependen de lo que registres en vehículos, componentes y tiempos.",
+        "Si algo falla al cargar, revisa la conexión; parte de la información viene de varias peticiones al servidor."
+      ],
+      "gotchas": [],
+      "linkTo": "/dashboard",
+      "linkLabel": "Ir a Inicio",
+      "keywords": ["dashboard", "inicio", "resumen", "gráficos", "inversión", "colección", "métricas"]
+    },
+    {
+      "id": "vehiculos",
+      "title": "Vehículos",
+      "pathBadge": "/vehicles",
+      "description": "Catálogo de coches: alta, edición, filtros y exportación.",
+      "intro": "Puedes ver la lista en cuadrícula o tabla, filtrar por fabricante, tipo, modificado/analógico-digital, y marcar criterios como museo o taller. Los filtros se guardan en este navegador para la próxima visita.",
+      "steps": [
+        "Ve a Vehículos en el menú.",
+        "Pulsa «Añadir vehículo» (o entra en la ruta de nuevo vehículo).",
+        "Completa nombre, tipo, fabricante y el resto de campos que quieras registrar.",
+        "Opcional: sube imágenes (vistas del coche) desde la ficha.",
+        "Guarda. Podrás abrir la ficha después para añadir especificaciones técnicas, componentes, mantenimiento y tiempos."
+      ],
+      "tips": [
+        "Cada vehículo tiene una ficha detallada (componentes, mantenimiento, tiempos asociados, etc.).",
+        "«Añadir vehículo» y la edición usan el mismo modelo de datos: cuanto más completa la ficha, mejores métricas en Inicio y Tiempos.",
+        "La exportación y la paginación respetan filtros y límites que configures en pantalla."
+      ],
+      "gotchas": [],
+      "linkTo": "/vehicles",
+      "linkLabel": "Ir a Vehículos",
+      "keywords": ["vehículo", "vehiculos", "coche", "coches", "añadir", "alta", "ficha", "catálogo", "filtros", "fotos", "imágenes"]
+    },
+    {
+      "id": "tiempos",
+      "title": "Tiempos",
+      "pathBadge": "/timings",
+      "description": "Registro de sesiones por vehículo, circuito y carril: mejores vueltas, velocidad y comparativas.",
+      "intro": "Los tiempos se agrupan por vehículo, circuito y carril. Puedes ampliar el historial de sesiones, ver especificaciones de la sesión, comparar sesiones, analizar rendimiento e importar datos cuando la app lo permita.",
+      "steps": [
+        "Desde Tiempos, elige o busca el vehículo y circuito que quieras.",
+        "Registra una nueva sesión con los datos que pida el formulario (carril, vueltas, etc.).",
+        "Consulta el historial y comparativas desde la misma zona de la app."
+      ],
+      "tips": [
+        "Los circuitos deben existir en la sección Circuitos para que los registros sean coherentes.",
+        "El carril y la distancia influyen en rankings y estadísticas por circuito.",
+        "Si usas integraciones externas (por ejemplo envío de tiempos), revisa en Perfil la API y las notificaciones."
+      ],
+      "gotchas": [],
+      "linkTo": "/timings",
+      "linkLabel": "Ir a Tiempos",
+      "keywords": ["tiempos", "vueltas", "sesión", "carril", "circuito", "cronometrar", "ranking"]
+    },
+    {
+      "id": "circuitos",
+      "title": "Circuitos",
+      "pathBadge": "/circuits",
+      "description": "Tus pistas: nombre, descripción, número de carriles y longitud por carril.",
+      "intro": "Define aquí las pistas que usarás en tiempos y competiciones. Al crear o editar, indica cuántos carriles tiene y, si aplica, la longitud de cada uno.",
+      "steps": [
+        "Abre Circuitos y crea una nueva pista.",
+        "Indica nombre, número de carriles y longitudes si las usas en estadísticas.",
+        "Guarda. Ya podrás seleccionar este circuito al registrar tiempos o al crear competiciones."
+      ],
+      "tips": [
+        "Al crear una competición puedes asociar un circuito; conviene tenerlo dado de alta antes.",
+        "Borrar un circuito puede afectar a datos que lo referencian: hazlo solo si estás seguro."
+      ],
+      "gotchas": [],
+      "linkTo": "/circuits",
+      "linkLabel": "Ir a Circuitos",
+      "keywords": ["circuito", "circuitos", "pista", "carriles", "longitud"]
+    },
+    {
+      "id": "inventario",
+      "title": "Inventario",
+      "pathBadge": "/inventory",
+      "description": "Piezas y consumibles: stock, categorías, precios y vínculo con vehículos.",
+      "intro": "Gestiona repuestos con categoría, unidades, precio de compra, fechas y notas. Puedes filtrar por categoría, búsqueda y stock bajo, reponer cantidades, montar piezas en un vehículo y consultar el historial de movimientos.",
+      "steps": [
+        "Crea artículos de inventario con categoría y cantidad.",
+        "Usa filtros para ver stock bajo o buscar por nombre.",
+        "Desde la ficha de un vehículo puedes montar piezas del inventario cuando la app lo permita; el stock se actualiza según la lógica de la aplicación."
+      ],
+      "tips": [
+        "El stock mínimo ayuda a ver qué necesitas reponer.",
+        "Montar una pieza en un vehículo descuenta del inventario según la lógica de la aplicación.",
+        "Algunos campos son específicos del tipo de pieza (material, piñonería, etc.)."
+      ],
+      "gotchas": [],
+      "linkTo": "/inventory",
+      "linkLabel": "Ir a Inventario",
+      "keywords": ["inventario", "stock", "piezas", "repuestos", "montar", "consumibles"]
+    },
+    {
+      "id": "competiciones",
+      "title": "Competiciones",
+      "pathBadge": "/competitions",
+      "description": "Eventos con plazas, rondas, circuito, participantes y gestión de tiempos.",
+      "intro": "Crea competiciones indicando nombre, plazas, número de rondas y, opcionalmente, circuito. Tras crearla, accedes a la gestión de participantes (inscripciones, categorías, reglas) y a la pantalla de tiempos de la competición. Existen URLs públicas para inscripción, estado y presentación usando el identificador (slug) del evento; no requieren iniciar sesión en la web principal.",
+      "steps": [
+        "En Competiciones, crea un evento nuevo con los datos básicos.",
+        "Asocia un circuito si lo necesitas (debe existir en Circuitos).",
+        "Gestiona participantes y tiempos desde las pantallas del evento.",
+        "Comparte las URLs públicas de inscripción o estado con quien corresponda."
+      ],
+      "tips": [
+        "Necesitas circuitos creados si quieres asociar uno al crear la competición.",
+        "Desde la lista puedes abrir participantes y tiempos según el flujo de cada evento."
+      ],
+      "gotchas": [],
+      "linkTo": "/competitions",
+      "linkLabel": "Ir a Competiciones",
+      "keywords": ["competición", "competiciones", "evento", "participantes", "inscripción", "rondas"]
+    },
+    {
+      "id": "configuracion",
+      "title": "Configuración",
+      "pathBadge": "/settings",
+      "description": "Preferencias del dashboard, notificaciones y cambio de contraseña.",
+      "intro": "Umbral de días sin sesión en tu circuito habitual (para el bloque «Pendientes y alertas» del inicio), webhook de Discord y Chat ID de Telegram. La pestaña Cuenta permite cambiar la contraseña sin escribir la anterior (sesión iniciada), o definirla si solo usas Google. Puedes usar ?tab=notifications o ?tab=cuenta en la URL para abrir la pestaña deseada.",
+      "steps": [
+        "Abre Configuración desde el menú o el acceso de usuario.",
+        "Ajusta alertas del dashboard y notificaciones (Discord/Telegram) si las usas.",
+        "En la pestaña Cuenta cambia la contraseña si lo necesitas."
+      ],
+      "tips": [
+        "Tras cambiar el umbral de días, recarga el dashboard para ver el nuevo criterio en alertas.",
+        "El cambio de contraseña en Cuenta no pide la anterior: basta con tener la sesión iniciada.",
+        "Regenerar API key no se hace aquí: la clave de integración está en Mi perfil."
+      ],
+      "gotchas": [],
+      "linkTo": "/settings",
+      "linkLabel": "Ir a Configuración",
+      "keywords": ["configuración", "settings", "alertas", "discord", "telegram", "contraseña", "cuenta", "notificaciones"]
+    },
+    {
+      "id": "perfil",
+      "title": "Perfil",
+      "pathBadge": "/profile",
+      "description": "Cuenta, clave API de integración y licencia Slot Race Manager.",
+      "intro": "Consulta tu email, genera o regenera la API key para el header X-API-Key, y revisa las instalaciones de la licencia de escritorio. Las preferencias del dashboard y Discord/Telegram están en Configuración.",
+      "steps": [
+        "Abre Mi perfil.",
+        "Copia o regenera la API key para integraciones con header X-API-Key.",
+        "Revisa el estado de la licencia Slot Race Manager si aplica."
+      ],
+      "tips": [
+        "Regenerar la API key invalida la anterior: actualiza cualquier script o dispositivo que la use.",
+        "Los metadatos de usuario se sincronizan con el proveedor de autenticación; si algo no guarda, revisa permisos de sesión."
+      ],
+      "gotchas": [],
+      "linkTo": "/profile",
+      "linkLabel": "Ir a Perfil",
+      "keywords": ["perfil", "api", "api key", "licencia", "slot race", "cuenta", "email"]
+    }
+  ],
+  "faq": [
+    {
+      "id": "crear-vehiculo",
+      "question": "¿Cómo creo o doy de alta un vehículo?",
+      "keywords": ["crear", "coche", "vehículo", "alta", "añadir", "nuevo", "registrar"],
+      "answerSteps": [
+        "En el menú, entra en Vehículos.",
+        "Pulsa «Añadir vehículo» (o ve a la ruta de nuevo vehículo).",
+        "Rellena los campos obligatorios y los opcionales que quieras (tipo, fabricante, notas, etc.).",
+        "Opcional: añade fotos en la ficha.",
+        "Guarda. Podrás completar después especificaciones, componentes y tiempos desde la misma ficha."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles/new",
+      "linkLabel": "Añadir vehículo"
+    },
+    {
+      "id": "api-integracion",
+      "question": "¿Dónde está la API key para integraciones?",
+      "keywords": ["api", "clave", "integración", "x-api-key", "header"],
+      "answerSteps": [
+        "La clave de integración está en Mi perfil, no en Configuración.",
+        "Se envía en el header X-API-Key en las peticiones que documente la API.",
+        "Si regeneras la clave, la anterior deja de valer: actualiza scripts y dispositivos."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Ir a Perfil"
+    },
+    {
+      "id": "registrar-tiempos",
+      "question": "¿Cómo registro una sesión de tiempos o una vuelta?",
+      "keywords": ["tiempos", "sesión", "vueltas", "cronómetro", "registrar", "carril"],
+      "answerSteps": [
+        "Antes conviene tener el circuito dado de alta en Circuitos y el vehículo en Vehículos.",
+        "Ve a Tiempos y localiza el vehículo y el circuito que correspondan.",
+        "Añade o edita la sesión con carril, datos de vuelta y lo que pida el formulario.",
+        "Desde la ficha de un vehículo también puedes gestionar tiempos asociados a ese coche."
+      ],
+      "sectionId": "tiempos",
+      "linkTo": "/timings",
+      "linkLabel": "Ir a Tiempos"
+    },
+    {
+      "id": "circuito-antes-tiempos",
+      "question": "¿Tengo que crear el circuito antes de poner tiempos?",
+      "keywords": ["circuito", "pista", "antes", "orden", "tiempos"],
+      "answerSteps": [
+        "Sí: los registros de tiempos quedan coherentes si el circuito existe en la sección Circuitos.",
+        "Crea la pista con nombre, carriles y longitudes si las usas.",
+        "Luego podrás seleccionarlo al registrar sesiones y en competiciones."
+      ],
+      "sectionId": "circuitos",
+      "linkTo": "/circuits",
+      "linkLabel": "Ir a Circuitos"
+    },
+    {
+      "id": "crear-circuito",
+      "question": "¿Cómo creo o edito un circuito?",
+      "keywords": ["circuito", "pista", "nuevo", "carriles", "longitud"],
+      "answerSteps": [
+        "Abre Circuitos en el menú.",
+        "Crea una nueva pista e indica nombre, descripción si quieres, número de carriles y longitud por carril cuando aplique.",
+        "Guarda. El circuito podrá usarse en Tiempos y al crear competiciones."
+      ],
+      "sectionId": "circuitos",
+      "linkTo": "/circuits",
+      "linkLabel": "Ir a Circuitos"
+    },
+    {
+      "id": "competicion-publica",
+      "question": "¿Cómo comparto la inscripción o el estado de una competición?",
+      "keywords": ["competición", "público", "url", "inscripción", "slug", "compartir"],
+      "answerSteps": [
+        "En Competiciones crea o abre el evento; cada uno tiene un identificador (slug) en la app.",
+        "Existen URLs públicas para inscripción, estado y presentación que no exigen iniciar sesión en la web principal.",
+        "Comparte el enlace que corresponda con pilotos u organización según el flujo del evento."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Ir a Competiciones"
+    },
+    {
+      "id": "cambiar-contrasena",
+      "question": "¿Cómo cambio mi contraseña?",
+      "keywords": ["contraseña", "password", "cuenta", "google"],
+      "answerSteps": [
+        "Ve a Configuración y abre la pestaña Cuenta (también puedes usar ?tab=cuenta en la URL).",
+        "Con sesión iniciada puedes definir o cambiar la contraseña sin escribir la anterior.",
+        "Si solo usas inicio con Google, puedes establecer una contraseña local desde ahí si la app lo permite."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Ir a Configuración"
+    },
+    {
+      "id": "discord-telegram",
+      "question": "¿Dónde configuro Discord o Telegram?",
+      "keywords": ["discord", "telegram", "webhook", "notificaciones", "chat id"],
+      "answerSteps": [
+        "Las notificaciones (webhook de Discord, Chat ID de Telegram) se configuran en Configuración, pestaña de notificaciones (?tab=notifications).",
+        "En Mi perfil está la cuenta y la API key; las alertas del dashboard y el umbral de días también se ajustan en Configuración."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Ir a Configuración"
+    },
+    {
+      "id": "inventario-montar",
+      "question": "¿Cómo descuento o monto una pieza del inventario en un vehículo?",
+      "keywords": ["inventario", "pieza", "montar", "stock", "repuesto"],
+      "answerSteps": [
+        "Registra primero las piezas en Inventario con categoría y cantidad.",
+        "Abre la ficha del vehículo (edición) y usa el flujo para montar una pieza desde inventario cuando la aplicación lo ofrezca.",
+        "El stock se actualiza según la lógica de la app al montar o desmontar componentes."
+      ],
+      "sectionId": "inventario",
+      "linkTo": "/inventory",
+      "linkLabel": "Ir a Inventario"
+    },
+    {
+      "id": "busqueda-rapida",
+      "question": "¿Hay búsqueda rápida en la aplicación?",
+      "keywords": ["buscar", "búsqueda", "atajo", "teclado", "comando"],
+      "answerSteps": [
+        "En la barra superior hay un acceso a la búsqueda rápida de vehículos, circuitos, inventario y más.",
+        "En escritorio suele mostrarse el atajo de teclado (por ejemplo Ctrl+K o Cmd+K en Mac) junto al campo de búsqueda.",
+        "Ábrela, escribe y elige un resultado para ir a esa pantalla."
+      ],
+      "sectionId": "inicio",
+      "linkTo": "/dashboard",
+      "linkLabel": "Ir a Inicio"
+    },
+    {
+      "id": "exportar-vehiculos",
+      "question": "¿Puedo exportar la lista de vehículos?",
+      "keywords": ["exportar", "csv", "excel", "descargar", "lista"],
+      "answerSteps": [
+        "En la sección Vehículos puedes usar la exportación respetando los filtros y la paginación que tengas activos.",
+        "Ajusta filtros antes si solo quieres un subconjunto de la colección.",
+        "La exportación refleja lo que ves según los límites configurados en pantalla."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Ir a Vehículos"
+    },
+    {
+      "id": "importar-tiempos",
+      "question": "¿Puedo importar tiempos?",
+      "keywords": ["importar", "tiempos", "csv", "pegar", "datos"],
+      "answerSteps": [
+        "Si la aplicación ofrece importación de tiempos en la zona de Tiempos o en la ficha del vehículo, sigue el asistente o el formulario que aparezca.",
+        "Asegúrate de que el vehículo y el circuito existen para que los registros cuadren.",
+        "Si no ves la opción, puede no estar disponible en tu versión o requerir un formato concreto."
+      ],
+      "sectionId": "tiempos",
+      "linkTo": "/timings",
+      "linkLabel": "Ir a Tiempos"
+    },
+    {
+      "id": "licencia-srm",
+      "question": "¿Qué es la licencia Slot Race Manager y dónde la veo?",
+      "keywords": ["licencia", "slot race", "srm", "escritorio", "instalaciones"],
+      "answerSteps": [
+        "En Mi perfil puedes consultar información relacionada con la licencia Slot Race Manager y las instalaciones de escritorio asociadas.",
+        "La API key para integraciones con header X-API-Key también se gestiona en Mi perfil.",
+        "Las preferencias de alertas y notificaciones del dashboard están en Configuración."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Ir a Perfil"
+    },
+    {
+      "id": "filtros-vehiculos",
+      "question": "¿Se guardan los filtros en Vehículos?",
+      "keywords": ["filtros", "guardar", "navegador", "tabla", "cuadrícula"],
+      "answerSteps": [
+        "Los filtros de la lista de vehículos se guardan en este navegador para la próxima visita.",
+        "Puedes alternar vista cuadrícula o tabla y filtrar por fabricante, tipo, museo/taller, etc.",
+        "La exportación respeta los filtros activos."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Ir a Vehículos"
+    },
+    {
+      "id": "mantenimiento-coche",
+      "question": "¿Dónde registro el mantenimiento de un coche?",
+      "keywords": ["mantenimiento", "revision", "historial", "ficha"],
+      "answerSteps": [
+        "Abre el vehículo desde Vehículos y entra en su ficha detallada.",
+        "En la ficha hay secciones para mantenimiento y componentes según lo que exponga la aplicación.",
+        "Los tiempos y el mantenimiento pueden relacionarse para ver evolución del rendimiento."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Ir a Vehículos"
+    },
+    {
+      "id": "alertas-dashboard",
+      "question": "¿Qué son las alertas o pendientes en el Inicio?",
+      "keywords": ["alertas", "pendientes", "días", "circuito", "dashboard"],
+      "answerSteps": [
+        "En Configuración puedes definir un umbral de días sin sesión en tu circuito habitual.",
+        "Ese valor alimenta el bloque de pendientes y alertas del panel de Inicio.",
+        "Tras cambiar el umbral, recarga el Inicio para ver el criterio actualizado."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Ir a Configuración"
+    },
+    {
+      "id": "datos-no-cargan",
+      "question": "No se cargan bien los datos o las gráficas. ¿Qué hago?",
+      "keywords": ["error", "carga", "conexión", "vacío", "gráficos"],
+      "answerSteps": [
+        "Comprueba tu conexión a internet; el dashboard combina varias peticiones al servidor.",
+        "Recarga la página y asegúrate de usar la última versión de la aplicación.",
+        "Si el problema continúa, cierra sesión y vuelve a entrar por si el token caducó."
+      ],
+      "sectionId": "inicio",
+      "linkTo": "/dashboard",
+      "linkLabel": "Ir a Inicio"
+    },
+    {
+      "id": "diferencia-perfil-settings",
+      "question": "¿Qué diferencia hay entre Perfil y Configuración?",
+      "keywords": ["perfil", "configuración", "diferencia", "api", "alertas"],
+      "answerSteps": [
+        "Mi perfil: email, API key (header X-API-Key), licencia Slot Race Manager e integraciones de ese tipo.",
+        "Configuración: alertas del dashboard, umbral de días, Discord, Telegram y pestaña Cuenta (contraseña).",
+        "Regenerar la API key solo desde Perfil, no desde Configuración."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Ir a Perfil"
+    }
+  ]
+}

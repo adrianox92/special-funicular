@@ -38,7 +38,7 @@ export function getDocumentTitle(pathname) {
 
   if (p === '/profile') return withBrand('Mi perfil');
   if (p === '/settings') return withBrand('Configuración');
-  if (p === '/help') return withBrand('Ayuda');
+  if (p === '/help') return withBrand('Ayuda · Guía de inicio');
   if (p === '/admin/slot-race-licenses') return withBrand('Admin licencias SRM');
 
   if (p === '/privacidad') return withBrand('Política de privacidad');
