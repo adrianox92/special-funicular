@@ -1,6 +1,25 @@
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
+const sharp = require('sharp');
 const { modificationLineTotal } = require('../../lib/componentPricing');
+
+/** PDFKit solo incrusta JPEG y PNG; las subidas usan WebP por defecto (processVehicleImageBuffer). */
+function isJpegBuffer(buf) {
+  return buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8;
+}
+function isPngBuffer(buf) {
+  return buf.length >= 8 && buf[0] === 0x89 && buf.toString('ascii', 1, 4) === 'PNG';
+}
+
+async function bufferForPdfKitImage(buf) {
+  if (!buf || buf.length === 0) return null;
+  if (isJpegBuffer(buf) || isPngBuffer(buf)) return buf;
+  try {
+    return await sharp(buf).rotate().png().toBuffer();
+  } catch {
+    return null;
+  }
+}
 
 // Paleta de colores
 const COLORS = {
@@ -45,7 +64,7 @@ function drawHeader(doc, genDate) {
   doc.save();
   doc.rect(0, 0, PAGE_WIDTH, HEADER_HEIGHT).fill(COLORS.header);
   doc.fillColor('white').fontSize(14).font('Helvetica-Bold');
-  doc.text('Scalextric Collection · Ficha Técnica', MARGIN, 11, { width: 300, lineBreak: false });
+  doc.text('Slot Collection Pro · Ficha Técnica', MARGIN, 11, { width: 300, lineBreak: false });
   doc.fontSize(10).font('Helvetica');
   doc.text(`Generado: ${genDate}`, PAGE_WIDTH - MARGIN - 120, 13, { width: 120, align: 'right', lineBreak: false });
   doc.restore();
@@ -197,7 +216,9 @@ function drawPriceSummary(doc, vehicle, totalModCost) {
 
   doc.save();
   doc.strokeColor(COLORS.border).lineWidth(0.5);
-  doc.rect(MARGIN, baseY, CONTENT_WIDTH, 52).stroke();
+  // Altura del recuadro: dejar aire bajo la última línea (52 pt era corto; el texto en y+44 invadía el borde).
+  const priceBoxHeight = 64;
+  doc.rect(MARGIN, baseY, CONTENT_WIDTH, priceBoxHeight).stroke();
   doc.fillColor(COLORS.text).fontSize(10).font('Helvetica');
   doc.text('Precio base:', MARGIN + 12, baseY + 12);
   doc.text(formatPrice(vehicle.price), PAGE_WIDTH - MARGIN - 100, baseY + 12, { width: 90, align: 'right' });
@@ -207,7 +228,8 @@ function drawPriceSummary(doc, vehicle, totalModCost) {
   doc.text('Precio total:', MARGIN + 12, baseY + 44);
   doc.text(formatPrice(totalPrice), PAGE_WIDTH - MARGIN - 100, baseY + 44, { width: 90, align: 'right' });
   doc.restore();
-  doc.y = baseY + 60;
+  const gapBelowPriceBox = 20;
+  doc.y = baseY + priceBoxHeight + gapBelowPriceBox;
 }
 
 async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
@@ -244,44 +266,43 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
       const odometer = formatDistance(vehicle.total_distance_meters);
       const opts = { genDate };
 
-      // Imagen
+      // Imagen (incl. WebP → PNG; antes solo se aceptaba JPEG/PNG por Content-Type y se perdía la foto)
       let imageBuffer = null;
       if (vehicle.image) {
         try {
           const imageResponse = await axios.get(vehicle.image, {
             responseType: 'arraybuffer',
-            timeout: 5000,
+            timeout: 15000,
           });
-          const ct = imageResponse.headers['content-type'] || '';
-          if (ct.includes('jpeg') || ct.includes('png')) {
-            imageBuffer = Buffer.from(imageResponse.data);
+          const raw = Buffer.from(imageResponse.data);
+          if (raw.length > 0) {
+            imageBuffer = await bufferForPdfKitImage(raw);
           }
         } catch (_) {}
       }
 
       const imgWidth = 160;
       const imgHeight = 110;
-      const imgX = PAGE_WIDTH - MARGIN - imgWidth - 4;
+      const imgX = PAGE_WIDTH - MARGIN - imgWidth;
       const imgY = doc.y;
 
       if (imageBuffer) {
         try {
-          doc.rect(imgX, imgY, imgWidth + 4, imgHeight + 4).stroke(COLORS.border);
-          doc.image(imageBuffer, imgX + 2, imgY + 2, {
+          doc.image(imageBuffer, imgX, imgY, {
             fit: [imgWidth, imgHeight],
           });
         } catch (_) {
-          doc.rect(imgX, imgY, imgWidth + 4, imgHeight + 4).fill(COLORS.rowAlt);
+          doc.rect(imgX, imgY, imgWidth, imgHeight).fill(COLORS.rowAlt);
           doc.fillColor(COLORS.textMuted).fontSize(9);
-          doc.text('Sin imagen', imgX + 2, imgY + imgHeight / 2 - 6, {
+          doc.text('Sin imagen', imgX, imgY + imgHeight / 2 - 6, {
             width: imgWidth,
             align: 'center',
           });
         }
       } else {
-        doc.rect(imgX, imgY, imgWidth + 4, imgHeight + 4).fill(COLORS.rowAlt);
+        doc.rect(imgX, imgY, imgWidth, imgHeight).fill(COLORS.rowAlt);
         doc.fillColor(COLORS.textMuted).fontSize(9);
-        doc.text('Sin imagen', imgX + 2, imgY + imgHeight / 2 - 6, {
+        doc.text('Sin imagen', imgX, imgY + imgHeight / 2 - 6, {
           width: imgWidth,
           align: 'center',
         });
