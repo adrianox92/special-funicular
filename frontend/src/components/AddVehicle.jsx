@@ -11,6 +11,7 @@ import { Switch } from './ui/switch';
 import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { VEHICLE_TYPES } from '../data/vehicleTypes';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -94,6 +95,7 @@ const AddVehicle = () => {
       ...prev,
       model: item.model_name || '',
       manufacturer: item.manufacturer || '',
+      type: item.vehicle_type || '',
       reference: item.reference || '',
       commercial_release_date: item.commercial_release_date
         ? String(item.commercial_release_date).slice(0, 10)
@@ -244,7 +246,7 @@ const AddVehicle = () => {
                 onChange={handleChange}
               >
                 <option value="">Selecciona tipo</option>
-                {['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => (
+                {VEHICLE_TYPES.map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
@@ -406,6 +408,9 @@ const AddVehicle = () => {
                         <span className="font-medium">{item.reference}</span>
                         {' — '}
                         {item.manufacturer} {item.model_name}
+                        {item.vehicle_type ? (
+                          <span className="text-muted-foreground"> · {item.vehicle_type}</span>
+                        ) : null}
                       </button>
                     </li>
                   ))}

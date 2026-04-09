@@ -75,6 +75,7 @@ import {
   normalizeVehicleComponentType,
   getVehicleComponentTypeLabel,
 } from '../data/componentTypes';
+import { VEHICLE_TYPES as vehicleTypes } from '../data/vehicleTypes';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -102,8 +103,6 @@ const viewTypeMap = {
   'chassis': 'chassis',
   'three_quarters': 'three_quarters',
 };
-
-const vehicleTypes = ['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'];
 
 /** Categoría de inventario (`otro`) → tipo de componente del vehículo (`other`). */
 function inventoryCategoryToVehicleType(cat) {

@@ -43,11 +43,13 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { Database, Upload, GitPullRequest, PlusCircle } from 'lucide-react';
+import { VEHICLE_TYPES } from '../data/vehicleTypes';
 
 const emptyItem = {
   reference: '',
   manufacturer: '',
   model_name: '',
+  vehicle_type: '',
   commercial_release_date: '',
 };
 
@@ -142,6 +144,7 @@ function AdminSlotCatalog() {
       reference: row.reference ?? '',
       manufacturer: row.manufacturer ?? '',
       model_name: row.model_name ?? '',
+      vehicle_type: row.vehicle_type ?? '',
       commercial_release_date: row.commercial_release_date
         ? String(row.commercial_release_date).slice(0, 10)
         : '',
@@ -157,6 +160,7 @@ function AdminSlotCatalog() {
       fd.append('reference', form.reference);
       fd.append('manufacturer', form.manufacturer);
       fd.append('model_name', form.model_name);
+      if (form.vehicle_type) fd.append('vehicle_type', form.vehicle_type);
       if (form.commercial_release_date) fd.append('commercial_release_date', form.commercial_release_date);
       if (imageFile) fd.append('image', imageFile);
 
@@ -279,7 +283,9 @@ function AdminSlotCatalog() {
           <Card>
             <CardHeader>
               <CardTitle>Listado</CardTitle>
-              <CardDescription>CSV/Excel: columnas reference, manufacturer, model_name, commercial_release_date (opcional).</CardDescription>
+              <CardDescription>
+                CSV/Excel: reference, manufacturer, model_name, vehicle_type (opcional, mismo listado que en vehículos), commercial_release_date (opcional).
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -312,6 +318,7 @@ function AdminSlotCatalog() {
                       <TableHead>Referencia</TableHead>
                       <TableHead>Marca</TableHead>
                       <TableHead>Nombre</TableHead>
+                      <TableHead>Tipo</TableHead>
                       <TableHead>Comercialización</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -322,6 +329,7 @@ function AdminSlotCatalog() {
                         <TableCell className="font-mono text-sm">{row.reference}</TableCell>
                         <TableCell>{row.manufacturer}</TableCell>
                         <TableCell>{row.model_name}</TableCell>
+                        <TableCell>{row.vehicle_type || '—'}</TableCell>
                         <TableCell>{row.commercial_release_date || '—'}</TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
@@ -437,6 +445,7 @@ function AdminSlotCatalog() {
                         <TableRow>
                           <TableHead>Referencia</TableHead>
                           <TableHead>Marca / Nombre</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -445,6 +454,7 @@ function AdminSlotCatalog() {
                           <TableRow key={r.id}>
                             <TableCell className="font-mono text-sm">{r.proposed_reference}</TableCell>
                             <TableCell>{r.proposed_manufacturer} — {r.proposed_model_name}</TableCell>
+                            <TableCell>{r.proposed_vehicle_type || '—'}</TableCell>
                             <TableCell className="text-right space-x-2">
                               <Button size="sm" onClick={() => approveIns(r.id)}>Aprobar</Button>
                               <Button size="sm" variant="outline" onClick={() => rejectIns(r.id)}>Rechazar</Button>
@@ -478,6 +488,23 @@ function AdminSlotCatalog() {
             <div className="space-y-2">
               <Label>Nombre / modelo</Label>
               <Input value={form.model_name} onChange={e => setForm(f => ({ ...f, model_name: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select
+                value={form.vehicle_type || '__none__'}
+                onValueChange={v => setForm(f => ({ ...f, vehicle_type: v === '__none__' ? '' : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona tipo (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin tipo —</SelectItem>
+                  {VEHICLE_TYPES.map(t => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Comercialización</Label>

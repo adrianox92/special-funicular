@@ -220,10 +220,10 @@
       "title": "Catálogo slot (administradores)",
       "pathBadge": "/admin/slot-catalog",
       "description": "Catálogo compartido de referencias: CRUD, importación CSV/Excel y colas de moderación.",
-      "intro": "Solo usuarios cuyo email está en la lista de administradores (LICENSE_ADMIN_EMAILS). Aquí se mantienen referencias con marca, nombre, fecha de comercialización e imagen; se puede importar en bloque y revisar colas de solicitudes.",
+      "intro": "Solo usuarios cuyo email está en la lista de administradores (LICENSE_ADMIN_EMAILS). Aquí se mantienen referencias con marca, nombre, tipo de vehículo (misma lista que al crear un coche), fecha de comercialización e imagen; se puede importar en bloque y revisar colas de solicitudes.",
       "steps": [
         "Menú de usuario → Catálogo slot (admin).",
-        "En Ítems crea o edita fichas; en Importar sube CSV o Excel con columnas reference, manufacturer, model_name y opcionalmente commercial_release_date.",
+        "En Ítems crea o edita fichas; en Importar sube CSV o Excel con columnas reference, manufacturer, model_name, vehicle_type (opcional) y commercial_release_date (opcional).",
         "En Colas aprueba o rechaza solicitudes de edición o de alta nuevas."
       ],
       "tips": [

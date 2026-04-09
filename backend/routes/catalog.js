@@ -36,6 +36,13 @@ function parseOptionalDate(raw) {
   return s;
 }
 
+/** Tipo de vehículo (misma semántica que vehicles.type). */
+function parseOptionalVehicleType(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim();
+  return s === '' ? null : s;
+}
+
 function adminGuard(req, res, next) {
   if (!assertLicenseAdmin(req, res)) return;
   next();
@@ -54,17 +61,19 @@ router.get('/search', async (req, res) => {
       return res.json({ items: [] });
     }
     const pattern = `%${escapeIlikePattern(q)}%`;
-    const sel = 'id, reference, manufacturer, model_name, commercial_release_date, image_url';
-    const [r1, r2, r3] = await Promise.all([
+    const sel = 'id, reference, manufacturer, model_name, vehicle_type, commercial_release_date, image_url';
+    const [r1, r2, r3, r4] = await Promise.all([
       supabase.from('slot_catalog_items').select(sel).ilike('reference', pattern).limit(20),
       supabase.from('slot_catalog_items').select(sel).ilike('manufacturer', pattern).limit(20),
       supabase.from('slot_catalog_items').select(sel).ilike('model_name', pattern).limit(20),
+      supabase.from('slot_catalog_items').select(sel).ilike('vehicle_type', pattern).limit(20),
     ]);
     if (r1.error) return res.status(500).json({ error: r1.error.message });
     if (r2.error) return res.status(500).json({ error: r2.error.message });
     if (r3.error) return res.status(500).json({ error: r3.error.message });
+    if (r4.error) return res.status(500).json({ error: r4.error.message });
     const byId = new Map();
-    for (const row of [...(r1.data || []), ...(r2.data || []), ...(r3.data || [])]) {
+    for (const row of [...(r1.data || []), ...(r2.data || []), ...(r3.data || []), ...(r4.data || [])]) {
       byId.set(row.id, row);
     }
     const items = Array.from(byId.values()).slice(0, 20);
@@ -90,7 +99,7 @@ router.get('/my-requests', async (req, res) => {
       supabase
         .from('slot_catalog_insert_requests')
         .select(
-          'id, proposed_reference, proposed_manufacturer, proposed_model_name, proposed_commercial_release_date, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
+          'id, proposed_reference, proposed_manufacturer, proposed_model_name, proposed_vehicle_type, proposed_commercial_release_date, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
         )
         .eq('submitted_by', uid)
         .order('created_at', { ascending: false })
@@ -169,6 +178,7 @@ router.post('/items', itemUpload, async (req, res) => {
     const reference = normalizeReference(req.body.reference);
     const manufacturer = String(req.body.manufacturer ?? '').trim();
     const model_name = String(req.body.model_name ?? '').trim();
+    const vehicle_type = parseOptionalVehicleType(req.body.vehicle_type);
     const commercial_release_date = parseOptionalDate(req.body.commercial_release_date);
 
     if (!reference || !manufacturer || !model_name) {
@@ -192,6 +202,7 @@ router.post('/items', itemUpload, async (req, res) => {
           reference,
           manufacturer,
           model_name,
+          vehicle_type,
           commercial_release_date,
           image_url,
           updated_at: new Date().toISOString(),
@@ -225,6 +236,10 @@ router.put('/items/:id', itemUpload, async (req, res) => {
     const reference = req.body.reference != null ? normalizeReference(req.body.reference) : existing.reference;
     const manufacturer = req.body.manufacturer != null ? String(req.body.manufacturer).trim() : existing.manufacturer;
     const model_name = req.body.model_name != null ? String(req.body.model_name).trim() : existing.model_name;
+    const vehicle_type =
+      req.body.vehicle_type !== undefined
+        ? parseOptionalVehicleType(req.body.vehicle_type)
+        : existing.vehicle_type;
     const commercial_release_date =
       req.body.commercial_release_date !== undefined
         ? parseOptionalDate(req.body.commercial_release_date)
@@ -249,6 +264,7 @@ router.put('/items/:id', itemUpload, async (req, res) => {
         reference,
         manufacturer,
         model_name,
+        vehicle_type,
         commercial_release_date,
         image_url,
         updated_at: new Date().toISOString(),
@@ -307,6 +323,10 @@ router.post('/items/:catalogItemId/change-requests', changeUpload, async (req, r
     const proposed_patch = {
       manufacturer: req.body.manufacturer != null ? String(req.body.manufacturer).trim() : item.manufacturer,
       model_name: req.body.model_name != null ? String(req.body.model_name).trim() : item.model_name,
+      vehicle_type:
+        req.body.vehicle_type !== undefined
+          ? parseOptionalVehicleType(req.body.vehicle_type)
+          : item.vehicle_type,
       commercial_release_date:
         req.body.commercial_release_date !== undefined
           ? parseOptionalDate(req.body.commercial_release_date)
@@ -382,7 +402,7 @@ router.post('/change-requests/:requestId/approve', async (req, res) => {
     }
 
     const patch = row.proposed_patch || {};
-    const { data: item, error: iErr } = await supabase.from('slot_catalog_items').select('image_url').eq('id', row.catalog_item_id).maybeSingle();
+    const { data: item, error: iErr } = await supabase.from('slot_catalog_items').select('*').eq('id', row.catalog_item_id).maybeSingle();
     if (iErr) return res.status(500).json({ error: iErr.message });
     if (!item) return res.status(404).json({ error: 'Ítem de catálogo no encontrado' });
 
@@ -394,8 +414,9 @@ router.post('/change-requests/:requestId/approve', async (req, res) => {
     const { error: upErr } = await supabase
       .from('slot_catalog_items')
       .update({
-        manufacturer: patch.manufacturer,
-        model_name: patch.model_name,
+        manufacturer: patch.manufacturer ?? item.manufacturer,
+        model_name: patch.model_name ?? item.model_name,
+        vehicle_type: patch.vehicle_type !== undefined ? patch.vehicle_type : item.vehicle_type,
         commercial_release_date: patch.commercial_release_date ?? null,
         image_url: patch.image_url ?? null,
         updated_at: new Date().toISOString(),
@@ -464,6 +485,9 @@ router.post('/insert-requests', insertUpload, async (req, res) => {
     const proposed_reference = normalizeReference(req.body.proposed_reference ?? req.body.reference);
     const proposed_manufacturer = String(req.body.proposed_manufacturer ?? req.body.manufacturer ?? '').trim();
     const proposed_model_name = String(req.body.proposed_model_name ?? req.body.model_name ?? '').trim();
+    const proposed_vehicle_type = parseOptionalVehicleType(
+      req.body.proposed_vehicle_type ?? req.body.vehicle_type,
+    );
     const proposed_commercial_release_date = parseOptionalDate(
       req.body.proposed_commercial_release_date ?? req.body.commercial_release_date,
     );
@@ -489,6 +513,7 @@ router.post('/insert-requests', insertUpload, async (req, res) => {
           proposed_reference,
           proposed_manufacturer,
           proposed_model_name,
+          proposed_vehicle_type,
           proposed_commercial_release_date,
           proposed_image_url,
           submitted_by: req.user.id,
@@ -546,6 +571,7 @@ router.post('/insert-requests/:requestId/approve', async (req, res) => {
           reference: normalizeReference(row.proposed_reference),
           manufacturer: row.proposed_manufacturer,
           model_name: row.proposed_model_name,
+          vehicle_type: row.proposed_vehicle_type ?? null,
           commercial_release_date: row.proposed_commercial_release_date,
           image_url: row.proposed_image_url,
           updated_at: new Date().toISOString(),
@@ -668,6 +694,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
       const ref = normalizeReference(r.reference ?? r.Reference ?? r.REFERENCIA ?? r.ref);
       const manufacturer = String(r.manufacturer ?? r.Marca ?? r.fabricante ?? '').trim();
       const model_name = String(r.model_name ?? r.model ?? r.nombre ?? r.Nombre ?? '').trim();
+      const vehicle_type = parseOptionalVehicleType(
+        r.vehicle_type ?? r.tipo ?? r.type ?? r.Tipo ?? '',
+      );
       const commercial_release_date = parseOptionalDate(
         r.commercial_release_date ?? r.fecha ?? r.release_date ?? '',
       );
@@ -693,6 +722,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
           .update({
             manufacturer,
             model_name,
+            vehicle_type,
             commercial_release_date,
             updated_at: new Date().toISOString(),
           })
@@ -709,6 +739,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
             reference: ref,
             manufacturer,
             model_name,
+            vehicle_type,
             commercial_release_date,
             updated_at: new Date().toISOString(),
           },
