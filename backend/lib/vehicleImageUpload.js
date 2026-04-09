@@ -80,7 +80,35 @@ async function saveVehicleImagesFromMultipart(supabase, vehicleId, files, option
   }
 }
 
+/**
+ * Sube una vista procesada (buffer ya pasado por processVehicleImageBuffer o equivalente).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} vehicleId
+ * @param {string} viewType
+ * @param {{ buffer: Buffer, contentType: string, ext: string }} processed
+ */
+async function saveVehicleViewProcessed(supabase, vehicleId, viewType, processed) {
+  if (!VALID_VIEW_TYPES.includes(viewType)) {
+    throw new Error(`Vista no válida: ${viewType}`);
+  }
+  const filePath = `vehicles/${vehicleId}/${Date.now()}-${viewType}${processed.ext}`;
+  const { error: storageError } = await supabase.storage.from(VEHICLE_IMAGES_BUCKET).upload(filePath, processed.buffer, {
+    contentType: processed.contentType,
+    upsert: false,
+  });
+  if (storageError) throw new Error(storageError.message);
+
+  const { data: publicUrlData } = supabase.storage.from(VEHICLE_IMAGES_BUCKET).getPublicUrl(filePath);
+  const imageUrl = publicUrlData.publicUrl;
+
+  const { error: imgError } = await supabase
+    .from('vehicle_images')
+    .insert([{ vehicle_id: vehicleId, image_url: imageUrl, view_type: viewType }]);
+  if (imgError) throw new Error(imgError.message);
+}
+
 module.exports = {
   VALID_VIEW_TYPES,
   saveVehicleImagesFromMultipart,
+  saveVehicleViewProcessed,
 };

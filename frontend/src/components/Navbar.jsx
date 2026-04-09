@@ -18,6 +18,7 @@ import {
   Shield,
   CircleHelp,
   Search,
+  Database,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { Button } from './ui/button';
@@ -225,6 +226,14 @@ const Navbar = () => {
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  {showLicenseAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/slot-catalog" className="flex items-center gap-2 cursor-pointer">
+                        <Database className="size-4" />
+                        Catálogo slot (admin)
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
                       <Settings className="size-4" />
@@ -263,6 +272,15 @@ const Navbar = () => {
                   >
                     <Shield className="size-4" />
                     Admin licencias SRM
+                  </Link>
+                )}
+                {showLicenseAdmin && (
+                  <Link
+                    to="/admin/slot-catalog"
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Database className="size-4" />
+                    Catálogo slot (admin)
                   </Link>
                 )}
               </nav>

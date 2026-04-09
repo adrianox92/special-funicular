@@ -13,23 +13,7 @@ const supabaseAdmin = createClient(
 
 const router = express.Router();
 
-function getAdminEmails() {
-  const raw = process.env.LICENSE_ADMIN_EMAILS || '';
-  return raw
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function assertLicenseAdmin(req, res) {
-  const email = req.user?.email?.toLowerCase();
-  const admins = getAdminEmails();
-  if (!email || admins.length === 0 || !admins.includes(email)) {
-    res.status(403).json({ error: 'Solo administradores' });
-    return false;
-  }
-  return true;
-}
+const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 
 /**
  * Busca un usuario de Auth por email (paginación hasta ~20k usuarios).

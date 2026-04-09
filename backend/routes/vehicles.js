@@ -10,6 +10,7 @@ const multer = require('multer');
 const authMiddleware = require('../middleware/auth');
 const { removeObjectByPublicUrl, removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const { saveVehicleImagesFromMultipart } = require('../lib/vehicleImageUpload');
+const { tryCopyCatalogImageToVehicleFront } = require('../lib/copyCatalogToVehicleImage');
 const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
@@ -48,6 +49,8 @@ const VEHICLE_PUT_BODY_KEYS = [
   'anotaciones',
   'reference',
   'total_price',
+  'commercial_release_date',
+  'catalog_item_id',
 ];
 
 /** Evita cadenas "null"/"undefined" o vacíos mal interpretados por Postgres (date, numeric, etc.) */
@@ -67,7 +70,7 @@ function vehicleScalarFieldsFromBody(body) {
     if (!Object.prototype.hasOwnProperty.call(body, k)) continue;
     let v = body[k];
     v = normalizeFormScalar(v);
-    if (k === 'purchase_date') {
+    if (k === 'purchase_date' || k === 'commercial_release_date') {
       o[k] = v;
     } else if (k === 'price' || k === 'total_price') {
       if (v == null) o[k] = null;
@@ -605,35 +608,67 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
 // Crear un vehículo
 router.post('/', runVehicleImageUpload, async (req, res) => {
   try {
-    const { model, manufacturer, type, traction, price, purchase_date, purchase_place, modified, digital, museo, taller, anotaciones, reference, scale_factor } = req.body;
-    
+    const {
+      model,
+      manufacturer,
+      type,
+      traction,
+      price,
+      purchase_date,
+      purchase_place,
+      modified,
+      digital,
+      museo,
+      taller,
+      anotaciones,
+      reference,
+      scale_factor,
+      commercial_release_date,
+      catalog_item_id,
+    } = req.body;
+
     // Campos numéricos: convertir vacío a null para evitar "invalid input syntax for type numeric"
     const priceNum = (price === '' || price == null) ? null : Number(price);
     const total_price = modified === 'true' ? null : (priceNum != null ? priceNum : null);
     const scaleFactor = (scale_factor === '' || scale_factor == null) ? DEFAULT_SCALE_FACTOR : parseInt(scale_factor, 10);
-    
+
+    const commercial_release_date_val =
+      commercial_release_date === '' || commercial_release_date == null
+        ? null
+        : String(commercial_release_date).trim().slice(0, 10);
+    const catalog_item_id_val =
+      catalog_item_id === '' || catalog_item_id == null ? null : String(catalog_item_id).trim();
+
+    let catalogRow = null;
+    if (catalog_item_id_val) {
+      const { data: cr } = await supabase.from('slot_catalog_items').select('*').eq('id', catalog_item_id_val).maybeSingle();
+      catalogRow = cr;
+    }
+
     // Añadir user_id al crear el vehículo
     const { data, error } = await supabase
       .from('vehicles')
       .insert([
-        { 
-          model, 
-          manufacturer, 
-          type, 
-          traction: traction || null, 
-          price: priceNum, 
+        {
+          model,
+          manufacturer,
+          type,
+          traction: traction || null,
+          price: priceNum,
           total_price,
           purchase_date: purchase_date || null,
-          purchase_place: purchase_place || null, 
-          modified, 
+          purchase_place: purchase_place || null,
+          modified,
           digital,
           museo,
           taller,
           anotaciones,
           reference,
           scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
-          user_id: req.user.id 
-        }
+          commercial_release_date: commercial_release_date_val,
+          catalog_item_id: catalog_item_id_val,
+          user_id: req.user.id,
+        },
       ])
       .select()
       .single();
@@ -649,6 +684,12 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
         console.error('saveVehicleImagesFromMultipart (POST)', e);
         return res.status(500).json({ error: e.message || 'Error al subir imágenes' });
       }
+    }
+
+    try {
+      await tryCopyCatalogImageToVehicleFront(supabase, data.id, catalogRow, req.files);
+    } catch (e) {
+      console.warn('[vehicles POST] tryCopyCatalogImageToVehicleFront', e.message);
     }
 
     res.status(201).json(data);

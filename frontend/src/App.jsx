@@ -29,6 +29,7 @@ import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
+import AdminSlotCatalog from './pages/AdminSlotCatalog';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useCookieConsent } from './context/CookieConsentContext';
 import CookieBanner from './components/CookieBanner';
@@ -238,6 +239,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <AdminSlotRaceLicenses />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/slot-catalog"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <AdminSlotCatalog />
               </AuthedShell>
             </PrivateRoute>
           }
