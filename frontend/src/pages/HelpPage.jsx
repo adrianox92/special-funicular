@@ -16,7 +16,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Separator } from '../components/ui/separator';
 import { Badge } from '../components/ui/badge';
 import HelpAssistant from '../components/HelpAssistant';
-import { primerosPasos, helpSections, helpTableOfContents } from '../content/helpGuide';
+import { useAuth } from '../context/AuthContext';
+import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import { primerosPasos, getHelpTableOfContents, visibleHelpSections } from '../content/helpGuide';
 
 const SECTION_ICONS = {
   inicio: Home,
@@ -45,7 +47,13 @@ const StepsList = ({ items }) => (
   </ol>
 );
 
-const HelpPage = () => (
+const HelpPage = () => {
+  const { user } = useAuth();
+  const isAdmin = isLicenseAdminUser(user);
+  const helpTableOfContents = getHelpTableOfContents(isAdmin);
+  const sections = visibleHelpSections(isAdmin);
+
+  return (
   <div className="space-y-8 max-w-3xl">
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-primary">
@@ -116,7 +124,7 @@ const HelpPage = () => (
       </Card>
     </section>
 
-    {helpSections.map((sec) => {
+    {sections.map((sec) => {
       const Icon = SECTION_ICONS[sec.id] || BookOpen;
       return (
         <section key={sec.id} id={sec.id} className="scroll-mt-24">
@@ -167,6 +175,7 @@ const HelpPage = () => (
       página.
     </p>
   </div>
-);
+  );
+};
 
 export default HelpPage;

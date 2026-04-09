@@ -322,10 +322,25 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
       doc.moveDown(0.5);
 
       const scaleStr = vehicle.scale_factor ? `1:${vehicle.scale_factor}` : '-';
+      const motorLbl =
+        vehicle.motor_position === 'inline'
+          ? 'en línea'
+          : vehicle.motor_position === 'angular'
+            ? 'angular'
+            : vehicle.motor_position === 'transverse'
+              ? 'transversal'
+              : vehicle.motor_position
+                ? String(vehicle.motor_position)
+                : '-';
       doc.fillColor(COLORS.text).fontSize(10);
-      doc.text(`Escala: ${scaleStr} · Tipo: ${vehicle.type || '-'} · Tracción: ${vehicle.traction || '-'}`, MARGIN, doc.y, {
-        width: dataWidth,
-      });
+      doc.text(
+        `Escala: ${scaleStr} · Tipo: ${vehicle.type || '-'} · Tracción: ${vehicle.traction || '-'} · Motor: ${motorLbl}`,
+        MARGIN,
+        doc.y,
+        {
+          width: dataWidth,
+        },
+      );
       doc.moveDown(0.8);
 
       drawBadges(doc, vehicle);

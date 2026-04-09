@@ -4,16 +4,23 @@ export const primerosPasos = guideData.primerosPasos;
 export const helpSections = guideData.sections;
 export const helpFaq = guideData.faq;
 
+/** Secciones visibles según rol (p. ej. catálogo admin solo para administradores). */
+export function visibleHelpSections(isAdmin) {
+  return helpSections.filter((s) => !s.adminOnly || isAdmin);
+}
+
 /** Índice para la página: primeros pasos + secciones principales */
-export const helpTableOfContents = [
-  { id: 'primeros-pasos', label: primerosPasos.title },
-  ...helpSections.map((s) => ({ id: s.id, label: s.title })),
-];
+export function getHelpTableOfContents(isAdmin) {
+  return [
+    { id: 'primeros-pasos', label: primerosPasos.title },
+    ...visibleHelpSections(isAdmin).map((s) => ({ id: s.id, label: s.title })),
+  ];
+}
 
 /**
  * Texto plano para IA y emparejamiento (frontend).
  */
-export function getHelpGuidePlainText() {
+export function getHelpGuidePlainText(isAdmin = false) {
   const lines = [];
   lines.push('# Slot Collection Pro — Guía y onboarding\n');
   lines.push('## Primeros pasos\n');
@@ -22,7 +29,7 @@ export function getHelpGuidePlainText() {
     lines.push(`${i + 1}. ${st.title}: ${st.body}`);
   });
   lines.push('');
-  for (const sec of helpSections) {
+  for (const sec of visibleHelpSections(isAdmin)) {
     lines.push(`## ${sec.title} (${sec.pathBadge})`);
     lines.push(sec.description);
     lines.push(sec.intro);
@@ -48,6 +55,9 @@ export function getHelpGuidePlainText() {
   return lines.join('\n');
 }
 
-export function getSectionById(id) {
-  return helpSections.find((s) => s.id === id);
+export function getSectionById(id, isAdmin = false) {
+  const sec = helpSections.find((s) => s.id === id);
+  if (!sec) return undefined;
+  if (sec.adminOnly && !isAdmin) return undefined;
+  return sec;
 }

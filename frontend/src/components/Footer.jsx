@@ -29,6 +29,9 @@ const Footer = () => {
             <Link to="/contacto" className={linkClass}>
               Contacto
             </Link>
+            <Link to="/catalogo" className={linkClass}>
+              Catálogo de referencias
+            </Link>
           </nav>
           <button type="button" onClick={openSettings} className={linkClass}>
             Gestionar cookies

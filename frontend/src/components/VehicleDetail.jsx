@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
+import { labelMotorPosition } from '../data/motorPosition';
 import { formatModificationSnapshot, formatHistoryDate, modificationLineTotal } from '../utils/formatUtils';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -145,6 +146,11 @@ const VehicleDetail = () => {
               { name: 'reference', label: 'Referencia', value: vehicle.reference },
               { name: 'manufacturer', label: 'Fabricante', value: vehicle.manufacturer },
               { name: 'traction', label: 'Tracción', value: vehicle.traction },
+              {
+                name: 'motor_position',
+                label: 'Posición del motor',
+                value: labelMotorPosition(vehicle.motor_position),
+              },
               { name: 'price', label: 'Precio original (€)', type: 'number', value: vehicle.price },
               { name: 'total_price', label: 'Precio actual (€)', type: 'number', value: vehicle.total_price },
               { name: 'purchase_date', label: 'Fecha de compra', type: 'date', value: vehicle.purchase_date?.substring(0, 10) },

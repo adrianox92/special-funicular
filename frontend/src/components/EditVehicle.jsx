@@ -76,6 +76,7 @@ import {
   getVehicleComponentTypeLabel,
 } from '../data/componentTypes';
 import { VEHICLE_TYPES as vehicleTypes } from '../data/vehicleTypes';
+import { MOTOR_POSITION_OPTIONS } from '../data/motorPosition';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -2043,6 +2044,34 @@ const EditVehicle = () => {
                 <div className="space-y-2">
                   <Label htmlFor="traction">Tracción</Label>
                   <Input id="traction" name="traction" value={vehicle.traction || ''} onChange={handleChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="motor_position">Posición del motor</Label>
+                  <Select
+                    value={vehicle.motor_position || '__none__'}
+                    onValueChange={(v) =>
+                      handleChange({
+                        target: {
+                          name: 'motor_position',
+                          value: v === '__none__' ? '' : v,
+                          type: 'select',
+                          checked: false,
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger id="motor_position">
+                      <SelectValue placeholder="Opcional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                      {MOTOR_POSITION_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="price">Precio original (€)</Label>

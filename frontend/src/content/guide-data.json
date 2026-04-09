@@ -217,23 +217,47 @@
     },
     {
       "id": "catalogo-admin",
+      "adminOnly": true,
       "title": "Catálogo slot (administradores)",
       "pathBadge": "/admin/slot-catalog",
       "description": "Catálogo compartido de referencias: CRUD, importación CSV/Excel y colas de moderación.",
       "intro": "Solo usuarios cuyo email está en la lista de administradores (LICENSE_ADMIN_EMAILS). Aquí se mantienen referencias con marca, nombre, tipo de vehículo (misma lista que al crear un coche), fecha de comercialización e imagen; se puede importar en bloque y revisar colas de solicitudes.",
       "steps": [
         "Menú de usuario → Catálogo slot (admin).",
-        "En Ítems crea o edita fichas; en Importar sube CSV o Excel con columnas reference, manufacturer, model_name, vehicle_type (opcional) y commercial_release_date (opcional).",
+        "En Ítems crea o edita fichas; en Importar sube CSV o Excel con columnas reference, manufacturer, model_name, vehicle_type (opcional) y commercial_release_year (opcional, solo año).",
         "En Colas aprueba o rechaza solicitudes de edición o de alta nuevas."
       ],
       "tips": [
-        "Los administradores pueden en Añadir vehículo usar la pestaña Buscar en catálogo para rellenar datos por referencia.",
-        "La importación desde PDF no está soportada: convierte a CSV o Excel antes."
+        "En Añadir vehículo, la pestaña «Buscar en catálogo» rellena datos por referencia para cualquier usuario registrado.",
+        "La importación desde PDF no está soportada: convierte a CSV o Excel antes.",
+        "En importación, duplicado significa misma referencia y misma marca; varias marcas pueden compartir el mismo código de referencia."
       ],
       "gotchas": [],
       "linkTo": "/admin/slot-catalog",
       "linkLabel": "Ir al catálogo (admin)",
       "keywords": ["catálogo", "admin", "referencia", "importar", "csv", "excel", "marca", "moderación"]
+    },
+    {
+      "id": "catalogo-publico",
+      "title": "Catálogo de referencias (público)",
+      "pathBadge": "/catalogo",
+      "description": "Listado y ficha de cada modelo; consulta sin cuenta; con cuenta puedes valorar y sugerir cambios.",
+      "intro": "Desde la landing o el pie de página puedes abrir el catálogo público: filtra por marca, tipo y año de comercialización, navega por páginas y abre la ficha de cada referencia (imagen y detalles). Las valoraciones medias y el recuento aparecen en listado y ficha. Con sesión iniciada puedes puntuar de 1 a 5, sugerir correcciones sobre una ficha, proponer un modelo nuevo y ver el estado de tus propuestas.",
+      "steps": [
+        "Abre Catálogo de referencias (ruta /catalogo).",
+        "Usa los filtros o el listado; pulsa una tarjeta para ver la ficha completa.",
+        "Comparte la URL de la ficha; el enlace incluye un fragmento legible del nombre además del identificador.",
+        "Inicia sesión para valorar (estrellas), abrir «Sugerir corrección» o enlazar a «Proponer nuevo modelo» y «Mis sugerencias» (rutas /proponer-alta-catalogo y /mis-sugerencias-catalogo)."
+      ],
+      "tips": [
+        "Las aprobaciones las hace el equipo desde Catálogo slot (admin); hasta entonces tus sugerencias quedan pendientes.",
+        "No puedes tener dos cambios pendientes sobre el mismo ítem ni dos altas pendientes con la misma referencia y marca.",
+        "En Añadir vehículo, la pestaña «Buscar en catálogo» está disponible para cualquier usuario registrado."
+      ],
+      "gotchas": [],
+      "linkTo": "/catalogo",
+      "linkLabel": "Ir al catálogo público",
+      "keywords": ["catálogo", "público", "referencia", "marca", "slot", "consultar", "valorar", "sugerencia", "colaborar"]
     }
   ],
   "faq": [

@@ -7,11 +7,11 @@ CREATE TABLE IF NOT EXISTS public.slot_catalog_items (
   manufacturer text NOT NULL,
   model_name text NOT NULL,
   vehicle_type text,
-  commercial_release_date date,
+  commercial_release_year integer,
   image_url text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT slot_catalog_items_reference_unique UNIQUE (reference)
+  CONSTRAINT slot_catalog_items_reference_manufacturer_unique UNIQUE (reference, manufacturer)
 );
 
 CREATE INDEX IF NOT EXISTS idx_slot_catalog_items_manufacturer ON public.slot_catalog_items (manufacturer);
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.slot_catalog_insert_requests (
   proposed_manufacturer text NOT NULL,
   proposed_model_name text NOT NULL,
   proposed_vehicle_type text,
-  proposed_commercial_release_date date,
+  proposed_commercial_release_year integer,
   proposed_image_url text,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   submitted_by uuid NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS public.slot_catalog_insert_requests (
 
 CREATE INDEX IF NOT EXISTS idx_slot_catalog_insert_requests_status ON public.slot_catalog_insert_requests (status);
 
-ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS commercial_release_date date;
+ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS commercial_release_year integer;
 ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS catalog_item_id uuid REFERENCES public.slot_catalog_items(id) ON DELETE SET NULL;
 
 -- Bucket público para imágenes del catálogo (la API sube con la clave de servicio)

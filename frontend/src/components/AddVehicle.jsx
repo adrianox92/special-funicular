@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
-import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -12,6 +11,14 @@ import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
+import { MOTOR_POSITION_OPTIONS } from '../data/motorPosition';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -32,7 +39,6 @@ const requiredFields = [
 const AddVehicle = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = isLicenseAdminUser(user);
 
   const [entryMode, setEntryMode] = useState('manual');
   const [catalogQuery, setCatalogQuery] = useState('');
@@ -46,6 +52,7 @@ const AddVehicle = () => {
     manufacturer: '',
     type: '',
     traction: '',
+    motor_position: '',
     price: '',
     total_price: '',
     purchase_date: '',
@@ -57,7 +64,7 @@ const AddVehicle = () => {
     anotaciones: '',
     reference: '',
     scale_factor: 32,
-    commercial_release_date: '',
+    commercial_release_year: '',
   });
   const [images, setImages] = useState({});
   const [previews, setPreviews] = useState({});
@@ -83,10 +90,10 @@ const AddVehicle = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin || entryMode !== 'catalog') return;
+    if (!user || entryMode !== 'catalog') return;
     const t = setTimeout(() => searchCatalog(catalogQuery), 350);
     return () => clearTimeout(t);
-  }, [catalogQuery, entryMode, isAdmin, searchCatalog]);
+  }, [catalogQuery, entryMode, user, searchCatalog]);
 
   const applyCatalogItem = (item) => {
     setCatalogItemId(item.id);
@@ -96,10 +103,13 @@ const AddVehicle = () => {
       model: item.model_name || '',
       manufacturer: item.manufacturer || '',
       type: item.vehicle_type || '',
+      traction: item.traction || '',
+      motor_position: item.motor_position || '',
       reference: item.reference || '',
-      commercial_release_date: item.commercial_release_date
-        ? String(item.commercial_release_date).slice(0, 10)
-        : '',
+      commercial_release_year:
+        item.commercial_release_year != null && item.commercial_release_year !== ''
+          ? String(item.commercial_release_year)
+          : '',
     }));
     if (error) setError(null);
   };
@@ -226,14 +236,18 @@ const AddVehicle = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Comercialización (catálogo)</Label>
+              <Label>Año de comercialización (catálogo)</Label>
               <Input
-                name="commercial_release_date"
-                type="date"
-                value={vehicle.commercial_release_date ?? ''}
+                name="commercial_release_year"
+                type="number"
+                inputMode="numeric"
+                min={1900}
+                max={2100}
+                placeholder="ej. 2020"
+                value={vehicle.commercial_release_year ?? ''}
                 onChange={handleChange}
               />
-              <p className="text-xs text-muted-foreground">Fecha de comercialización del modelo (opcional). Distinta de la fecha de compra.</p>
+              <p className="text-xs text-muted-foreground">Solo el año de comercialización del modelo (opcional). Distinto de la fecha de compra.</p>
             </div>
             <div className="space-y-2">
               <Label>Tipo</Label>
@@ -254,6 +268,27 @@ const AddVehicle = () => {
             <div className="space-y-2">
               <Label>Tracción</Label>
               <Input name="traction" value={vehicle.traction} onChange={handleChange} />
+            </div>
+            <div className="space-y-2">
+              <Label>Posición del motor</Label>
+              <Select
+                value={vehicle.motor_position || '__none__'}
+                onValueChange={(v) =>
+                  setVehicle((prev) => ({ ...prev, motor_position: v === '__none__' ? '' : v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Opcional" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                  {MOTOR_POSITION_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Precio original (€)</Label>
@@ -375,7 +410,7 @@ const AddVehicle = () => {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Añadir Vehículo</h2>
 
-      {isAdmin && (
+      {user && (
         <Tabs value={entryMode} onValueChange={setEntryMode}>
           <TabsList>
             <TabsTrigger value="manual">Introducir a mano</TabsTrigger>

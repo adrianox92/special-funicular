@@ -6,6 +6,7 @@ export const VEHICLE_TYPES = [
   'Hypercar',
   'Grupo 5',
   'Road Car',
+  'Turismo',
   'Clásico',
   'DTM',
   'F1',

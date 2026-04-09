@@ -30,6 +30,10 @@ import Contact from './pages/Contact';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
+import PublicCatalogList from './pages/PublicCatalogList';
+import PublicCatalogDetail from './pages/PublicCatalogDetail';
+import CatalogMySuggestions from './pages/CatalogMySuggestions';
+import ProposeCatalogInsert from './pages/ProposeCatalogInsert';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useCookieConsent } from './context/CookieConsentContext';
 import CookieBanner from './components/CookieBanner';
@@ -73,6 +77,7 @@ const AppContent = () => {
     '/privacidad',
     '/terminos',
     '/contacto',
+    '/catalogo',
   ];
   const hasNavbar = user && !noNavbarRoutes.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
 
@@ -122,6 +127,30 @@ const AppContent = () => {
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
         <Route path="/piloto/:slug" element={<PublicPilotProfile />} />
+        <Route path="/catalogo/:id/:slug" element={<PublicCatalogDetail />} />
+        <Route path="/catalogo/:id" element={<PublicCatalogDetail />} />
+        <Route path="/catalogo" element={<PublicCatalogList />} />
+
+        <Route
+          path="/mis-sugerencias-catalogo"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <CatalogMySuggestions />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/proponer-alta-catalogo"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <ProposeCatalogInsert />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
 
         <Route
           path="/dashboard"

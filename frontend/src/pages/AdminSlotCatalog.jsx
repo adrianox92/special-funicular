@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
+import { supabase } from '../lib/supabase';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -44,14 +45,115 @@ import {
 } from '../components/ui/select';
 import { Database, Upload, GitPullRequest, PlusCircle } from 'lucide-react';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
+import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
 
 const emptyItem = {
   reference: '',
   manufacturer: '',
   model_name: '',
   vehicle_type: '',
-  commercial_release_date: '',
+  traction: '',
+  motor_position: '',
+  commercial_release_year: '',
 };
+
+const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
+/**
+ * POST /catalog/import (NDJSON). onProgress(current, total) tras cada fila procesada.
+ */
+async function runCatalogImportStream(file, duplicateMode, onProgress) {
+  const url = `${apiBase}/catalog/import?duplicateMode=${encodeURIComponent(duplicateMode)}`;
+
+  const fetchOnce = (token) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return fetch(url, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    });
+  };
+
+  let { data: { session } } = await supabase.auth.getSession();
+  let response = await fetchOnce(session?.access_token);
+  if (response.status === 401) {
+    await supabase.auth.refreshSession();
+    ({ data: { session } } = await supabase.auth.getSession());
+    response = await fetchOnce(session?.access_token);
+  }
+
+  if (!response.ok) {
+    const ct = response.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      const j = await response.json().catch(() => ({}));
+      throw new Error(j.error || `Error ${response.status}`);
+    }
+    const text = await response.text();
+    throw new Error(text || `Error ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('El navegador no permite leer el progreso de la importación.');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let completePayload = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) continue;
+      let msg;
+      try {
+        msg = JSON.parse(t);
+      } catch {
+        continue;
+      }
+      if (msg.type === 'progress' && onProgress) {
+        onProgress(msg.current ?? 0, msg.total ?? 0);
+      }
+      if (msg.type === 'complete') {
+        const { type, ...rest } = msg;
+        void type;
+        completePayload = rest;
+      }
+      if (msg.type === 'error') {
+        throw new Error(msg.message || 'Error en la importación');
+      }
+    }
+  }
+  const tail = buffer.trim();
+  if (tail) {
+    try {
+      const msg = JSON.parse(tail);
+      if (msg.type === 'complete') {
+        const { type, ...rest } = msg;
+        void type;
+        completePayload = rest;
+      }
+      if (msg.type === 'error') throw new Error(msg.message || 'Error en la importación');
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        /* línea incompleta al cortar el stream */
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  if (!completePayload) {
+    throw new Error('Respuesta de importación incompleta.');
+  }
+  return completePayload;
+}
 
 function AdminSlotCatalog() {
   const { user } = useAuth();
@@ -72,7 +174,23 @@ function AdminSlotCatalog() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyItem);
   const [imageFile, setImageFile] = useState(null);
+  /** URL guardada en servidor al editar (solo lectura en el formulario). */
+  const [existingImageUrl, setExistingImageUrl] = useState(null);
+  /** Vista previa de archivo nuevo elegido (object URL). */
+  const [newImageObjectUrl, setNewImageObjectUrl] = useState(null);
   const [formSaving, setFormSaving] = useState(false);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setNewImageObjectUrl(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setNewImageObjectUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [imageFile]);
 
   const [deleteId, setDeleteId] = useState(null);
 
@@ -80,6 +198,7 @@ function AdminSlotCatalog() {
   const [duplicateMode, setDuplicateMode] = useState('skip');
   const [importResult, setImportResult] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState(null);
 
   const [chgReq, setChgReq] = useState([]);
   const [insReq, setInsReq] = useState([]);
@@ -134,6 +253,8 @@ function AdminSlotCatalog() {
     setEditingId(null);
     setForm(emptyItem);
     setImageFile(null);
+    setExistingImageUrl(null);
+    setNewImageObjectUrl(null);
     setEditOpen(true);
   };
 
@@ -145,11 +266,17 @@ function AdminSlotCatalog() {
       manufacturer: row.manufacturer ?? '',
       model_name: row.model_name ?? '',
       vehicle_type: row.vehicle_type ?? '',
-      commercial_release_date: row.commercial_release_date
-        ? String(row.commercial_release_date).slice(0, 10)
-        : '',
+      traction: row.traction ?? '',
+      motor_position: row.motor_position ?? '',
+      commercial_release_year:
+        row.commercial_release_year != null && row.commercial_release_year !== ''
+          ? String(row.commercial_release_year)
+          : '',
     });
     setImageFile(null);
+    const url = row.image_url != null && String(row.image_url).trim() ? String(row.image_url) : null;
+    setExistingImageUrl(url);
+    setNewImageObjectUrl(null);
     setEditOpen(true);
   };
 
@@ -161,7 +288,9 @@ function AdminSlotCatalog() {
       fd.append('manufacturer', form.manufacturer);
       fd.append('model_name', form.model_name);
       if (form.vehicle_type) fd.append('vehicle_type', form.vehicle_type);
-      if (form.commercial_release_date) fd.append('commercial_release_date', form.commercial_release_date);
+      fd.append('traction', form.traction ?? '');
+      fd.append('motor_position', form.motor_position ?? '');
+      if (form.commercial_release_year) fd.append('commercial_release_year', form.commercial_release_year);
       if (imageFile) fd.append('image', imageFile);
 
       if (editMode === 'create') {
@@ -193,16 +322,18 @@ function AdminSlotCatalog() {
     if (!importFile) return;
     setImportLoading(true);
     setImportResult(null);
+    setImportProgress({ current: 0, total: 0 });
     try {
-      const fd = new FormData();
-      fd.append('file', importFile);
-      const { data } = await api.post(`/catalog/import?duplicateMode=${duplicateMode}`, fd);
+      const data = await runCatalogImportStream(importFile, duplicateMode, (current, total) => {
+        setImportProgress({ current, total });
+      });
       setImportResult(data);
       fetchItems();
     } catch (e) {
-      setImportResult({ error: e.response?.data?.error || e.message });
+      setImportResult({ error: e.message || 'Error al importar' });
     } finally {
       setImportLoading(false);
+      setImportProgress(null);
     }
   };
 
@@ -284,7 +415,7 @@ function AdminSlotCatalog() {
             <CardHeader>
               <CardTitle>Listado</CardTitle>
               <CardDescription>
-                CSV/Excel: reference, manufacturer, model_name, vehicle_type (opcional, mismo listado que en vehículos), commercial_release_date (opcional).
+                CSV/Excel: reference, manufacturer, model_name, vehicle_type (opcional), traction (opcional), motor_position (opcional: inline, angular, transverse, transversal, en línea, en angular…), commercial_release_year (opcional, solo año).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -319,7 +450,9 @@ function AdminSlotCatalog() {
                       <TableHead>Marca</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Tipo</TableHead>
-                      <TableHead>Comercialización</TableHead>
+                      <TableHead>Tracción</TableHead>
+                      <TableHead>Motor</TableHead>
+                      <TableHead>Año</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -330,7 +463,9 @@ function AdminSlotCatalog() {
                         <TableCell>{row.manufacturer}</TableCell>
                         <TableCell>{row.model_name}</TableCell>
                         <TableCell>{row.vehicle_type || '—'}</TableCell>
-                        <TableCell>{row.commercial_release_date || '—'}</TableCell>
+                        <TableCell>{row.traction || '—'}</TableCell>
+                        <TableCell>{labelMotorPosition(row.motor_position)}</TableCell>
+                        <TableCell>{row.commercial_release_year ?? '—'}</TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
                             Editar
@@ -371,14 +506,14 @@ function AdminSlotCatalog() {
                 <Input type="file" accept=".csv,.xlsx,.xls" onChange={e => setImportFile(e.target.files?.[0] || null)} />
               </div>
               <div className="space-y-2">
-                <Label>Si la referencia ya existe</Label>
+                <Label>Si la referencia y la marca ya existen</Label>
                 <Select value={duplicateMode} onValueChange={setDuplicateMode}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="skip">Omitir fila</SelectItem>
-                    <SelectItem value="update">Actualizar marca/nombre/fecha</SelectItem>
+                    <SelectItem value="update">Actualizar marca/nombre/año</SelectItem>
                     <SelectItem value="fail">Registrar error y continuar</SelectItem>
                   </SelectContent>
                 </Select>
@@ -386,6 +521,26 @@ function AdminSlotCatalog() {
               <Button onClick={runImport} disabled={!importFile || importLoading}>
                 {importLoading ? 'Importando…' : 'Importar'}
               </Button>
+              {importLoading && importProgress && (
+                <div className="space-y-2 max-w-md">
+                  <p className="text-sm text-muted-foreground">
+                    {importProgress.total > 0
+                      ? `Procesando filas: ${importProgress.current} / ${importProgress.total}`
+                      : 'Leyendo archivo…'}
+                  </p>
+                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-[width] duration-150 ease-out rounded-full"
+                      style={{
+                        width:
+                          importProgress.total > 0
+                            ? `${Math.min(100, (importProgress.current / importProgress.total) * 100)}%`
+                            : '0%',
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
               {importResult && (
                 <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-64">
                   {JSON.stringify(importResult, null, 2)}
@@ -446,6 +601,7 @@ function AdminSlotCatalog() {
                           <TableHead>Referencia</TableHead>
                           <TableHead>Marca / Nombre</TableHead>
                           <TableHead>Tipo</TableHead>
+                          <TableHead>Tracción / motor</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -455,6 +611,11 @@ function AdminSlotCatalog() {
                             <TableCell className="font-mono text-sm">{r.proposed_reference}</TableCell>
                             <TableCell>{r.proposed_manufacturer} — {r.proposed_model_name}</TableCell>
                             <TableCell>{r.proposed_vehicle_type || '—'}</TableCell>
+                            <TableCell className="text-sm">
+                              {[r.proposed_traction, r.proposed_motor_position ? labelMotorPosition(r.proposed_motor_position) : null]
+                                .filter(Boolean)
+                                .join(' · ') || '—'}
+                            </TableCell>
                             <TableCell className="text-right space-x-2">
                               <Button size="sm" onClick={() => approveIns(r.id)}>Aprobar</Button>
                               <Button size="sm" variant="outline" onClick={() => rejectIns(r.id)}>Rechazar</Button>
@@ -507,16 +668,62 @@ function AdminSlotCatalog() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Comercialización</Label>
+              <Label>Tracción</Label>
               <Input
-                type="date"
-                value={form.commercial_release_date}
-                onChange={e => setForm(f => ({ ...f, commercial_release_date: e.target.value }))}
+                value={form.traction}
+                onChange={e => setForm(f => ({ ...f, traction: e.target.value }))}
+                placeholder="Opcional (ej. trasera, AWD)"
               />
             </div>
             <div className="space-y-2">
+              <Label>Posición del motor</Label>
+              <Select
+                value={form.motor_position || '__none__'}
+                onValueChange={v => setForm(f => ({ ...f, motor_position: v === '__none__' ? '' : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Opcional" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                  {MOTOR_POSITION_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Año de comercialización</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={1900}
+                max={2100}
+                placeholder="ej. 2020"
+                value={form.commercial_release_year}
+                onChange={e => setForm(f => ({ ...f, commercial_release_year: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">Solo el año (opcional).</p>
+            </div>
+            <div className="space-y-2">
               <Label>Imagen (opcional)</Label>
-              <Input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} />
+              {(newImageObjectUrl || existingImageUrl) && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    {newImageObjectUrl ? 'Vista previa (sustituirá la actual al guardar)' : 'Imagen actual'}
+                  </p>
+                  <img
+                    src={newImageObjectUrl || existingImageUrl}
+                    alt=""
+                    className="max-h-48 w-auto max-w-full rounded-md border object-contain bg-muted/30"
+                  />
+                </div>
+              )}
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={e => setImageFile(e.target.files?.[0] || null)}
+              />
             </div>
           </div>
           <DialogFooter>

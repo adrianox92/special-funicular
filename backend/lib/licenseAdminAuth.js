@@ -24,7 +24,18 @@ function assertLicenseAdmin(req, res) {
   return true;
 }
 
+/**
+ * @param {{ email?: string } | null | undefined} user
+ * @returns {boolean}
+ */
+function isLicenseAdminUser(user) {
+  const email = user?.email?.toLowerCase();
+  const admins = getAdminEmails();
+  return Boolean(email && admins.length > 0 && admins.includes(email));
+}
+
 module.exports = {
   getAdminEmails,
   assertLicenseAdmin,
+  isLicenseAdminUser,
 };

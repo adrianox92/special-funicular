@@ -22,7 +22,12 @@ if (isTelegramBotConfigured()) {
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
-const { publicSignupLimiter, authSoftLimiter, contactLimiter } = require('./middleware/rateLimits');
+const {
+  publicSignupLimiter,
+  publicCatalogReadLimiter,
+  authSoftLimiter,
+  contactLimiter,
+} = require('./middleware/rateLimits');
 
 const app = express();
 
@@ -116,8 +121,10 @@ const publicCompetitionsRoute = require('./routes/publicCompetitions');
 const publicPilotRoute = require('./routes/publicPilot');
 const pilotProfileRoute = require('./routes/pilotProfile');
 const contactRoute = require('./routes/contact');
+const publicCatalogRoute = require('./routes/publicCatalog');
 app.use('/api/public-signup', publicSignupLimiter, publicCompetitionsRoute);
 app.use('/api/public/pilot', publicSignupLimiter, publicPilotRoute);
+app.use('/api/public/catalog', publicCatalogReadLimiter, publicCatalogRoute);
 app.use('/api/public/contact', contactLimiter, contactRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================

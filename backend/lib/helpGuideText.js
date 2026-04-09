@@ -2,7 +2,12 @@
  * Construye el texto de contexto para la IA a partir de guide-data.json
  * (misma semántica que frontend/src/content/helpGuide.js → getHelpGuidePlainText).
  */
-function buildHelpGuidePlainText(data) {
+/**
+ * @param {object} data - guide-data.json
+ * @param {{ includeAdminSections?: boolean }} [options]
+ */
+function buildHelpGuidePlainText(data, options = {}) {
+  const { includeAdminSections = false } = options;
   if (!data || !data.sections) return '';
   const lines = [];
   const primeros = data.primerosPasos;
@@ -14,6 +19,7 @@ function buildHelpGuidePlainText(data) {
   });
   lines.push('');
   for (const sec of data.sections) {
+    if (sec.adminOnly && !includeAdminSections) continue;
     lines.push(`## ${sec.title} (${sec.pathBadge})`);
     lines.push(sec.description);
     lines.push(sec.intro);

@@ -1,6 +1,6 @@
 import { LANDING_PAGE_TITLE } from './landingSeo';
 
-const BRAND = 'Slot Collection Pro';
+export const BRAND = 'Slot Collection Pro';
 
 /** @param {string} section */
 function withBrand(section) {
@@ -49,6 +49,12 @@ export function getDocumentTitle(pathname) {
   if (p === '/slot-race-manager') return withBrand('Slot Race Manager');
 
   if (p.startsWith('/piloto/')) return withBrand('Piloto');
+
+  if (p === '/catalogo') return withBrand('Catálogo de referencias');
+  if (p.startsWith('/catalogo/')) return withBrand('Catálogo');
+
+  if (p === '/mis-sugerencias-catalogo') return withBrand('Mis sugerencias al catálogo');
+  if (p === '/proponer-alta-catalogo') return withBrand('Proponer alta en el catálogo');
 
   return BRAND;
 }

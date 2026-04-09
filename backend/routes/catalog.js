@@ -1,5 +1,6 @@
 /**
- * Catálogo slot — Fase 1: todas las rutas requieren admin (LICENSE_ADMIN_EMAILS).
+ * Catálogo slot — Admin: CRUD, importación, colas y aprobaciones.
+ * Usuarios autenticados: sugerencias, valoraciones, GET /search y /my-requests.
  */
 const express = require('express');
 const multer = require('multer');
@@ -9,6 +10,7 @@ const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const { uploadCatalogImageBuffer, removeCatalogObjectByPublicUrl } = require('../lib/catalogImageStorage');
+const { catalogContributionsLimiter } = require('../middleware/rateLimits');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -29,11 +31,61 @@ function normalizeReference(ref) {
     .toUpperCase();
 }
 
-function parseOptionalDate(raw) {
+function normalizeManufacturer(m) {
+  return String(m ?? '').trim();
+}
+
+function parseOptionalYear(raw) {
   if (raw == null || raw === '') return null;
-  const s = String(raw).trim().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-  return s;
+  const s = String(raw).trim();
+  const n = parseInt(s, 10);
+  if (!Number.isFinite(n) || n < 1900 || n > 2100) return null;
+  return n;
+}
+
+/** Año desde texto, número o fecha ISO / serial Excel (import CSV/Excel). */
+function parseYearFromImportCell(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const n = Math.floor(raw);
+    if (n >= 1900 && n <= 2100) return n;
+    if (raw > 200 && raw < 60000) {
+      const epochMs = Date.UTC(1899, 11, 30);
+      const d = new Date(epochMs + raw * 86400000);
+      const y = d.getUTCFullYear();
+      if (y >= 1900 && y <= 2100) return y;
+    }
+    return null;
+  }
+  const s = String(raw).trim();
+  const n = parseInt(s, 10);
+  if (Number.isFinite(n) && n >= 1900 && n <= 2100) return n;
+  const iso = s.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const y = parseInt(iso.slice(0, 4), 10);
+    if (y >= 1900 && y <= 2100) return y;
+  }
+  return null;
+}
+
+function parseYearFromBody(raw) {
+  if (raw == null || raw === '') return null;
+  const y = parseOptionalYear(raw);
+  if (y != null) return y;
+  return parseYearFromImportCell(raw);
+}
+
+function resolveCatalogYearFromPatch(patch, item) {
+  if (patch.commercial_release_year !== undefined) {
+    if (patch.commercial_release_year === null || patch.commercial_release_year === '') return null;
+    const y = parseYearFromBody(patch.commercial_release_year);
+    if (y != null) return y;
+  }
+  if (patch.commercial_release_date != null && patch.commercial_release_date !== '') {
+    const y = parseYearFromImportCell(patch.commercial_release_date);
+    if (y != null) return y;
+  }
+  return item.commercial_release_year ?? null;
 }
 
 /** Tipo de vehículo (misma semántica que vehicles.type). */
@@ -43,13 +95,38 @@ function parseOptionalVehicleType(raw) {
   return s === '' ? null : s;
 }
 
+/** Tracción (texto libre, como en vehicles.traction). */
+function parseOptionalTraction(raw) {
+  return parseOptionalVehicleType(raw);
+}
+
+/** Posición del motor: inline | angular | transverse. */
+function parseOptionalMotorPosition(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'inline' || s === 'angular' || s === 'transverse') return s;
+  if (s === 'en_linea' || s === 'en línea' || s === 'en linea' || s === 'lineal') return 'inline';
+  if (s === 'en_angular' || s === 'en angular') return 'angular';
+  if (s === 'transversal' || s === 'transversa' || s === 'en_transversal' || s === 'en transversal') return 'transverse';
+  return null;
+}
+
+function parseMotorPositionFromImportCell(raw) {
+  return parseOptionalMotorPosition(raw);
+}
+
 function adminGuard(req, res, next) {
   if (!assertLicenseAdmin(req, res)) return;
   next();
 }
 
+function parseRatingBody(raw) {
+  const n = parseInt(String(raw ?? ''), 10);
+  if (!Number.isFinite(n) || n < 1 || n > 5) return null;
+  return n;
+}
+
 router.use(authMiddleware);
-router.use(adminGuard);
 
 /**
  * GET /search?q=
@@ -61,7 +138,8 @@ router.get('/search', async (req, res) => {
       return res.json({ items: [] });
     }
     const pattern = `%${escapeIlikePattern(q)}%`;
-    const sel = 'id, reference, manufacturer, model_name, vehicle_type, commercial_release_date, image_url';
+    const sel =
+      'id, reference, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, image_url';
     const [r1, r2, r3, r4] = await Promise.all([
       supabase.from('slot_catalog_items').select(sel).ilike('reference', pattern).limit(20),
       supabase.from('slot_catalog_items').select(sel).ilike('manufacturer', pattern).limit(20),
@@ -99,7 +177,7 @@ router.get('/my-requests', async (req, res) => {
       supabase
         .from('slot_catalog_insert_requests')
         .select(
-          'id, proposed_reference, proposed_manufacturer, proposed_model_name, proposed_vehicle_type, proposed_commercial_release_date, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
+          'id, proposed_reference, proposed_manufacturer, proposed_model_name, proposed_vehicle_type, proposed_traction, proposed_motor_position, proposed_commercial_release_year, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
         )
         .eq('submitted_by', uid)
         .order('created_at', { ascending: false })
@@ -117,9 +195,105 @@ router.get('/my-requests', async (req, res) => {
 });
 
 /**
+ * GET /items/:catalogItemId/rating/mine
+ */
+router.get('/items/:catalogItemId/rating/mine', async (req, res) => {
+  try {
+    const { catalogItemId } = req.params;
+    const { data: row, error } = await supabase
+      .from('slot_catalog_ratings')
+      .select('rating')
+      .eq('catalog_item_id', catalogItemId)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ rating: row?.rating ?? null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * PUT /items/:catalogItemId/rating — body { rating: 1..5 }
+ */
+router.put('/items/:catalogItemId/rating', catalogContributionsLimiter, async (req, res) => {
+  try {
+    const { catalogItemId } = req.params;
+    const rating = parseRatingBody(req.body?.rating);
+    if (rating == null) {
+      return res.status(400).json({ error: 'rating debe ser un entero entre 1 y 5' });
+    }
+
+    const { data: item, error: iErr } = await supabase
+      .from('slot_catalog_items')
+      .select('id')
+      .eq('id', catalogItemId)
+      .maybeSingle();
+    if (iErr) return res.status(500).json({ error: iErr.message });
+    if (!item) return res.status(404).json({ error: 'Ítem no encontrado' });
+
+    const now = new Date().toISOString();
+    const { data: existing } = await supabase
+      .from('slot_catalog_ratings')
+      .select('catalog_item_id')
+      .eq('catalog_item_id', catalogItemId)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    let data;
+    let error;
+    if (existing) {
+      ({ data, error } = await supabase
+        .from('slot_catalog_ratings')
+        .update({ rating, updated_at: now })
+        .eq('catalog_item_id', catalogItemId)
+        .eq('user_id', req.user.id)
+        .select()
+        .single());
+    } else {
+      ({ data, error } = await supabase
+        .from('slot_catalog_ratings')
+        .insert([
+          {
+            catalog_item_id: catalogItemId,
+            user_id: req.user.id,
+            rating,
+            updated_at: now,
+          },
+        ])
+        .select()
+        .single());
+    }
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, rating: data.rating });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * DELETE /items/:catalogItemId/rating
+ */
+router.delete('/items/:catalogItemId/rating', catalogContributionsLimiter, async (req, res) => {
+  try {
+    const { catalogItemId } = req.params;
+    const { error } = await supabase
+      .from('slot_catalog_ratings')
+      .delete()
+      .eq('catalog_item_id', catalogItemId)
+      .eq('user_id', req.user.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
  * GET /items — paginación
  */
-router.get('/items', async (req, res) => {
+router.get('/items', adminGuard, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
@@ -156,7 +330,7 @@ router.get('/items', async (req, res) => {
 /**
  * GET /items/:id
  */
-router.get('/items/:id', async (req, res) => {
+router.get('/items/:id', adminGuard, async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await supabase.from('slot_catalog_items').select('*').eq('id', id).maybeSingle();
@@ -173,13 +347,17 @@ const itemUpload = upload.fields([{ name: 'image', maxCount: 1 }]);
 /**
  * POST /items
  */
-router.post('/items', itemUpload, async (req, res) => {
+router.post('/items', adminGuard, itemUpload, async (req, res) => {
   try {
     const reference = normalizeReference(req.body.reference);
-    const manufacturer = String(req.body.manufacturer ?? '').trim();
+    const manufacturer = normalizeManufacturer(req.body.manufacturer);
     const model_name = String(req.body.model_name ?? '').trim();
     const vehicle_type = parseOptionalVehicleType(req.body.vehicle_type);
-    const commercial_release_date = parseOptionalDate(req.body.commercial_release_date);
+    const traction = parseOptionalTraction(req.body.traction);
+    const motor_position = parseOptionalMotorPosition(req.body.motor_position);
+    const commercial_release_year = parseYearFromBody(
+      req.body.commercial_release_year ?? req.body.commercial_release_date,
+    );
 
     if (!reference || !manufacturer || !model_name) {
       return res.status(400).json({ error: 'reference, manufacturer y model_name son obligatorios' });
@@ -203,7 +381,9 @@ router.post('/items', itemUpload, async (req, res) => {
           manufacturer,
           model_name,
           vehicle_type,
-          commercial_release_date,
+          traction,
+          motor_position,
+          commercial_release_year,
           image_url,
           updated_at: new Date().toISOString(),
         },
@@ -213,7 +393,7 @@ router.post('/items', itemUpload, async (req, res) => {
 
     if (error) {
       if (error.code === '23505') {
-        return res.status(409).json({ error: 'Ya existe un ítem con esa referencia' });
+        return res.status(409).json({ error: 'Ya existe un ítem con esa referencia y marca' });
       }
       return res.status(500).json({ error: error.message });
     }
@@ -226,7 +406,7 @@ router.post('/items', itemUpload, async (req, res) => {
 /**
  * PUT /items/:id
  */
-router.put('/items/:id', itemUpload, async (req, res) => {
+router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
   try {
     const { id } = req.params;
     const { data: existing, error: exErr } = await supabase.from('slot_catalog_items').select('*').eq('id', id).maybeSingle();
@@ -234,16 +414,23 @@ router.put('/items/:id', itemUpload, async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     const reference = req.body.reference != null ? normalizeReference(req.body.reference) : existing.reference;
-    const manufacturer = req.body.manufacturer != null ? String(req.body.manufacturer).trim() : existing.manufacturer;
+    const manufacturer =
+      req.body.manufacturer != null ? normalizeManufacturer(req.body.manufacturer) : existing.manufacturer;
     const model_name = req.body.model_name != null ? String(req.body.model_name).trim() : existing.model_name;
     const vehicle_type =
       req.body.vehicle_type !== undefined
         ? parseOptionalVehicleType(req.body.vehicle_type)
         : existing.vehicle_type;
-    const commercial_release_date =
-      req.body.commercial_release_date !== undefined
-        ? parseOptionalDate(req.body.commercial_release_date)
-        : existing.commercial_release_date;
+    const commercial_release_year =
+      req.body.commercial_release_year !== undefined || req.body.commercial_release_date !== undefined
+        ? parseYearFromBody(req.body.commercial_release_year ?? req.body.commercial_release_date)
+        : existing.commercial_release_year;
+    const traction =
+      req.body.traction !== undefined ? parseOptionalTraction(req.body.traction) : existing.traction;
+    const motor_position =
+      req.body.motor_position !== undefined
+        ? parseOptionalMotorPosition(req.body.motor_position)
+        : existing.motor_position;
 
     let image_url = existing.image_url;
     const img = req.files?.image?.[0];
@@ -265,7 +452,9 @@ router.put('/items/:id', itemUpload, async (req, res) => {
         manufacturer,
         model_name,
         vehicle_type,
-        commercial_release_date,
+        traction,
+        motor_position,
+        commercial_release_year,
         image_url,
         updated_at: new Date().toISOString(),
       })
@@ -275,7 +464,7 @@ router.put('/items/:id', itemUpload, async (req, res) => {
 
     if (error) {
       if (error.code === '23505') {
-        return res.status(409).json({ error: 'Ya existe un ítem con esa referencia' });
+        return res.status(409).json({ error: 'Ya existe un ítem con esa referencia y marca' });
       }
       return res.status(500).json({ error: error.message });
     }
@@ -288,7 +477,7 @@ router.put('/items/:id', itemUpload, async (req, res) => {
 /**
  * DELETE /items/:id
  */
-router.delete('/items/:id', async (req, res) => {
+router.delete('/items/:id', adminGuard, async (req, res) => {
   try {
     const { id } = req.params;
     const { data: existing, error: exErr } = await supabase.from('slot_catalog_items').select('image_url').eq('id', id).maybeSingle();
@@ -313,7 +502,7 @@ const changeUpload = upload.fields([{ name: 'image', maxCount: 1 }]);
 /**
  * POST /items/:catalogItemId/change-requests
  */
-router.post('/items/:catalogItemId/change-requests', changeUpload, async (req, res) => {
+router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter, changeUpload, async (req, res) => {
   try {
     const { catalogItemId } = req.params;
     const { data: item, error: iErr } = await supabase.from('slot_catalog_items').select('*').eq('id', catalogItemId).maybeSingle();
@@ -321,16 +510,21 @@ router.post('/items/:catalogItemId/change-requests', changeUpload, async (req, r
     if (!item) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     const proposed_patch = {
-      manufacturer: req.body.manufacturer != null ? String(req.body.manufacturer).trim() : item.manufacturer,
+      manufacturer: req.body.manufacturer != null ? normalizeManufacturer(req.body.manufacturer) : item.manufacturer,
       model_name: req.body.model_name != null ? String(req.body.model_name).trim() : item.model_name,
       vehicle_type:
         req.body.vehicle_type !== undefined
           ? parseOptionalVehicleType(req.body.vehicle_type)
           : item.vehicle_type,
-      commercial_release_date:
-        req.body.commercial_release_date !== undefined
-          ? parseOptionalDate(req.body.commercial_release_date)
-          : item.commercial_release_date,
+      traction: req.body.traction !== undefined ? parseOptionalTraction(req.body.traction) : item.traction,
+      motor_position:
+        req.body.motor_position !== undefined
+          ? parseOptionalMotorPosition(req.body.motor_position)
+          : item.motor_position,
+      commercial_release_year:
+        req.body.commercial_release_year !== undefined || req.body.commercial_release_date !== undefined
+          ? parseYearFromBody(req.body.commercial_release_year ?? req.body.commercial_release_date)
+          : item.commercial_release_year,
       image_url: item.image_url,
     };
 
@@ -356,7 +550,14 @@ router.post('/items/:catalogItemId/change-requests', changeUpload, async (req, r
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(409).json({
+          error: 'Ya tienes una solicitud de cambio pendiente para este ítem. Espera a que el equipo la revise.',
+        });
+      }
+      return res.status(500).json({ error: error.message });
+    }
     res.status(201).json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -366,7 +567,7 @@ router.post('/items/:catalogItemId/change-requests', changeUpload, async (req, r
 /**
  * GET /change-requests?status=pending
  */
-router.get('/change-requests', async (req, res) => {
+router.get('/change-requests', adminGuard, async (req, res) => {
   try {
     const status = String(req.query.status || 'pending').toLowerCase();
     const ok = ['pending', 'approved', 'rejected', 'all'];
@@ -388,7 +589,7 @@ router.get('/change-requests', async (req, res) => {
 /**
  * POST /change-requests/:requestId/approve
  */
-router.post('/change-requests/:requestId/approve', async (req, res) => {
+router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) => {
   try {
     const { requestId } = req.params;
     const { data: row, error: rErr } = await supabase
@@ -417,7 +618,12 @@ router.post('/change-requests/:requestId/approve', async (req, res) => {
         manufacturer: patch.manufacturer ?? item.manufacturer,
         model_name: patch.model_name ?? item.model_name,
         vehicle_type: patch.vehicle_type !== undefined ? patch.vehicle_type : item.vehicle_type,
-        commercial_release_date: patch.commercial_release_date ?? null,
+        traction: patch.traction !== undefined ? patch.traction : item.traction,
+        motor_position:
+          patch.motor_position !== undefined
+            ? parseOptionalMotorPosition(patch.motor_position)
+            : item.motor_position,
+        commercial_release_year: resolveCatalogYearFromPatch(patch, item),
         image_url: patch.image_url ?? null,
         updated_at: new Date().toISOString(),
       })
@@ -444,7 +650,7 @@ router.post('/change-requests/:requestId/approve', async (req, res) => {
 /**
  * POST /change-requests/:requestId/reject
  */
-router.post('/change-requests/:requestId/reject', async (req, res) => {
+router.post('/change-requests/:requestId/reject', adminGuard, async (req, res) => {
   try {
     const { requestId } = req.params;
     const reason = req.body?.reason != null ? String(req.body.reason).slice(0, 2000) : null;
@@ -480,20 +686,40 @@ const insertUpload = upload.fields([{ name: 'image', maxCount: 1 }]);
 /**
  * POST /insert-requests
  */
-router.post('/insert-requests', insertUpload, async (req, res) => {
+router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async (req, res) => {
   try {
     const proposed_reference = normalizeReference(req.body.proposed_reference ?? req.body.reference);
-    const proposed_manufacturer = String(req.body.proposed_manufacturer ?? req.body.manufacturer ?? '').trim();
+    const proposed_manufacturer = normalizeManufacturer(req.body.proposed_manufacturer ?? req.body.manufacturer ?? '');
     const proposed_model_name = String(req.body.proposed_model_name ?? req.body.model_name ?? '').trim();
     const proposed_vehicle_type = parseOptionalVehicleType(
       req.body.proposed_vehicle_type ?? req.body.vehicle_type,
     );
-    const proposed_commercial_release_date = parseOptionalDate(
-      req.body.proposed_commercial_release_date ?? req.body.commercial_release_date,
+    const proposed_traction = parseOptionalTraction(
+      req.body.proposed_traction ?? req.body.traction,
+    );
+    const proposed_motor_position = parseOptionalMotorPosition(
+      req.body.proposed_motor_position ?? req.body.motor_position,
+    );
+    const proposed_commercial_release_year = parseYearFromBody(
+      req.body.proposed_commercial_release_year ??
+        req.body.proposed_commercial_release_date ??
+        req.body.commercial_release_date,
     );
 
     if (!proposed_reference || !proposed_manufacturer || !proposed_model_name) {
       return res.status(400).json({ error: 'reference, manufacturer y model_name son obligatorios' });
+    }
+
+    const { data: existingItem } = await supabase
+      .from('slot_catalog_items')
+      .select('id')
+      .eq('reference', proposed_reference)
+      .eq('manufacturer', proposed_manufacturer)
+      .maybeSingle();
+    if (existingItem) {
+      return res.status(409).json({
+        error: 'Ya existe un ítem en el catálogo con esa referencia y marca. No es necesario proponer un alta.',
+      });
     }
 
     let proposed_image_url = null;
@@ -514,7 +740,9 @@ router.post('/insert-requests', insertUpload, async (req, res) => {
           proposed_manufacturer,
           proposed_model_name,
           proposed_vehicle_type,
-          proposed_commercial_release_date,
+          proposed_traction,
+          proposed_motor_position,
+          proposed_commercial_release_year,
           proposed_image_url,
           submitted_by: req.user.id,
           status: 'pending',
@@ -523,7 +751,15 @@ router.post('/insert-requests', insertUpload, async (req, res) => {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(409).json({
+          error:
+            'Ya tienes una solicitud de alta pendiente para esa referencia y marca. Espera a que el equipo la revise.',
+        });
+      }
+      return res.status(500).json({ error: error.message });
+    }
     res.status(201).json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -533,7 +769,7 @@ router.post('/insert-requests', insertUpload, async (req, res) => {
 /**
  * GET /insert-requests?status=
  */
-router.get('/insert-requests', async (req, res) => {
+router.get('/insert-requests', adminGuard, async (req, res) => {
   try {
     const status = String(req.query.status || 'pending').toLowerCase();
     const ok = ['pending', 'approved', 'rejected', 'all'];
@@ -551,7 +787,7 @@ router.get('/insert-requests', async (req, res) => {
 /**
  * POST /insert-requests/:requestId/approve
  */
-router.post('/insert-requests/:requestId/approve', async (req, res) => {
+router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) => {
   try {
     const { requestId } = req.params;
     const { data: row, error: rErr } = await supabase
@@ -572,7 +808,9 @@ router.post('/insert-requests/:requestId/approve', async (req, res) => {
           manufacturer: row.proposed_manufacturer,
           model_name: row.proposed_model_name,
           vehicle_type: row.proposed_vehicle_type ?? null,
-          commercial_release_date: row.proposed_commercial_release_date,
+          traction: row.proposed_traction ?? null,
+          motor_position: row.proposed_motor_position ?? null,
+          commercial_release_year: row.proposed_commercial_release_year ?? null,
           image_url: row.proposed_image_url,
           updated_at: new Date().toISOString(),
         },
@@ -582,7 +820,7 @@ router.post('/insert-requests/:requestId/approve', async (req, res) => {
 
     if (cErr) {
       if (cErr.code === '23505') {
-        return res.status(409).json({ error: 'Ya existe un ítem con esa referencia en el catálogo' });
+        return res.status(409).json({ error: 'Ya existe un ítem con esa referencia y marca en el catálogo' });
       }
       return res.status(500).json({ error: cErr.message });
     }
@@ -607,7 +845,7 @@ router.post('/insert-requests/:requestId/approve', async (req, res) => {
 /**
  * POST /insert-requests/:requestId/reject
  */
-router.post('/insert-requests/:requestId/reject', async (req, res) => {
+router.post('/insert-requests/:requestId/reject', adminGuard, async (req, res) => {
   try {
     const { requestId } = req.params;
     const reason = req.body?.reason != null ? String(req.body.reason).slice(0, 2000) : null;
@@ -639,9 +877,126 @@ router.post('/insert-requests/:requestId/reject', async (req, res) => {
 });
 
 /**
- * POST /import — multipart: file, duplicateMode=skip|update|fail, sheetIndex (excel)
+ * @param {Record<string, unknown>[]} rows
+ * @param {string} duplicateMode
+ * @param {(current: number, total: number) => void} [onProgress] current = filas ya procesadas
  */
-router.post('/import', upload.single('file'), async (req, res) => {
+async function runCatalogImportRows(rows, duplicateMode, onProgress) {
+  const inserted = [];
+  const updated = [];
+  const skipped = [];
+  const errors = [];
+  const total = rows.length;
+  if (onProgress) onProgress(0, total);
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const rowNum = i + 2;
+    const ref = normalizeReference(r.reference ?? r.Reference ?? r.REFERENCIA ?? r.ref);
+    const manufacturer = normalizeManufacturer(r.manufacturer ?? r.Marca ?? r.fabricante ?? '');
+    const model_name = String(r.model_name ?? r.model ?? r.nombre ?? r.Nombre ?? '').trim();
+    const vehicle_type = parseOptionalVehicleType(
+      r.vehicle_type ?? r.tipo ?? r.type ?? r.Tipo ?? '',
+    );
+    const traction = parseOptionalTraction(
+      r.traction ?? r.tracción ?? r.Tracción ?? r.traccion ?? '',
+    );
+    const motor_position = parseMotorPositionFromImportCell(
+      r.motor_position ?? r.posicion_motor ?? r.posición_motor ?? r.motor ?? '',
+    );
+    const commercial_release_year = parseYearFromImportCell(
+      r.commercial_release_year ??
+        r.commercial_release_date ??
+        r.fecha ??
+        r.release_date ??
+        r.año ??
+        r.year ??
+        '',
+    );
+
+    if (!ref || !manufacturer || !model_name) {
+      errors.push({ row: rowNum, message: 'Faltan reference, manufacturer o model_name' });
+      if (onProgress) onProgress(i + 1, total);
+      continue;
+    }
+
+    const { data: existing } = await supabase
+      .from('slot_catalog_items')
+      .select('id')
+      .eq('reference', ref)
+      .eq('manufacturer', manufacturer)
+      .maybeSingle();
+
+    if (existing) {
+      if (duplicateMode === 'skip') {
+        skipped.push(ref);
+        if (onProgress) onProgress(i + 1, total);
+        continue;
+      }
+      if (duplicateMode === 'fail') {
+        errors.push({ row: rowNum, message: `Referencia y marca duplicadas: ${ref} / ${manufacturer}` });
+        if (onProgress) onProgress(i + 1, total);
+        continue;
+      }
+      const { error: upErr } = await supabase
+        .from('slot_catalog_items')
+        .update({
+          manufacturer,
+          model_name,
+          vehicle_type,
+          traction,
+          motor_position,
+          commercial_release_year,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+      if (upErr) errors.push({ row: rowNum, message: upErr.message });
+      else updated.push(ref);
+      if (onProgress) onProgress(i + 1, total);
+      continue;
+    }
+
+    const { data: ins, error: insErr } = await supabase
+      .from('slot_catalog_items')
+      .insert([
+        {
+          reference: ref,
+          manufacturer,
+          model_name,
+          vehicle_type,
+          traction,
+          motor_position,
+          commercial_release_year,
+          updated_at: new Date().toISOString(),
+        },
+      ])
+      .select('id')
+      .single();
+
+    if (insErr) {
+      errors.push({ row: rowNum, message: insErr.message });
+    } else {
+      inserted.push(ref);
+    }
+    if (onProgress) onProgress(i + 1, total);
+  }
+
+  return {
+    inserted: inserted.length,
+    updated: updated.length,
+    skipped: skipped.length,
+    insertedRefs: inserted,
+    updatedRefs: updated,
+    skippedRefs: skipped,
+    errors,
+  };
+}
+
+/**
+ * POST /import — multipart: file, duplicateMode=skip|update|fail, sheetIndex (excel)
+ * Respuesta: NDJSON (application/x-ndjson): líneas { type: 'progress', current, total } y cierre { type: 'complete', ... }.
+ */
+router.post('/import', adminGuard, upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'Archivo requerido (field: file)' });
@@ -683,88 +1038,26 @@ router.post('/import', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Formato no soportado. Usa CSV o Excel (.xlsx/.xls).' });
     }
 
-    const inserted = [];
-    const updated = [];
-    const skipped = [];
-    const errors = [];
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no');
 
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      const rowNum = i + 2;
-      const ref = normalizeReference(r.reference ?? r.Reference ?? r.REFERENCIA ?? r.ref);
-      const manufacturer = String(r.manufacturer ?? r.Marca ?? r.fabricante ?? '').trim();
-      const model_name = String(r.model_name ?? r.model ?? r.nombre ?? r.Nombre ?? '').trim();
-      const vehicle_type = parseOptionalVehicleType(
-        r.vehicle_type ?? r.tipo ?? r.type ?? r.Tipo ?? '',
-      );
-      const commercial_release_date = parseOptionalDate(
-        r.commercial_release_date ?? r.fecha ?? r.release_date ?? '',
-      );
-
-      if (!ref || !manufacturer || !model_name) {
-        errors.push({ row: rowNum, message: 'Faltan reference, manufacturer o model_name' });
-        continue;
-      }
-
-      const { data: existing } = await supabase.from('slot_catalog_items').select('id').eq('reference', ref).maybeSingle();
-
-      if (existing) {
-        if (duplicateMode === 'skip') {
-          skipped.push(ref);
-          continue;
-        }
-        if (duplicateMode === 'fail') {
-          errors.push({ row: rowNum, message: `Referencia duplicada: ${ref}` });
-          continue;
-        }
-        const { error: upErr } = await supabase
-          .from('slot_catalog_items')
-          .update({
-            manufacturer,
-            model_name,
-            vehicle_type,
-            commercial_release_date,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
-        if (upErr) errors.push({ row: rowNum, message: upErr.message });
-        else updated.push(ref);
-        continue;
-      }
-
-      const { data: ins, error: insErr } = await supabase
-        .from('slot_catalog_items')
-        .insert([
-          {
-            reference: ref,
-            manufacturer,
-            model_name,
-            vehicle_type,
-            commercial_release_date,
-            updated_at: new Date().toISOString(),
-          },
-        ])
-        .select('id')
-        .single();
-
-      if (insErr) {
-        errors.push({ row: rowNum, message: insErr.message });
-      } else {
-        inserted.push(ref);
+    const result = await runCatalogImportRows(rows, duplicateMode, (current, total) => {
+      res.write(`${JSON.stringify({ type: 'progress', current, total })}\n`);
+    });
+    res.write(`${JSON.stringify({ type: 'complete', ...result })}\n`);
+    res.end();
+  } catch (e) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: e.message });
+    } else {
+      try {
+        res.write(`${JSON.stringify({ type: 'error', message: e.message })}\n`);
+        res.end();
+      } catch (_) {
+        /* ignore */
       }
     }
-
-    res.json({
-      inserted: inserted.length,
-      updated: updated.length,
-      skipped: skipped.length,
-      insertedRefs: inserted,
-      updatedRefs: updated,
-      skippedRefs: skipped,
-      errors,
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
   }
 });
 

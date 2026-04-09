@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useId } from 'react';
 import { MessageCircleQuestion, Loader2 } from 'lucide-react';
 import api from '../lib/axios';
-import { helpSections } from '../content/helpGuide';
+import { useAuth } from '../context/AuthContext';
+import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import { visibleHelpSections } from '../content/helpGuide';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
@@ -16,6 +18,8 @@ function SectionAnchor({ id, children }) {
 }
 
 export default function HelpAssistant() {
+  const { user } = useAuth();
+  const helpSections = visibleHelpSections(isLicenseAdminUser(user));
   const formId = useId();
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);

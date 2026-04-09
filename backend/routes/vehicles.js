@@ -29,6 +29,30 @@ const VEHICLE_SORT_COLUMNS = {
   updated_at: 'updated_at',
 };
 
+function parseVehicleCommercialYearFromBody(body) {
+  const raw = body.commercial_release_year ?? body.commercial_release_date;
+  if (raw == null || raw === '') return null;
+  const n = parseInt(String(raw).trim(), 10);
+  if (Number.isFinite(n) && n >= 1900 && n <= 2100) return n;
+  const s = String(raw).trim().slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const y = parseInt(s.slice(0, 4), 10);
+    return y >= 1900 && y <= 2100 ? y : null;
+  }
+  return null;
+}
+
+/** inline | angular | transverse — misma semántica que slot_catalog_items.motor_position */
+function parseOptionalMotorPosition(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'inline' || s === 'angular' || s === 'transverse') return s;
+  if (s === 'en_linea' || s === 'en línea' || s === 'en linea' || s === 'lineal') return 'inline';
+  if (s === 'en_angular' || s === 'en angular') return 'angular';
+  if (s === 'transversal' || s === 'transversa' || s === 'en_transversal' || s === 'en transversal') return 'transverse';
+  return null;
+}
+
 function parseVehicleSort(req) {
   const raw = String(req.query.sort || 'purchase_date').toLowerCase();
   const sortKey = Object.prototype.hasOwnProperty.call(VEHICLE_SORT_COLUMNS, raw) ? raw : 'purchase_date';
@@ -43,13 +67,14 @@ const VEHICLE_PUT_BODY_KEYS = [
   'manufacturer',
   'type',
   'traction',
+  'motor_position',
   'price',
   'purchase_date',
   'purchase_place',
   'anotaciones',
   'reference',
   'total_price',
-  'commercial_release_date',
+  'commercial_release_year',
   'catalog_item_id',
 ];
 
@@ -70,14 +95,22 @@ function vehicleScalarFieldsFromBody(body) {
     if (!Object.prototype.hasOwnProperty.call(body, k)) continue;
     let v = body[k];
     v = normalizeFormScalar(v);
-    if (k === 'purchase_date' || k === 'commercial_release_date') {
+    if (k === 'purchase_date') {
       o[k] = v;
+    } else if (k === 'commercial_release_year') {
+      if (v == null || v === '') o[k] = null;
+      else {
+        const n = parseInt(String(v).trim(), 10);
+        o[k] = Number.isFinite(n) && n >= 1900 && n <= 2100 ? n : null;
+      }
     } else if (k === 'price' || k === 'total_price') {
       if (v == null) o[k] = null;
       else {
         const n = Number(v);
         o[k] = Number.isNaN(n) ? null : n;
       }
+    } else if (k === 'motor_position') {
+      o[k] = parseOptionalMotorPosition(v);
     } else {
       o[k] = v;
     }
@@ -613,6 +646,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
       manufacturer,
       type,
       traction,
+      motor_position,
       price,
       purchase_date,
       purchase_place,
@@ -623,6 +657,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
       anotaciones,
       reference,
       scale_factor,
+      commercial_release_year,
       commercial_release_date,
       catalog_item_id,
     } = req.body;
@@ -632,10 +667,10 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
     const total_price = modified === 'true' ? null : (priceNum != null ? priceNum : null);
     const scaleFactor = (scale_factor === '' || scale_factor == null) ? DEFAULT_SCALE_FACTOR : parseInt(scale_factor, 10);
 
-    const commercial_release_date_val =
-      commercial_release_date === '' || commercial_release_date == null
-        ? null
-        : String(commercial_release_date).trim().slice(0, 10);
+    const commercial_release_year_val = parseVehicleCommercialYearFromBody({
+      commercial_release_year,
+      commercial_release_date,
+    });
     const catalog_item_id_val =
       catalog_item_id === '' || catalog_item_id == null ? null : String(catalog_item_id).trim();
 
@@ -645,6 +680,17 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
       catalogRow = cr;
     }
 
+    const traction_val =
+      traction != null && String(traction).trim() !== ''
+        ? String(traction).trim()
+        : catalogRow?.traction != null && String(catalogRow.traction).trim() !== ''
+          ? String(catalogRow.traction).trim()
+          : null;
+    const motor_position_val =
+      motor_position != null && String(motor_position).trim() !== ''
+        ? parseOptionalMotorPosition(motor_position)
+        : parseOptionalMotorPosition(catalogRow?.motor_position);
+
     // Añadir user_id al crear el vehículo
     const { data, error } = await supabase
       .from('vehicles')
@@ -653,7 +699,8 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
           model,
           manufacturer,
           type,
-          traction: traction || null,
+          traction: traction_val,
+          motor_position: motor_position_val,
           price: priceNum,
           total_price,
           purchase_date: purchase_date || null,
@@ -665,7 +712,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
           anotaciones,
           reference,
           scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
-          commercial_release_date: commercial_release_date_val,
+          commercial_release_year: commercial_release_year_val,
           catalog_item_id: catalog_item_id_val,
           user_id: req.user.id,
         },

@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/auth');
 const { helpAskLimiter } = require('../middleware/rateLimits');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { buildHelpGuidePlainText } = require('../lib/helpGuideText');
+const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 
 const router = express.Router();
 
@@ -39,7 +40,10 @@ router.post(
     }
 
     const guideData = loadGuideData();
-    const context = guideData ? buildHelpGuidePlainText(guideData) : 'No hay guía cargada. Di que no tienes contexto suficiente.';
+    const includeAdminSections = isLicenseAdminUser(req.user);
+    const context = guideData
+      ? buildHelpGuidePlainText(guideData, { includeAdminSections })
+      : 'No hay guía cargada. Di que no tienes contexto suficiente.';
 
     const systemPrompt = `Eres el asistente de ayuda de la aplicación web Slot Collection Pro (gestión de colección slot/coches, tiempos, circuitos, inventario y competiciones).
 Responde SIEMPRE en español, de forma breve y con pasos numerados cuando proceda.

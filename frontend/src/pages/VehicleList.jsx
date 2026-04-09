@@ -6,6 +6,7 @@ import api from '../lib/axios';
 import { ArrowDownUp, Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon, SlidersHorizontal } from 'lucide-react';
 import { formatDistance } from '../utils/formatUtils';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
+import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '../components/ui/input';
@@ -416,7 +417,7 @@ const VehicleList = () => {
               onChange={e => setFilters({ ...filters, type: e.target.value })}
             >
               <option value="">Todos los tipos</option>
-              {['Rally', 'GT', 'LMP', 'Hypercar', 'Grupo 5', 'Road Car', 'Clásico', 'DTM', 'F1', 'Camiones', 'Raid'].map(t => (
+              {VEHICLE_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>

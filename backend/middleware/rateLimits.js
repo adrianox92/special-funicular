@@ -10,6 +10,18 @@ const publicSignupLimiter = rateLimit({
 });
 
 /**
+ * Catálogo público (GET facets/items/detail): lecturas frecuentes; no comparte cupo con signup/pilot.
+ * Misma instancia en server.js solo para /api/public/catalog.
+ */
+const publicCatalogReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
+});
+
+/**
  * Auth para app de sincronización: límite suave (configurable al arranque).
  * AUTH_RATE_LIMIT_MAX=0 desactiva el límite.
  */
@@ -54,4 +66,24 @@ const helpAskLimiter = rateLimit({
   },
 });
 
-module.exports = { publicSignupLimiter, authSoftLimiter, contactLimiter, helpAskLimiter };
+/** Sugerencias de catálogo y valoraciones: por usuario autenticado */
+const catalogContributionsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes al catálogo. Inténtalo más tarde.' },
+  keyGenerator: (req) => {
+    if (req.user?.id) return `user:${req.user.id}`;
+    return ipKeyGenerator(req.ip);
+  },
+});
+
+module.exports = {
+  publicSignupLimiter,
+  publicCatalogReadLimiter,
+  authSoftLimiter,
+  contactLimiter,
+  helpAskLimiter,
+  catalogContributionsLimiter,
+};
