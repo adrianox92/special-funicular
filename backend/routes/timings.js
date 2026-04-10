@@ -6,69 +6,13 @@ const { getCircuitRanking } = require('../lib/positionTracker');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
+const csvTimingParse = require('../lib/csvTimingParse');
+const smartraceCsv = require('../lib/smartraceCsvImport');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
-
-function parseCsv(content) {
-  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  if (!normalized.trim()) return [];
-  const rows = [];
-  let row = [];
-  let field = '';
-  let inQuotes = false;
-  for (let i = 0; i < normalized.length; i++) {
-    const c = normalized[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (normalized[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += c;
-      }
-    } else if (c === '"') {
-      inQuotes = true;
-    } else if (c === ',') {
-      row.push(field.trim());
-      field = '';
-    } else if (c === '\n') {
-      row.push(field.trim());
-      rows.push(row);
-      row = [];
-      field = '';
-    } else {
-      field += c;
-    }
-  }
-  row.push(field.trim());
-  if (row.length > 1 || (row.length === 1 && row[0] !== '')) {
-    rows.push(row);
-  }
-  return rows;
-}
-
-function csvToObjects(content) {
-  const rows = parseCsv(content);
-  if (rows.length < 2) return [];
-  const headers = rows[0].map((h) => String(h).trim().toLowerCase());
-  const out = [];
-  for (let r = 1; r < rows.length; r++) {
-    const line = rows[r];
-    if (!line || line.every((c) => c === '' || c == null)) continue;
-    const obj = {};
-    headers.forEach((h, j) => {
-      obj[h] = line[j] != null ? String(line[j]) : '';
-    });
-    out.push(obj);
-  }
-  return out;
-}
 
 function parseNumber(val) {
   if (val == null || val === '') return null;
@@ -164,15 +108,13 @@ function normalizeJsonTimingRow(row) {
 }
 
 /**
- * POST /api/timings/import
- * Body: { vehicle_id?, format: "csv"|"json", content: string }
- * CSV: cabeceras timing_date, circuit, lane, laps, best_lap_time, total_time, average_time,
- *      best_lap_timestamp?, total_time_timestamp?, average_time_timestamp?, circuit_id?, supply_voltage_volts|voltage?, lap_1, lap_2, ...
- * JSON: array de objetos (mismo esquema que POST /api/sync/timings); vehicle_id opcional si se envía arriba.
+ * POST /api/timings/import-preview
+ * Body: { format: "csv"|"json", content: string }
+ * Respuesta: { format: "native"|"smartrace", rows: [{ index, pilotLabel, lapsExpected, error?, warning? }] }
  */
-router.post('/import', async (req, res) => {
+router.post('/import-preview', async (req, res) => {
   try {
-    const { vehicle_id: defaultVehicleId, format, content } = req.body || {};
+    const { format, content } = req.body || {};
     if (content == null || typeof content !== 'string') {
       return res.status(400).json({ error: 'content (string) es requerido' });
     }
@@ -180,7 +122,6 @@ router.post('/import', async (req, res) => {
       return res.status(400).json({ error: 'format debe ser "csv" o "json"' });
     }
 
-    let items = [];
     if (format === 'json') {
       let parsed;
       try {
@@ -188,9 +129,183 @@ router.post('/import', async (req, res) => {
       } catch {
         return res.status(400).json({ error: 'JSON inválido' });
       }
-      items = Array.isArray(parsed) ? parsed : [parsed];
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      const rows = items.map((row, i) => {
+        try {
+          const merged = normalizeJsonTimingRow({ ...row });
+          merged.vehicle_id = merged.vehicle_id || smartraceCsv.PREVIEW_VEHICLE_ID;
+          if (!merged.vehicle_id) {
+            throw new Error('vehicle_id requerido en cada objeto o en la petición');
+          }
+          if (merged.laps == null || merged.best_lap_time == null || merged.total_time == null || merged.average_time == null) {
+            throw new Error('Faltan laps, best_lap_time, total_time o average_time');
+          }
+          const lapsN = parseInt(String(merged.laps).replace(',', '.'), 10);
+          return {
+            index: i,
+            pilotLabel: '',
+            lapsExpected: Number.isFinite(lapsN) ? lapsN : null,
+            error: null,
+          };
+        } catch (e) {
+          return {
+            index: i,
+            pilotLabel: '',
+            lapsExpected: null,
+            error: e.message,
+          };
+        }
+      });
+      return res.json({ format: 'native', rows });
+    }
+
+    const headers = csvTimingParse.csvHeadersNormalized(content);
+    const objects = csvTimingParse.csvToObjects(content);
+    if (objects.length === 0) {
+      return res.status(400).json({ error: 'No hay filas para importar' });
+    }
+
+    if (smartraceCsv.isSmartRaceHeaders(headers)) {
+      const smartraceMeta = smartraceCsv.getSmartRaceCsvMeta(headers, objects);
+      const rows = objects.map((row, i) => {
+        const p = smartraceCsv.previewSmartRaceRow(row, i);
+        return {
+          index: p.index,
+          pilotLabel: p.pilotLabel,
+          lapsExpected: p.lapsExpected,
+          error: p.error,
+          warning: p.warning || undefined,
+        };
+      });
+      return res.json({ format: 'smartrace', rows, smartraceMeta });
+    }
+
+    const rows = objects.map((row, i) => {
+      try {
+        csvRowToSyncBody(row, smartraceCsv.PREVIEW_VEHICLE_ID);
+        const lapsExpected = parseInt(String(row.laps ?? '').replace(',', '.'), 10);
+        return {
+          index: i,
+          pilotLabel: '',
+          lapsExpected: Number.isFinite(lapsExpected) ? lapsExpected : null,
+          error: null,
+        };
+      } catch (e) {
+        return {
+          index: i,
+          pilotLabel: '',
+          lapsExpected: null,
+          error: e.message,
+        };
+      }
+    });
+    return res.json({ format: 'native', rows });
+  } catch (err) {
+    console.error('POST /api/timings/import-preview:', err);
+    res.status(500).json({ error: err.message || 'Error al generar vista previa' });
+  }
+});
+
+/**
+ * POST /api/timings/import
+ * Body: { vehicle_id?, format: "csv"|"json", content: string, selected_row_indices?: number[] }
+ * CSV: cabeceras timing_date, circuit, lane, laps, best_lap_time, total_time, average_time,
+ *      best_lap_timestamp?, total_time_timestamp?, average_time_timestamp?, circuit_id?, supply_voltage_volts|voltage?, lap_1, lap_2, ...
+ * CSV SmartRace: columnas tipo exportación SmartRace (vueltas, piloto, 1, 2, …); varias filas requieren selected_row_indices.
+ * CSV SmartRace sin circuito/carril en el fichero: enviar circuit_id (y opcionalmente circuit) y lane según elección del usuario.
+ * JSON: array de objetos (mismo esquema que POST /api/sync/timings); vehicle_id opcional si se envía arriba.
+ */
+router.post('/import', async (req, res) => {
+  try {
+    const {
+      vehicle_id: defaultVehicleId,
+      format,
+      content,
+      selected_row_indices,
+      circuit_id: importCircuitId,
+      circuit: importCircuitName,
+      lane: importLane,
+    } = req.body || {};
+    if (content == null || typeof content !== 'string') {
+      return res.status(400).json({ error: 'content (string) es requerido' });
+    }
+    if (!format || !['csv', 'json'].includes(format)) {
+      return res.status(400).json({ error: 'format debe ser "csv" o "json"' });
+    }
+
+    const selectedSet =
+      Array.isArray(selected_row_indices) && selected_row_indices.length > 0
+        ? new Set(selected_row_indices.map((x) => Number(x)))
+        : null;
+
+    let items = [];
+    let csvFormat = null;
+    let originalIndices = null;
+
+    if (format === 'json') {
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return res.status(400).json({ error: 'JSON inválido' });
+      }
+      const all = Array.isArray(parsed) ? parsed : [parsed];
+      if (selectedSet) {
+        items = [];
+        originalIndices = [];
+        for (let j = 0; j < all.length; j++) {
+          if (selectedSet.has(j)) {
+            items.push(all[j]);
+            originalIndices.push(j);
+          }
+        }
+      } else {
+        items = all;
+        originalIndices = all.map((_, j) => j);
+      }
     } else {
-      items = csvToObjects(content);
+      const headers = csvTimingParse.csvHeadersNormalized(content);
+      const objects = csvTimingParse.csvToObjects(content);
+      if (objects.length === 0) {
+        return res.status(400).json({ error: 'No hay filas para importar' });
+      }
+
+      if (smartraceCsv.isSmartRaceHeaders(headers)) {
+        csvFormat = 'smartrace';
+        if (objects.length > 1 && (!selectedSet || selectedSet.size === 0)) {
+          return res.status(400).json({
+            error:
+              'Este CSV tiene varios pilotos. Obtén una vista previa (POST /api/timings/import-preview) y envía selected_row_indices con las filas a importar.',
+          });
+        }
+        const useSet = selectedSet && selectedSet.size > 0 ? selectedSet : new Set([0]);
+        items = [];
+        originalIndices = [];
+        for (let i = 0; i < objects.length; i++) {
+          if (useSet.has(i)) {
+            items.push(objects[i]);
+            originalIndices.push(i);
+          }
+        }
+        if (items.length === 0) {
+          return res.status(400).json({ error: 'No hay filas seleccionadas para importar' });
+        }
+      } else {
+        csvFormat = 'native';
+        if (selectedSet) {
+          items = [];
+          originalIndices = [];
+          for (let j = 0; j < objects.length; j++) {
+            if (selectedSet.has(j)) {
+              items.push(objects[j]);
+              originalIndices.push(j);
+            }
+          }
+        } else {
+          items = objects;
+          originalIndices = objects.map((_, j) => j);
+        }
+      }
     }
 
     if (items.length === 0) {
@@ -201,6 +316,7 @@ router.post('/import', async (req, res) => {
     let imported = 0;
 
     for (let i = 0; i < items.length; i++) {
+      const sourceRowNumber = originalIndices ? originalIndices[i] + 1 : i + 1;
       let body;
       try {
         if (format === 'json') {
@@ -210,17 +326,36 @@ router.post('/import', async (req, res) => {
             throw new Error('vehicle_id requerido en cada objeto o en la petición');
           }
           body = merged;
+        } else if (csvFormat === 'smartrace') {
+          const importOptions = {
+            circuit_id: importCircuitId,
+            circuit: importCircuitName,
+            lane: importLane,
+          };
+          const merged = smartraceCsv.mergeSmartRaceRowWithImportOptions(items[i], importOptions);
+          if (!smartraceCsv.hasCircuitInRow(merged)) {
+            throw new Error(
+              'Falta circuito: el CSV no lo incluye o está vacío. Selecciona un circuito en la importación o añade columnas circuit/circuito/circuit_id.'
+            );
+          }
+          if (!smartraceCsv.hasLaneInRow(merged)) {
+            throw new Error(
+              'Falta carril: el CSV no lo incluye o está vacío. Selecciona un carril en la importación o añade columnas lane/carril.'
+            );
+          }
+          body = smartraceCsv.smartRaceRowToSyncBody(merged, defaultVehicleId);
+          delete body._smartraceWarning;
         } else {
           body = csvRowToSyncBody(items[i], defaultVehicleId);
         }
       } catch (e) {
-        errors.push({ row: i + 1, error: e.message });
+        errors.push({ row: sourceRowNumber, error: e.message });
         continue;
       }
 
       const result = await insertVehicleTimingFromSyncBody(supabase, req.user.id, body);
       if (!result.success) {
-        errors.push({ row: i + 1, error: result.error });
+        errors.push({ row: sourceRowNumber, error: result.error });
         continue;
       }
       imported += 1;

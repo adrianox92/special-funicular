@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
@@ -122,13 +122,13 @@ export default function PublicCatalogDetail() {
     };
   }, [user, id]);
 
-  useEffect(() => {
-    if (!item) return;
+  useLayoutEffect(() => {
+    if (!item?.id || String(item.id) !== String(id)) return;
     applyCatalogItemPageSeo(item);
     return () => {
       clearCatalogItemPageSeo();
     };
-  }, [item]);
+  }, [item, id]);
 
   const submitRating = async (value) => {
     if (!user) return;

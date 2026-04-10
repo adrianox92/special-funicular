@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -45,24 +45,69 @@ const JSON_TEMPLATE = `[
 ]`;
 
 /**
- * @param {{ open: boolean, onOpenChange: (v: boolean) => void, vehicles: Array<{ id: string, manufacturer?: string, model?: string }>, defaultVehicleId?: string, onImported?: () => void }} props
+ * @param {{ open: boolean, onOpenChange: (v: boolean) => void, vehicles: Array<{ id: string, manufacturer?: string, model?: string }>, circuits?: Array<{ id: string, name?: string, num_lanes?: number }>, defaultVehicleId?: string, defaultCircuitId?: string, onImported?: () => void }} props
  */
-export default function ImportTimingsModal({ open, onOpenChange, vehicles, defaultVehicleId, onImported }) {
+export default function ImportTimingsModal({
+  open,
+  onOpenChange,
+  vehicles,
+  circuits = [],
+  defaultVehicleId,
+  defaultCircuitId,
+  onImported,
+}) {
   const [vehicleId, setVehicleId] = useState(defaultVehicleId || '');
+  const [importCircuitId, setImportCircuitId] = useState('');
+  const [importLane, setImportLane] = useState('');
   const [format, setFormat] = useState('csv');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [previewInfo, setPreviewInfo] = useState(null);
+  const [showSmartracePicker, setShowSmartracePicker] = useState(false);
+  const [selectedRowIndices, setSelectedRowIndices] = useState([]);
   const fileInputRef = useRef(null);
+  /** Contenido para el que `previewInfo` sigue siendo válida */
+  const previewContentRef = useRef(null);
+
+  const resetPreviewState = () => {
+    setPreviewInfo(null);
+    setShowSmartracePicker(false);
+    setSelectedRowIndices([]);
+    previewContentRef.current = null;
+  };
+
+  const smartraceLaneCount = useMemo(() => {
+    if (!importCircuitId) return 12;
+    const c = circuits.find((x) => x.id === importCircuitId);
+    const n = parseInt(c?.num_lanes, 10);
+    return Number.isFinite(n) && n > 0 ? n : 8;
+  }, [importCircuitId, circuits]);
+
+  const laneOptions = useMemo(
+    () => Array.from({ length: smartraceLaneCount }, (_, i) => String(i + 1)),
+    [smartraceLaneCount]
+  );
 
   useEffect(() => {
     if (open) {
       setVehicleId(defaultVehicleId || (vehicles[0]?.id ?? ''));
+      setImportCircuitId(defaultCircuitId || '');
+      setImportLane('');
       setError(null);
       setResult(null);
+      resetPreviewState();
     }
-  }, [open, defaultVehicleId, vehicles]);
+  }, [open, defaultVehicleId, defaultCircuitId, vehicles]);
+
+  useEffect(() => {
+    resetPreviewState();
+  }, [content, format]);
+
+  useEffect(() => {
+    setImportLane('');
+  }, [importCircuitId]);
 
   const downloadTemplate = () => {
     const text = format === 'csv' ? CSV_TEMPLATE : JSON_TEMPLATE;
@@ -85,24 +130,179 @@ export default function ImportTimingsModal({ open, onOpenChange, vehicles, defau
     e.target.value = '';
   };
 
+  const toggleRowIndex = (idx) => {
+    setSelectedRowIndices((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx].sort((a, b) => a - b)
+    );
+  };
+
+  const smartracePayload = () => ({
+    ...(importCircuitId ? { circuit_id: importCircuitId } : {}),
+    ...(importLane ? { lane: importLane } : {}),
+  });
+
+  /** Si al menos una sesión se importó, refresca datos y cierra el modal. Si no, muestra el resultado en el propio modal. */
+  const applyImportResult = (data) => {
+    if (data.imported > 0) {
+      if (onImported) onImported();
+      onOpenChange(false);
+    } else {
+      setResult(data);
+    }
+  };
+
+  const smartraceMeta = previewInfo?.smartraceMeta;
+  const showSmartraceCircuitLane =
+    previewInfo?.format === 'smartrace' &&
+    smartraceMeta &&
+    (smartraceMeta.needsCircuitPick || smartraceMeta.needsLanePick);
+
+  const smartraceNeedsCircuitLaneInput =
+    previewInfo?.format === 'smartrace' &&
+    smartraceMeta &&
+    ((smartraceMeta.needsCircuitPick && !importCircuitId) ||
+      (smartraceMeta.needsLanePick && !importLane));
+
   const handleImport = async () => {
+    if (!content.trim()) return;
+    if (!vehicleId) {
+      setError('Selecciona un vehículo para asociar las sesiones importadas.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
+
     try {
-      const { data } = await api.post('/timings/import', {
-        vehicle_id: vehicleId || undefined,
-        format,
-        content,
-      });
-      setResult(data);
-      if (data.imported > 0 && onImported) onImported();
+      if (format === 'json') {
+        const { data } = await api.post('/timings/import', {
+          vehicle_id: vehicleId,
+          format,
+          content,
+        });
+        applyImportResult(data);
+        return;
+      }
+
+      const previewFresh = previewInfo && previewContentRef.current === content;
+
+      // Fase 2: SmartRace multi-fila
+      if (previewFresh && showSmartracePicker && previewInfo.format === 'smartrace') {
+        const meta = previewInfo.smartraceMeta || {};
+        if ((meta.needsCircuitPick && !importCircuitId) || (meta.needsLanePick && !importLane)) {
+          setError('Selecciona circuito y carril obligatorios para este CSV.');
+          return;
+        }
+        const valid = selectedRowIndices.filter((i) => {
+          const row = previewInfo.rows.find((r) => r.index === i);
+          return row && !row.error;
+        });
+        if (valid.length === 0) {
+          setError('Selecciona al menos una fila válida para importar.');
+          return;
+        }
+        const { data } = await api.post('/timings/import', {
+          vehicle_id: vehicleId,
+          format,
+          content,
+          selected_row_indices: valid,
+          ...smartracePayload(),
+        });
+        resetPreviewState();
+        applyImportResult(data);
+        return;
+      }
+
+      if (!previewFresh) {
+        const { data: prev } = await api.post('/timings/import-preview', { format, content });
+        setPreviewInfo(prev);
+        previewContentRef.current = content;
+
+        if (prev.format === 'smartrace') {
+          const meta = prev.smartraceMeta || {};
+          if (prev.rows.length > 1) {
+            setSelectedRowIndices(prev.rows.filter((r) => !r.error).map((r) => r.index));
+            setShowSmartracePicker(true);
+            return;
+          }
+          if (prev.rows.length === 1) {
+            if ((meta.needsCircuitPick && !importCircuitId) || (meta.needsLanePick && !importLane)) {
+              setError('Selecciona circuito y/o carril obligatorios (el CSV no los incluye).');
+              return;
+            }
+            const { data } = await api.post('/timings/import', {
+              vehicle_id: vehicleId,
+              format,
+              content,
+              selected_row_indices: [0],
+              ...smartracePayload(),
+            });
+            resetPreviewState();
+            applyImportResult(data);
+            return;
+          }
+        }
+
+        const { data } = await api.post('/timings/import', {
+          vehicle_id: vehicleId,
+          format,
+          content,
+        });
+        resetPreviewState();
+        applyImportResult(data);
+        return;
+      }
+
+      // Segundo clic: vista previa ya cargada (p. ej. usuario rellenó circuito/carril)
+      if (previewFresh && previewInfo.format === 'smartrace' && previewInfo.rows.length === 1) {
+        const meta = previewInfo.smartraceMeta || {};
+        if ((meta.needsCircuitPick && !importCircuitId) || (meta.needsLanePick && !importLane)) {
+          setError('Selecciona circuito y/o carril obligatorios (el CSV no los incluye).');
+          return;
+        }
+        const { data } = await api.post('/timings/import', {
+          vehicle_id: vehicleId,
+          format,
+          content,
+          selected_row_indices: [0],
+          ...smartracePayload(),
+        });
+        resetPreviewState();
+        applyImportResult(data);
+        return;
+      }
+
+      if (previewFresh && previewInfo.format === 'native') {
+        const { data } = await api.post('/timings/import', {
+          vehicle_id: vehicleId,
+          format,
+          content,
+        });
+        resetPreviewState();
+        applyImportResult(data);
+        return;
+      }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Error al importar');
     } finally {
       setLoading(false);
     }
   };
+
+  const importButtonLabel =
+    showSmartracePicker && previewInfo?.format === 'smartrace' ? 'Importar selección' : 'Importar';
+
+  const importDisabled =
+    loading ||
+    !content.trim() ||
+    smartraceNeedsCircuitLaneInput ||
+    (showSmartracePicker &&
+      previewInfo?.format === 'smartrace' &&
+      selectedRowIndices.filter((i) => {
+        const row = previewInfo.rows.find((r) => r.index === i);
+        return row && !row.error;
+      }).length === 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,7 +327,84 @@ export default function ImportTimingsModal({ open, onOpenChange, vehicles, defau
                 ))}
               </SelectContent>
             </Select>
+            {previewInfo?.format === 'smartrace' && (
+              <p className="text-xs text-muted-foreground">
+                Formato SmartRace detectado: el coche de la sesión es el que elijas aquí (no se usa la columna «Coche» del
+                CSV).
+              </p>
+            )}
           </div>
+
+          {showSmartraceCircuitLane && (
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <p className="text-sm font-medium">Circuito y carril</p>
+              <p className="text-xs text-muted-foreground">
+                El CSV no incluye circuito o carril (o vienen vacíos). Elige un circuito y un carril de tu colección para
+                guardar la sesión correctamente.
+              </p>
+              {smartraceMeta?.needsCircuitPick && circuits.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="import-circuit">Circuito</Label>
+                  <Select value={importCircuitId || '__none__'} onValueChange={(v) => setImportCircuitId(v === '__none__' ? '' : v)}>
+                    <SelectTrigger id="import-circuit">
+                      <SelectValue placeholder="Selecciona circuito" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Selecciona —</SelectItem>
+                      {circuits.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name || c.id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {smartraceMeta?.needsCircuitPick && circuits.length === 0 && (
+                <Alert variant="destructive">
+                  <AlertDescription className="text-sm">
+                    El CSV no incluye circuito. Añade al menos un circuito en la aplicación para poder indicar dónde se
+                    rodó la sesión.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {smartraceMeta?.needsLanePick && (
+                <div className="space-y-2">
+                  <Label htmlFor="import-lane">Carril</Label>
+                  <Select
+                    value={importLane || '__none__'}
+                    onValueChange={(v) => setImportLane(v === '__none__' ? '' : v)}
+                    disabled={!!(smartraceMeta?.needsCircuitPick && !importCircuitId)}
+                  >
+                    <SelectTrigger id="import-lane">
+                      <SelectValue
+                        placeholder={
+                          smartraceMeta?.needsCircuitPick && !importCircuitId ? 'Primero elige circuito' : 'Carril'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Selecciona —</SelectItem>
+                      {laneOptions.map((n) => (
+                        <SelectItem key={n} value={n}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {importCircuitId ? (
+                    <p className="text-xs text-muted-foreground">
+                      Carril 1–{smartraceLaneCount} según el circuito seleccionado.
+                    </p>
+                  ) : smartraceMeta?.needsCircuitPick ? (
+                    <p className="text-xs text-muted-foreground">Tras elegir circuito, se ajustan los carriles disponibles.</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Elige el número de carril (1–{smartraceLaneCount}).</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Formato</Label>
@@ -170,6 +447,40 @@ export default function ImportTimingsModal({ open, onOpenChange, vehicles, defau
             />
           </div>
 
+          {showSmartracePicker && previewInfo?.format === 'smartrace' && previewInfo.rows.length > 1 && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <p className="text-sm font-medium">Varios pilotos en el archivo</p>
+              <p className="text-xs text-muted-foreground">
+                Marca las filas que quieres registrar como sesiones (cada una con el vehículo seleccionado arriba).
+              </p>
+              <ul className="max-h-48 space-y-2 overflow-y-auto text-sm">
+                {previewInfo.rows.map((row) => {
+                  const id = `import-row-${row.index}`;
+                  return (
+                    <li key={row.index} className="flex items-start gap-2">
+                      <input
+                        id={id}
+                        type="checkbox"
+                        className="mt-1 size-4 shrink-0 rounded border-input"
+                        checked={selectedRowIndices.includes(row.index)}
+                        disabled={!!row.error}
+                        onChange={() => toggleRowIndex(row.index)}
+                      />
+                      <label htmlFor={id} className={`cursor-pointer ${row.error ? 'text-muted-foreground' : ''}`}>
+                        <span className="font-medium">{row.pilotLabel}</span>
+                        {row.lapsExpected != null && (
+                          <span className="text-muted-foreground"> · {row.lapsExpected} vueltas</span>
+                        )}
+                        {row.error && <span className="block text-destructive">Error: {row.error}</span>}
+                        {row.warning && <span className="block text-amber-600 dark:text-amber-500">Aviso: {row.warning}</span>}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -200,9 +511,9 @@ export default function ImportTimingsModal({ open, onOpenChange, vehicles, defau
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>
-          <Button onClick={handleImport} disabled={loading || !content.trim()}>
+          <Button onClick={handleImport} disabled={importDisabled}>
             {loading ? <Spinner className="size-4 mr-2" /> : null}
-            Importar
+            {importButtonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

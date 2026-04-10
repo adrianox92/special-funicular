@@ -747,7 +747,9 @@ const TimingsList = () => {
         open={showImportModal}
         onOpenChange={setShowImportModal}
         vehicles={Object.values(vehicles)}
+        circuits={circuits}
         defaultVehicleId={filter.vehicle || undefined}
+        defaultCircuitId={filter.circuit_id || undefined}
         onImported={loadData}
       />
     </div>

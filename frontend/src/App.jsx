@@ -45,7 +45,7 @@ import { Toaster } from './components/ui/sonner';
 import GlobalCommandPalette from './components/GlobalCommandPalette';
 import HomeRoute from './components/HomeRoute';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
-import { getDocumentTitle } from './utils/documentTitle';
+import { getDocumentTitle, isPublicCatalogDetailPath } from './utils/documentTitle';
 
 const PageLayout = ({ children }) => (
   <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
@@ -87,6 +87,8 @@ const AppContent = () => {
   }, [hasNavbar]);
 
   React.useEffect(() => {
+    // La ficha pública del catálogo fija título y metadescripción en `applyCatalogItemPageSeo`.
+    if (isPublicCatalogDetailPath(location.pathname)) return;
     document.title = getDocumentTitle(location.pathname);
   }, [location.pathname]);
 

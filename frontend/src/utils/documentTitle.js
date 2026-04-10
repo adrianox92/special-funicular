@@ -2,6 +2,19 @@ import { LANDING_PAGE_TITLE } from './landingSeo';
 
 export const BRAND = 'Slot Collection Pro';
 
+/** Ruta pública `/catalogo/:uuid` o `/catalogo/:uuid/:slug` (ficha de un ítem). */
+const PUBLIC_CATALOG_ITEM_PATH =
+  /^\/catalogo\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(\/[^/]*)?$/i;
+
+/**
+ * @param {string} pathname
+ * @returns {boolean}
+ */
+export function isPublicCatalogDetailPath(pathname) {
+  const p = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  return PUBLIC_CATALOG_ITEM_PATH.test(p);
+}
+
 /** @param {string} section */
 function withBrand(section) {
   return `${section} | ${BRAND}`;
