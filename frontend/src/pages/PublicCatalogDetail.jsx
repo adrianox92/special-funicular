@@ -28,7 +28,10 @@ import { labelMotorPosition, MOTOR_POSITION_OPTIONS } from '../data/motorPositio
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { applyCatalogItemPageSeo, clearCatalogItemPageSeo } from '../utils/catalogItemSeo';
 import { ChevronRight, Package, Star } from 'lucide-react';
+import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
+import CatalogBrandSelect from '../components/CatalogBrandSelect';
+import CatalogTractionSelect from '../components/CatalogTractionSelect';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -64,13 +67,15 @@ export default function PublicCatalogDetail() {
     const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(id)}`);
     setItem(data);
     setSuggestForm({
-      manufacturer: data.manufacturer ?? '',
+      manufacturer_id: data.manufacturer_id ?? '',
       model_name: data.model_name ?? '',
       vehicle_type: data.vehicle_type ?? '',
       traction: data.traction ?? '',
       motor_position: data.motor_position ?? '',
       commercial_release_year:
         data.commercial_release_year != null ? String(data.commercial_release_year) : '',
+      discontinued: Boolean(data.discontinued),
+      upcoming_release: Boolean(data.upcoming_release),
     });
   }, [id]);
 
@@ -154,10 +159,14 @@ export default function PublicCatalogDetail() {
   const submitSuggest = async (e) => {
     e.preventDefault();
     if (!user) return;
+    if (!suggestForm.manufacturer_id?.trim()) {
+      toast.error('Selecciona una marca registrada.');
+      return;
+    }
     setSuggestSaving(true);
     try {
       const fd = new FormData();
-      fd.append('manufacturer', suggestForm.manufacturer ?? '');
+      fd.append('manufacturer_id', suggestForm.manufacturer_id ?? '');
       fd.append('model_name', suggestForm.model_name ?? '');
       if (suggestForm.vehicle_type) fd.append('vehicle_type', suggestForm.vehicle_type);
       fd.append('traction', suggestForm.traction ?? '');
@@ -165,6 +174,8 @@ export default function PublicCatalogDetail() {
       if (suggestForm.commercial_release_year) {
         fd.append('commercial_release_year', suggestForm.commercial_release_year);
       }
+      fd.append('discontinued', suggestForm.discontinued ? 'true' : 'false');
+      fd.append('upcoming_release', suggestForm.upcoming_release ? 'true' : 'false');
       if (suggestImage) fd.append('image', suggestImage);
       await api.post(`/catalog/items/${encodeURIComponent(id)}/change-requests`, fd);
       toast.success('Sugerencia enviada. El equipo la revisará.');
@@ -224,9 +235,12 @@ export default function PublicCatalogDetail() {
             Catálogo
           </Link>
           <ChevronRight className="size-4 shrink-0 opacity-60" />
-          <span className="text-foreground font-medium truncate max-w-[12rem] sm:max-w-none">
+          <Link
+            to={`/catalogo?manufacturer=${encodeURIComponent(item.manufacturer)}`}
+            className="text-foreground font-medium truncate max-w-[12rem] sm:max-w-none hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
             {item.manufacturer}
-          </span>
+          </Link>
           <ChevronRight className="size-4 shrink-0 opacity-60 hidden sm:inline" />
           <span className="text-foreground font-medium truncate max-w-[14rem] sm:max-w-md">
             {item.model_name}
@@ -310,6 +324,8 @@ export default function PublicCatalogDetail() {
                   label="Año de comercialización"
                   value={item.commercial_release_year != null ? String(item.commercial_release_year) : '—'}
                 />
+                <DetailRow label="Descatalogado" value={item.discontinued ? 'Sí' : 'No'} />
+                <DetailRow label="Próximo lanzamiento" value={item.upcoming_release ? 'Sí' : 'No'} />
                 <DetailRow label="Última actualización" value={formatDate(item.updated_at)} />
               </dl>
             </CardContent>
@@ -363,13 +379,14 @@ export default function PublicCatalogDetail() {
             <DialogTitle>Sugerir corrección</DialogTitle>
           </DialogHeader>
           <form onSubmit={submitSuggest} className="space-y-3 py-2">
-            <div className="space-y-2">
-              <Label>Marca</Label>
-              <Input
-                value={suggestForm.manufacturer ?? ''}
-                onChange={(e) => setSuggestForm((f) => ({ ...f, manufacturer: e.target.value }))}
-              />
-            </div>
+            <CatalogBrandSelect
+              label="Marca"
+              required
+              value={suggestForm.manufacturer_id ?? ''}
+              onChange={(manufacturer_id) =>
+                setSuggestForm((f) => ({ ...f, manufacturer_id }))
+              }
+            />
             <div className="space-y-2">
               <Label>Nombre / modelo</Label>
               <Input
@@ -398,13 +415,11 @@ export default function PublicCatalogDetail() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Tracción</Label>
-              <Input
-                value={suggestForm.traction ?? ''}
-                onChange={(e) => setSuggestForm((f) => ({ ...f, traction: e.target.value }))}
-              />
-            </div>
+            <CatalogTractionSelect
+              value={suggestForm.traction ?? ''}
+              onChange={(traction) => setSuggestForm((f) => ({ ...f, traction }))}
+              id="suggest-catalog-traction"
+            />
             <div className="space-y-2">
               <Label>Posición del motor</Label>
               <Select
@@ -437,6 +452,28 @@ export default function PublicCatalogDetail() {
                   setSuggestForm((f) => ({ ...f, commercial_release_year: e.target.value }))
                 }
               />
+            </div>
+            <div className="flex flex-col gap-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="suggest-discontinued" className="cursor-pointer">
+                  Descatalogado
+                </Label>
+                <Switch
+                  id="suggest-discontinued"
+                  checked={!!suggestForm.discontinued}
+                  onCheckedChange={(v) => setSuggestForm((f) => ({ ...f, discontinued: v }))}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="suggest-upcoming" className="cursor-pointer">
+                  Próximo lanzamiento
+                </Label>
+                <Switch
+                  id="suggest-upcoming"
+                  checked={!!suggestForm.upcoming_release}
+                  onCheckedChange={(v) => setSuggestForm((f) => ({ ...f, upcoming_release: v }))}
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Imagen (opcional)</Label>

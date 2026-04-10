@@ -68,6 +68,8 @@ export function buildCatalogItemMetaDescription(item) {
     extras.push(`año de comercialización ${item.commercial_release_year}`);
   }
   if (item.traction) extras.push(`tracción ${item.traction}`);
+  if (item.discontinued) extras.push('descatalogado');
+  if (item.upcoming_release) extras.push('próximo lanzamiento');
   const motor = labelMotorForMeta(item.motor_position);
   if (motor) extras.push(`motor ${motor.toLowerCase()}`);
   const rc = Number(item.rating_count);

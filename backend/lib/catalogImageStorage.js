@@ -46,8 +46,24 @@ async function removeCatalogObjectByPublicUrl(supabase, publicUrl) {
   return { error: error || null };
 }
 
+/**
+ * Logo de marca (mismo bucket, carpeta brands/).
+ */
+async function uploadBrandLogoBuffer(supabase, buffer, mimetype) {
+  const processed = await processVehicleImageBuffer(buffer, mimetype);
+  const filePath = `brands/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${processed.ext}`;
+  const { error: storageError } = await supabase.storage.from(CATALOG_IMAGES_BUCKET).upload(filePath, processed.buffer, {
+    contentType: processed.contentType,
+    upsert: false,
+  });
+  if (storageError) throw new Error(storageError.message);
+  const { data: publicUrlData } = supabase.storage.from(CATALOG_IMAGES_BUCKET).getPublicUrl(filePath);
+  return publicUrlData.publicUrl;
+}
+
 module.exports = {
   CATALOG_IMAGES_BUCKET,
   uploadCatalogImageBuffer,
+  uploadBrandLogoBuffer,
   removeCatalogObjectByPublicUrl,
 };

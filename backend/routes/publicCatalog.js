@@ -8,7 +8,7 @@ const router = express.Router();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 const PUBLIC_SELECT =
-  'id, reference, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, image_url, updated_at, rating_avg, rating_count';
+  'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, image_url, updated_at, rating_avg, rating_count';
 
 function escapeIlikePattern(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
@@ -27,7 +27,7 @@ function isUuid(id) {
 router.get('/facets', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('slot_catalog_items')
+      .from('slot_catalog_items_with_ratings')
       .select('manufacturer, vehicle_type, commercial_release_year');
     if (error) return res.status(500).json({ error: error.message });
 
@@ -51,6 +51,22 @@ router.get('/facets', async (req, res) => {
       vehicle_types: Array.from(vehicleTypes).sort((a, b) => a.localeCompare(b, 'es')),
       years: Array.from(years).sort((a, b) => b - a),
     });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /brands — lista de marcas (desplegables / formularios públicos)
+ */
+router.get('/brands', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('slot_catalog_brands')
+      .select('id,name,logo_url')
+      .order('name', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ brands: data ?? [] });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

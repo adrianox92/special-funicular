@@ -9,9 +9,18 @@ import { Input } from './ui/input';
  * El panel se renderiza en el mismo árbol DOM que el trigger (sin portal) para que el foco
  * funcione dentro de diálogos con focus trap de Radix. La lista usa scroll nativo.
  *
- * @param {{ value: string, onValueChange: (v: string) => void, options: { value: string, label: string }[], id?: string, 'aria-labelledby'?: string }} props
+ * @param {{ value: string, onValueChange: (v: string) => void, options: { value: string, label: string }[], id?: string, 'aria-labelledby'?: string, placeholder?: string, searchPlaceholder?: string, disabled?: boolean }} props
  */
-export function SearchableCategorySelect({ value, onValueChange, options, id, 'aria-labelledby': ariaLabelledBy }) {
+export function SearchableCategorySelect({
+  value,
+  onValueChange,
+  options,
+  id,
+  'aria-labelledby': ariaLabelledBy,
+  placeholder = 'Seleccionar categoría',
+  searchPlaceholder = 'Buscar por nombre…',
+  disabled = false,
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef(null);
@@ -37,6 +46,10 @@ export function SearchableCategorySelect({ value, onValueChange, options, id, 'a
       return label.includes(q) || val.includes(q);
     });
   }, [options, query, normalized]);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +84,7 @@ export function SearchableCategorySelect({ value, onValueChange, options, id, 'a
   }, [open]);
 
   const handleOpen = () => {
+    if (disabled) return;
     setQuery('');
     setOpen((prev) => !prev);
   };
@@ -84,7 +98,7 @@ export function SearchableCategorySelect({ value, onValueChange, options, id, 'a
   const listId = id ? `${id}-listbox` : 'searchable-category-listbox';
 
   return (
-    <div ref={rootRef} className="relative z-0 w-full">
+    <div ref={rootRef} className="relative z-20 w-full">
       <Button
         type="button"
         variant="outline"
@@ -93,13 +107,14 @@ export function SearchableCategorySelect({ value, onValueChange, options, id, 'a
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
+        disabled={disabled}
         className={cn(
           'h-9 w-full justify-between font-normal shadow-sm',
           !selected && 'text-muted-foreground',
         )}
         onClick={handleOpen}
       >
-        <span className="truncate">{selected ? selected.label : 'Seleccionar categoría'}</span>
+        <span className="truncate">{selected ? selected.label : placeholder}</span>
         <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
       </Button>
 
@@ -107,20 +122,20 @@ export function SearchableCategorySelect({ value, onValueChange, options, id, 'a
         <div
           id={panelDomId}
           role="presentation"
-          className="absolute left-0 right-0 top-full z-[100] mt-1 rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+          className="absolute left-0 right-0 top-full z-[1000] mt-1 rounded-md border border-border bg-card text-card-foreground shadow-xl animate-in fade-in-0 zoom-in-95"
           onMouseDown={(e) => {
             // Evita que el foco vuelva al trigger al pulsar la lista; no interferir con el campo de búsqueda.
             if (e.target.closest('input, textarea')) return;
             e.preventDefault();
           }}
         >
-          <div className="border-b border-border p-2">
+          <div className="border-b border-border bg-muted/40 p-2">
             <Input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nombre…"
-              className="h-8"
+              placeholder={searchPlaceholder}
+              className="h-8 bg-background"
               aria-label="Filtrar categorías"
               autoComplete="off"
             />

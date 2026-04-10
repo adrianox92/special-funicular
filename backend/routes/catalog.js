@@ -9,7 +9,11 @@ const XLSX = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
-const { uploadCatalogImageBuffer, removeCatalogObjectByPublicUrl } = require('../lib/catalogImageStorage');
+const {
+  uploadCatalogImageBuffer,
+  uploadBrandLogoBuffer,
+  removeCatalogObjectByPublicUrl,
+} = require('../lib/catalogImageStorage');
 const { catalogContributionsLimiter } = require('../middleware/rateLimits');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -23,6 +27,13 @@ const upload = multer({
 
 function escapeIlikePattern(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+function isUuid(id) {
+  return (
+    typeof id === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  );
 }
 
 function normalizeReference(ref) {
@@ -115,9 +126,124 @@ function parseMotorPositionFromImportCell(raw) {
   return parseOptionalMotorPosition(raw);
 }
 
+/** Boolean desde multipart (true/false/on) o JSON. Por defecto false si no viene. */
+function parseBodyBool(raw) {
+  if (raw === undefined || raw === null || raw === '') return false;
+  if (typeof raw === 'boolean') return raw;
+  const s = String(raw).trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'on' || s === 'yes' || s === 'sí' || s === 'si';
+}
+
+function parseOptionalBoolFromImportCell(raw) {
+  if (raw === undefined || raw === null || raw === '') return false;
+  if (typeof raw === 'boolean') return raw;
+  const s = String(raw).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'sí', 'si', 'x', 's'].includes(s)) return true;
+  if (['0', 'false', 'no', 'n'].includes(s)) return false;
+  return false;
+}
+
 function adminGuard(req, res, next) {
   if (!assertLicenseAdmin(req, res)) return;
   next();
+}
+
+/**
+ * Completitud ponderada del catálogo (dashboard admin). Marca excluida: `manufacturer_id` es NOT NULL
+ * y no discrimina. Pesos sobre 5 campos, suma 1 — imagen 32%, resto 17% cada uno.
+ */
+const CATALOG_COMPLETENESS_WEIGHTS = {
+  image_url: 0.32,
+  model_name: 0.17,
+  vehicle_type: 0.17,
+  traction: 0.17,
+  motor_position: 0.17,
+};
+
+function catalogCompletenessFilled(row) {
+  return {
+    model_name: row.model_name != null && String(row.model_name).trim() !== '',
+    vehicle_type: row.vehicle_type != null && String(row.vehicle_type).trim() !== '',
+    traction: row.traction != null && String(row.traction).trim() !== '',
+    motor_position: row.motor_position != null && String(row.motor_position).trim() !== '',
+    image_url: row.image_url != null && String(row.image_url).trim() !== '',
+  };
+}
+
+/** Año de comercialización válido para métricas “sin año”. */
+function catalogYearPresent(y) {
+  if (y == null || y === '') return false;
+  const n = Number(y);
+  return Number.isFinite(n) && n >= 1900 && n <= 2100;
+}
+
+function computeCatalogDashboardStats(rows) {
+  const w = CATALOG_COMPLETENESS_WEIGHTS;
+  const total = rows.length;
+  let sumScores = 0;
+  let fullyComplete = 0;
+  let withoutImage = 0;
+  let withoutVehicleType = 0;
+  let withoutTraction = 0;
+  let withoutMotor = 0;
+  let withoutYear = 0;
+
+  for (const row of rows) {
+    const f = catalogCompletenessFilled(row);
+    sumScores +=
+      w.image_url * (f.image_url ? 1 : 0) +
+      w.model_name * (f.model_name ? 1 : 0) +
+      w.vehicle_type * (f.vehicle_type ? 1 : 0) +
+      w.traction * (f.traction ? 1 : 0) +
+      w.motor_position * (f.motor_position ? 1 : 0);
+    if (f.model_name && f.vehicle_type && f.traction && f.motor_position && f.image_url) {
+      fullyComplete += 1;
+    }
+    if (!f.image_url) withoutImage += 1;
+    if (!f.vehicle_type) withoutVehicleType += 1;
+    if (!f.traction) withoutTraction += 1;
+    if (!f.motor_position) withoutMotor += 1;
+    if (!catalogYearPresent(row.commercial_release_year)) withoutYear += 1;
+  }
+
+  const pctRatio = (num, den) => (den > 0 ? Math.round((num / den) * 10000) / 100 : 0);
+
+  return {
+    totalItems: total,
+    weightedCompletenessPercent: total > 0 ? pctRatio(sumScores, total) : 0,
+    fullyCompleteCount: fullyComplete,
+    fullyCompletePercent: pctRatio(fullyComplete, total),
+    missing: {
+      withoutImage,
+      withoutVehicleType,
+      withoutTraction,
+      withoutMotor,
+      withoutYear,
+    },
+    weights: {
+      ...CATALOG_COMPLETENESS_WEIGHTS,
+      note: 'Marca (manufacturer_id) no entra en la ponderación.',
+    },
+  };
+}
+
+async function fetchAllSlotCatalogRowsForStats() {
+  const pageSize = 1000;
+  let from = 0;
+  const all = [];
+  for (;;) {
+    const { data, error } = await supabase
+      .from('slot_catalog_items')
+      .select('model_name, vehicle_type, traction, motor_position, image_url, commercial_release_year')
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
 }
 
 function parseRatingBody(raw) {
@@ -126,7 +252,51 @@ function parseRatingBody(raw) {
   return n;
 }
 
+/** Resuelve UUID de marca por nombre (trim, case-insensitive) vía RPC en BD. */
+async function findBrandIdByName(raw) {
+  const s = normalizeManufacturer(raw);
+  if (!s) return null;
+  const { data, error } = await supabase.rpc('slot_catalog_brand_id_by_name', { p_name: s });
+  if (error) return null;
+  return data || null;
+}
+
+async function resolveManufacturerIdFromBody(reqBody, existingManufacturerId) {
+  if (reqBody.manufacturer_id != null && String(reqBody.manufacturer_id).trim() !== '') {
+    return String(reqBody.manufacturer_id).trim();
+  }
+  if (reqBody.manufacturer != null && String(reqBody.manufacturer).trim() !== '') {
+    return await findBrandIdByName(reqBody.manufacturer);
+  }
+  return existingManufacturerId ?? null;
+}
+
+async function enrichInsertRequestsWithBrandNames(rows) {
+  if (!rows?.length) return rows || [];
+  const ids = [...new Set(rows.map((r) => r.proposed_manufacturer_id).filter(Boolean))];
+  if (!ids.length) return rows;
+  const { data: brands } = await supabase.from('slot_catalog_brands').select('id,name').in('id', ids);
+  const m = new Map((brands || []).map((b) => [b.id, b.name]));
+  return rows.map((r) => ({
+    ...r,
+    proposed_manufacturer: m.get(r.proposed_manufacturer_id) ?? null,
+  }));
+}
+
 router.use(authMiddleware);
+
+/**
+ * GET /stats — métricas de completitud y huecos (solo admin)
+ */
+router.get('/stats', adminGuard, async (req, res) => {
+  try {
+    const rows = await fetchAllSlotCatalogRowsForStats();
+    const stats = computeCatalogDashboardStats(rows);
+    res.json(stats);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 /**
  * GET /search?q=
@@ -139,12 +309,12 @@ router.get('/search', async (req, res) => {
     }
     const pattern = `%${escapeIlikePattern(q)}%`;
     const sel =
-      'id, reference, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, image_url';
+      'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, image_url';
     const [r1, r2, r3, r4] = await Promise.all([
-      supabase.from('slot_catalog_items').select(sel).ilike('reference', pattern).limit(20),
-      supabase.from('slot_catalog_items').select(sel).ilike('manufacturer', pattern).limit(20),
-      supabase.from('slot_catalog_items').select(sel).ilike('model_name', pattern).limit(20),
-      supabase.from('slot_catalog_items').select(sel).ilike('vehicle_type', pattern).limit(20),
+      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('reference', pattern).limit(20),
+      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('manufacturer', pattern).limit(20),
+      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('model_name', pattern).limit(20),
+      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('vehicle_type', pattern).limit(20),
     ]);
     if (r1.error) return res.status(500).json({ error: r1.error.message });
     if (r2.error) return res.status(500).json({ error: r2.error.message });
@@ -177,7 +347,7 @@ router.get('/my-requests', async (req, res) => {
       supabase
         .from('slot_catalog_insert_requests')
         .select(
-          'id, proposed_reference, proposed_manufacturer, proposed_model_name, proposed_vehicle_type, proposed_traction, proposed_motor_position, proposed_commercial_release_year, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
+          'id, proposed_reference, proposed_manufacturer_id, proposed_model_name, proposed_vehicle_type, proposed_traction, proposed_motor_position, proposed_commercial_release_year, proposed_discontinued, proposed_upcoming_release, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
         )
         .eq('submitted_by', uid)
         .order('created_at', { ascending: false })
@@ -185,9 +355,10 @@ router.get('/my-requests', async (req, res) => {
     ]);
     if (chg.error) return res.status(500).json({ error: chg.error.message });
     if (ins.error) return res.status(500).json({ error: ins.error.message });
+    const insertRows = await enrichInsertRequestsWithBrandNames(ins.data ?? []);
     res.json({
       change_requests: chg.data ?? [],
-      insert_requests: ins.data ?? [],
+      insert_requests: insertRows,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -300,14 +471,17 @@ router.get('/items', adminGuard, async (req, res) => {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     const refFilter = String(req.query.reference ?? '').trim();
+    const manufacturerId = String(req.query.manufacturer_id ?? '').trim();
     const mfgFilter = String(req.query.manufacturer ?? '').trim();
 
-    let q = supabase.from('slot_catalog_items').select('*', { count: 'exact' });
+    let q = supabase.from('slot_catalog_items_with_ratings').select('*', { count: 'exact' });
     if (refFilter) {
       const p = `%${escapeIlikePattern(refFilter)}%`;
       q = q.ilike('reference', p);
     }
-    if (mfgFilter) {
+    if (manufacturerId && isUuid(manufacturerId)) {
+      q = q.eq('manufacturer_id', manufacturerId);
+    } else if (mfgFilter) {
       const p = `%${escapeIlikePattern(mfgFilter)}%`;
       q = q.ilike('manufacturer', p);
     }
@@ -333,7 +507,7 @@ router.get('/items', adminGuard, async (req, res) => {
 router.get('/items/:id', adminGuard, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabase.from('slot_catalog_items').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Ítem no encontrado' });
     res.json(data);
@@ -350,17 +524,21 @@ const itemUpload = upload.fields([{ name: 'image', maxCount: 1 }]);
 router.post('/items', adminGuard, itemUpload, async (req, res) => {
   try {
     const reference = normalizeReference(req.body.reference);
-    const manufacturer = normalizeManufacturer(req.body.manufacturer);
     const model_name = String(req.body.model_name ?? '').trim();
+    const manufacturer_id = await resolveManufacturerIdFromBody(req.body, null);
     const vehicle_type = parseOptionalVehicleType(req.body.vehicle_type);
     const traction = parseOptionalTraction(req.body.traction);
     const motor_position = parseOptionalMotorPosition(req.body.motor_position);
     const commercial_release_year = parseYearFromBody(
       req.body.commercial_release_year ?? req.body.commercial_release_date,
     );
+    const discontinued = parseBodyBool(req.body.discontinued);
+    const upcoming_release = parseBodyBool(req.body.upcoming_release);
 
-    if (!reference || !manufacturer || !model_name) {
-      return res.status(400).json({ error: 'reference, manufacturer y model_name son obligatorios' });
+    if (!reference || !manufacturer_id || !model_name) {
+      return res.status(400).json({
+        error: 'reference, manufacturer_id (o manufacturer) y model_name son obligatorios',
+      });
     }
 
     let image_url = null;
@@ -373,22 +551,24 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
       }
     }
 
-    const { data, error } = await supabase
+    const { data: insRow, error } = await supabase
       .from('slot_catalog_items')
       .insert([
         {
           reference,
-          manufacturer,
+          manufacturer_id,
           model_name,
           vehicle_type,
           traction,
           motor_position,
           commercial_release_year,
+          discontinued,
+          upcoming_release,
           image_url,
           updated_at: new Date().toISOString(),
         },
       ])
-      .select()
+      .select('id')
       .single();
 
     if (error) {
@@ -397,7 +577,12 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
       }
       return res.status(500).json({ error: error.message });
     }
-    res.status(201).json(data);
+    const { data: full } = await supabase
+      .from('slot_catalog_items_with_ratings')
+      .select('*')
+      .eq('id', insRow.id)
+      .maybeSingle();
+    res.status(201).json(full || insRow);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -414,8 +599,7 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     const reference = req.body.reference != null ? normalizeReference(req.body.reference) : existing.reference;
-    const manufacturer =
-      req.body.manufacturer != null ? normalizeManufacturer(req.body.manufacturer) : existing.manufacturer;
+    const manufacturer_id = await resolveManufacturerIdFromBody(req.body, existing.manufacturer_id);
     const model_name = req.body.model_name != null ? String(req.body.model_name).trim() : existing.model_name;
     const vehicle_type =
       req.body.vehicle_type !== undefined
@@ -431,6 +615,14 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
       req.body.motor_position !== undefined
         ? parseOptionalMotorPosition(req.body.motor_position)
         : existing.motor_position;
+    const discontinued =
+      req.body.discontinued !== undefined
+        ? parseBodyBool(req.body.discontinued)
+        : Boolean(existing.discontinued);
+    const upcoming_release =
+      req.body.upcoming_release !== undefined
+        ? parseBodyBool(req.body.upcoming_release)
+        : Boolean(existing.upcoming_release);
 
     let image_url = existing.image_url;
     const img = req.files?.image?.[0];
@@ -445,22 +637,26 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
       }
     }
 
-    const { data, error } = await supabase
+    if (!manufacturer_id) {
+      return res.status(400).json({ error: 'manufacturer_id inválido o marca no encontrada' });
+    }
+
+    const { error } = await supabase
       .from('slot_catalog_items')
       .update({
         reference,
-        manufacturer,
+        manufacturer_id,
         model_name,
         vehicle_type,
         traction,
         motor_position,
         commercial_release_year,
+        discontinued,
+        upcoming_release,
         image_url,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
 
     if (error) {
       if (error.code === '23505') {
@@ -468,7 +664,8 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
       }
       return res.status(500).json({ error: error.message });
     }
-    res.json(data);
+    const { data: full } = await supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
+    res.json(full);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -509,8 +706,16 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
     if (iErr) return res.status(500).json({ error: iErr.message });
     if (!item) return res.status(404).json({ error: 'Ítem no encontrado' });
 
+    let proposed_manufacturer_id = item.manufacturer_id;
+    if (req.body.manufacturer_id != null && String(req.body.manufacturer_id).trim() !== '') {
+      proposed_manufacturer_id = String(req.body.manufacturer_id).trim();
+    } else if (req.body.manufacturer != null && String(req.body.manufacturer).trim() !== '') {
+      const fid = await findBrandIdByName(req.body.manufacturer);
+      if (fid) proposed_manufacturer_id = fid;
+    }
+
     const proposed_patch = {
-      manufacturer: req.body.manufacturer != null ? normalizeManufacturer(req.body.manufacturer) : item.manufacturer,
+      manufacturer_id: proposed_manufacturer_id,
       model_name: req.body.model_name != null ? String(req.body.model_name).trim() : item.model_name,
       vehicle_type:
         req.body.vehicle_type !== undefined
@@ -525,6 +730,12 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
         req.body.commercial_release_year !== undefined || req.body.commercial_release_date !== undefined
           ? parseYearFromBody(req.body.commercial_release_year ?? req.body.commercial_release_date)
           : item.commercial_release_year,
+      discontinued:
+        req.body.discontinued !== undefined ? parseBodyBool(req.body.discontinued) : Boolean(item.discontinued),
+      upcoming_release:
+        req.body.upcoming_release !== undefined
+          ? parseBodyBool(req.body.upcoming_release)
+          : Boolean(item.upcoming_release),
       image_url: item.image_url,
     };
 
@@ -615,7 +826,10 @@ router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) 
     const { error: upErr } = await supabase
       .from('slot_catalog_items')
       .update({
-        manufacturer: patch.manufacturer ?? item.manufacturer,
+        manufacturer_id:
+          patch.manufacturer_id !== undefined && patch.manufacturer_id !== null
+            ? String(patch.manufacturer_id)
+            : item.manufacturer_id,
         model_name: patch.model_name ?? item.model_name,
         vehicle_type: patch.vehicle_type !== undefined ? patch.vehicle_type : item.vehicle_type,
         traction: patch.traction !== undefined ? patch.traction : item.traction,
@@ -624,6 +838,9 @@ router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) 
             ? parseOptionalMotorPosition(patch.motor_position)
             : item.motor_position,
         commercial_release_year: resolveCatalogYearFromPatch(patch, item),
+        discontinued: patch.discontinued !== undefined ? Boolean(patch.discontinued) : Boolean(item.discontinued),
+        upcoming_release:
+          patch.upcoming_release !== undefined ? Boolean(patch.upcoming_release) : Boolean(item.upcoming_release),
         image_url: patch.image_url ?? null,
         updated_at: new Date().toISOString(),
       })
@@ -689,8 +906,14 @@ const insertUpload = upload.fields([{ name: 'image', maxCount: 1 }]);
 router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async (req, res) => {
   try {
     const proposed_reference = normalizeReference(req.body.proposed_reference ?? req.body.reference);
-    const proposed_manufacturer = normalizeManufacturer(req.body.proposed_manufacturer ?? req.body.manufacturer ?? '');
     const proposed_model_name = String(req.body.proposed_model_name ?? req.body.model_name ?? '').trim();
+    const proposed_manufacturer_id = await resolveManufacturerIdFromBody(
+      {
+        manufacturer_id: req.body.proposed_manufacturer_id ?? req.body.manufacturer_id,
+        manufacturer: req.body.proposed_manufacturer ?? req.body.manufacturer,
+      },
+      null,
+    );
     const proposed_vehicle_type = parseOptionalVehicleType(
       req.body.proposed_vehicle_type ?? req.body.vehicle_type,
     );
@@ -705,16 +928,22 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
         req.body.proposed_commercial_release_date ??
         req.body.commercial_release_date,
     );
+    const proposed_discontinued = parseBodyBool(req.body.proposed_discontinued ?? req.body.discontinued);
+    const proposed_upcoming_release = parseBodyBool(
+      req.body.proposed_upcoming_release ?? req.body.upcoming_release,
+    );
 
-    if (!proposed_reference || !proposed_manufacturer || !proposed_model_name) {
-      return res.status(400).json({ error: 'reference, manufacturer y model_name son obligatorios' });
+    if (!proposed_reference || !proposed_manufacturer_id || !proposed_model_name) {
+      return res.status(400).json({
+        error: 'reference, proposed_manufacturer_id (o marca por nombre) y model_name son obligatorios',
+      });
     }
 
     const { data: existingItem } = await supabase
       .from('slot_catalog_items')
       .select('id')
       .eq('reference', proposed_reference)
-      .eq('manufacturer', proposed_manufacturer)
+      .eq('manufacturer_id', proposed_manufacturer_id)
       .maybeSingle();
     if (existingItem) {
       return res.status(409).json({
@@ -732,17 +961,19 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
       }
     }
 
-    const { data, error } = await supabase
+    const { data: insRow, error } = await supabase
       .from('slot_catalog_insert_requests')
       .insert([
         {
           proposed_reference,
-          proposed_manufacturer,
+          proposed_manufacturer_id,
           proposed_model_name,
           proposed_vehicle_type,
           proposed_traction,
           proposed_motor_position,
           proposed_commercial_release_year,
+          proposed_discontinued,
+          proposed_upcoming_release,
           proposed_image_url,
           submitted_by: req.user.id,
           status: 'pending',
@@ -760,7 +991,8 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
       }
       return res.status(500).json({ error: error.message });
     }
-    res.status(201).json(data);
+    const enriched = await enrichInsertRequestsWithBrandNames([insRow]);
+    res.status(201).json(enriched[0] || insRow);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -778,7 +1010,8 @@ router.get('/insert-requests', adminGuard, async (req, res) => {
     if (st !== 'all') q = q.eq('status', st);
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ requests: data ?? [] });
+    const rows = await enrichInsertRequestsWithBrandNames(data ?? []);
+    res.json({ requests: rows });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -805,12 +1038,14 @@ router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) 
       .insert([
         {
           reference: normalizeReference(row.proposed_reference),
-          manufacturer: row.proposed_manufacturer,
+          manufacturer_id: row.proposed_manufacturer_id,
           model_name: row.proposed_model_name,
           vehicle_type: row.proposed_vehicle_type ?? null,
           traction: row.proposed_traction ?? null,
           motor_position: row.proposed_motor_position ?? null,
           commercial_release_year: row.proposed_commercial_release_year ?? null,
+          discontinued: Boolean(row.proposed_discontinued),
+          upcoming_release: Boolean(row.proposed_upcoming_release),
           image_url: row.proposed_image_url,
           updated_at: new Date().toISOString(),
         },
@@ -893,7 +1128,8 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
     const r = rows[i];
     const rowNum = i + 2;
     const ref = normalizeReference(r.reference ?? r.Reference ?? r.REFERENCIA ?? r.ref);
-    const manufacturer = normalizeManufacturer(r.manufacturer ?? r.Marca ?? r.fabricante ?? '');
+    const manufacturerRaw = normalizeManufacturer(r.manufacturer ?? r.Marca ?? r.fabricante ?? '');
+    const manufacturer_id = await findBrandIdByName(manufacturerRaw);
     const model_name = String(r.model_name ?? r.model ?? r.nombre ?? r.Nombre ?? '').trim();
     const vehicle_type = parseOptionalVehicleType(
       r.vehicle_type ?? r.tipo ?? r.type ?? r.Tipo ?? '',
@@ -913,9 +1149,24 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
         r.year ??
         '',
     );
+    const discontinued = parseOptionalBoolFromImportCell(
+      r.discontinued ?? r.descatalogado ?? r.Descatalogado ?? '',
+    );
+    const upcoming_release = parseOptionalBoolFromImportCell(
+      r.upcoming_release ?? r.proximo_lanzamiento ?? r['próximo_lanzamiento'] ?? r.próximo_lanzamiento ?? '',
+    );
 
-    if (!ref || !manufacturer || !model_name) {
+    if (!ref || !manufacturerRaw || !model_name) {
       errors.push({ row: rowNum, message: 'Faltan reference, manufacturer o model_name' });
+      if (onProgress) onProgress(i + 1, total);
+      continue;
+    }
+
+    if (!manufacturer_id) {
+      errors.push({
+        row: rowNum,
+        message: `Marca no registrada en el catálogo: "${manufacturerRaw}". Créala en Marcas o usa el nombre exacto.`,
+      });
       if (onProgress) onProgress(i + 1, total);
       continue;
     }
@@ -924,7 +1175,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
       .from('slot_catalog_items')
       .select('id')
       .eq('reference', ref)
-      .eq('manufacturer', manufacturer)
+      .eq('manufacturer_id', manufacturer_id)
       .maybeSingle();
 
     if (existing) {
@@ -934,19 +1185,21 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
         continue;
       }
       if (duplicateMode === 'fail') {
-        errors.push({ row: rowNum, message: `Referencia y marca duplicadas: ${ref} / ${manufacturer}` });
+        errors.push({ row: rowNum, message: `Referencia y marca duplicadas: ${ref} / ${manufacturerRaw}` });
         if (onProgress) onProgress(i + 1, total);
         continue;
       }
       const { error: upErr } = await supabase
         .from('slot_catalog_items')
         .update({
-          manufacturer,
+          manufacturer_id,
           model_name,
           vehicle_type,
           traction,
           motor_position,
           commercial_release_year,
+          discontinued,
+          upcoming_release,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
@@ -961,12 +1214,14 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
       .insert([
         {
           reference: ref,
-          manufacturer,
+          manufacturer_id,
           model_name,
           vehicle_type,
           traction,
           motor_position,
           commercial_release_year,
+          discontinued,
+          upcoming_release,
           updated_at: new Date().toISOString(),
         },
       ])
@@ -1058,6 +1313,127 @@ router.post('/import', adminGuard, upload.single('file'), async (req, res) => {
         /* ignore */
       }
     }
+  }
+});
+
+const brandUpload = upload.fields([{ name: 'logo', maxCount: 1 }]);
+
+/**
+ * GET /brands — admin: listado completo con timestamps (misma fuente que público + metadatos)
+ */
+router.get('/brands', adminGuard, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('slot_catalog_brands')
+      .select('id,name,logo_url,created_at,updated_at')
+      .order('name', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ brands: data ?? [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /brands — crear marca (multipart: name, logo opcional)
+ */
+router.post('/brands', adminGuard, brandUpload, async (req, res) => {
+  try {
+    const name = normalizeManufacturer(req.body.name);
+    if (!name) return res.status(400).json({ error: 'name es obligatorio' });
+    let logo_url = null;
+    const logoFile = req.files?.logo?.[0];
+    if (logoFile?.buffer) {
+      logo_url = await uploadBrandLogoBuffer(supabase, logoFile.buffer, logoFile.mimetype || 'image/jpeg');
+    }
+    const { data, error } = await supabase
+      .from('slot_catalog_brands')
+      .insert([{ name, logo_url }])
+      .select('id,name,logo_url,created_at,updated_at')
+      .single();
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'Ya existe una marca con ese nombre' });
+      return res.status(500).json({ error: error.message });
+    }
+    res.status(201).json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * PUT /brands/:id — actualizar nombre y/o logo (clear_logo=true quita logo y borra objeto)
+ */
+router.put('/brands/:id', adminGuard, brandUpload, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isUuid(id)) return res.status(404).json({ error: 'Marca no encontrada' });
+    const { data: existing, error: fetchErr } = await supabase.from('slot_catalog_brands').select('*').eq('id', id).maybeSingle();
+    if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+    if (!existing) return res.status(404).json({ error: 'Marca no encontrada' });
+
+    const name = req.body.name !== undefined ? normalizeManufacturer(req.body.name) : existing.name;
+    if (!name) return res.status(400).json({ error: 'name no puede estar vacío' });
+
+    let logo_url = existing.logo_url;
+    const clearLogo = parseBodyBool(req.body.clear_logo);
+    if (clearLogo) {
+      if (existing.logo_url) await removeCatalogObjectByPublicUrl(supabase, existing.logo_url);
+      logo_url = null;
+    }
+    const logoFile = req.files?.logo?.[0];
+    if (logoFile?.buffer) {
+      if (existing.logo_url) await removeCatalogObjectByPublicUrl(supabase, existing.logo_url);
+      logo_url = await uploadBrandLogoBuffer(supabase, logoFile.buffer, logoFile.mimetype || 'image/jpeg');
+    }
+
+    const { data, error } = await supabase
+      .from('slot_catalog_brands')
+      .update({ name, logo_url, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id,name,logo_url,created_at,updated_at')
+      .single();
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'Ya existe una marca con ese nombre' });
+      return res.status(500).json({ error: error.message });
+    }
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * DELETE /brands/:id — solo si no hay ítems ni solicitudes de alta que referencien la marca
+ */
+router.delete('/brands/:id', adminGuard, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isUuid(id)) return res.status(404).json({ error: 'Marca no encontrada' });
+    const { count: itemCount, error: c1 } = await supabase
+      .from('slot_catalog_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('manufacturer_id', id);
+    if (c1) return res.status(500).json({ error: c1.message });
+    if ((itemCount ?? 0) > 0) {
+      return res.status(409).json({ error: 'No se puede eliminar: hay ítems del catálogo que usan esta marca' });
+    }
+    const { count: reqCount, error: c2 } = await supabase
+      .from('slot_catalog_insert_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('proposed_manufacturer_id', id);
+    if (c2) return res.status(500).json({ error: c2.message });
+    if ((reqCount ?? 0) > 0) {
+      return res.status(409).json({ error: 'No se puede eliminar: hay solicitudes de alta que referencian esta marca' });
+    }
+    const { data: brand } = await supabase.from('slot_catalog_brands').select('logo_url').eq('id', id).maybeSingle();
+    if (!brand) return res.status(404).json({ error: 'Marca no encontrada' });
+    const { error } = await supabase.from('slot_catalog_brands').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    if (brand.logo_url) await removeCatalogObjectByPublicUrl(supabase, brand.logo_url);
+    res.status(204).end();
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

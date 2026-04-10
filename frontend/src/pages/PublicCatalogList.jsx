@@ -254,6 +254,14 @@ function PublicCatalogList() {
                           </p>
                         )}
                         <div className="flex flex-wrap gap-2 pt-1 text-xs">
+                          {row.discontinued && (
+                            <span className="rounded-md bg-muted px-2 py-0.5">Descatalogado</span>
+                          )}
+                          {row.upcoming_release && (
+                            <span className="rounded-md bg-primary/15 text-primary px-2 py-0.5">
+                              Próximo lanzamiento
+                            </span>
+                          )}
                           {row.vehicle_type && (
                             <span className="rounded-md bg-secondary px-2 py-0.5">{row.vehicle_type}</span>
                           )}

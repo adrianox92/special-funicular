@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import CatalogBrandSelect from '../components/CatalogBrandSelect';
+import CatalogTractionSelect from '../components/CatalogTractionSelect';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -15,15 +17,18 @@ import {
 } from '../components/ui/select';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS } from '../data/motorPosition';
+import { Switch } from '../components/ui/switch';
 
 const emptyForm = {
   proposed_reference: '',
-  proposed_manufacturer: '',
+  proposed_manufacturer_id: '',
   proposed_model_name: '',
   proposed_vehicle_type: '',
   proposed_traction: '',
   proposed_motor_position: '',
   proposed_commercial_release_year: '',
+  proposed_discontinued: false,
+  proposed_upcoming_release: false,
 };
 
 export default function ProposeCatalogInsert() {
@@ -36,11 +41,15 @@ export default function ProposeCatalogInsert() {
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
+    if (!form.proposed_manufacturer_id?.trim()) {
+      setError('Selecciona una marca registrada.');
+      return;
+    }
     setSaving(true);
     try {
       const fd = new FormData();
       fd.append('proposed_reference', form.proposed_reference);
-      fd.append('proposed_manufacturer', form.proposed_manufacturer);
+      fd.append('proposed_manufacturer_id', form.proposed_manufacturer_id);
       fd.append('proposed_model_name', form.proposed_model_name);
       if (form.proposed_vehicle_type) fd.append('proposed_vehicle_type', form.proposed_vehicle_type);
       fd.append('proposed_traction', form.proposed_traction ?? '');
@@ -48,6 +57,8 @@ export default function ProposeCatalogInsert() {
       if (form.proposed_commercial_release_year) {
         fd.append('proposed_commercial_release_year', form.proposed_commercial_release_year);
       }
+      fd.append('proposed_discontinued', form.proposed_discontinued ? 'true' : 'false');
+      fd.append('proposed_upcoming_release', form.proposed_upcoming_release ? 'true' : 'false');
       if (imageFile) fd.append('image', imageFile);
 
       await api.post('/catalog/insert-requests', fd);
@@ -77,7 +88,9 @@ export default function ProposeCatalogInsert() {
       <Card>
         <CardHeader>
           <CardTitle>Datos del modelo</CardTitle>
-          <CardDescription>Referencia, marca y nombre son obligatorios.</CardDescription>
+          <CardDescription>
+            Referencia, marca (registrada en el catálogo) y nombre son obligatorios.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
@@ -89,14 +102,14 @@ export default function ProposeCatalogInsert() {
                 onChange={(e) => setForm((f) => ({ ...f, proposed_reference: e.target.value }))}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Marca</Label>
-              <Input
-                required
-                value={form.proposed_manufacturer}
-                onChange={(e) => setForm((f) => ({ ...f, proposed_manufacturer: e.target.value }))}
-              />
-            </div>
+            <CatalogBrandSelect
+              label="Marca"
+              required
+              value={form.proposed_manufacturer_id}
+              onChange={(proposed_manufacturer_id) =>
+                setForm((f) => ({ ...f, proposed_manufacturer_id }))
+              }
+            />
             <div className="space-y-2">
               <Label>Nombre / modelo</Label>
               <Input
@@ -126,14 +139,11 @@ export default function ProposeCatalogInsert() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Tracción</Label>
-              <Input
-                value={form.proposed_traction}
-                onChange={(e) => setForm((f) => ({ ...f, proposed_traction: e.target.value }))}
-                placeholder="Opcional"
-              />
-            </div>
+            <CatalogTractionSelect
+              value={form.proposed_traction}
+              onChange={(proposed_traction) => setForm((f) => ({ ...f, proposed_traction }))}
+              id="propose-catalog-traction"
+            />
             <div className="space-y-2">
               <Label>Posición del motor</Label>
               <Select
@@ -168,6 +178,28 @@ export default function ProposeCatalogInsert() {
                   setForm((f) => ({ ...f, proposed_commercial_release_year: e.target.value }))
                 }
               />
+            </div>
+            <div className="flex flex-col gap-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="propose-discontinued" className="cursor-pointer">
+                  Descatalogado
+                </Label>
+                <Switch
+                  id="propose-discontinued"
+                  checked={form.proposed_discontinued}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, proposed_discontinued: v }))}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="propose-upcoming" className="cursor-pointer">
+                  Próximo lanzamiento
+                </Label>
+                <Switch
+                  id="propose-upcoming"
+                  checked={form.proposed_upcoming_release}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, proposed_upcoming_release: v }))}
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Imagen (opcional)</Label>

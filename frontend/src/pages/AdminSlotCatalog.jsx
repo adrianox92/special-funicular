@@ -43,18 +43,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { Database, Upload, GitPullRequest, PlusCircle } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { Database, LayoutDashboard, Upload, GitPullRequest, PlusCircle, Tag } from 'lucide-react';
+import CatalogBrandSelect from '../components/CatalogBrandSelect';
+import CatalogTractionSelect from '../components/CatalogTractionSelect';
+import { Switch } from '../components/ui/switch';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
 
 const emptyItem = {
   reference: '',
-  manufacturer: '',
+  manufacturer_id: '',
   model_name: '',
   vehicle_type: '',
   traction: '',
   motor_position: '',
   commercial_release_year: '',
+  discontinued: false,
+  upcoming_release: false,
 };
 
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -159,7 +173,11 @@ function AdminSlotCatalog() {
   const { user } = useAuth();
   const isAdmin = isLicenseAdminUser(user);
 
-  const [tab, setTab] = useState('items');
+  const [tab, setTab] = useState('dashboard');
+
+  const [catalogStats, setCatalogStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(null);
 
   const [items, setItems] = useState([]);
   const [itemsLoading, setItemsLoading] = useState(false);
@@ -167,7 +185,7 @@ function AdminSlotCatalog() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [refFilter, setRefFilter] = useState('');
-  const [mfgFilter, setMfgFilter] = useState('');
+  const [mfgBrandId, setMfgBrandId] = useState('');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editMode, setEditMode] = useState('create');
@@ -204,12 +222,58 @@ function AdminSlotCatalog() {
   const [insReq, setInsReq] = useState([]);
   const [queuesLoading, setQueuesLoading] = useState(false);
 
+  const [brandsAdmin, setBrandsAdmin] = useState([]);
+  const [brandsTabLoading, setBrandsTabLoading] = useState(false);
+  const [brandDialogOpen, setBrandDialogOpen] = useState(false);
+  const [brandEditId, setBrandEditId] = useState(null);
+  const [brandName, setBrandName] = useState('');
+  const [brandLogoFile, setBrandLogoFile] = useState(null);
+  const [brandExistingLogo, setBrandExistingLogo] = useState(null);
+  const [brandClearLogo, setBrandClearLogo] = useState(false);
+  const [brandSaving, setBrandSaving] = useState(false);
+  const [deleteBrandId, setDeleteBrandId] = useState(null);
+  const [brandLogoPreviewUrl, setBrandLogoPreviewUrl] = useState(null);
+
+  useEffect(() => {
+    if (!brandLogoFile) {
+      setBrandLogoPreviewUrl(null);
+      return undefined;
+    }
+    const u = URL.createObjectURL(brandLogoFile);
+    setBrandLogoPreviewUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [brandLogoFile]);
+
+  const fetchCatalogStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      const { data } = await api.get('/catalog/stats');
+      setCatalogStats(data);
+    } catch (e) {
+      setStatsError(e.response?.data?.error || e.message || 'Error');
+      setCatalogStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin || tab !== 'dashboard') return;
+    fetchCatalogStats();
+  }, [isAdmin, tab, fetchCatalogStats]);
+
   const fetchItems = useCallback(async () => {
     setItemsLoading(true);
     setItemsError(null);
     try {
       const { data } = await api.get('/catalog/items', {
-        params: { page, limit: 20, reference: refFilter || undefined, manufacturer: mfgFilter || undefined },
+        params: {
+          page,
+          limit: 20,
+          reference: refFilter || undefined,
+          manufacturer_id: mfgBrandId || undefined,
+        },
       });
       setItems(data.items ?? []);
       setTotalPages(data.totalPages ?? 1);
@@ -219,12 +283,12 @@ function AdminSlotCatalog() {
     } finally {
       setItemsLoading(false);
     }
-  }, [page, refFilter, mfgFilter]);
+  }, [page, refFilter, mfgBrandId]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || tab !== 'items') return;
     fetchItems();
-  }, [isAdmin, fetchItems]);
+  }, [isAdmin, tab, fetchItems]);
 
   const fetchQueues = useCallback(async () => {
     setQueuesLoading(true);
@@ -248,6 +312,79 @@ function AdminSlotCatalog() {
     fetchQueues();
   }, [isAdmin, fetchQueues]);
 
+  const fetchBrandsAdmin = useCallback(async () => {
+    setBrandsTabLoading(true);
+    try {
+      const { data } = await api.get('/catalog/brands');
+      setBrandsAdmin(data.brands ?? []);
+    } catch {
+      setBrandsAdmin([]);
+    } finally {
+      setBrandsTabLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin || tab !== 'brands') return;
+    fetchBrandsAdmin();
+  }, [isAdmin, tab, fetchBrandsAdmin]);
+
+  const openCreateBrand = () => {
+    setBrandEditId(null);
+    setBrandName('');
+    setBrandLogoFile(null);
+    setBrandExistingLogo(null);
+    setBrandClearLogo(false);
+    setBrandDialogOpen(true);
+  };
+
+  const openEditBrand = (row) => {
+    setBrandEditId(row.id);
+    setBrandName(row.name ?? '');
+    setBrandLogoFile(null);
+    const u = row.logo_url != null && String(row.logo_url).trim() ? String(row.logo_url) : null;
+    setBrandExistingLogo(u);
+    setBrandClearLogo(false);
+    setBrandDialogOpen(true);
+  };
+
+  const saveBrand = async () => {
+    const n = brandName.trim();
+    if (!n) {
+      alert('El nombre de la marca es obligatorio');
+      return;
+    }
+    setBrandSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('name', n);
+      if (brandLogoFile) fd.append('logo', brandLogoFile);
+      if (brandEditId && brandClearLogo) fd.append('clear_logo', 'true');
+      if (brandEditId) {
+        await api.put(`/catalog/brands/${brandEditId}`, fd);
+      } else {
+        await api.post('/catalog/brands', fd);
+      }
+      setBrandDialogOpen(false);
+      fetchBrandsAdmin();
+    } catch (e) {
+      alert(e.response?.data?.error || e.message || 'Error al guardar la marca');
+    } finally {
+      setBrandSaving(false);
+    }
+  };
+
+  const confirmDeleteBrand = async () => {
+    if (!deleteBrandId) return;
+    try {
+      await api.delete(`/catalog/brands/${deleteBrandId}`);
+      setDeleteBrandId(null);
+      fetchBrandsAdmin();
+    } catch (e) {
+      alert(e.response?.data?.error || e.message);
+    }
+  };
+
   const openCreate = () => {
     setEditMode('create');
     setEditingId(null);
@@ -263,7 +400,7 @@ function AdminSlotCatalog() {
     setEditingId(row.id);
     setForm({
       reference: row.reference ?? '',
-      manufacturer: row.manufacturer ?? '',
+      manufacturer_id: row.manufacturer_id ?? '',
       model_name: row.model_name ?? '',
       vehicle_type: row.vehicle_type ?? '',
       traction: row.traction ?? '',
@@ -272,6 +409,8 @@ function AdminSlotCatalog() {
         row.commercial_release_year != null && row.commercial_release_year !== ''
           ? String(row.commercial_release_year)
           : '',
+      discontinued: Boolean(row.discontinued),
+      upcoming_release: Boolean(row.upcoming_release),
     });
     setImageFile(null);
     const url = row.image_url != null && String(row.image_url).trim() ? String(row.image_url) : null;
@@ -281,16 +420,22 @@ function AdminSlotCatalog() {
   };
 
   const saveItem = async () => {
+    if (!form.manufacturer_id?.trim()) {
+      alert('Selecciona una marca registrada');
+      return;
+    }
     setFormSaving(true);
     try {
       const fd = new FormData();
       fd.append('reference', form.reference);
-      fd.append('manufacturer', form.manufacturer);
+      fd.append('manufacturer_id', form.manufacturer_id);
       fd.append('model_name', form.model_name);
       if (form.vehicle_type) fd.append('vehicle_type', form.vehicle_type);
       fd.append('traction', form.traction ?? '');
       fd.append('motor_position', form.motor_position ?? '');
       if (form.commercial_release_year) fd.append('commercial_release_year', form.commercial_release_year);
+      fd.append('discontinued', form.discontinued ? 'true' : 'false');
+      fd.append('upcoming_release', form.upcoming_release ? 'true' : 'false');
       if (imageFile) fd.append('image', imageFile);
 
       if (editMode === 'create') {
@@ -399,7 +544,15 @@ function AdminSlotCatalog() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
+          <TabsTrigger value="dashboard">
+            <LayoutDashboard className="size-4 mr-1 inline" />
+            Dashboard
+          </TabsTrigger>
           <TabsTrigger value="items">Ítems</TabsTrigger>
+          <TabsTrigger value="brands">
+            <Tag className="size-4 mr-1 inline" />
+            Marcas
+          </TabsTrigger>
           <TabsTrigger value="import">
             <Upload className="size-4 mr-1 inline" />
             Importar
@@ -410,28 +563,181 @@ function AdminSlotCatalog() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="dashboard" className="space-y-4 mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold">Métricas del catálogo</h2>
+              <p className="text-sm text-muted-foreground">
+                Completitud ponderada (5 campos; la marca no entra). Imagen 32%; nombre, tipo, tracción y motor 17% cada uno.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => fetchCatalogStats()} disabled={statsLoading}>
+              {statsLoading ? 'Actualizando…' : 'Actualizar'}
+            </Button>
+          </div>
+          {statsLoading && !catalogStats ? (
+            <Spinner className="mx-auto" />
+          ) : statsError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{statsError}</AlertDescription>
+            </Alert>
+          ) : catalogStats ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Ítems en catálogo</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold tabular-nums">{catalogStats.totalItems}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Completitud media (ponderada)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold tabular-nums">
+                      {catalogStats.weightedCompletenessPercent}%
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Ítems 100% completos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold tabular-nums">
+                      {catalogStats.fullyCompletePercent}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {catalogStats.fullyCompleteCount} de {catalogStats.totalItems}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="sm:col-span-2 lg:col-span-1">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Pesos (API)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground space-y-1 font-mono">
+                    <div>imagen {Math.round((catalogStats.weights?.image_url ?? 0.32) * 100)}%</div>
+                    <div>nombre / tipo / tracción / motor {Math.round((catalogStats.weights?.model_name ?? 0.17) * 100)}% c/u</div>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Huecos en datos</CardTitle>
+                    <CardDescription>Conteos absolutos y % sobre el total de ítems.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {[
+                      {
+                        key: 'withoutImage',
+                        label: 'Sin imagen',
+                        n: catalogStats.missing?.withoutImage ?? 0,
+                      },
+                      {
+                        key: 'withoutVehicleType',
+                        label: 'Sin tipo',
+                        n: catalogStats.missing?.withoutVehicleType ?? 0,
+                      },
+                      {
+                        key: 'withoutTraction',
+                        label: 'Sin tracción',
+                        n: catalogStats.missing?.withoutTraction ?? 0,
+                      },
+                      {
+                        key: 'withoutMotor',
+                        label: 'Sin motor (posición)',
+                        n: catalogStats.missing?.withoutMotor ?? 0,
+                      },
+                      {
+                        key: 'withoutYear',
+                        label: 'Sin año de comercialización',
+                        n: catalogStats.missing?.withoutYear ?? 0,
+                      },
+                    ].map((row) => {
+                      const t = catalogStats.totalItems || 1;
+                      const pct = Math.round(((row.n / t) * 10000)) / 100;
+                      return (
+                        <div
+                          key={row.key}
+                          className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
+                        >
+                          <span className="text-sm">{row.label}</span>
+                          <span className="text-sm tabular-nums">
+                            <strong>{row.n}</strong>
+                            <span className="text-muted-foreground"> ({pct}%)</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Huecos (gráfico)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[min(320px,50vh)] w-full min-h-[240px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={[
+                          { label: 'Sin imagen', value: catalogStats.missing?.withoutImage ?? 0 },
+                          { label: 'Sin tipo', value: catalogStats.missing?.withoutVehicleType ?? 0 },
+                          { label: 'Sin tracción', value: catalogStats.missing?.withoutTraction ?? 0 },
+                          { label: 'Sin motor', value: catalogStats.missing?.withoutMotor ?? 0 },
+                          { label: 'Sin año', value: catalogStats.missing?.withoutYear ?? 0 },
+                        ]}
+                        margin={{ top: 8, right: 8, left: 0, bottom: 48 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={56} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <Tooltip
+                          contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          formatter={(v) => [v, 'Ítems']}
+                        />
+                        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Ítems" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : null}
+        </TabsContent>
+
         <TabsContent value="items" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
               <CardTitle>Listado</CardTitle>
               <CardDescription>
-                CSV/Excel: reference, manufacturer, model_name, vehicle_type (opcional), traction (opcional), motor_position (opcional: inline, angular, transverse, transversal, en línea, en angular…), commercial_release_year (opcional, solo año).
+                CSV/Excel: reference, manufacturer (nombre exacto de una marca registrada en la pestaña Marcas), model_name, vehicle_type (opcional), traction (opcional; en formularios: 4x4, Trasera o Delantera), motor_position (opcional: inline, angular, transverse…), commercial_release_year (opcional, solo año), discontinued y upcoming_release (opcional: true/false, 1/0; también descatalogado, proximo_lanzamiento).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Input
                   placeholder="Filtrar referencia"
                   value={refFilter}
                   onChange={e => { setRefFilter(e.target.value); setPage(1); }}
                   className="max-w-xs"
                 />
-                <Input
-                  placeholder="Filtrar marca"
-                  value={mfgFilter}
-                  onChange={e => { setMfgFilter(e.target.value); setPage(1); }}
-                  className="max-w-xs"
-                />
+                <div className="w-full max-w-xs shrink-0">
+                  <CatalogBrandSelect
+                    showLabel={false}
+                    emptyOptionLabel="Todas las marcas"
+                    required={false}
+                    value={mfgBrandId}
+                    onChange={(id) => {
+                      setMfgBrandId(id);
+                      setPage(1);
+                    }}
+                    id="admin-catalog-filter-brand"
+                  />
+                </div>
                 <Button type="button" variant="secondary" onClick={() => fetchItems()}>
                   Aplicar
                 </Button>
@@ -453,6 +759,8 @@ function AdminSlotCatalog() {
                       <TableHead>Tracción</TableHead>
                       <TableHead>Motor</TableHead>
                       <TableHead>Año</TableHead>
+                      <TableHead className="whitespace-nowrap">Desc.</TableHead>
+                      <TableHead className="whitespace-nowrap">Próx.</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -466,6 +774,8 @@ function AdminSlotCatalog() {
                         <TableCell>{row.traction || '—'}</TableCell>
                         <TableCell>{labelMotorPosition(row.motor_position)}</TableCell>
                         <TableCell>{row.commercial_release_year ?? '—'}</TableCell>
+                        <TableCell className="text-sm">{row.discontinued ? 'Sí' : '—'}</TableCell>
+                        <TableCell className="text-sm">{row.upcoming_release ? 'Sí' : '—'}</TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
                             Editar
@@ -494,11 +804,78 @@ function AdminSlotCatalog() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="brands" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
+              <div>
+                <CardTitle>Marcas del catálogo</CardTitle>
+                <CardDescription>
+                  Nombre canónico único (comparación sin distinguir mayúsculas). Logo opcional. Los ítems e importaciones deben usar estas marcas.
+                </CardDescription>
+              </div>
+              <Button type="button" onClick={openCreateBrand}>
+                <PlusCircle className="size-4 mr-2" />
+                Nueva marca
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {brandsTabLoading ? (
+                <Spinner className="mx-auto" />
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-24">Logo</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead className="hidden sm:table-cell">Creada</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {brandsAdmin.map((b) => (
+                      <TableRow key={b.id}>
+                        <TableCell>
+                          {b.logo_url ? (
+                            <img
+                              src={b.logo_url}
+                              alt=""
+                              className="h-10 w-10 rounded object-contain border bg-muted/30"
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{b.name}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                          {b.created_at
+                            ? new Date(b.created_at).toLocaleDateString('es-ES')
+                            : '—'}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button size="sm" variant="outline" onClick={() => openEditBrand(b)}>
+                            Editar
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => setDeleteBrandId(b.id)}>
+                            Eliminar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="import" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
               <CardTitle>Importar CSV o Excel</CardTitle>
-              <CardDescription>La primera fila debe ser cabecera. PDF: exporta a Excel/CSV primero.</CardDescription>
+              <CardDescription>
+                La primera fila debe ser cabecera. La columna de marca (manufacturer / Marca) debe coincidir con el nombre de una marca registrada; si no, la fila fallará con un mensaje explícito.
+                No hay importación JSON ni PDF: usa CSV o Excel; el PDF no está soportado.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-lg">
               <div className="space-y-2">
@@ -633,20 +1010,22 @@ function AdminSlotCatalog() {
       </Tabs>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editMode === 'create' ? 'Nuevo ítem del catálogo' : 'Editar ítem'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
+          <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Referencia</Label>
               <Input name="reference" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} />
             </div>
-            <div className="space-y-2">
-              <Label>Marca</Label>
-              <Input value={form.manufacturer} onChange={e => setForm(f => ({ ...f, manufacturer: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
+            <CatalogBrandSelect
+              label="Marca"
+              required
+              value={form.manufacturer_id}
+              onChange={(manufacturer_id) => setForm((f) => ({ ...f, manufacturer_id }))}
+            />
+            <div className="space-y-2 sm:col-span-2">
               <Label>Nombre / modelo</Label>
               <Input value={form.model_name} onChange={e => setForm(f => ({ ...f, model_name: e.target.value }))} />
             </div>
@@ -667,14 +1046,11 @@ function AdminSlotCatalog() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Tracción</Label>
-              <Input
-                value={form.traction}
-                onChange={e => setForm(f => ({ ...f, traction: e.target.value }))}
-                placeholder="Opcional (ej. trasera, AWD)"
-              />
-            </div>
+            <CatalogTractionSelect
+              value={form.traction}
+              onChange={(traction) => setForm((f) => ({ ...f, traction }))}
+              id="catalog-item-traction"
+            />
             <div className="space-y-2">
               <Label>Posición del motor</Label>
               <Select
@@ -705,7 +1081,29 @@ function AdminSlotCatalog() {
               />
               <p className="text-xs text-muted-foreground">Solo el año (opcional).</p>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-4 rounded-lg border p-3 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+              <div className="flex items-center justify-between gap-3 sm:min-w-[200px]">
+                <Label htmlFor="catalog-discontinued" className="cursor-pointer">
+                  Descatalogado
+                </Label>
+                <Switch
+                  id="catalog-discontinued"
+                  checked={form.discontinued}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, discontinued: v }))}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 sm:min-w-[220px]">
+                <Label htmlFor="catalog-upcoming" className="cursor-pointer">
+                  Próximo lanzamiento
+                </Label>
+                <Switch
+                  id="catalog-upcoming"
+                  checked={form.upcoming_release}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, upcoming_release: v }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
               <Label>Imagen (opcional)</Label>
               {(newImageObjectUrl || existingImageUrl) && (
                 <div className="space-y-1">
@@ -715,7 +1113,7 @@ function AdminSlotCatalog() {
                   <img
                     src={newImageObjectUrl || existingImageUrl}
                     alt=""
-                    className="max-h-48 w-auto max-w-full rounded-md border object-contain bg-muted/30"
+                    className="max-h-36 w-auto max-w-full rounded-md border object-contain bg-muted/30"
                   />
                 </div>
               )}
@@ -744,6 +1142,78 @@ function AdminSlotCatalog() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={brandDialogOpen} onOpenChange={setBrandDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{brandEditId ? 'Editar marca' : 'Nueva marca'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nombre</Label>
+              <Input
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                placeholder="Ej. Scalextric"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Logo (opcional)</Label>
+              {(brandLogoPreviewUrl || (brandExistingLogo && !brandClearLogo)) && (
+                <img
+                  src={brandLogoPreviewUrl || brandExistingLogo}
+                  alt=""
+                  className="max-h-24 w-auto rounded border object-contain bg-muted/30"
+                />
+              )}
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  setBrandLogoFile(e.target.files?.[0] || null);
+                  setBrandClearLogo(false);
+                }}
+              />
+              {brandEditId && brandExistingLogo && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={brandClearLogo}
+                    onChange={(e) => {
+                      setBrandClearLogo(e.target.checked);
+                      if (e.target.checked) setBrandLogoFile(null);
+                    }}
+                  />
+                  Quitar logo actual
+                </label>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setBrandDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={saveBrand} disabled={brandSaving}>
+              {brandSaving ? 'Guardando…' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteBrandId} onOpenChange={() => setDeleteBrandId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta marca?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Solo se puede si no hay ítems ni solicitudes de alta que la usen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteBrand}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

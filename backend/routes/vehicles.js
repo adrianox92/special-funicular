@@ -676,7 +676,11 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
 
     let catalogRow = null;
     if (catalog_item_id_val) {
-      const { data: cr } = await supabase.from('slot_catalog_items').select('*').eq('id', catalog_item_id_val).maybeSingle();
+      const { data: cr } = await supabase
+        .from('slot_catalog_items_with_ratings')
+        .select('*')
+        .eq('id', catalog_item_id_val)
+        .maybeSingle();
       catalogRow = cr;
     }
 
