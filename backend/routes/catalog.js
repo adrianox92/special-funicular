@@ -283,6 +283,250 @@ async function enrichInsertRequestsWithBrandNames(rows) {
   }));
 }
 
+function normOptionalStr(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+
+function normYearForDiff(v) {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : parseInt(String(v), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Comparación ítem actual vs proposed_patch para la cola admin (solo campos que cambian).
+ */
+function computeCatalogChangeFieldDiffs(item, patch, brandNameById) {
+  const changes = [];
+  if (!patch) return changes;
+
+  const brandLabel = (id) => {
+    if (id == null || id === '') return '—';
+    const s = String(id);
+    return brandNameById.get(s) ?? s;
+  };
+
+  if (item) {
+    const curM = String(item.manufacturer_id ?? '');
+    const nextM = String(patch.manufacturer_id ?? item.manufacturer_id ?? '');
+    if (curM !== nextM) {
+      changes.push({
+        field: 'manufacturer_id',
+        label: 'Marca',
+        before: brandLabel(curM),
+        after: brandLabel(nextM),
+      });
+    }
+  }
+
+  const curModel = item ? normOptionalStr(item.model_name) : null;
+  const propModel = normOptionalStr(patch.model_name);
+  if (item && curModel !== propModel) {
+    changes.push({
+      field: 'model_name',
+      label: 'Nombre / modelo',
+      before: curModel ?? '—',
+      after: propModel ?? '—',
+    });
+  }
+
+  const curVt = item ? normOptionalStr(item.vehicle_type) : null;
+  const propVt = normOptionalStr(patch.vehicle_type);
+  if (item && curVt !== propVt) {
+    changes.push({ field: 'vehicle_type', label: 'Tipo', before: curVt ?? '—', after: propVt ?? '—' });
+  }
+
+  const curTr = item ? normOptionalStr(item.traction) : null;
+  const propTr = normOptionalStr(patch.traction);
+  if (item && curTr !== propTr) {
+    changes.push({ field: 'traction', label: 'Tracción', before: curTr ?? '—', after: propTr ?? '—' });
+  }
+
+  const curMp = item ? normOptionalStr(item.motor_position) : null;
+  const propMp = normOptionalStr(patch.motor_position);
+  if (item && curMp !== propMp) {
+    changes.push({
+      field: 'motor_position',
+      label: 'Motor',
+      before: curMp ?? '—',
+      after: propMp ?? '—',
+    });
+  }
+
+  const curY = item ? normYearForDiff(item.commercial_release_year) : null;
+  const propY = normYearForDiff(patch.commercial_release_year);
+  if (item && curY !== propY) {
+    changes.push({
+      field: 'commercial_release_year',
+      label: 'Año',
+      before: curY != null ? String(curY) : '—',
+      after: propY != null ? String(propY) : '—',
+    });
+  }
+
+  const curD = item ? Boolean(item.discontinued) : null;
+  const propD = Boolean(patch.discontinued);
+  if (item && curD !== propD) {
+    changes.push({
+      field: 'discontinued',
+      label: 'Descatalogado',
+      before: curD ? 'Sí' : 'No',
+      after: propD ? 'Sí' : 'No',
+    });
+  }
+
+  const curU = item ? Boolean(item.upcoming_release) : null;
+  const propU = Boolean(patch.upcoming_release);
+  if (item && curU !== propU) {
+    changes.push({
+      field: 'upcoming_release',
+      label: 'Próximo lanzamiento',
+      before: curU ? 'Sí' : 'No',
+      after: propU ? 'Sí' : 'No',
+    });
+  }
+
+  const curImg = item ? normOptionalStr(item.image_url) : null;
+  const propImg = normOptionalStr(patch.image_url);
+  if (item && curImg !== propImg) {
+    changes.push({
+      field: 'image_url',
+      label: 'Imagen',
+      before: curImg,
+      after: propImg,
+      kind: 'image',
+    });
+  }
+
+  return changes;
+}
+
+/** Si el ítem ya no existe, igual mostramos los valores pretendidos en la cola. */
+function proposedPatchToFallbackDiffs(patch, brandNameById) {
+  const changes = [];
+  if (!patch) return changes;
+  const bl = (id) => {
+    if (id == null || id === '') return '—';
+    return brandNameById.get(String(id)) ?? String(id);
+  };
+  if (patch.manufacturer_id != null && String(patch.manufacturer_id).trim() !== '') {
+    changes.push({
+      field: 'manufacturer_id',
+      label: 'Marca',
+      before: '—',
+      after: bl(patch.manufacturer_id),
+    });
+  }
+  if (patch.model_name != null && String(patch.model_name).trim() !== '') {
+    changes.push({
+      field: 'model_name',
+      label: 'Nombre / modelo',
+      before: '—',
+      after: String(patch.model_name).trim(),
+    });
+  }
+  const vt = normOptionalStr(patch.vehicle_type);
+  if (vt) changes.push({ field: 'vehicle_type', label: 'Tipo', before: '—', after: vt });
+  const tr = normOptionalStr(patch.traction);
+  if (tr) changes.push({ field: 'traction', label: 'Tracción', before: '—', after: tr });
+  const mp = normOptionalStr(patch.motor_position);
+  if (mp) changes.push({ field: 'motor_position', label: 'Motor', before: '—', after: mp });
+  const y = normYearForDiff(patch.commercial_release_year);
+  if (y != null) {
+    changes.push({
+      field: 'commercial_release_year',
+      label: 'Año',
+      before: '—',
+      after: String(y),
+    });
+  }
+  if (patch.discontinued !== undefined) {
+    changes.push({
+      field: 'discontinued',
+      label: 'Descatalogado',
+      before: '—',
+      after: patch.discontinued ? 'Sí' : 'No',
+    });
+  }
+  if (patch.upcoming_release !== undefined) {
+    changes.push({
+      field: 'upcoming_release',
+      label: 'Próximo lanzamiento',
+      before: '—',
+      after: patch.upcoming_release ? 'Sí' : 'No',
+    });
+  }
+  const img = normOptionalStr(patch.image_url);
+  if (img) {
+    changes.push({
+      field: 'image_url',
+      label: 'Imagen',
+      before: null,
+      after: img,
+      kind: 'image',
+    });
+  }
+  return changes;
+}
+
+const CATALOG_ITEM_SUMMARY_SELECT =
+  'id, reference, manufacturer_id, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, image_url';
+
+/**
+ * Añade resumen del ítem y lista de cambios respecto al estado actual (admin).
+ */
+async function enrichChangeRequestsForAdmin(rows) {
+  if (!rows?.length) return rows || [];
+  const itemIds = [...new Set(rows.map((r) => r.catalog_item_id).filter(Boolean))];
+  let itemsById = new Map();
+  if (itemIds.length) {
+    const { data: items, error } = await supabase
+      .from('slot_catalog_items_with_ratings')
+      .select(CATALOG_ITEM_SUMMARY_SELECT)
+      .in('id', itemIds);
+    if (error) {
+      console.warn('[catalog] enrichChangeRequestsForAdmin items', error.message);
+    } else {
+      itemsById = new Map((items || []).map((it) => [it.id, it]));
+    }
+  }
+
+  const brandIds = new Set();
+  for (const r of rows) {
+    const it = itemsById.get(r.catalog_item_id);
+    if (it?.manufacturer_id) brandIds.add(String(it.manufacturer_id));
+    const p = r.proposed_patch;
+    if (p?.manufacturer_id) brandIds.add(String(p.manufacturer_id));
+  }
+  let brandNameById = new Map();
+  if (brandIds.size) {
+    const { data: brands } = await supabase.from('slot_catalog_brands').select('id,name').in('id', [...brandIds]);
+    brandNameById = new Map((brands || []).map((b) => [String(b.id), b.name]));
+  }
+
+  return rows.map((r) => {
+    const item = itemsById.get(r.catalog_item_id) ?? null;
+    const field_diffs = item
+      ? computeCatalogChangeFieldDiffs(item, r.proposed_patch, brandNameById)
+      : proposedPatchToFallbackDiffs(r.proposed_patch, brandNameById);
+    const catalog_item_summary = item
+      ? {
+          id: item.id,
+          reference: item.reference ?? null,
+          manufacturer: item.manufacturer ?? null,
+          model_name: item.model_name ?? null,
+        }
+      : null;
+    return {
+      ...r,
+      catalog_item_summary,
+      field_diffs,
+    };
+  });
+}
+
 router.use(authMiddleware);
 
 /**
@@ -791,7 +1035,8 @@ router.get('/change-requests', adminGuard, async (req, res) => {
     if (st !== 'all') q = q.eq('status', st);
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ requests: data ?? [] });
+    const enriched = await enrichChangeRequestsForAdmin(data ?? []);
+    res.json({ requests: enriched });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import PublicCatalogShell from '../components/PublicCatalogShell';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Spinner } from '../components/ui/spinner';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
@@ -26,7 +26,12 @@ import {
 import { catalogSlugify } from '../utils/catalogSlug';
 import { labelMotorPosition, MOTOR_POSITION_OPTIONS } from '../data/motorPosition';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
-import { applyCatalogItemPageSeo, clearCatalogItemPageSeo } from '../utils/catalogItemSeo';
+import {
+  applyCatalogItemPageSeo,
+  buildCatalogItemImageAlt,
+  buildCatalogItemLeadParagraph,
+  clearCatalogItemPageSeo,
+} from '../utils/catalogItemSeo';
 import { ChevronRight, Package, Star } from 'lucide-react';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
@@ -222,11 +227,16 @@ export default function PublicCatalogDetail() {
 
   const ratingAvgStr = formatRatingAvg(item.rating_avg);
   const ratingCount = Number(item.rating_count) || 0;
+  const imageAlt = buildCatalogItemImageAlt(item);
+  const leadText = buildCatalogItemLeadParagraph(item);
 
   return (
     <PublicCatalogShell>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <nav className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+        <nav
+          className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground"
+          aria-label="Migas de pan"
+        >
           <Link to="/" className="hover:text-foreground transition-colors">
             Inicio
           </Link>
@@ -254,6 +264,7 @@ export default function PublicCatalogDetail() {
             <span aria-hidden>·</span>
             <span>{item.manufacturer}</span>
           </p>
+          <p className="text-base text-muted-foreground max-w-3xl leading-relaxed">{leadText}</p>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {ratingAvgStr != null ? (
               <span className="inline-flex items-center gap-1 text-foreground">
@@ -296,7 +307,7 @@ export default function PublicCatalogDetail() {
               {item.image_url ? (
                 <img
                   src={item.image_url}
-                  alt=""
+                  alt={imageAlt}
                   className="max-w-full max-h-[min(420px,50vh)] w-auto h-auto object-contain"
                 />
               ) : (
@@ -310,7 +321,7 @@ export default function PublicCatalogDetail() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xl">Detalles</CardTitle>
+              <h2 className="text-xl font-semibold leading-none tracking-tight">Detalles técnicos</h2>
             </CardHeader>
             <CardContent>
               <dl className="space-y-0 divide-y divide-border">
@@ -335,7 +346,7 @@ export default function PublicCatalogDetail() {
         {user && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Tu valoración</CardTitle>
+              <h2 className="text-base font-semibold leading-none tracking-tight">Tu valoración</h2>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-2">
               {myRatingLoading ? (

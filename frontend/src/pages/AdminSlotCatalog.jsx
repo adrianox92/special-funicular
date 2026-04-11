@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
@@ -167,6 +167,12 @@ async function runCatalogImportStream(file, duplicateMode, onProgress) {
     throw new Error('Respuesta de importación incompleta.');
   }
   return completePayload;
+}
+
+function formatCatalogDiffValue(field, value) {
+  if (value == null || value === '' || value === '—') return '—';
+  if (field === 'motor_position') return labelMotorPosition(value) || String(value);
+  return String(value);
 }
 
 function AdminSlotCatalog() {
@@ -935,6 +941,9 @@ function AdminSlotCatalog() {
               <Card>
                 <CardHeader>
                   <CardTitle>Ediciones propuestas</CardTitle>
+                  <CardDescription>
+                    Comparación respecto a la ficha actual. Revisa los campos antes de aprobar.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {chgReq.length === 0 ? (
@@ -944,16 +953,87 @@ function AdminSlotCatalog() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Ítem</TableHead>
-                          <TableHead>Estado</TableHead>
+                          <TableHead className="min-w-[280px]">Cambios propuestos</TableHead>
+                          <TableHead className="whitespace-nowrap">Recibida</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {chgReq.map(r => (
                           <TableRow key={r.id}>
-                            <TableCell className="font-mono text-sm">{r.catalog_item_id}</TableCell>
-                            <TableCell>{r.status}</TableCell>
-                            <TableCell className="text-right space-x-2">
+                            <TableCell>
+                              {r.catalog_item_summary ? (
+                                <div className="space-y-0.5">
+                                  <Link
+                                    to={`/catalogo/${r.catalog_item_summary.id}`}
+                                    className="font-mono text-sm text-primary hover:underline"
+                                  >
+                                    {r.catalog_item_summary.reference}
+                                  </Link>
+                                  <div className="text-xs text-muted-foreground">
+                                    {r.catalog_item_summary.manufacturer} — {r.catalog_item_summary.model_name}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  {r.catalog_item_id
+                                    ? `Ficha no encontrada (id en solicitud)`
+                                    : '—'}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="align-top">
+                              {!r.field_diffs?.length ? (
+                                <span className="text-xs text-muted-foreground">
+                                  Sin cambios detectados
+                                </span>
+                              ) : (
+                                <ul className="text-sm space-y-2 max-h-56 overflow-y-auto pr-1">
+                                  {r.field_diffs.map((d, i) => (
+                                    <li key={`${d.field}-${i}`} className="border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                                      {d.kind === 'image' ? (
+                                        <div className="space-y-1">
+                                          <span className="font-medium">{d.label}</span>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            {d.before ? (
+                                              <img src={d.before} alt="" className="h-14 w-auto max-w-[120px] rounded border object-contain bg-muted/30" />
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">Sin imagen</span>
+                                            )}
+                                            <span className="text-muted-foreground">→</span>
+                                            {d.after ? (
+                                              <img src={d.after} alt="" className="h-14 w-auto max-w-[120px] rounded border object-contain bg-muted/30" />
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">Quitar imagen</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <span className="font-medium">{d.label}</span>
+                                          <div className="text-xs sm:text-sm mt-0.5 break-words">
+                                            <span className="text-muted-foreground line-through decoration-muted-foreground/70">
+                                              {formatCatalogDiffValue(d.field, d.before)}
+                                            </span>
+                                            <span className="mx-1 text-muted-foreground">→</span>
+                                            <span>{formatCatalogDiffValue(d.field, d.after)}</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </TableCell>
+                            <TableCell className="align-top text-xs text-muted-foreground whitespace-nowrap">
+                              {r.created_at
+                                ? new Date(r.created_at).toLocaleString('es-ES', {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short',
+                                  })
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="text-right align-top space-x-2">
                               <Button size="sm" onClick={() => approveChg(r.id)}>Aprobar</Button>
                               <Button size="sm" variant="outline" onClick={() => rejectChg(r.id)}>Rechazar</Button>
                             </TableCell>
@@ -967,6 +1047,9 @@ function AdminSlotCatalog() {
               <Card>
                 <CardHeader>
                   <CardTitle>Altas propuestas</CardTitle>
+                  <CardDescription>
+                    Datos enviados por el usuario para crear una nueva ficha.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {insReq.length === 0 ? (
@@ -979,6 +1062,9 @@ function AdminSlotCatalog() {
                           <TableHead>Marca / Nombre</TableHead>
                           <TableHead>Tipo</TableHead>
                           <TableHead>Tracción / motor</TableHead>
+                          <TableHead>Año</TableHead>
+                          <TableHead className="whitespace-nowrap">Desc. / próx.</TableHead>
+                          <TableHead className="w-16">Img.</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -992,6 +1078,23 @@ function AdminSlotCatalog() {
                               {[r.proposed_traction, r.proposed_motor_position ? labelMotorPosition(r.proposed_motor_position) : null]
                                 .filter(Boolean)
                                 .join(' · ') || '—'}
+                            </TableCell>
+                            <TableCell>{r.proposed_commercial_release_year ?? '—'}</TableCell>
+                            <TableCell className="text-xs">
+                              {[r.proposed_discontinued ? 'Descatalogado' : null, r.proposed_upcoming_release ? 'Próx. lanzamiento' : null]
+                                .filter(Boolean)
+                                .join(' · ') || '—'}
+                            </TableCell>
+                            <TableCell>
+                              {r.proposed_image_url ? (
+                                <img
+                                  src={r.proposed_image_url}
+                                  alt=""
+                                  className="h-11 w-11 rounded border object-contain bg-muted/30"
+                                />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                             <TableCell className="text-right space-x-2">
                               <Button size="sm" onClick={() => approveIns(r.id)}>Aprobar</Button>

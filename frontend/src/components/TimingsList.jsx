@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3, Trash2 } from 'lucide-react';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
 import ImportTimingsModal from './ImportTimingsModal';
@@ -28,6 +28,17 @@ import {
   TableRow,
 } from './ui/table';
 import { Card, CardContent } from './ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
+import { toast } from 'sonner';
 import './TimingsList.css';
 import { formatDistance } from '../utils/formatUtils';
 
@@ -49,6 +60,7 @@ function TimingMobileGroupCard({
   setShowPerformanceModal,
   setComparisonSessions,
   setShowComparisonModal,
+  onRequestDeleteSession,
   getSeconds,
   getTotalSeconds,
 }) {
@@ -164,6 +176,17 @@ function TimingMobileGroupCard({
               Comparar
             </Button>
           )}
+          {group.sessions.length === 1 && group.sessions[0]?.id != null && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => onRequestDeleteSession(group.vehicle_id, group.sessions[0].id)}
+              title="Eliminar esta sesión"
+            >
+              <Trash2 className="size-4 mr-1" />
+              Eliminar
+            </Button>
+          )}
         </div>
 
         {expanded && group.sessions.length > 1 && (
@@ -223,6 +246,17 @@ function TimingMobileGroupCard({
                         <BarChart3 className="size-4" />
                       </Button>
                     )}
+                    {session.id != null && (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onRequestDeleteSession(group.vehicle_id, session.id)}
+                        title="Eliminar esta sesión"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -247,6 +281,11 @@ const TimingsList = () => {
   const [performanceTiming, setPerformanceTiming] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
+  const [deleteSessionConfirm, setDeleteSessionConfirm] = useState({
+    open: false,
+    vehicleId: null,
+    timingId: null,
+  });
   const [filter, setFilter] = useState({
     vehicle: '',
     dateFrom: '',
@@ -285,6 +324,39 @@ const TimingsList = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const reloadTimings = async () => {
+    try {
+      const { data } = await api.get('/timings');
+      setTimings(data);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Error al actualizar la lista de tiempos');
+    }
+  };
+
+  const requestDeleteSession = (vehicleId, timingId) => {
+    if (vehicleId == null || timingId == null) return;
+    setDeleteSessionConfirm({ open: true, vehicleId, timingId });
+  };
+
+  const confirmDeleteSession = async () => {
+    const { vehicleId, timingId } = deleteSessionConfirm;
+    if (vehicleId == null || timingId == null) return;
+    setDeleteSessionConfirm({ open: false, vehicleId: null, timingId: null });
+    try {
+      const response = await api.delete(`/vehicles/${vehicleId}/timings/${timingId}`);
+      if (response.data?.position_updated) {
+        toast.success(
+          `Tiempo eliminado y posiciones recalculadas en: ${response.data.circuit}`,
+        );
+      }
+      await reloadTimings();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Error al eliminar el registro de tiempo');
+    }
+  };
 
   const getSeconds = (timeStr) => {
     const [minutes, seconds] = timeStr.split(':');
@@ -554,6 +626,7 @@ const TimingsList = () => {
               setShowPerformanceModal={setShowPerformanceModal}
               setComparisonSessions={setComparisonSessions}
               setShowComparisonModal={setShowComparisonModal}
+              onRequestDeleteSession={requestDeleteSession}
               getSeconds={getSeconds}
               getTotalSeconds={getTotalSeconds}
             />
@@ -577,7 +650,7 @@ const TimingsList = () => {
               <TableHead>V (V)</TableHead>
               <TableHead>Ses.</TableHead>
               <TableHead>Última</TableHead>
-              <TableHead className="text-center w-[80px]">Acciones</TableHead>
+              <TableHead className="text-center min-w-[112px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -635,8 +708,8 @@ const TimingsList = () => {
                     <TableCell className="font-mono text-sm">{formatVoltageVolts(group.best_time.supply_voltage_volts)}</TableCell>
                     <TableCell><Badge>{group.total_sessions}</Badge></TableCell>
                     <TableCell>{new Date(group.last_session.timing_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-center w-[80px]">
-                      <div className="flex items-center justify-center gap-1">
+                    <TableCell className="text-center min-w-[112px]">
+                      <div className="flex items-center justify-center gap-1 flex-wrap">
                         {group.best_time.setup_snapshot && (
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(group.best_time); setShowSpecsModal(true); }} title="Ver especificaciones">
                             <Wrench className="size-4" />
@@ -666,8 +739,17 @@ const TimingsList = () => {
                           >
                             <GitCompare className="size-4" />
                           </Button>
-                        ) : (
-                          !group.best_time.setup_snapshot && <span className="text-muted-foreground text-sm">-</span>
+                        ) : null}
+                        {group.sessions.length === 1 && group.sessions[0]?.id != null && (
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => requestDeleteSession(group.vehicle_id, group.sessions[0].id)}
+                            title="Eliminar esta sesión"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
                         )}
                       </div>
                     </TableCell>
@@ -728,6 +810,17 @@ const TimingsList = () => {
                                   <BarChart3 className="size-4" />
                                 </Button>
                               )}
+                              {session.id != null && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => requestDeleteSession(group.vehicle_id, session.id)}
+                                  title="Eliminar esta sesión"
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -752,6 +845,30 @@ const TimingsList = () => {
         defaultCircuitId={filter.circuit_id || undefined}
         onImported={loadData}
       />
+
+      <AlertDialog
+        open={deleteSessionConfirm.open}
+        onOpenChange={(open) => !open && setDeleteSessionConfirm({ open: false, vehicleId: null, timingId: null })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar registro de tiempo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar este registro de tiempo? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={confirmDeleteSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
