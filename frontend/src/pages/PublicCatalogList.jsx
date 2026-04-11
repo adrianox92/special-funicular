@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
 import PublicCatalogShell from '../components/PublicCatalogShell';
+import CatalogThirdPartyNotice from '../components/CatalogThirdPartyNotice';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -301,6 +302,8 @@ function PublicCatalogList() {
             )}
           </>
         )}
+
+        <CatalogThirdPartyNotice />
       </div>
     </PublicCatalogShell>
   );

@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import PublicCatalogShell from '../components/PublicCatalogShell';
+import CatalogThirdPartyNotice from '../components/CatalogThirdPartyNotice';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Spinner } from '../components/ui/spinner';
 import { Alert, AlertDescription } from '../components/ui/alert';
@@ -29,7 +30,6 @@ import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import {
   applyCatalogItemPageSeo,
   buildCatalogItemImageAlt,
-  buildCatalogItemLeadParagraph,
   clearCatalogItemPageSeo,
 } from '../utils/catalogItemSeo';
 import { ChevronRight, Package, Star } from 'lucide-react';
@@ -228,7 +228,6 @@ export default function PublicCatalogDetail() {
   const ratingAvgStr = formatRatingAvg(item.rating_avg);
   const ratingCount = Number(item.rating_count) || 0;
   const imageAlt = buildCatalogItemImageAlt(item);
-  const leadText = buildCatalogItemLeadParagraph(item);
 
   return (
     <PublicCatalogShell>
@@ -264,7 +263,6 @@ export default function PublicCatalogDetail() {
             <span aria-hidden>·</span>
             <span>{item.manufacturer}</span>
           </p>
-          <p className="text-base text-muted-foreground max-w-3xl leading-relaxed">{leadText}</p>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {ratingAvgStr != null ? (
               <span className="inline-flex items-center gap-1 text-foreground">
@@ -382,6 +380,8 @@ export default function PublicCatalogDetail() {
             </CardContent>
           </Card>
         )}
+
+        <CatalogThirdPartyNotice />
       </div>
 
       <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>

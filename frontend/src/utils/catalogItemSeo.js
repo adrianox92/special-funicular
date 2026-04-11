@@ -113,32 +113,6 @@ export function buildCatalogItemPageTitle(item) {
 }
 
 /**
- * Párrafo introductorio visible (contenido indexable, sin duplicar literalmente la meta description).
- * @param {Record<string, unknown>} item
- * @returns {string}
- */
-export function buildCatalogItemLeadParagraph(item) {
-  const ref = item.reference != null ? String(item.reference) : '';
-  const mfg = item.manufacturer != null ? String(item.manufacturer) : '';
-  const name = item.model_name != null ? String(item.model_name) : '';
-  const type = item.vehicle_type != null ? String(item.vehicle_type) : '';
-  const year =
-    item.commercial_release_year != null && item.commercial_release_year !== ''
-      ? String(item.commercial_release_year)
-      : '';
-  const bits = [];
-  if (type) bits.push(`tipo ${type.toLowerCase()}`);
-  if (year) bits.push(`comercializado en ${year}`);
-  if (item.discontinued) bits.push('descatalogado');
-  if (item.upcoming_release) bits.push('anunciado como próximo lanzamiento');
-  const detail = bits.length ? `${bits.join(', ')}.` : '';
-  return `Referencia de coche slot ${name} (${ref}) de ${mfg}. ${detail} Ficha pública con datos técnicos y valoraciones de la comunidad en ${BRAND}.`.replace(
-    /\s+/g,
-    ' ',
-  ).trim();
-}
-
-/**
  * @param {Record<string, unknown>} item
  * @returns {string}
  */
