@@ -30,6 +30,7 @@ import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import {
   applyCatalogItemPageSeo,
   buildCatalogItemImageAlt,
+  buildCatalogItemLeadParagraph,
   clearCatalogItemPageSeo,
 } from '../utils/catalogItemSeo';
 import { ChevronRight, Package, Star } from 'lucide-react';
@@ -228,6 +229,14 @@ export default function PublicCatalogDetail() {
   const ratingAvgStr = formatRatingAvg(item.rating_avg);
   const ratingCount = Number(item.rating_count) || 0;
   const imageAlt = buildCatalogItemImageAlt(item);
+  const leadText = buildCatalogItemLeadParagraph(item);
+  const registeredUserCount = Number(item.registered_user_count) || 0;
+  const collectionBlurb =
+    registeredUserCount === 0
+      ? 'Ningún usuario ha registrado aún este modelo en su colección.'
+      : registeredUserCount === 1
+        ? '1 usuario tiene este modelo en su colección.'
+        : `${registeredUserCount} usuarios tienen este modelo en su colección.`;
 
   return (
     <PublicCatalogShell>
@@ -341,6 +350,7 @@ export default function PublicCatalogDetail() {
           </Card>
         </div>
 
+
         {user && (
           <Card>
             <CardHeader className="pb-2">
@@ -380,8 +390,17 @@ export default function PublicCatalogDetail() {
             </CardContent>
           </Card>
         )}
-
+<Card className="border shadow-sm">
+          <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
+            <h2 className="text-base font-semibold leading-none tracking-tight">Colecciones</h2>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6 pt-0">
+            <p className="text-sm text-muted-foreground leading-relaxed">{collectionBlurb}</p>
+          </CardContent>
+        </Card>
         <CatalogThirdPartyNotice />
+
+        
       </div>
 
       <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>

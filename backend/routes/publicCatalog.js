@@ -135,7 +135,19 @@ router.get('/items/:id', async (req, res) => {
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Ítem no encontrado' });
-    res.json(data);
+
+    let registered_user_count = 0;
+    const { data: countVal, error: countErr } = await supabase.rpc(
+      'slot_catalog_item_registered_user_count',
+      { p_catalog_item_id: id },
+    );
+    if (countErr) {
+      console.warn('[publicCatalog] registered_user_count', countErr.message);
+    } else if (countVal != null && Number.isFinite(Number(countVal))) {
+      registered_user_count = Number(countVal);
+    }
+
+    res.json({ ...data, registered_user_count });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

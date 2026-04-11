@@ -52,7 +52,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Database, LayoutDashboard, Upload, GitPullRequest, PlusCircle, Tag } from 'lucide-react';
+import { Database, ExternalLink, LayoutDashboard, Upload, GitPullRequest, PlusCircle, Tag } from 'lucide-react';
+import { catalogSlugify } from '../utils/catalogSlug';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
 import CatalogTractionSelect from '../components/CatalogTractionSelect';
 import { Switch } from '../components/ui/switch';
@@ -720,7 +721,7 @@ function AdminSlotCatalog() {
             <CardHeader>
               <CardTitle>Listado</CardTitle>
               <CardDescription>
-                CSV/Excel: reference, manufacturer (nombre exacto de una marca registrada en la pestaña Marcas), model_name, vehicle_type (opcional), traction (opcional; en formularios: 4x4, Trasera o Delantera), motor_position (opcional: inline, angular, transverse…), commercial_release_year (opcional, solo año), discontinued y upcoming_release (opcional: true/false, 1/0; también descatalogado, proximo_lanzamiento).
+                Listado con todas las referencias del catálogo.              
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -783,6 +784,16 @@ function AdminSlotCatalog() {
                         <TableCell className="text-sm">{row.discontinued ? 'Sí' : '—'}</TableCell>
                         <TableCell className="text-sm">{row.upcoming_release ? 'Sí' : '—'}</TableCell>
                         <TableCell className="text-right space-x-2">
+                          <Button size="sm" variant="outline" asChild>
+                            <Link
+                              to={`/catalogo/${row.id}/${catalogSlugify(row.model_name || row.reference)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="size-3.5 mr-1 inline-block align-text-bottom" aria-hidden />
+                              Ficha pública
+                            </Link>
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
                             Editar
                           </Button>

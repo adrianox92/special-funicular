@@ -148,6 +148,44 @@ export function buildCatalogItemMetaDescription(item) {
 }
 
 /**
+ * Párrafo introductorio visible en la ficha pública (no es meta description).
+ * @param {Record<string, unknown>} item
+ * @returns {string}
+ */
+export function buildCatalogItemLeadParagraph(item) {
+  const ref = item.reference != null ? String(item.reference) : '';
+  const mfg = item.manufacturer != null ? String(item.manufacturer) : '';
+  const name = item.model_name != null ? String(item.model_name) : '';
+  const parts = [
+    `${name} (${ref}) es un modelo slot de ${mfg} en el catálogo público de ${BRAND}.`,
+  ];
+  const extras = [];
+  if (item.vehicle_type) extras.push(String(item.vehicle_type));
+  if (item.commercial_release_year != null && item.commercial_release_year !== '') {
+    extras.push(`comercializado en ${item.commercial_release_year}`);
+  }
+  if (item.traction) extras.push(`tracción ${item.traction}`);
+  if (item.discontinued) extras.push('descatalogado');
+  if (item.upcoming_release) extras.push('próximo lanzamiento');
+  const motor = labelMotorForMeta(item.motor_position);
+  if (motor) extras.push(`motor ${motor.toLowerCase()}`);
+  const rc = Number(item.rating_count);
+  if (Number.isFinite(rc) && rc > 0 && item.rating_avg != null) {
+    const avg = Number(item.rating_avg);
+    if (Number.isFinite(avg)) {
+      extras.push(
+        `valoración media ${avg.toFixed(1)}/5 (${rc} ${rc === 1 ? 'opinión' : 'opiniones'})`,
+      );
+    }
+  }
+  if (extras.length) {
+    parts.push(`Datos: ${extras.join('; ')}.`);
+  }
+  parts.push('Consulta imagen, especificaciones y valoraciones de otros coleccionistas.');
+  return truncate(parts.join(' '), 420);
+}
+
+/**
  * @param {Record<string, unknown>} item
  */
 export function buildCatalogItemKeywords(item) {
