@@ -59,6 +59,25 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 
+/** Promedio por vuelta = tiempo total / vueltas (formato mm:ss.mmm). */
+function averageTimeFromTotalAndLaps(totalTimeStr, lapsStr) {
+  if (!totalTimeStr || lapsStr === '' || lapsStr === undefined || lapsStr === null) {
+    return '';
+  }
+  const match = totalTimeStr.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
+  if (!match) return '';
+  const [, min, sec, ms] = match.map(Number);
+  const totalSeconds = min * 60 + sec + ms / 1000;
+  if (totalSeconds <= 0) return '';
+  const laps = parseInt(lapsStr, 10);
+  if (!Number.isFinite(laps) || laps <= 0) return '';
+  const averageSeconds = totalSeconds / laps;
+  const avgMinutes = Math.floor(averageSeconds / 60);
+  const avgSeconds = Math.floor(averageSeconds % 60);
+  const avgMilliseconds = Math.floor((averageSeconds % 1) * 1000);
+  return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
+}
+
 const CompetitionTimings = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -199,6 +218,15 @@ const CompetitionTimings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => {
+    if (!showModal) return;
+    const avg = averageTimeFromTotalAndLaps(formData.total_time, formData.laps);
+    setFormData((prev) => {
+      if ((prev.average_time || '') === (avg || '')) return prev;
+      return { ...prev, average_time: avg };
+    });
+  }, [showModal, formData.total_time, formData.laps]);
+
   const loadCompetitionData = async () => {
     try {
       setLoading(true);
@@ -288,8 +316,9 @@ const CompetitionTimings = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validar que hay participantes disponibles para la ronda seleccionada
+    // Validar que hay participantes disponibles para la ronda seleccionada (solo alta nueva)
     if (
+      !editingTiming &&
       formData.round_number &&
       getAvailableParticipantsForRound(formData.round_number).length === 0
     ) {
@@ -299,16 +328,29 @@ const CompetitionTimings = () => {
       return;
     }
 
+    const average_time = averageTimeFromTotalAndLaps(
+      formData.total_time,
+      formData.laps
+    );
+    if (!average_time) {
+      toast.error(
+        'Introduce el tiempo total en formato 00:00.000 y un número de vueltas válido.'
+      );
+      return;
+    }
+
+    const payload = { ...formData, average_time };
+
     try {
       if (editingTiming) {
         // Actualizar tiempo existente
         await axios.put(
           `/competitions/${id}/timings/${editingTiming.id}`,
-          formData
+          payload
         );
       } else {
         // Crear nuevo tiempo
-        await axios.post(`/competitions/${id}/timings`, formData);
+        await axios.post(`/competitions/${id}/timings`, payload);
       }
 
       handleCloseModal();
@@ -1445,22 +1487,17 @@ const CompetitionTimings = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="average_time">Tiempo Promedio *</Label>
+                    <Label htmlFor="average_time">Tiempo promedio (calculado)</Label>
                     <Input
                       id="average_time"
                       type="text"
+                      readOnly
                       value={formData.average_time}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          average_time: e.target.value,
-                        })
-                      }
                       placeholder="00:00.000"
-                      required
+                      className="bg-muted"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Tiempo promedio por vuelta
+                      Tiempo total dividido entre el número de vueltas. Se guarda automáticamente al registrar.
                     </p>
                   </div>
 

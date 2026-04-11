@@ -904,6 +904,34 @@ router.get('/:id/progress', async (req, res) => {
 
 // ==================== TIEMPOS DE COMPETICIÓN ====================
 
+function parseMmSsMmmToSeconds(timeStr) {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const match = timeStr.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
+  if (!match) return null;
+  const [, min, sec, ms] = match.map(Number);
+  return min * 60 + sec + ms / 1000;
+}
+
+function formatAverageLapSeconds(seconds) {
+  const avgMinutes = Math.floor(seconds / 60);
+  const avgSeconds = Math.floor(seconds % 60);
+  const avgMilliseconds = Math.floor((seconds % 1) * 1000);
+  return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
+}
+
+/** Promedio por vuelta = tiempo total / vueltas (mismo criterio que el formulario de vehículos). */
+function deriveCompetitionAverageFromTotalAndLaps(total_time, laps) {
+  const lapsNum = typeof laps === 'number' ? laps : parseInt(String(laps), 10);
+  if (!Number.isInteger(lapsNum) || lapsNum <= 0) return null;
+  const totalSec = parseMmSsMmmToSeconds(total_time);
+  if (totalSec === null || totalSec <= 0) return null;
+  const avgSec = totalSec / lapsNum;
+  return {
+    average_time: formatAverageLapSeconds(avgSec),
+    average_time_timestamp: avgSec,
+  };
+}
+
 // Registrar un tiempo de competición
 router.post('/:id/timings', async (req, res) => {
   try {
@@ -913,13 +941,11 @@ router.post('/:id/timings', async (req, res) => {
       best_lap_time, 
       total_time, 
       laps, 
-      average_time, 
       lane, 
       driver, 
       timing_date,
       best_lap_timestamp,
       total_time_timestamp,
-      average_time_timestamp,
       setup_snapshot,
       circuit,
       circuit_id,
@@ -962,8 +988,15 @@ router.post('/:id/timings', async (req, res) => {
     }
 
     // Validaciones
-    if (!best_lap_time || !total_time || !laps || !average_time) {
-      return res.status(400).json({ error: 'Todos los campos de tiempo son requeridos' });
+    if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
+      return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
+    }
+
+    const derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
+    if (!derivedAverage) {
+      return res.status(400).json({
+        error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
+      });
     }
 
     if (!round_number || round_number <= 0 || round_number > competition.rounds) {
@@ -992,7 +1025,8 @@ router.post('/:id/timings', async (req, res) => {
       best_lap_time,
       total_time,
       laps,
-      average_time,
+      average_time: derivedAverage.average_time,
+      average_time_timestamp: derivedAverage.average_time_timestamp,
       round_number,
       timing_date: timing_date || new Date().toISOString().split('T')[0]
     };
@@ -1002,7 +1036,6 @@ router.post('/:id/timings', async (req, res) => {
     if (driver) timingData.driver = driver;
     if (best_lap_timestamp) timingData.best_lap_timestamp = best_lap_timestamp;
     if (total_time_timestamp) timingData.total_time_timestamp = total_time_timestamp;
-    if (average_time_timestamp) timingData.average_time_timestamp = average_time_timestamp;
     if (setup_snapshot) timingData.setup_snapshot = setup_snapshot;
     let circuitLaneLengths = [];
     if (circuit_id) {
@@ -1143,13 +1176,11 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       best_lap_time, 
       total_time, 
       laps, 
-      average_time, 
       lane, 
       driver, 
       timing_date,
       best_lap_timestamp,
       total_time_timestamp,
-      average_time_timestamp,
       setup_snapshot,
       circuit,
       circuit_id
@@ -1202,8 +1233,15 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     }
 
     // Validaciones
-    if (!best_lap_time || !total_time || !laps || !average_time) {
-      return res.status(400).json({ error: 'Todos los campos de tiempo son requeridos' });
+    if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
+      return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
+    }
+
+    const derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
+    if (!derivedAverage) {
+      return res.status(400).json({
+        error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
+      });
     }
 
     // Actualizar el tiempo
@@ -1211,7 +1249,8 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       best_lap_time,
       total_time,
       laps,
-      average_time
+      average_time: derivedAverage.average_time,
+      average_time_timestamp: derivedAverage.average_time_timestamp,
     };
 
     // Campos opcionales
@@ -1220,7 +1259,6 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     if (timing_date) updateData.timing_date = timing_date;
     if (best_lap_timestamp !== undefined) updateData.best_lap_timestamp = best_lap_timestamp;
     if (total_time_timestamp !== undefined) updateData.total_time_timestamp = total_time_timestamp;
-    if (average_time_timestamp !== undefined) updateData.average_time_timestamp = average_time_timestamp;
     if (setup_snapshot !== undefined) updateData.setup_snapshot = setup_snapshot;
     let circuitLaneLengths = [];
     if (circuit_id !== undefined) {
