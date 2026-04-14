@@ -307,21 +307,41 @@ export default function PublicCatalogDetail() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          <Card className="overflow-hidden border-2 shadow-sm">
-            <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8">
-              {item.image_url ? (
-                <img
-                  src={item.image_url}
-                  alt={imageAlt}
-                  className="max-w-full max-h-[min(420px,50vh)] w-auto h-auto object-contain"
-                />
-              ) : (
+          <Card className="overflow-visible border-2 shadow-sm">
+            {item.image_url ? (
+              <div
+                className="group relative rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') e.currentTarget.blur();
+                }}
+              >
+                <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8 rounded-xl overflow-hidden">
+                  <img
+                    src={item.image_url}
+                    alt={imageAlt}
+                    className="max-w-full max-h-[min(420px,50vh)] w-auto h-auto object-contain cursor-zoom-in"
+                  />
+                </div>
+                <div
+                  className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 bg-background/70 backdrop-blur-sm opacity-0 invisible pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:visible group-focus-within:pointer-events-auto"
+                  aria-hidden
+                >
+                  <img
+                    src={item.image_url}
+                    alt=""
+                    className="max-h-[min(90vh,900px)] max-w-[min(96vw,56rem)] w-auto object-contain rounded-lg border-2 border-border shadow-2xl bg-card"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8 rounded-xl overflow-hidden">
                 <div className="flex flex-col items-center gap-2 text-muted-foreground py-12">
                   <Package className="size-16 opacity-40" />
                   <span className="text-sm">Sin imagen en catálogo</span>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </Card>
 
           <Card>
