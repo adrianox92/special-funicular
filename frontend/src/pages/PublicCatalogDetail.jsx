@@ -32,7 +32,7 @@ import {
   buildCatalogItemImageAlt,
   clearCatalogItemPageSeo,
 } from '../utils/catalogItemSeo';
-import { ChevronRight, Package, Star } from 'lucide-react';
+import { ChevronRight, Package, Star, X } from 'lucide-react';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
@@ -67,6 +67,24 @@ export default function PublicCatalogDetail() {
   const [suggestSaving, setSuggestSaving] = useState(false);
   const [suggestForm, setSuggestForm] = useState({});
   const [suggestImage, setSuggestImage] = useState(null);
+  const [catalogImageZoomOpen, setCatalogImageZoomOpen] = useState(false);
+
+  const closeCatalogImageZoom = useCallback(() => {
+    setCatalogImageZoomOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!catalogImageZoomOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeCatalogImageZoom();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [catalogImageZoomOpen, closeCatalogImageZoom]);
+
+  useEffect(() => {
+    setCatalogImageZoomOpen(false);
+  }, [id]);
 
   const loadItem = useCallback(async () => {
     const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(id)}`);
@@ -310,10 +328,20 @@ export default function PublicCatalogDetail() {
           <Card className="overflow-visible border-2 shadow-sm">
             {item.image_url ? (
               <div
-                className="group relative rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="relative rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 tabIndex={0}
+                onMouseEnter={() => setCatalogImageZoomOpen(true)}
+                onMouseLeave={() => setCatalogImageZoomOpen(false)}
+                onFocus={() => setCatalogImageZoomOpen(true)}
+                onBlur={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget)) setCatalogImageZoomOpen(false);
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Escape') e.currentTarget.blur();
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeCatalogImageZoom();
+                    e.currentTarget.blur();
+                  }
                 }}
               >
                 <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8 rounded-xl overflow-hidden">
@@ -323,16 +351,39 @@ export default function PublicCatalogDetail() {
                     className="max-w-full max-h-[min(420px,50vh)] w-auto h-auto object-contain cursor-zoom-in"
                   />
                 </div>
-                <div
-                  className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 bg-background/70 backdrop-blur-sm opacity-0 invisible pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:visible group-focus-within:pointer-events-auto"
-                  aria-hidden
-                >
-                  <img
-                    src={item.image_url}
-                    alt=""
-                    className="max-h-[min(90vh,900px)] max-w-[min(96vw,56rem)] w-auto object-contain rounded-lg border-2 border-border shadow-2xl bg-card"
-                  />
-                </div>
+                {catalogImageZoomOpen ? (
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Vista ampliada de la imagen"
+                    className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 bg-background/70 backdrop-blur-sm animate-in fade-in-0 duration-200"
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) closeCatalogImageZoom();
+                    }}
+                  >
+                    <div className="relative max-h-[min(90vh,900px)] max-w-[min(96vw,56rem)]">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="absolute -right-2 -top-2 z-10 size-10 rounded-full border-2 border-border shadow-md sm:-right-3 sm:-top-3"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeCatalogImageZoom();
+                        }}
+                        aria-label="Cerrar vista ampliada"
+                      >
+                        <X className="size-5" aria-hidden />
+                      </Button>
+                      <img
+                        src={item.image_url}
+                        alt=""
+                        className="max-h-[min(90vh,900px)] max-w-[min(96vw,56rem)] w-auto object-contain rounded-lg border-2 border-border shadow-2xl bg-card"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8 rounded-xl overflow-hidden">
