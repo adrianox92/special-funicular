@@ -958,7 +958,7 @@ Los estilos están organizados en:
 
 El proyecto incluye configuración para desplegar el frontend en Vercel:
 
-- **[vercel.json](vercel.json)** (raíz del repo): `installCommand` y `buildCommand` ejecutan el build dentro de `frontend/` y publican `frontend/build`. Deja el **Root Directory** del proyecto en Vercel en la raíz del repositorio (vacío / `.`). Si ya usas **Root Directory** = `frontend`, mueve `vercel.json` a `frontend/`, quita los prefijos `cd frontend &&` y ajusta `outputDirectory` a `build`.
+- **[frontend/vercel.json](frontend/vercel.json)**: pensado para Vercel con **Root Directory** = `frontend` (recomendado). Usa `npm install`, `npm run build` y `outputDirectory: build` sin `cd frontend`. Si despliegas desde la raíz del monorepo sin Root Directory, tendrías que definir comandos con `cd frontend && …` y salida `frontend/build` (solo si no usas subcarpeta en el dashboard).
 - **postinstall** (en `frontend/package.json`): Actualiza la base de datos de Browserslist (`caniuse-lite`) tras `npm install` para evitar warnings en el build
 
 Si el build falla por memoria, añade en Vercel → Settings → Environment Variables: `NODE_OPTIONS=--max-old-space-size=4096`
@@ -967,7 +967,7 @@ Si el build falla por memoria, añade en Vercel → Settings → Environment Var
 
 - **Frontend (Vercel):** variable `REACT_APP_SITE_URL` = URL canónica pública **sin barra final**, p. ej. `https://slotdatabase.es`. Debe coincidir con la propiedad de Google Search Console y con lo que declara [`frontend/public/robots.txt`](frontend/public/robots.txt) (`Sitemap:`).
 - **Backend (API Express):** variable `PUBLIC_SITE_ORIGIN` = el mismo origen canónico (`https://slotdatabase.es`). Sirve para generar las URLs absolutas del XML en `GET /sitemap.xml` ([`backend/routes/sitemap.js`](backend/routes/sitemap.js)). En producción, si falta, la ruta responde `503`.
-- **Proxy del sitemap en el mismo host que la web:** en [vercel.json](vercel.json), sustituye `https://REPLACE_WITH_YOUR_API_PUBLIC_ORIGIN/sitemap.xml` por la URL completa del sitemap en tu API (origen público del servicio Node, **sin** el sufijo `/api`; p. ej. `https://tu-servicio.onrender.com/sitemap.xml`). Así Search Console puede usar `https://slotdatabase.es/sitemap.xml`.
+- **Proxy del sitemap en el mismo host que la web:** en [frontend/vercel.json](frontend/vercel.json), sustituye `https://REPLACE_WITH_YOUR_API_PUBLIC_ORIGIN/sitemap.xml` por la URL completa del sitemap en tu API (origen público del servicio Node, **sin** el sufijo `/api`; p. ej. `https://tu-servicio.onrender.com/sitemap.xml`). Así Search Console puede usar `https://slotdatabase.es/sitemap.xml`.
 - Tras el despliegue, en Search Console añade el sitemap: `https://slotdatabase.es/sitemap.xml`.
 
 ## Contribución
