@@ -150,15 +150,23 @@ function adminGuard(req, res, next) {
 
 /**
  * Completitud ponderada del catálogo (dashboard admin). Marca excluida: `manufacturer_id` es NOT NULL
- * y no discrimina. Pesos sobre 5 campos, suma 1 — imagen 32%, resto 17% cada uno.
+ * y no discrimina. Pesos sobre 6 campos, suma 1 — imagen 30%; nombre, tipo, tracción, motor y año 14% cada uno.
  */
 const CATALOG_COMPLETENESS_WEIGHTS = {
-  image_url: 0.32,
-  model_name: 0.17,
-  vehicle_type: 0.17,
-  traction: 0.17,
-  motor_position: 0.17,
+  image_url: 0.3,
+  model_name: 0.14,
+  vehicle_type: 0.14,
+  traction: 0.14,
+  motor_position: 0.14,
+  commercial_release_year: 0.14,
 };
+
+/** Año de comercialización válido para métricas “sin año” y ponderación. */
+function catalogYearPresent(y) {
+  if (y == null || y === '') return false;
+  const n = Number(y);
+  return Number.isFinite(n) && n >= 1900 && n <= 2100;
+}
 
 function catalogCompletenessFilled(row) {
   return {
@@ -167,14 +175,8 @@ function catalogCompletenessFilled(row) {
     traction: row.traction != null && String(row.traction).trim() !== '',
     motor_position: row.motor_position != null && String(row.motor_position).trim() !== '',
     image_url: row.image_url != null && String(row.image_url).trim() !== '',
+    commercial_release_year: catalogYearPresent(row.commercial_release_year),
   };
-}
-
-/** Año de comercialización válido para métricas “sin año”. */
-function catalogYearPresent(y) {
-  if (y == null || y === '') return false;
-  const n = Number(y);
-  return Number.isFinite(n) && n >= 1900 && n <= 2100;
 }
 
 function computeCatalogDashboardStats(rows) {
@@ -195,8 +197,16 @@ function computeCatalogDashboardStats(rows) {
       w.model_name * (f.model_name ? 1 : 0) +
       w.vehicle_type * (f.vehicle_type ? 1 : 0) +
       w.traction * (f.traction ? 1 : 0) +
-      w.motor_position * (f.motor_position ? 1 : 0);
-    if (f.model_name && f.vehicle_type && f.traction && f.motor_position && f.image_url) {
+      w.motor_position * (f.motor_position ? 1 : 0) +
+      w.commercial_release_year * (f.commercial_release_year ? 1 : 0);
+    if (
+      f.model_name &&
+      f.vehicle_type &&
+      f.traction &&
+      f.motor_position &&
+      f.image_url &&
+      f.commercial_release_year
+    ) {
       fullyComplete += 1;
     }
     if (!f.image_url) withoutImage += 1;
@@ -717,6 +727,8 @@ router.get('/items', adminGuard, async (req, res) => {
     const refFilter = String(req.query.reference ?? '').trim();
     const manufacturerId = String(req.query.manufacturer_id ?? '').trim();
     const mfgFilter = String(req.query.manufacturer ?? '').trim();
+    /** Hueco de datos: solo ítems que carecen de ese campo (alineado con métricas del dashboard). */
+    const missing = String(req.query.missing ?? '').trim().toLowerCase();
 
     let q = supabase.from('slot_catalog_items_with_ratings').select('*', { count: 'exact' });
     if (refFilter) {
@@ -728,6 +740,19 @@ router.get('/items', adminGuard, async (req, res) => {
     } else if (mfgFilter) {
       const p = `%${escapeIlikePattern(mfgFilter)}%`;
       q = q.ilike('manufacturer', p);
+    }
+    if (missing === 'image') {
+      q = q.or('image_url.is.null,image_url.eq.');
+    } else if (missing === 'vehicle_type') {
+      q = q.or('vehicle_type.is.null,vehicle_type.eq.');
+    } else if (missing === 'traction') {
+      q = q.or('traction.is.null,traction.eq.');
+    } else if (missing === 'motor' || missing === 'motor_position') {
+      q = q.or('motor_position.is.null,motor_position.eq.');
+    } else if (missing === 'year') {
+      q = q.or(
+        'commercial_release_year.is.null,commercial_release_year.lt.1900,commercial_release_year.gt.2100',
+      );
     }
     q = q.order('reference', { ascending: true }).range(from, to);
 

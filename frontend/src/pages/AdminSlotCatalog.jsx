@@ -72,6 +72,24 @@ const emptyItem = {
   upcoming_release: false,
 };
 
+/** Parámetro `missing` en GET /catalog/items (huecos alineados con el dashboard). */
+const CATALOG_ITEMS_MISSING = {
+  withoutImage: 'image',
+  withoutVehicleType: 'vehicle_type',
+  withoutTraction: 'traction',
+  withoutMotor: 'motor',
+  withoutYear: 'year',
+};
+
+const CATALOG_MISSING_FILTER_LABELS = {
+  '': 'Sin filtrar por huecos',
+  image: 'Solo sin imagen',
+  vehicle_type: 'Solo sin tipo',
+  traction: 'Solo sin tracción',
+  motor: 'Solo sin motor',
+  year: 'Solo sin año de comercialización',
+};
+
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 /**
@@ -193,6 +211,8 @@ function AdminSlotCatalog() {
   const [totalPages, setTotalPages] = useState(1);
   const [refFilter, setRefFilter] = useState('');
   const [mfgBrandId, setMfgBrandId] = useState('');
+  /** Filtro por hueco de datos (pestaña Ítems); vacío = sin filtro. */
+  const [itemsMissingFilter, setItemsMissingFilter] = useState('');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editMode, setEditMode] = useState('create');
@@ -280,6 +300,7 @@ function AdminSlotCatalog() {
           limit: 20,
           reference: refFilter || undefined,
           manufacturer_id: mfgBrandId || undefined,
+          missing: itemsMissingFilter || undefined,
         },
       });
       setItems(data.items ?? []);
@@ -290,7 +311,7 @@ function AdminSlotCatalog() {
     } finally {
       setItemsLoading(false);
     }
-  }, [page, refFilter, mfgBrandId]);
+  }, [page, refFilter, mfgBrandId, itemsMissingFilter]);
 
   useEffect(() => {
     if (!isAdmin || tab !== 'items') return;
@@ -575,7 +596,7 @@ function AdminSlotCatalog() {
             <div>
               <h2 className="text-lg font-semibold">Métricas del catálogo</h2>
               <p className="text-sm text-muted-foreground">
-                Completitud ponderada (5 campos; la marca no entra). Imagen 32%; nombre, tipo, tracción y motor 17% cada uno.
+                Completitud ponderada (6 campos; la marca no entra). Imagen 30%; nombre, tipo, tracción, motor y año de comercialización 14% cada uno.
               </p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => fetchCatalogStats()} disabled={statsLoading}>
@@ -627,8 +648,11 @@ function AdminSlotCatalog() {
                     <CardTitle className="text-sm font-medium text-muted-foreground">Pesos (API)</CardTitle>
                   </CardHeader>
                   <CardContent className="text-xs text-muted-foreground space-y-1 font-mono">
-                    <div>imagen {Math.round((catalogStats.weights?.image_url ?? 0.32) * 100)}%</div>
-                    <div>nombre / tipo / tracción / motor {Math.round((catalogStats.weights?.model_name ?? 0.17) * 100)}% c/u</div>
+                    <div>imagen {Math.round((catalogStats.weights?.image_url ?? 0.3) * 100)}%</div>
+                    <div>
+                      nombre / tipo / tracción / motor / año{' '}
+                      {Math.round((catalogStats.weights?.model_name ?? 0.14) * 100)}% c/u
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -636,9 +660,12 @@ function AdminSlotCatalog() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Huecos en datos</CardTitle>
-                    <CardDescription>Conteos absolutos y % sobre el total de ítems.</CardDescription>
+                    <CardDescription>
+                      Conteos absolutos y % sobre el total de ítems. Pulsa una fila para listar solo esos ítems en la pestaña
+                      Ítems.
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="divide-y divide-border/60">
                     {[
                       {
                         key: 'withoutImage',
@@ -668,17 +695,24 @@ function AdminSlotCatalog() {
                     ].map((row) => {
                       const t = catalogStats.totalItems || 1;
                       const pct = Math.round(((row.n / t) * 10000)) / 100;
+                      const missingParam = CATALOG_ITEMS_MISSING[row.key];
                       return (
-                        <div
+                        <button
                           key={row.key}
-                          className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
+                          type="button"
+                          className="flex w-full flex-wrap items-center justify-between gap-2 py-2 text-left transition-colors first:pt-0 last:pb-0 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => {
+                            setPage(1);
+                            setItemsMissingFilter(missingParam);
+                            setTab('items');
+                          }}
                         >
                           <span className="text-sm">{row.label}</span>
                           <span className="text-sm tabular-nums">
                             <strong>{row.n}</strong>
                             <span className="text-muted-foreground"> ({pct}%)</span>
                           </span>
-                        </div>
+                        </button>
                       );
                     })}
                   </CardContent>
@@ -744,6 +778,27 @@ function AdminSlotCatalog() {
                     }}
                     id="admin-catalog-filter-brand"
                   />
+                </div>
+                <div className="w-full max-w-xs shrink-0">
+                  <Select
+                    value={itemsMissingFilter === '' ? '__all__' : itemsMissingFilter}
+                    onValueChange={(v) => {
+                      setPage(1);
+                      setItemsMissingFilter(v === '__all__' ? '' : v);
+                    }}
+                  >
+                    <SelectTrigger id="admin-catalog-filter-missing" className="w-full">
+                      <SelectValue placeholder="Filtrar por hueco en datos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{CATALOG_MISSING_FILTER_LABELS['']}</SelectItem>
+                      <SelectItem value="image">{CATALOG_MISSING_FILTER_LABELS.image}</SelectItem>
+                      <SelectItem value="vehicle_type">{CATALOG_MISSING_FILTER_LABELS.vehicle_type}</SelectItem>
+                      <SelectItem value="traction">{CATALOG_MISSING_FILTER_LABELS.traction}</SelectItem>
+                      <SelectItem value="motor">{CATALOG_MISSING_FILTER_LABELS.motor}</SelectItem>
+                      <SelectItem value="year">{CATALOG_MISSING_FILTER_LABELS.year}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button type="button" variant="secondary" onClick={() => fetchItems()}>
                   Aplicar
