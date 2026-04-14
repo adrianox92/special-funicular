@@ -23,7 +23,7 @@
       },
       {
         "title": "Registra tiempos de sesión",
-        "body": "Asocia cada sesión a vehículo, circuito y carril. Así podrás comparar y ver evolución.",
+        "body": "Asocia cada sesión a vehículo, circuito y carril (manualmente, desde el listado de Tiempos o desde la pestaña «Tabla de Tiempos» de cada coche). También puedes importar CSV o JSON con «Importar sesiones» en Tiempos o en esa pestaña de la ficha.",
         "linkTo": "/timings",
         "linkLabel": "Ir a Tiempos"
       },
@@ -84,6 +84,7 @@
       "tips": [
         "Cada vehículo tiene una ficha detallada (componentes, mantenimiento, tiempos asociados, etc.).",
         "«Añadir vehículo» y la edición usan el mismo modelo de datos: cuanto más completa la ficha, mejores métricas en Inicio y Tiempos.",
+        "En la pestaña «Tabla de Tiempos» de la ficha puedes importar sesiones desde CSV o JSON con «Importar sesiones»; se asignan automáticamente a ese vehículo (mismo flujo que en el listado global de Tiempos).",
         "La exportación y la paginación respetan filtros y límites que configures en pantalla."
       ],
       "gotchas": [],
@@ -96,21 +97,24 @@
       "title": "Tiempos",
       "pathBadge": "/timings",
       "description": "Registro de sesiones por vehículo, circuito y carril: mejores vueltas, velocidad y comparativas.",
-      "intro": "Los tiempos se agrupan por vehículo, circuito y carril. Puedes ampliar el historial de sesiones, ver especificaciones de la sesión, comparar sesiones, analizar rendimiento e importar datos cuando la app lo permita.",
+      "intro": "Los tiempos se agrupan por vehículo, circuito y carril. Puedes ampliar el historial de sesiones, ver especificaciones de la sesión, comparar sesiones, analizar rendimiento e importar sesiones desde fichero CSV (formato propio o SmartRace) o JSON. En el listado global (/timings) usa «Importar sesiones» y elige a qué coche asignarlas; en la ficha de un vehículo, pestaña «Tabla de Tiempos», el mismo asistente asigna las sesiones directamente a ese coche.",
       "steps": [
         "Desde Tiempos, elige o busca el vehículo y circuito que quieras.",
         "Registra una nueva sesión con los datos que pida el formulario (carril, vueltas, etc.).",
+        "Para importar en bloque: en Tiempos pulsa «Importar sesiones», elige CSV o JSON, pega el contenido o carga un fichero, selecciona el vehículo (obligatorio salvo que cada fila/objeto traiga vehicle_id) y confirma; con CSV SmartRace de varios pilotos puedes marcar filas y, si falta circuito o carril en el archivo, indicarlos desde tus circuitos dados de alta.",
+        "Alternativa: abre la ficha del vehículo (editar), ve a la pestaña «Tabla de Tiempos» y pulsa «Importar sesiones»; el flujo es el mismo (CSV/JSON, plantilla, SmartRace) pero el coche ya está fijado y no hace falta elegirlo.",
         "Consulta el historial y comparativas desde la misma zona de la app."
       ],
       "tips": [
-        "Los circuitos deben existir en la sección Circuitos para que los registros sean coherentes.",
+        "Los circuitos deben existir en la sección Circuitos para que los registros sean coherentes; en importaciones SmartRace a veces debes elegir circuito y carril manualmente.",
         "El carril y la distancia influyen en rankings y estadísticas por circuito.",
+        "En CSV SmartRace detectado, el coche de la sesión es el que eliges en el modal (no la columna «Coche» del export).",
         "Si usas integraciones externas (por ejemplo envío de tiempos), revisa en Perfil la API y las notificaciones."
       ],
       "gotchas": [],
       "linkTo": "/timings",
       "linkLabel": "Ir a Tiempos",
-      "keywords": ["tiempos", "vueltas", "sesión", "carril", "circuito", "cronometrar", "ranking"]
+      "keywords": ["tiempos", "vueltas", "sesión", "carril", "circuito", "cronometrar", "ranking", "importar", "csv", "json", "smartrace"]
     },
     {
       "id": "circuitos",
@@ -297,7 +301,7 @@
         "Antes conviene tener el circuito dado de alta en Circuitos y el vehículo en Vehículos.",
         "Ve a Tiempos y localiza el vehículo y el circuito que correspondan.",
         "Añade o edita la sesión con carril, datos de vuelta y lo que pida el formulario.",
-        "Desde la ficha de un vehículo también puedes gestionar tiempos asociados a ese coche."
+        "Desde la ficha de un vehículo (edición), pestaña «Tabla de Tiempos», puedes dar de alta sesiones manualmente o usar «Importar sesiones» para cargar CSV (incluido SmartRace) o JSON; en ese caso las sesiones quedan asignadas a ese coche directamente."
       ],
       "sectionId": "tiempos",
       "linkTo": "/timings",
@@ -409,11 +413,12 @@
     {
       "id": "importar-tiempos",
       "question": "¿Puedo importar tiempos?",
-      "keywords": ["importar", "tiempos", "csv", "pegar", "datos"],
+      "keywords": ["importar", "tiempos", "csv", "json", "smartrace", "pegar", "ficha", "sesiones"],
       "answerSteps": [
-        "Si la aplicación ofrece importación de tiempos en la zona de Tiempos o en la ficha del vehículo, sigue el asistente o el formulario que aparezca.",
-        "Asegúrate de que el vehículo y el circuito existen para que los registros cuadren.",
-        "Si no ves la opción, puede no estar disponible en tu versión o requerir un formato concreto."
+        "Sí. En Tiempos pulsa «Importar sesiones»: elige CSV o JSON, descarga la plantilla si la necesitas, pega el texto o elige un fichero. Debes seleccionar el vehículo al que asociar las sesiones (salvo que el CSV/JSON incluya vehicle_id por fila o por objeto).",
+        "En la ficha del vehículo, pestaña «Tabla de Tiempos», también hay «Importar sesiones» con el mismo flujo (CSV propio, SmartRace o JSON); el coche ya está fijado y las sesiones se guardan para ese vehículo.",
+        "Con CSV SmartRace de varios pilotos puedes elegir qué filas importar; si al archivo le faltan circuito o carril, indícalos entre tus circuitos dados de alta. El coche de la sesión en SmartRace es el que eliges en el modal, no la columna «Coche» del export.",
+        "Ten creados en Circuitos los circuitos que vayas a usar y revisa errores que muestre el asistente antes de cerrar."
       ],
       "sectionId": "tiempos",
       "linkTo": "/timings",

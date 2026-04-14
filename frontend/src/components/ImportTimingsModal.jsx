@@ -45,7 +45,7 @@ const JSON_TEMPLATE = `[
 ]`;
 
 /**
- * @param {{ open: boolean, onOpenChange: (v: boolean) => void, vehicles: Array<{ id: string, manufacturer?: string, model?: string }>, circuits?: Array<{ id: string, name?: string, num_lanes?: number }>, defaultVehicleId?: string, defaultCircuitId?: string, onImported?: () => void }} props
+ * @param {{ open: boolean, onOpenChange: (v: boolean) => void, vehicles: Array<{ id: string, manufacturer?: string, model?: string }>, circuits?: Array<{ id: string, name?: string, num_lanes?: number }>, defaultVehicleId?: string, defaultCircuitId?: string, fixedVehicleId?: string, onImported?: () => void }} props
  */
 export default function ImportTimingsModal({
   open,
@@ -54,6 +54,7 @@ export default function ImportTimingsModal({
   circuits = [],
   defaultVehicleId,
   defaultCircuitId,
+  fixedVehicleId,
   onImported,
 }) {
   const [vehicleId, setVehicleId] = useState(defaultVehicleId || '');
@@ -92,14 +93,14 @@ export default function ImportTimingsModal({
 
   useEffect(() => {
     if (open) {
-      setVehicleId(defaultVehicleId || (vehicles[0]?.id ?? ''));
+      setVehicleId(fixedVehicleId || defaultVehicleId || (vehicles[0]?.id ?? ''));
       setImportCircuitId(defaultCircuitId || '');
       setImportLane('');
       setError(null);
       setResult(null);
       resetPreviewState();
     }
-  }, [open, defaultVehicleId, defaultCircuitId, vehicles]);
+  }, [open, defaultVehicleId, defaultCircuitId, fixedVehicleId, vehicles]);
 
   useEffect(() => {
     resetPreviewState();
@@ -165,7 +166,8 @@ export default function ImportTimingsModal({
 
   const handleImport = async () => {
     if (!content.trim()) return;
-    if (!vehicleId) {
+    const effectiveVehicleId = fixedVehicleId || vehicleId;
+    if (!effectiveVehicleId) {
       setError('Selecciona un vehículo para asociar las sesiones importadas.');
       return;
     }
@@ -177,7 +179,7 @@ export default function ImportTimingsModal({
     try {
       if (format === 'json') {
         const { data } = await api.post('/timings/import', {
-          vehicle_id: vehicleId,
+          vehicle_id: effectiveVehicleId,
           format,
           content,
         });
@@ -203,7 +205,7 @@ export default function ImportTimingsModal({
           return;
         }
         const { data } = await api.post('/timings/import', {
-          vehicle_id: vehicleId,
+          vehicle_id: effectiveVehicleId,
           format,
           content,
           selected_row_indices: valid,
@@ -232,7 +234,7 @@ export default function ImportTimingsModal({
               return;
             }
             const { data } = await api.post('/timings/import', {
-              vehicle_id: vehicleId,
+              vehicle_id: effectiveVehicleId,
               format,
               content,
               selected_row_indices: [0],
@@ -245,7 +247,7 @@ export default function ImportTimingsModal({
         }
 
         const { data } = await api.post('/timings/import', {
-          vehicle_id: vehicleId,
+          vehicle_id: effectiveVehicleId,
           format,
           content,
         });
@@ -262,7 +264,7 @@ export default function ImportTimingsModal({
           return;
         }
         const { data } = await api.post('/timings/import', {
-          vehicle_id: vehicleId,
+          vehicle_id: effectiveVehicleId,
           format,
           content,
           selected_row_indices: [0],
@@ -275,7 +277,7 @@ export default function ImportTimingsModal({
 
       if (previewFresh && previewInfo.format === 'native') {
         const { data } = await api.post('/timings/import', {
-          vehicle_id: vehicleId,
+          vehicle_id: effectiveVehicleId,
           format,
           content,
         });
@@ -313,25 +315,46 @@ export default function ImportTimingsModal({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Vehículo (obligatorio si el CSV/JSON no incluye vehicle_id por fila)</Label>
-            <Select value={vehicleId || '__none__'} onValueChange={(v) => setVehicleId(v === '__none__' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona vehículo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— Sin seleccionar —</SelectItem>
-                {vehicles.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.manufacturer} {v.model}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {previewInfo?.format === 'smartrace' && (
-              <p className="text-xs text-muted-foreground">
-                Formato SmartRace detectado: el coche de la sesión es el que elijas aquí (no se usa la columna «Coche» del
-                CSV).
-              </p>
+            {fixedVehicleId ? (
+              <>
+                <Label>Vehículo</Label>
+                <p className="text-sm text-muted-foreground">
+                  Sesiones asignadas a:{' '}
+                  <strong>
+                    {vehicles.find((v) => v.id === fixedVehicleId)?.manufacturer}{' '}
+                    {vehicles.find((v) => v.id === fixedVehicleId)?.model}
+                  </strong>
+                </p>
+                {previewInfo?.format === 'smartrace' && (
+                  <p className="text-xs text-muted-foreground">
+                    Formato SmartRace detectado: el coche de la sesión es el de esta ficha (no se usa la columna «Coche» del
+                    CSV).
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <Label>Vehículo (obligatorio si el CSV/JSON no incluye vehicle_id por fila)</Label>
+                <Select value={vehicleId || '__none__'} onValueChange={(v) => setVehicleId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona vehículo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Sin seleccionar —</SelectItem>
+                    {vehicles.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.manufacturer} {v.model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {previewInfo?.format === 'smartrace' && (
+                  <p className="text-xs text-muted-foreground">
+                    Formato SmartRace detectado: el coche de la sesión es el que elijas aquí (no se usa la columna «Coche» del
+                    CSV).
+                  </p>
+                )}
+              </>
             )}
           </div>
 

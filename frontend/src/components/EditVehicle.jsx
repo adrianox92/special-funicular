@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ExternalLink,
@@ -11,6 +11,7 @@ import {
   Info,
   Package,
   LayoutPanelLeft,
+  Upload,
 } from 'lucide-react';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
@@ -20,6 +21,7 @@ import SessionPerformanceModal from './SessionPerformanceModal';
 import SetupPerformanceAnalysis, { hasMultipleConfigs } from './SetupPerformanceAnalysis';
 import MaintenanceCorrelationChart from './charts/MaintenanceCorrelationChart';
 import MaintenanceLog from './MaintenanceLog';
+import ImportTimingsModal from './ImportTimingsModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -238,6 +240,7 @@ const EditVehicle = () => {
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [inventoryPickerLoading, setInventoryPickerLoading] = useState(false);
   const [inventoryPickerItems, setInventoryPickerItems] = useState([]);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
@@ -326,41 +329,6 @@ const EditVehicle = () => {
 
     if (id) {
       loadTechnicalSpecs();
-    }
-  }, [id]);
-
-  useEffect(() => {
-    const loadTimings = async () => {
-      try {
-        setLoadingTimings(true);
-        const response = await api.get(`/vehicles/${id}/timings`);
-        const timingsWithRecalculatedAverages = response.data.map(timing => {
-          const averageTime = calculateAverageTime(timing.total_time, timing.laps, timing.best_lap_time);
-          let average_time_timestamp = null;
-          if (averageTime) {
-            const avgMatch = averageTime.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
-            if (avgMatch) {
-              const [, minutes, seconds, milliseconds] = avgMatch.map(Number);
-              average_time_timestamp = minutes * 60 + seconds + milliseconds / 1000;
-            }
-          }
-          return {
-            ...timing,
-            average_time: averageTime || timing.average_time,
-            average_time_timestamp: average_time_timestamp || timing.average_time_timestamp
-          };
-        });
-        setTimings(timingsWithRecalculatedAverages);
-      } catch (error) {
-        console.error('Error al cargar tiempos:', error);
-        setError('Error al cargar los tiempos');
-      } finally {
-        setLoadingTimings(false);
-      }
-    };
-
-    if (id) {
-      loadTimings();
     }
   }, [id]);
 
@@ -895,6 +863,40 @@ const EditVehicle = () => {
 
     return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
   };
+
+  const loadTimings = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoadingTimings(true);
+      const response = await api.get(`/vehicles/${id}/timings`);
+      const timingsWithRecalculatedAverages = response.data.map((timing) => {
+        const averageTime = calculateAverageTime(timing.total_time, timing.laps, timing.best_lap_time);
+        let average_time_timestamp = null;
+        if (averageTime) {
+          const avgMatch = averageTime.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
+          if (avgMatch) {
+            const [, minutes, seconds, milliseconds] = avgMatch.map(Number);
+            average_time_timestamp = minutes * 60 + seconds + milliseconds / 1000;
+          }
+        }
+        return {
+          ...timing,
+          average_time: averageTime || timing.average_time,
+          average_time_timestamp: average_time_timestamp || timing.average_time_timestamp,
+        };
+      });
+      setTimings(timingsWithRecalculatedAverages);
+    } catch (error) {
+      console.error('Error al cargar tiempos:', error);
+      setError('Error al cargar los tiempos');
+    } finally {
+      setLoadingTimings(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) loadTimings();
+  }, [id, loadTimings]);
 
   const handleTimingChange = (e) => {
     const { name, value } = e.target;
@@ -1521,6 +1523,24 @@ const EditVehicle = () => {
   const renderTimingsForm = () => {
     return (
       <div className="mt-4 space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" onClick={() => setShowImportModal(true)}>
+            <Upload className="size-4 mr-2" />
+            Importar sesiones
+          </Button>
+        </div>
+        <ImportTimingsModal
+          open={showImportModal}
+          onOpenChange={setShowImportModal}
+          vehicles={
+            vehicle
+              ? [{ id: vehicle.id, manufacturer: vehicle.manufacturer, model: vehicle.model }]
+              : []
+          }
+          circuits={circuits}
+          fixedVehicleId={id}
+          onImported={loadTimings}
+        />
         <h4 className="text-lg font-semibold">{editingTiming ? 'Editar' : 'Añadir'} Registro de Tiempo</h4>
         {timingNotice && (
           <Alert
