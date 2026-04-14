@@ -1,3 +1,21 @@
 # https://www.robotstxt.org/robotstxt.html
+# Origen canónico del sitio: https://slotdatabase.es
 User-agent: *
-Disallow:
+Allow: /
+
+# Aplicación (login / paneles): sin valor para búsqueda; ahorra rastreo.
+Disallow: /dashboard
+Disallow: /login
+Disallow: /reset-password
+Disallow: /mis-sugerencias-catalogo
+Disallow: /proponer-alta-catalogo
+Disallow: /vehicles
+Disallow: /timings
+Disallow: /circuits
+Disallow: /inventory
+Disallow: /profile
+Disallow: /settings
+Disallow: /help
+Disallow: /admin/
+
+Sitemap: https://slotdatabase.es/sitemap.xml

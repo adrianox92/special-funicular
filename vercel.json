@@ -1,5 +1,11 @@
 {
-  "framework": null,
-  "buildCommand": "CI=false NODE_OPTIONS=--max-old-space-size=4096 npm run build",
-  "outputDirectory": "build"
+  "installCommand": "cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/build",
+  "rewrites": [
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://REPLACE_WITH_YOUR_API_PUBLIC_ORIGIN/sitemap.xml"
+    }
+  ]
 }

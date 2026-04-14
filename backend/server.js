@@ -116,6 +116,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.use(express.json({ limit: '1mb' }));
 
+const sitemapHandler = require('./routes/sitemap');
+app.get('/sitemap.xml', sitemapHandler);
+
 // ==================== RUTAS PÚBLICAS (SIN AUTENTICACIÓN) ====================
 const publicCompetitionsRoute = require('./routes/publicCompetitions');
 const publicPilotRoute = require('./routes/publicPilot');
