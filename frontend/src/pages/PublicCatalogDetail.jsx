@@ -30,7 +30,6 @@ import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import {
   applyCatalogItemPageSeo,
   buildCatalogItemImageAlt,
-  buildCatalogItemLeadParagraph,
   clearCatalogItemPageSeo,
 } from '../utils/catalogItemSeo';
 import { ChevronRight, Package, Star } from 'lucide-react';
@@ -229,7 +228,6 @@ export default function PublicCatalogDetail() {
   const ratingAvgStr = formatRatingAvg(item.rating_avg);
   const ratingCount = Number(item.rating_count) || 0;
   const imageAlt = buildCatalogItemImageAlt(item);
-  const leadText = buildCatalogItemLeadParagraph(item);
   const registeredUserCount = Number(item.registered_user_count) || 0;
   const collectionBlurb =
     registeredUserCount === 0

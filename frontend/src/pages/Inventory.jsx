@@ -81,7 +81,7 @@ const emptyForm = () => ({
 });
 
 const Inventory = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);

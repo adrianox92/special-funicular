@@ -48,6 +48,113 @@ function formatVoltageVolts(v) {
   return Number.isFinite(n) ? `${n.toFixed(2)} V` : '—';
 }
 
+function getSeconds(timeStr) {
+  const [minutes, seconds] = timeStr.split(':');
+  const [secs, ms] = seconds?.split('.') || ['0', '0'];
+  return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+}
+
+function getTotalSeconds(timeStr) {
+  if (!timeStr) return 0;
+  const [minutes, seconds] = timeStr.split(':');
+  const [secs, ms] = seconds?.split('.') || ['0', '0'];
+  return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+}
+
+function groupTimings(timings) {
+  const groups = {};
+  timings.forEach((timing) => {
+    const circuitName = timing.circuit || timing.circuits?.name || 'Sin circuito';
+    const key = `${timing.vehicle_id}-${circuitName}-${timing.lane || 'sin-carril'}-${timing.laps || 'sin-vueltas'}`;
+    if (!groups[key]) {
+      groups[key] = {
+        key,
+        vehicle_id: timing.vehicle_id,
+        vehicle_manufacturer: timing.vehicle_manufacturer,
+        vehicle_model: timing.vehicle_model,
+        circuit: circuitName,
+        circuit_id: timing.circuit_id || timing.circuits?.id,
+        lane: timing.lane || 'Sin carril',
+        sessions: [],
+        best_time: null,
+        last_session: null,
+        total_sessions: 0,
+        improvement: null,
+      };
+    }
+    groups[key].sessions.push(timing);
+    groups[key].total_sessions++;
+    const currentLapTime = getSeconds(timing.best_lap_time);
+    if (!groups[key].best_time || currentLapTime < groups[key].best_time.seconds) {
+      groups[key].best_time = { ...timing, seconds: currentLapTime };
+    }
+    const currentDate = new Date(timing.timing_date);
+    if (!groups[key].last_session || currentDate > new Date(groups[key].last_session.timing_date)) {
+      groups[key].last_session = timing;
+    }
+  });
+  Object.values(groups).forEach((group) => {
+    if (group.sessions.length > 1) {
+      const sortedByLapTime = group.sessions
+        .map((s) => ({ ...s, lapSeconds: getSeconds(s.best_lap_time) }))
+        .sort((a, b) => a.lapSeconds - b.lapSeconds);
+      const sortedByTotalTime = group.sessions
+        .map((s) => ({ ...s, totalSeconds: getTotalSeconds(s.total_time) }))
+        .sort((a, b) => a.totalSeconds - b.totalSeconds);
+      const bestLap = sortedByLapTime[0];
+      const previousLap = sortedByLapTime[1];
+      const bestTotal = sortedByTotalTime[0];
+      const previousTotal = sortedByTotalTime[1];
+      group.improvement = {
+        lap_time_diff: previousLap ? (previousLap.lapSeconds - bestLap.lapSeconds).toFixed(3) : null,
+        lap_percentage: previousLap
+          ? (((previousLap.lapSeconds - bestLap.lapSeconds) / previousLap.lapSeconds) * 100).toFixed(1)
+          : null,
+        total_time_diff: previousTotal ? (previousTotal.totalSeconds - bestTotal.totalSeconds).toFixed(3) : null,
+        total_percentage: previousTotal
+          ? (((previousTotal.totalSeconds - bestTotal.totalSeconds) / previousTotal.totalSeconds) * 100).toFixed(1)
+          : null,
+        best_lap_session: bestLap,
+        best_total_session: bestTotal,
+      };
+    }
+  });
+  return groups;
+}
+
+function calculateCircuitRanking(groupedTimings) {
+  const circuitRankings = {};
+  Object.values(groupedTimings).forEach((group) => {
+    const circuit = group.circuit;
+    if (!circuitRankings[circuit]) circuitRankings[circuit] = [];
+    circuitRankings[circuit].push({
+      ...group,
+      best_lap_seconds: getSeconds(group.best_time.best_lap_time),
+      best_total_seconds: getTotalSeconds(group.best_time.total_time),
+    });
+  });
+  Object.keys(circuitRankings).forEach((circuit) => {
+    circuitRankings[circuit].sort((a, b) => a.best_lap_seconds - b.best_lap_seconds);
+    circuitRankings[circuit].forEach((entry, index) => {
+      entry.circuit_position = index + 1;
+      if (index === 0) {
+        entry.circuit_gap_to_leader = 0;
+        entry.circuit_gap_to_previous = 0;
+      } else {
+        entry.circuit_gap_to_leader = (
+          entry.best_lap_seconds - circuitRankings[circuit][0].best_lap_seconds
+        ).toFixed(3);
+        entry.circuit_gap_to_previous = (
+          entry.best_lap_seconds - circuitRankings[circuit][index - 1].best_lap_seconds
+        ).toFixed(3);
+      }
+      const bestTotalInCircuit = Math.min(...circuitRankings[circuit].map((e) => e.best_total_seconds));
+      entry.circuit_gap_to_best_total = (entry.best_total_seconds - bestTotalInCircuit).toFixed(3);
+    });
+  });
+  return circuitRankings;
+}
+
 /** Vista móvil: una tarjeta por grupo (misma agrupación que la tabla desktop). */
 function TimingMobileGroupCard({
   group,
@@ -356,105 +463,6 @@ const TimingsList = () => {
       console.error(err);
       toast.error(err.response?.data?.error || 'Error al eliminar el registro de tiempo');
     }
-  };
-
-  const getSeconds = (timeStr) => {
-    const [minutes, seconds] = timeStr.split(':');
-    const [secs, ms] = seconds?.split('.') || ['0', '0'];
-    return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
-  };
-
-  const getTotalSeconds = (timeStr) => {
-    if (!timeStr) return 0;
-    const [minutes, seconds] = timeStr.split(':');
-    const [secs, ms] = seconds?.split('.') || ['0', '0'];
-    return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
-  };
-
-  const groupTimings = (timings) => {
-    const groups = {};
-    timings.forEach(timing => {
-      const circuitName = timing.circuit || timing.circuits?.name || 'Sin circuito';
-      const key = `${timing.vehicle_id}-${circuitName}-${timing.lane || 'sin-carril'}-${timing.laps || 'sin-vueltas'}`;
-      if (!groups[key]) {
-        groups[key] = {
-          key,
-          vehicle_id: timing.vehicle_id,
-          vehicle_manufacturer: timing.vehicle_manufacturer,
-          vehicle_model: timing.vehicle_model,
-          circuit: circuitName,
-          circuit_id: timing.circuit_id || timing.circuits?.id,
-          lane: timing.lane || 'Sin carril',
-          sessions: [],
-          best_time: null,
-          last_session: null,
-          total_sessions: 0,
-          improvement: null
-        };
-      }
-      groups[key].sessions.push(timing);
-      groups[key].total_sessions++;
-      const currentLapTime = getSeconds(timing.best_lap_time);
-      if (!groups[key].best_time || currentLapTime < groups[key].best_time.seconds) {
-        groups[key].best_time = { ...timing, seconds: currentLapTime };
-      }
-      const currentDate = new Date(timing.timing_date);
-      if (!groups[key].last_session || currentDate > new Date(groups[key].last_session.timing_date)) {
-        groups[key].last_session = timing;
-      }
-    });
-    Object.values(groups).forEach(group => {
-      if (group.sessions.length > 1) {
-        const sortedByLapTime = group.sessions
-          .map(s => ({ ...s, lapSeconds: getSeconds(s.best_lap_time) }))
-          .sort((a, b) => a.lapSeconds - b.lapSeconds);
-        const sortedByTotalTime = group.sessions
-          .map(s => ({ ...s, totalSeconds: getTotalSeconds(s.total_time) }))
-          .sort((a, b) => a.totalSeconds - b.totalSeconds);
-        const bestLap = sortedByLapTime[0];
-        const previousLap = sortedByLapTime[1];
-        const bestTotal = sortedByTotalTime[0];
-        const previousTotal = sortedByTotalTime[1];
-        group.improvement = {
-          lap_time_diff: previousLap ? (previousLap.lapSeconds - bestLap.lapSeconds).toFixed(3) : null,
-          lap_percentage: previousLap ? ((previousLap.lapSeconds - bestLap.lapSeconds) / previousLap.lapSeconds * 100).toFixed(1) : null,
-          total_time_diff: previousTotal ? (previousTotal.totalSeconds - bestTotal.totalSeconds).toFixed(3) : null,
-          total_percentage: previousTotal ? ((previousTotal.totalSeconds - bestTotal.totalSeconds) / previousTotal.totalSeconds * 100).toFixed(1) : null,
-          best_lap_session: bestLap,
-          best_total_session: bestTotal
-        };
-      }
-    });
-    return groups;
-  };
-
-  const calculateCircuitRanking = (groupedTimings) => {
-    const circuitRankings = {};
-    Object.values(groupedTimings).forEach(group => {
-      const circuit = group.circuit;
-      if (!circuitRankings[circuit]) circuitRankings[circuit] = [];
-      circuitRankings[circuit].push({
-        ...group,
-        best_lap_seconds: getSeconds(group.best_time.best_lap_time),
-        best_total_seconds: getTotalSeconds(group.best_time.total_time)
-      });
-    });
-    Object.keys(circuitRankings).forEach(circuit => {
-      circuitRankings[circuit].sort((a, b) => a.best_lap_seconds - b.best_lap_seconds);
-      circuitRankings[circuit].forEach((entry, index) => {
-        entry.circuit_position = index + 1;
-        if (index === 0) {
-          entry.circuit_gap_to_leader = 0;
-          entry.circuit_gap_to_previous = 0;
-        } else {
-          entry.circuit_gap_to_leader = (entry.best_lap_seconds - circuitRankings[circuit][0].best_lap_seconds).toFixed(3);
-          entry.circuit_gap_to_previous = (entry.best_lap_seconds - circuitRankings[circuit][index - 1].best_lap_seconds).toFixed(3);
-        }
-        const bestTotalInCircuit = Math.min(...circuitRankings[circuit].map(e => e.best_total_seconds));
-        entry.circuit_gap_to_best_total = (entry.best_total_seconds - bestTotalInCircuit).toFixed(3);
-      });
-    });
-    return circuitRankings;
   };
 
   const getLaneBadgeVariant = (lane) => {
