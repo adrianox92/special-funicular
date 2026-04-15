@@ -846,7 +846,7 @@ function AdminSlotCatalog() {
                       <TableHead>Año</TableHead>
                       <TableHead className="whitespace-nowrap">Desc.</TableHead>
                       <TableHead className="whitespace-nowrap">Próx.</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
+                      <TableHead className="w-0 text-right align-top">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -861,26 +861,35 @@ function AdminSlotCatalog() {
                         <TableCell>{row.commercial_release_year ?? '—'}</TableCell>
                         <TableCell className="text-sm">{row.discontinued ? 'Sí' : '—'}</TableCell>
                         <TableCell className="text-sm">{row.upcoming_release ? 'Sí' : '—'}</TableCell>
-                        <TableCell className="text-right space-x-2">
-                          <Button size="sm" variant="outline" asChild>
-                            <Link
-                              to={`/catalogo/${row.id}/${catalogSlugify(row.model_name || row.reference)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                        <TableCell className="align-top text-right">
+                          <div className="inline-flex min-w-[12.5rem] max-w-[16rem] flex-col items-stretch gap-2 sm:min-w-[17rem] sm:max-w-none">
+                            <Button size="sm" variant="outline" className="w-full justify-center" asChild>
+                              <Link
+                                to={`/catalogo/${row.id}/${catalogSlugify(row.model_name || row.reference)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="size-3.5 mr-1 inline-block shrink-0 align-text-bottom" aria-hidden />
+                                Ficha pública
+                              </Link>
+                            </Button>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button size="sm" variant="outline" className="w-full" onClick={() => openEdit(row)}>
+                                Editar
+                              </Button>
+                              <Button size="sm" variant="outline" className="w-full" onClick={() => openDuplicate(row)}>
+                                Duplicar
+                              </Button>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="w-full"
+                              onClick={() => setDeleteId(row.id)}
                             >
-                              <ExternalLink className="size-3.5 mr-1 inline-block align-text-bottom" aria-hidden />
-                              Ficha pública
-                            </Link>
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
-                            Editar
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => openDuplicate(row)}>
-                            Duplicar
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => setDeleteId(row.id)}>
-                            Eliminar
-                          </Button>
+                              Eliminar
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
