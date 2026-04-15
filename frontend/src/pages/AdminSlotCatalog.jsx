@@ -447,6 +447,29 @@ function AdminSlotCatalog() {
     setEditOpen(true);
   };
 
+  const openDuplicate = (row) => {
+    setEditMode('duplicate');
+    setEditingId(null);
+    setForm({
+      reference: '',
+      manufacturer_id: row.manufacturer_id ?? '',
+      model_name: row.model_name ?? '',
+      vehicle_type: row.vehicle_type ?? '',
+      traction: row.traction ?? '',
+      motor_position: row.motor_position ?? '',
+      commercial_release_year:
+        row.commercial_release_year != null && row.commercial_release_year !== ''
+          ? String(row.commercial_release_year)
+          : '',
+      discontinued: Boolean(row.discontinued),
+      upcoming_release: Boolean(row.upcoming_release),
+    });
+    setImageFile(null);
+    setExistingImageUrl(null);
+    setNewImageObjectUrl(null);
+    setEditOpen(true);
+  };
+
   const saveItem = async () => {
     if (!form.manufacturer_id?.trim()) {
       alert('Selecciona una marca registrada');
@@ -466,7 +489,7 @@ function AdminSlotCatalog() {
       fd.append('upcoming_release', form.upcoming_release ? 'true' : 'false');
       if (imageFile) fd.append('image', imageFile);
 
-      if (editMode === 'create') {
+      if (editMode === 'create' || editMode === 'duplicate') {
         await api.post('/catalog/items', fd);
       } else {
         await api.put(`/catalog/items/${editingId}`, fd);
@@ -852,6 +875,9 @@ function AdminSlotCatalog() {
                           <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
                             Editar
                           </Button>
+                          <Button size="sm" variant="outline" onClick={() => openDuplicate(row)}>
+                            Duplicar
+                          </Button>
                           <Button size="sm" variant="destructive" onClick={() => setDeleteId(row.id)}>
                             Eliminar
                           </Button>
@@ -1181,7 +1207,13 @@ function AdminSlotCatalog() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{editMode === 'create' ? 'Nuevo ítem del catálogo' : 'Editar ítem'}</DialogTitle>
+            <DialogTitle>
+              {editMode === 'create'
+                ? 'Nuevo ítem del catálogo'
+                : editMode === 'duplicate'
+                  ? 'Duplicar ítem'
+                  : 'Editar ítem'}
+            </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
