@@ -147,7 +147,8 @@ const calculateTrends = async (userId, options = {}) => {
       .select(
         'id, model, manufacturer, price, total_price, modified, digital, museo, taller, purchase_date, created_at',
       )
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .limit(500);
 
     if (vehiclesError) throw vehiclesError;
 
@@ -361,7 +362,8 @@ router.get('/metrics', async (req, res) => {
           lane
         )
       `)
-      .eq('user_id', req.user.id);
+      .eq('user_id', req.user.id)
+      .limit(500);
 
     if (vehiclesError) throw vehiclesError;
 
@@ -1074,14 +1076,17 @@ router.get('/maintenance-summary', async (req, res) => {
     const { data: allVehicles, error: vErr } = await supabase
       .from('vehicles')
       .select('id, model, manufacturer')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .limit(500);
 
     if (vErr) throw vErr;
 
     const { data: allLogs, error: lErr } = await supabase
       .from('vehicle_maintenance_log')
       .select('vehicle_id, performed_at')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .order('performed_at', { ascending: false })
+      .limit(1000);
 
     if (lErr) throw lErr;
 

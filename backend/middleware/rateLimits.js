@@ -1,5 +1,10 @@
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
+// Nota de memoria: el store in-memory de express-rate-limit expira automáticamente las
+// entradas al final de cada ventana (windowMs). Mantener ventanas ≤ 15 min para que el GC
+// las libere en tiempo razonable. Para producción con alto tráfico de IPs únicas (bots,
+// crawlers) valorar rate-limit-redis para que el store no crezca en el proceso Node.
+
 /** Inscripciones públicas: límite por IP */
 const publicSignupLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -11,13 +16,14 @@ const publicSignupLimiter = rateLimit({
 
 /**
  * Catálogo público (GET facets/items/detail): lecturas frecuentes; no comparte cupo con signup/pilot.
- * Misma instancia en server.js solo para /api/public/catalog.
+ * Ventana de 1 min para que el store se limpie rápido y no acumule IPs de bots.
  */
 const publicCatalogReadLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: false,
   message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
 });
 

@@ -129,7 +129,7 @@ function orderOptsForVehicleSort(column, ascending) {
 const VEHICLE_IMAGE_MAX_UPLOAD_BYTES =
   Number(process.env.VEHICLE_IMAGE_MAX_UPLOAD_BYTES) > 0
     ? Number(process.env.VEHICLE_IMAGE_MAX_UPLOAD_BYTES)
-    : 12 * 1024 * 1024;
+    : 5 * 1024 * 1024;
 
 const upload = multer({
   storage: multer.memoryStorage(),

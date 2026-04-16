@@ -1,7 +1,22 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const sharp = require('sharp');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+
+// Limitar concurrencia de Sharp a 1 hilo para evitar picos de RAM en subidas paralelas.
+// Desactivar la caché interna de tiles para liberar buffers en cuanto terminan.
+sharp.cache(false);
+sharp.concurrency(1);
+
+// En Render (512 MB) configurar NODE_OPTIONS=--max-old-space-size=400 para que V8
+// active el GC de forma más agresiva antes de alcanzar el límite del contenedor.
+if (process.env.NODE_ENV === 'production' && !process.env.NODE_OPTIONS) {
+  console.warn(
+    '[MEM] NODE_OPTIONS no está definida. Se recomienda añadir NODE_OPTIONS=--max-old-space-size=400 ' +
+    'en las variables de entorno de Render para forzar GC antes de alcanzar el límite de 512 MB.',
+  );
+}
 
 const { getTelegramBotTokenFromEnv, isTelegramBotConfigured } = require('./lib/telegramEnv');
 

@@ -63,22 +63,20 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
 
     console.log(`Procesando ${timings.length} mejores tiempos únicos para el circuito ${circuit} (de ${allTimings.length} tiempos totales)`);
 
-    // PRIMERO: Obtener las posiciones actuales de todos los vehículos ANTES de hacer cambios
-    const currentPositions = {};
-    for (const timing of timings) {
-      const { data: currentTimingData, error: currentTimingError } = await supabase
-        .from('vehicle_timings')
-        .select('current_position')
-        .eq('id', timing.id)
-        .single();
-      
-      if (currentTimingError) {
-        console.error(`[ERR] Error al obtener posición actual del timing ${timing.id}:`, currentTimingError.message);
-        currentPositions[timing.id] = 999; // Posición muy alta como fallback
-      } else {
-        currentPositions[timing.id] = currentTimingData.current_position || 999;
-      }
+    // PRIMERO: Obtener las posiciones actuales de todos los timings en una sola consulta
+    const timingIds = timings.map(t => t.id);
+    const { data: posRows, error: posError } = await supabase
+      .from('vehicle_timings')
+      .select('id, current_position')
+      .in('id', timingIds);
+
+    if (posError) {
+      console.error('[ERR] Error al obtener posiciones actuales en batch:', posError.message);
     }
+
+    const currentPositions = Object.fromEntries(
+      (posRows || []).map(r => [r.id, r.current_position ?? 999])
+    );
 
     // SEGUNDO: Calcular las nuevas posiciones y cambios
     const updatePromises = timings.map(async (timing, index) => {
