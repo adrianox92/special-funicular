@@ -5,13 +5,18 @@
  * Las marcas se resuelven contra la API de brands (slugs en slot_catalog_brands.slug).
  */
 
-// Slugs canónicos de tipo de vehículo → etiqueta legible
+/**
+ * Slug de URL → valor exacto de `vehicle_type` en BD (mismo criterio que `data/vehicleTypes.js`).
+ * Incluye plural `camiones` (facet "Camiones") y tipos que faltaban (`dtm`, `lmp`, …) para que
+ * `parseCatalogPath` reconozca segmentos y el listado envíe `eq` correcto al API.
+ */
 export const VEHICLE_TYPE_SLUG_TO_LABEL = {
   'turismo':       'Turismo',
   'rally':         'Rally',
   'gt':            'GT',
   'formula':       'Fórmula',
   'camion':        'Camión',
+  'camiones':      'Camiones',
   'moto':          'Moto',
   'clasico':       'Clásico',
   'deportivo':     'Deportivo',
@@ -22,6 +27,13 @@ export const VEHICLE_TYPE_SLUG_TO_LABEL = {
   'stock-car':     'Stock Car',
   'prototipo':     'Prototipo',
   'otro':          'Otro',
+  'lmp':           'LMP',
+  'hypercar':      'Hypercar',
+  'grupo-5':       'Grupo 5',
+  'road-car':      'Road Car',
+  'dtm':           'DTM',
+  'f1':            'F1',
+  'raid':          'Raid',
 };
 
 // Slugs canónicos de tracción → etiqueta legible

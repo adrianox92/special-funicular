@@ -31,7 +31,10 @@ import {
   TRACTION_SLUG_TO_LABEL,
   vehicleTypeToSlug,
   tractionToSlug,
+  vehicleTypeSlugToLabel,
+  tractionSlugToLabel,
 } from '../utils/catalogFilterSlugs';
+import { labelMotorPosition } from '../data/motorPosition';
 import { Package, Search, Star, X } from 'lucide-react';
 
 const EMPTY   = '__all__';
@@ -103,6 +106,8 @@ function PublicCatalogList() {
   const [error,      setError]      = useState(null);
   const [facets,     setFacets]     = useState({ manufacturers: [], vehicle_types: [], tractions: [], motor_positions: [], years: [] });
   const [brands,     setBrands]     = useState([]); // { id, name, slug, logo_url }[]
+  /** Borrador del año en path: no navegar hasta tener un año válido (evita borrar "202" al escribir "2024"). */
+  const [pathYearDraft, setPathYearDraft] = useState('');
 
   // --- Redirect 301 legacy (query string → path) ---
   useEffect(() => {
@@ -137,8 +142,12 @@ function PublicCatalogList() {
 
       // Filtros básicos del path
       if (pathFilters.manufacturerSlug) apiParams.manufacturer_slug = pathFilters.manufacturerSlug;
-      if (pathFilters.vehicleTypeSlug)  apiParams.vehicle_type      = pathFilters.vehicleTypeSlug;
-      if (pathFilters.tractionSlug)     apiParams.traction          = pathFilters.tractionSlug;
+      if (pathFilters.vehicleTypeSlug) {
+        apiParams.vehicle_type = vehicleTypeSlugToLabel(pathFilters.vehicleTypeSlug);
+      }
+      if (pathFilters.tractionSlug) {
+        apiParams.traction = tractionSlugToLabel(pathFilters.tractionSlug);
+      }
       if (pathFilters.year)             apiParams.year              = pathFilters.year;
 
       // Filtros extra del query string
@@ -190,6 +199,24 @@ function PublicCatalogList() {
     navigate(`${path}${qs.toString() ? `?${qs.toString()}` : ''}`, { replace: true });
   }, [pathFilters, searchParams, navigate]);
 
+  useEffect(() => {
+    setPathYearDraft(pathFilters.year != null ? String(pathFilters.year) : '');
+  }, [pathFilters.year]);
+
+  const commitPathYearDraft = useCallback(() => {
+    const digits = pathYearDraft.replace(/\D/g, '').slice(0, 4);
+    if (!digits) {
+      if (pathFilters.year != null) setPathFilter('year', null);
+      return;
+    }
+    const n = parseInt(digits, 10);
+    if (Number.isFinite(n) && n >= 1900 && n <= 2100) {
+      setPathFilter('year', n);
+    } else {
+      setPathYearDraft(pathFilters.year != null ? String(pathFilters.year) : '');
+    }
+  }, [pathYearDraft, pathFilters.year, setPathFilter]);
+
   // ---- Helpers para filtros extra (query string) ----
   const setQsFilter = useCallback((key, value) => {
     setSearchParams((prev) => {
@@ -240,7 +267,10 @@ function PublicCatalogList() {
   }, [facets.tractions, pathFilters.tractionSlug]);
 
   const motorPositionOptions = useMemo(() => {
-    return (facets.motor_positions || []).map((m) => typeof m === 'string' ? m : m.name);
+    return (facets.motor_positions || []).map((row) => {
+      const value = typeof row === 'string' ? row : row.name;
+      return { value, label: labelMotorPosition(value) };
+    });
   }, [facets.motor_positions]);
 
   const hasActiveFilters = Boolean(
@@ -354,19 +384,24 @@ function PublicCatalogList() {
               </Select>
             </div>
 
-            {/* Año */}
+            {/* Año (path): se aplica al salir del campo o Enter; mientras tanto se edita libremente */}
             <div className="space-y-1.5 w-[110px]">
-              <Label>Año</Label>
+              <Label htmlFor="catalog-filter-year">Año</Label>
               <Input
-                type="number"
-                min="1900"
-                max="2100"
+                id="catalog-filter-year"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={4}
                 placeholder="2026"
-                value={pathFilters.year ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  const n = v ? parseInt(v, 10) : null;
-                  setPathFilter('year', Number.isFinite(n) && n >= 1900 && n <= 2100 ? n : null);
+                value={pathYearDraft}
+                onChange={(e) => setPathYearDraft(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onBlur={commitPathYearDraft}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  commitPathYearDraft();
+                  e.currentTarget.blur();
                 }}
               />
             </div>
@@ -392,8 +427,10 @@ function PublicCatalogList() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={EMPTY}>Todas</SelectItem>
-                    {motorPositionOptions.map((m) => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    {motorPositionOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -430,17 +467,25 @@ function PublicCatalogList() {
                 <Label>Rango de años</Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    type="number" min="1900" max="2100" placeholder="Desde"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={4}
+                    placeholder="Desde"
                     className="w-24"
                     value={yearFromParam}
-                    onChange={(e) => setQsFilter('year_from', e.target.value.trim())}
+                    onChange={(e) => setQsFilter('year_from', e.target.value.replace(/\D/g, '').slice(0, 4))}
                   />
                   <span className="text-muted-foreground text-sm">–</span>
                   <Input
-                    type="number" min="1900" max="2100" placeholder="Hasta"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={4}
+                    placeholder="Hasta"
                     className="w-24"
                     value={yearToParam}
-                    onChange={(e) => setQsFilter('year_to', e.target.value.trim())}
+                    onChange={(e) => setQsFilter('year_to', e.target.value.replace(/\D/g, '').slice(0, 4))}
                   />
                 </div>
               </div>

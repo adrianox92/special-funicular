@@ -56,8 +56,10 @@ function formatRatingAvg(avg) {
   return n.toFixed(1);
 }
 
-export default function PublicCatalogDetail() {
-  const { id, slug: slugParam } = useParams();
+export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {}) {
+  const params = useParams();
+  const id = catalogItemId ?? params.id;
+  const slugParam = catalogSlug ?? params.slug;
   const { user } = useAuth();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);

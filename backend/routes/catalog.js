@@ -625,6 +625,9 @@ router.get('/my-requests', async (req, res) => {
 router.get('/items/:catalogItemId/rating/mine', async (req, res) => {
   try {
     const { catalogItemId } = req.params;
+    if (!isUuid(catalogItemId)) {
+      return res.status(404).json({ error: 'Ítem no encontrado' });
+    }
     const { data: row, error } = await supabase
       .from('slot_catalog_ratings')
       .select('rating')
@@ -644,6 +647,9 @@ router.get('/items/:catalogItemId/rating/mine', async (req, res) => {
 router.put('/items/:catalogItemId/rating', catalogContributionsLimiter, async (req, res) => {
   try {
     const { catalogItemId } = req.params;
+    if (!isUuid(catalogItemId)) {
+      return res.status(404).json({ error: 'Ítem no encontrado' });
+    }
     const rating = parseRatingBody(req.body?.rating);
     if (rating == null) {
       return res.status(400).json({ error: 'rating debe ser un entero entre 1 y 5' });
@@ -703,6 +709,9 @@ router.put('/items/:catalogItemId/rating', catalogContributionsLimiter, async (r
 router.delete('/items/:catalogItemId/rating', catalogContributionsLimiter, async (req, res) => {
   try {
     const { catalogItemId } = req.params;
+    if (!isUuid(catalogItemId)) {
+      return res.status(404).json({ error: 'Ítem no encontrado' });
+    }
     const { error } = await supabase
       .from('slot_catalog_ratings')
       .delete()

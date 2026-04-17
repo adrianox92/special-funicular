@@ -32,7 +32,7 @@ import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
 import SellerDashboard from './pages/SellerDashboard';
 import PublicCatalogList from './pages/PublicCatalogList';
-import PublicCatalogDetail from './pages/PublicCatalogDetail';
+import PublicCatalogEntry from './pages/PublicCatalogEntry';
 import CatalogMySuggestions from './pages/CatalogMySuggestions';
 import ProposeCatalogInsert from './pages/ProposeCatalogInsert';
 import PoliciesPage from './pages/PoliciesPage';
@@ -133,11 +133,9 @@ const AppContent = () => {
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
         <Route path="/piloto/:slug" element={<PublicPilotProfile />} />
-        {/* Fichas de catálogo: tienen UUID como primer segmento → deben ir ANTES del wildcard */}
-        <Route path="/catalogo/:id/:slug" element={<PublicCatalogDetail />} />
-        <Route path="/catalogo/:id" element={<PublicCatalogDetail />} />
-        {/* Listado con rutas SEO: /catalogo, /catalogo/scalextric, /catalogo/scalextric/rally/2026, etc. */}
-        <Route path="/catalogo/*" element={<PublicCatalogList />} />
+        {/* Catálogo: índice + splat; PublicCatalogEntry distingue UUID (ficha) vs slugs SEO (listado). */}
+        <Route path="/catalogo" element={<PublicCatalogList />} />
+        <Route path="/catalogo/*" element={<PublicCatalogEntry />} />
 
         <Route
           path="/mis-sugerencias-catalogo"
