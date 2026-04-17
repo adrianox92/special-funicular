@@ -3,7 +3,6 @@ import api from '../lib/axios';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Spinner } from './ui/spinner';
 import { ArrowUpDown, ExternalLink, ShoppingCart } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';

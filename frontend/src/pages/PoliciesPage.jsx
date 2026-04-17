@@ -70,10 +70,12 @@ export default function PoliciesPage() {
   useEffect(() => {
     if (policy?.title) {
       document.title = `${policy.title} | Slot Collection Pro`;
+    } else if (slug && POLICY_TITLES[slug]) {
+      document.title = `${POLICY_TITLES[slug]} | Slot Collection Pro`;
     } else {
       document.title = `Políticas | Slot Collection Pro`;
     }
-  }, [policy]);
+  }, [policy, slug]);
 
   return (
     <PublicCatalogShell>

@@ -111,7 +111,7 @@ function PublicCatalogList() {
       const qs = migration.cleanSearchParams.toString();
       navigate(`${migration.path}${qs ? `?${qs}` : ''}`, { replace: true });
     }
-  }, []); // solo al montar // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigate, searchParams]);
 
   // Cargar facetas y brands una sola vez
   useEffect(() => {
