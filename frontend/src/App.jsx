@@ -30,6 +30,7 @@ import Contact from './pages/Contact';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
+import SellerDashboard from './pages/SellerDashboard';
 import PublicCatalogList from './pages/PublicCatalogList';
 import PublicCatalogDetail from './pages/PublicCatalogDetail';
 import CatalogMySuggestions from './pages/CatalogMySuggestions';
@@ -281,6 +282,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <AdminSlotCatalog />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/seller"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <SellerDashboard />
               </AuthedShell>
             </PrivateRoute>
           }

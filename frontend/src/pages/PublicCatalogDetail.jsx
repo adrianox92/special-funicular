@@ -33,6 +33,7 @@ import {
   clearCatalogItemPageSeo,
 } from '../utils/catalogItemSeo';
 import { ChevronRight, Package, Star, X } from 'lucide-react';
+import StoreListingsSection from '../components/StoreListingsSection';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
@@ -467,6 +468,7 @@ export default function PublicCatalogDetail() {
             <p className="text-sm text-muted-foreground leading-relaxed">{collectionBlurb}</p>
           </CardContent>
         </Card>
+        <StoreListingsSection catalogItemId={item.id} />
         <CatalogThirdPartyNotice />
 
         

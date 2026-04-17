@@ -10,6 +10,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
+import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Table,
@@ -52,7 +53,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Database, ExternalLink, LayoutDashboard, Upload, GitPullRequest, PlusCircle, Tag } from 'lucide-react';
+import { Database, ExternalLink, LayoutDashboard, Upload, GitPullRequest, PlusCircle, Tag, Store, MousePointerClick, CheckCircle2, XCircle } from 'lucide-react';
 import { catalogSlugify } from '../utils/catalogSlug';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
 import CatalogTractionSelect from '../components/CatalogTractionSelect';
@@ -249,6 +250,17 @@ function AdminSlotCatalog() {
   const [insReq, setInsReq] = useState([]);
   const [queuesLoading, setQueuesLoading] = useState(false);
 
+  // Tiendas
+  const [sellers, setSellers] = useState([]);
+  const [sellersLoading, setSellersLoading] = useState(false);
+  const [clickStats, setClickStats] = useState([]);
+  const [clickStatsLoading, setClickStatsLoading] = useState(false);
+  const [clickStatsDays, setClickStatsDays] = useState(30);
+  const [sellerApproving, setSellerApproving] = useState(null);
+  const [createSellerOpen, setCreateSellerOpen] = useState(false);
+  const [createSellerForm, setCreateSellerForm] = useState({ email: '', store_name: '', store_description: '', store_url: '' });
+  const [createSellerSaving, setCreateSellerSaving] = useState(false);
+
   const [brandsAdmin, setBrandsAdmin] = useState([]);
   const [brandsTabLoading, setBrandsTabLoading] = useState(false);
   const [brandDialogOpen, setBrandDialogOpen] = useState(false);
@@ -339,6 +351,67 @@ function AdminSlotCatalog() {
     if (!isAdmin) return;
     fetchQueues();
   }, [isAdmin, fetchQueues]);
+
+  const fetchSellers = useCallback(async () => {
+    setSellersLoading(true);
+    try {
+      const { data } = await api.get('/store-listings/admin/sellers');
+      setSellers(data.sellers ?? []);
+    } catch {
+      setSellers([]);
+    } finally {
+      setSellersLoading(false);
+    }
+  }, []);
+
+  const fetchClickStats = useCallback(async (days = clickStatsDays) => {
+    setClickStatsLoading(true);
+    try {
+      const { data } = await api.get(`/store-listings/admin/clicks?days=${days}`);
+      setClickStats(data.stats ?? []);
+    } catch {
+      setClickStats([]);
+    } finally {
+      setClickStatsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const approveSeller = async (userId, approved) => {
+    setSellerApproving(userId);
+    try {
+      await api.post(`/store-listings/admin/sellers/${userId}/approve`, { approved });
+      setSellers((prev) =>
+        prev.map((s) => (s.user_id === userId ? { ...s, approved } : s)),
+      );
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al actualizar el vendedor');
+    } finally {
+      setSellerApproving(null);
+    }
+  };
+
+  const createSeller = async (e) => {
+    e.preventDefault();
+    if (!createSellerForm.email.trim()) return alert('El email es obligatorio');
+    if (!createSellerForm.store_name.trim()) return alert('El nombre de tienda es obligatorio');
+    setCreateSellerSaving(true);
+    try {
+      const { data } = await api.post('/store-listings/admin/sellers', {
+        email: createSellerForm.email.trim(),
+        store_name: createSellerForm.store_name.trim(),
+        store_description: createSellerForm.store_description.trim() || null,
+        store_url: createSellerForm.store_url.trim() || null,
+      });
+      setSellers((prev) => [data, ...prev]);
+      setCreateSellerOpen(false);
+      setCreateSellerForm({ email: '', store_name: '', store_description: '', store_url: '' });
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al crear la tienda');
+    } finally {
+      setCreateSellerSaving(false);
+    }
+  };
 
   const fetchBrandsAdmin = useCallback(async () => {
     setBrandsTabLoading(true);
@@ -611,6 +684,16 @@ function AdminSlotCatalog() {
           <TabsTrigger value="queues">
             <GitPullRequest className="size-4 mr-1 inline" />
             Colas ({chgReq.length + insReq.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="stores"
+            onClick={() => {
+              if (sellers.length === 0) fetchSellers();
+              if (clickStats.length === 0) fetchClickStats(clickStatsDays);
+            }}
+          >
+            <Store className="size-4 mr-1 inline" />
+            Tiendas
           </TabsTrigger>
         </TabsList>
 
@@ -1211,7 +1294,308 @@ function AdminSlotCatalog() {
             </>
           )}
         </TabsContent>
+
+        {/* ==================== TIENDAS ==================== */}
+        <TabsContent value="stores" className="space-y-6 mt-4">
+          {/* Vendedores */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Store className="size-4" />
+                  Perfiles de vendedor
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => setCreateSellerOpen(true)}
+                  >
+                    <PlusCircle className="size-4 mr-1.5" />
+                    Crear tienda
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchSellers}
+                    disabled={sellersLoading}
+                  >
+                    {sellersLoading ? 'Cargando…' : 'Actualizar'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {sellersLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner className="size-5" />
+                </div>
+              ) : sellers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No hay solicitudes de vendedor aún.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tienda</TableHead>
+                        <TableHead>URL</TableHead>
+                        <TableHead className="text-center">Estado</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sellers.map((s) => (
+                        <TableRow key={s.user_id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {s.logo_url ? (
+                                <img
+                                  src={s.logo_url}
+                                  alt=""
+                                  className="h-8 w-12 shrink-0 rounded-md object-contain bg-muted border border-border"
+                                />
+                              ) : (
+                                <div className="h-8 w-12 shrink-0 rounded-md bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground border border-border">
+                                  {(s.store_name || '?')[0].toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-sm font-medium">{s.store_name}</p>
+                                {s.store_description && (
+                                  <p className="text-xs text-muted-foreground truncate max-w-[16rem]">
+                                    {s.store_description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {s.store_url ? (
+                              <a
+                                href={s.store_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-primary hover:underline flex items-center gap-1"
+                              >
+                                Visitar
+                                <ExternalLink className="size-3" />
+                              </a>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {s.approved ? (
+                              <Badge variant="default" className="text-xs">Aprobado</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">
+                                Pendiente
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {!s.approved ? (
+                                <Button
+                                  size="sm"
+                                  disabled={sellerApproving === s.user_id}
+                                  onClick={() => approveSeller(s.user_id, true)}
+                                >
+                                  <CheckCircle2 className="size-3.5 mr-1.5" />
+                                  Aprobar
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={sellerApproving === s.user_id}
+                                  onClick={() => approveSeller(s.user_id, false)}
+                                >
+                                  <XCircle className="size-3.5 mr-1.5" />
+                                  Revocar
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Estadísticas de clics */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MousePointerClick className="size-4" />
+                  Clics por listado
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={String(clickStatsDays)}
+                    onValueChange={(v) => {
+                      const d = parseInt(v, 10);
+                      setClickStatsDays(d);
+                      fetchClickStats(d);
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Últimos 7 días</SelectItem>
+                      <SelectItem value="30">Últimos 30 días</SelectItem>
+                      <SelectItem value="90">Últimos 90 días</SelectItem>
+                      <SelectItem value="365">Último año</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchClickStats(clickStatsDays)}
+                    disabled={clickStatsLoading}
+                  >
+                    {clickStatsLoading ? 'Cargando…' : 'Actualizar'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {clickStatsLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner className="size-5" />
+                </div>
+              ) : clickStats.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Sin datos de clics en el período seleccionado.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Listado</TableHead>
+                        <TableHead>Tienda</TableHead>
+                        <TableHead>Ítem del catálogo</TableHead>
+                        <TableHead className="text-right">
+                          <MousePointerClick className="size-4 inline" aria-label="Clics" />
+                        </TableHead>
+                        <TableHead className="text-center">Activo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clickStats.map((s) => (
+                        <TableRow key={s.listing_id}>
+                          <TableCell className="max-w-[12rem]">
+                            <a
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm hover:underline flex items-center gap-1 truncate"
+                            >
+                              {s.title}
+                              <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                            </a>
+                          </TableCell>
+                          <TableCell className="text-sm">{s.store_name ?? '—'}</TableCell>
+                          <TableCell className="text-sm">
+                            {s.catalog_item ? (
+                              <span>
+                                <span className="font-mono text-xs text-muted-foreground mr-1">
+                                  {s.catalog_item.reference}
+                                </span>
+                                {s.catalog_item.model_name}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums font-semibold">
+                            {s.click_count}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {s.active ? (
+                              <Badge variant="default" className="text-xs">Sí</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">No</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Diálogo: crear tienda (admin) */}
+      <Dialog open={createSellerOpen} onOpenChange={setCreateSellerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Crear tienda</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={createSeller} className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="cs_email">Email del usuario *</Label>
+              <Input
+                id="cs_email"
+                type="email"
+                placeholder="vendedor@tienda.com"
+                value={createSellerForm.email}
+                onChange={(e) => setCreateSellerForm((f) => ({ ...f, email: e.target.value }))}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                El usuario debe tener ya una cuenta registrada en la plataforma.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cs_store_name">Nombre de la tienda *</Label>
+              <Input
+                id="cs_store_name"
+                value={createSellerForm.store_name}
+                onChange={(e) => setCreateSellerForm((f) => ({ ...f, store_name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cs_store_description">Descripción (opcional)</Label>
+              <Input
+                id="cs_store_description"
+                value={createSellerForm.store_description}
+                onChange={(e) => setCreateSellerForm((f) => ({ ...f, store_description: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cs_store_url">Web de la tienda (opcional)</Label>
+              <Input
+                id="cs_store_url"
+                type="url"
+                placeholder="https://..."
+                value={createSellerForm.store_url}
+                onChange={(e) => setCreateSellerForm((f) => ({ ...f, store_url: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateSellerOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createSellerSaving}>
+                {createSellerSaving ? <Spinner className="size-4 mr-2" /> : null}
+                Crear tienda
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-4xl">

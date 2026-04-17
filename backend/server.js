@@ -163,6 +163,7 @@ const licenseRoute = require('./routes/license');
 const licenseAccountRoute = require('./routes/licenseAccount');
 const helpRoute = require('./routes/help');
 const catalogRoute = require('./routes/catalog');
+const storeListingsRoute = require('./routes/storeListings');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
@@ -180,6 +181,7 @@ app.use('/api/inventory', inventoryRoute);
 app.use('/api/pilot-profile', pilotProfileRoute);
 app.use('/api/help', helpRoute);
 app.use('/api/catalog', catalogRoute);
+app.use('/api/store-listings', storeListingsRoute);
 
 const competitionsRoute = require('./routes/competitions');
 app.use('/api/competitions', competitionsRoute);

@@ -19,8 +19,10 @@ import {
   CircleHelp,
   Search,
   Database,
+  Store,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import api from '../lib/axios';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -83,7 +85,27 @@ const Navbar = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isApprovedSeller, setIsApprovedSeller] = useState(false);
   const navbarRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) {
+      setIsApprovedSeller(false);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/store-listings/my/profile');
+        if (!cancelled) setIsApprovedSeller(Boolean(data?.approved));
+      } catch {
+        if (!cancelled) setIsApprovedSeller(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -123,6 +145,9 @@ const Navbar = () => {
     { path: '/circuits', label: 'Circuitos', icon: Flag },
     { path: '/inventory', label: 'Inventario', icon: Package },
     { path: '/competitions', label: 'Competiciones', icon: Trophy },
+    ...(isApprovedSeller
+      ? [{ path: '/seller', label: 'Mis listados', icon: Store }]
+      : []),
     { path: '/help', label: 'Ayuda', icon: CircleHelp },
   ];
 
@@ -218,6 +243,14 @@ const Navbar = () => {
                       Mi Perfil
                     </Link>
                   </DropdownMenuItem>
+                  {isApprovedSeller && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/seller" className="flex items-center gap-2 cursor-pointer">
+                        <Store className="size-4" />
+                        Mis listados
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {showLicenseAdmin && (
                     <DropdownMenuItem asChild>
                       <Link to="/admin/slot-race-licenses" className="flex items-center gap-2 cursor-pointer">
