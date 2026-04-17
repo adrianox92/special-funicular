@@ -200,24 +200,50 @@ export function buildCatalogItemKeywords(item) {
   return bits.join(', ');
 }
 
-const LIST_TITLE = `Catálogo de referencias | ${BRAND}`;
-const LIST_DESCRIPTION =
+const LIST_TITLE_BASE = `Catálogo de referencias | ${BRAND}`;
+const LIST_DESCRIPTION_BASE =
   'Catálogo público de modelos slot: referencia, marca, tipo, año de comercialización y valoraciones de la comunidad. Scalextric, Ninco, Avant Slot y más en Slot Collection Pro.';
 
 /**
- * Meta del listado /catalogo (sin sobrescribir document.title; lo gestiona App + getDocumentTitle).
+ * Meta del listado /catalogo — acepta filtros activos para componer título y canonical SEO-friendly.
+ *
+ * @param {object} [filters]
+ * @param {string|null}  filters.manufacturerName   — nombre legible de la marca (no slug)
+ * @param {string|null}  filters.vehicleTypeLabel   — etiqueta del tipo
+ * @param {string|null}  filters.tractionLabel      — etiqueta de la tracción
+ * @param {number|null}  filters.year
+ * @param {number|null}  filters.total              — número de resultados
+ * @param {string|null}  filters.canonicalPath      — path /catalogo/... ya construido
  */
-export function applyPublicCatalogListSeo() {
+export function applyPublicCatalogListSeo(filters = {}) {
+  const { manufacturerName, vehicleTypeLabel, tractionLabel, year, total, canonicalPath } = filters;
   const origin = getOrigin();
-  const canonicalUrl = origin ? `${origin}/catalogo` : '';
 
-  setMeta('description', LIST_DESCRIPTION, false);
+  // Construir título dinámico
+  const parts = [manufacturerName, vehicleTypeLabel, tractionLabel, year ? String(year) : null].filter(Boolean);
+  const titleSuffix = parts.length ? parts.join(' · ') : null;
+  const listTitle = titleSuffix
+    ? `${titleSuffix} | Catálogo slot | ${BRAND}`
+    : LIST_TITLE_BASE;
+
+  // Meta description dinámica
+  const countText = total != null ? `${total} modelo${total !== 1 ? 's' : ''}` : 'modelos';
+  const filterText = parts.length ? ` de ${parts.join(', ')}` : '';
+  const listDescription = parts.length
+    ? truncate(`Catálogo slot${filterText}: ${countText} encontrados. Referencia, precio, tipo y valoraciones en ${BRAND}.`, 158)
+    : LIST_DESCRIPTION_BASE;
+
+  const canonicalUrl = origin
+    ? `${origin}${canonicalPath || '/catalogo'}`
+    : '';
+
+  setMeta('description', listDescription, false);
   setMeta('keywords', KEYWORDS_BASE, false);
   setMeta('og:type', 'website', true);
   setMeta('og:locale', 'es_ES', true);
   setMeta('og:site_name', BRAND, true);
-  setMeta('og:title', LIST_TITLE, true);
-  setMeta('og:description', LIST_DESCRIPTION, true);
+  setMeta('og:title', listTitle, true);
+  setMeta('og:description', listDescription, true);
   if (canonicalUrl) setMeta('og:url', canonicalUrl, true);
   const logoUrl = origin ? `${origin}/logo512.png` : '';
   if (logoUrl) {
@@ -226,8 +252,8 @@ export function applyPublicCatalogListSeo() {
     setMeta('og:image:height', '512', true);
   }
   setMeta('twitter:card', 'summary_large_image', false);
-  setMeta('twitter:title', LIST_TITLE, false);
-  setMeta('twitter:description', LIST_DESCRIPTION, false);
+  setMeta('twitter:title', listTitle, false);
+  setMeta('twitter:description', listDescription, false);
   if (logoUrl) setMeta('twitter:image', logoUrl, false);
 
   let linkCanonical = document.querySelector('link[rel="canonical"]');

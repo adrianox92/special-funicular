@@ -22,14 +22,55 @@
  *   GET  /admin/clicks                    — stats de clics por listado
  */
 
+const crypto = require('crypto');
 const express = require('express');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const { processVehicleImageBuffer } = require('../lib/processVehicleImageBuffer');
+const { buildTrackedUrl } = require('../lib/affiliateUrl');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+/** Anon, sin sesión: lecturas/escrituras que RLS permite al rol anon (p. ej. listados públicos, INSERT de clics). */
+const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
+
+/** Service role: bypass RLS. Necesario para el panel admin de tiendas (ver todos los perfiles, notas internas, etc.). */
+const supabaseService = supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
+
+/**
+ * Cliente Supabase con el JWT del usuario que llama a la API.
+ * Sin esto, las políticas RLS con auth.uid() no ven al usuario y ocultan filas
+ * (p. ej. perfil de tienda pendiente de aprobación).
+ */
+function supabaseForUser(req) {
+  const authHeader = req.headers.authorization;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+    },
+  });
+}
+
+/** Operaciones de vendedor: preferir service role si está configurado; si no, JWT del usuario. */
+function dbSeller(req) {
+  return supabaseService || supabaseForUser(req);
+}
+
+function requireAdminDb(res) {
+  if (!supabaseService) {
+    res.status(503).json({
+      error:
+        'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor. '
+        + 'Es obligatoria para listar y moderar tiendas (RLS no expone todos los perfiles al rol anon).',
+    });
+    return null;
+  }
+  return supabaseService;
+}
 
 const router = express.Router();
 
@@ -52,17 +93,18 @@ function isUuid(id) {
   );
 }
 
-async function uploadStoreLogoBuffer(buffer, mimetype) {
+async function uploadStoreLogoBuffer(buffer, mimetype, storageClient) {
+  const client = storageClient || supabaseService || supabasePublic;
   const processed = await processVehicleImageBuffer(buffer, mimetype);
   const filePath = `${STORE_LOGOS_FOLDER}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${processed.ext}`;
-  const { error: storageError } = await supabase.storage
+  const { error: storageError } = await client.storage
     .from(STORE_LOGOS_BUCKET)
     .upload(filePath, processed.buffer, {
       contentType: processed.contentType,
       upsert: false,
     });
   if (storageError) throw new Error(storageError.message);
-  const { data: publicUrlData } = supabase.storage
+  const { data: publicUrlData } = client.storage
     .from(STORE_LOGOS_BUCKET)
     .getPublicUrl(filePath);
   return publicUrlData.publicUrl;
@@ -79,15 +121,16 @@ function storeLogoPathFromUrl(publicUrl) {
   return path || null;
 }
 
-async function removeStoreLogo(publicUrl) {
+async function removeStoreLogo(publicUrl, storageClient) {
+  const client = storageClient || supabaseService || supabasePublic;
   const storagePath = storeLogoPathFromUrl(publicUrl);
   if (!storagePath) return;
-  await supabase.storage.from(STORE_LOGOS_BUCKET).remove([storagePath]);
+  await client.storage.from(STORE_LOGOS_BUCKET).remove([storagePath]);
 }
 
 /** Verifica que el usuario autenticado tiene un perfil de vendedor aprobado. */
 async function sellerGuard(req, res, next) {
-  const { data: profile, error } = await supabase
+  const { data: profile, error } = await dbSeller(req)
     .from('seller_profiles')
     .select('approved')
     .eq('user_id', req.user.id)
@@ -115,9 +158,9 @@ router.get('/catalog/:catalogItemId', async (req, res) => {
       return res.status(400).json({ error: 'ID de ítem inválido' });
     }
 
-    const { data: listings, error } = await supabase
+    const { data: listings, error } = await supabasePublic
       .from('store_listings')
-      .select('id, user_id, title, url, price, currency, notes, created_at')
+      .select('id, user_id, title, url, price, currency, notes, condition, created_at')
       .eq('catalog_item_id', catalogItemId)
       .eq('active', true)
       .order('created_at', { ascending: true });
@@ -132,7 +175,7 @@ router.get('/catalog/:catalogItemId', async (req, res) => {
     const userIds = [...new Set(listings.map((l) => l.user_id).filter(Boolean))];
     let profilesByUserId = new Map();
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await supabasePublic
         .from('seller_profiles')
         .select('user_id, store_name, logo_url')
         .in('user_id', userIds)
@@ -149,6 +192,7 @@ router.get('/catalog/:catalogItemId', async (req, res) => {
         price: l.price,
         currency: l.currency,
         notes: l.notes,
+        condition: l.condition ?? null,
         created_at: l.created_at,
         store_name: profile?.store_name ?? null,
         store_logo_url: profile?.logo_url ?? null,
@@ -158,6 +202,77 @@ router.get('/catalog/:catalogItemId', async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /go/:id
+ * Registra el clic con tracking enriquecido y redirige 302 a la URL destino con UTM/afiliado.
+ * Si el listado no existe o está inactivo, redirige a la home del catálogo.
+ */
+router.get('/go/:id', async (req, res) => {
+  const frontendBase = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const fallbackUrl  = `${frontendBase}/catalogo`;
+
+  try {
+    const { id } = req.params;
+    if (!isUuid(id)) return res.redirect(302, fallbackUrl);
+
+    // Obtener listado + perfil de vendedor en paralelo
+    const { data: listing, error: lErr } = await supabasePublic
+      .from('store_listings')
+      .select('id, catalog_item_id, user_id, url, active, custom_utm_campaign')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (lErr || !listing || !listing.active) {
+      return res.redirect(302, fallbackUrl);
+    }
+
+    const { data: seller } = await supabasePublic
+      .from('seller_profiles')
+      .select('user_id, default_utm_source, default_utm_medium, affiliate_param_template')
+      .eq('user_id', listing.user_id)
+      .maybeSingle();
+
+    const trackedUrl = buildTrackedUrl(listing, seller);
+
+    // Registrar clic con datos enriquecidos (fire-and-forget, no bloquea redirect)
+    const rawIp   = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
+    const salt    = process.env.IP_HASH_SALT || 'slotdb-salt';
+    const ipHash  = rawIp
+      ? crypto.createHash('sha256').update(rawIp + salt).digest('hex')
+      : null;
+
+    // Obtener user_id del token si existe (opcional)
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      if (token) {
+        try {
+          const { data: { user } } = await supabasePublic.auth.getUser(token);
+          userId = user?.id ?? null;
+        } catch { /* ignorar */ }
+      }
+    }
+
+    supabasePublic.from('store_listing_clicks').insert([{
+      listing_id:  id,
+      user_id:     userId,
+      session_id:  req.query?.session_id ? String(req.query.session_id).slice(0, 128) : null,
+      referer:     req.headers.referer ? String(req.headers.referer).slice(0, 512) : null,
+      user_agent:  req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 512) : null,
+      ip_hash:     ipHash,
+      redirected:  true,
+    }]).then(({ error }) => {
+      if (error) console.warn('[store-listings/go] click insert error:', error.message);
+    });
+
+    return res.redirect(302, trackedUrl);
+  } catch (e) {
+    console.error('[store-listings/go] error:', e.message);
+    return res.redirect(302, fallbackUrl);
   }
 });
 
@@ -176,12 +291,12 @@ router.post('/:id/click', async (req, res) => {
     if (authHeader) {
       const token = authHeader.replace('Bearer ', '');
       if (token) {
-        const { data: { user } } = await supabase.auth.getUser(token);
+        const { data: { user } } = await supabasePublic.auth.getUser(token);
         userId = user?.id ?? null;
       }
     }
 
-    const { data: listing, error: lErr } = await supabase
+    const { data: listing, error: lErr } = await supabasePublic
       .from('store_listings')
       .select('id')
       .eq('id', id)
@@ -191,7 +306,7 @@ router.post('/:id/click', async (req, res) => {
     if (lErr) return res.status(500).json({ error: lErr.message });
     if (!listing) return res.status(404).json({ error: 'Listado no encontrado' });
 
-    const { error } = await supabase.from('store_listing_clicks').insert([
+    const { error } = await supabasePublic.from('store_listing_clicks').insert([
       {
         listing_id: id,
         user_id: userId,
@@ -211,13 +326,14 @@ router.post('/:id/click', async (req, res) => {
 // ----------------------------------------------------------------
 
 /**
- * GET /my/profile — obtener el perfil propio (o null si no existe)
+ * GET /my/profile — obtener el perfil propio (o null si no existe).
+ * Devuelve rejection_reason pero NUNCA admin_notes.
  */
 router.get('/my/profile', authMiddleware, async (req, res) => {
   try {
-    const { data: profile, error } = await supabase
+    const { data: profile, error } = await dbSeller(req)
       .from('seller_profiles')
-      .select('*')
+      .select('user_id, store_name, store_description, store_url, logo_url, approved, rejection_reason, default_utm_source, default_utm_medium, affiliate_param_template, created_at, updated_at')
       .eq('user_id', req.user.id)
       .maybeSingle();
 
@@ -239,7 +355,7 @@ router.post('/my/profile', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'store_name es obligatorio' });
     }
 
-    const { data: existing } = await supabase
+    const { data: existing } = await dbSeller(req)
       .from('seller_profiles')
       .select('user_id')
       .eq('user_id', req.user.id)
@@ -249,7 +365,7 @@ router.post('/my/profile', authMiddleware, async (req, res) => {
       return res.status(409).json({ error: 'Ya tienes un perfil de tienda. Usa PUT /my/profile para actualizarlo.' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await dbSeller(req)
       .from('seller_profiles')
       .insert([
         {
@@ -272,7 +388,7 @@ router.post('/my/profile', authMiddleware, async (req, res) => {
 
 /**
  * PUT /my/profile — actualizar perfil de tienda (solo el propietario)
- * body: { store_name?, store_description?, store_url? }
+ * body: { store_name?, store_description?, store_url?, default_utm_source?, default_utm_medium?, affiliate_param_template? }
  */
 router.put('/my/profile', authMiddleware, sellerGuard, async (req, res) => {
   try {
@@ -288,9 +404,18 @@ router.put('/my/profile', authMiddleware, sellerGuard, async (req, res) => {
     if (req.body?.store_url !== undefined) {
       updates.store_url = String(req.body.store_url).trim() || null;
     }
+    if (req.body?.default_utm_source !== undefined) {
+      updates.default_utm_source = String(req.body.default_utm_source).trim() || 'slotdb';
+    }
+    if (req.body?.default_utm_medium !== undefined) {
+      updates.default_utm_medium = String(req.body.default_utm_medium).trim() || 'catalog';
+    }
+    if (req.body?.affiliate_param_template !== undefined) {
+      updates.affiliate_param_template = String(req.body.affiliate_param_template).trim() || null;
+    }
     updates.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
+    const { data, error } = await dbSeller(req)
       .from('seller_profiles')
       .update(updates)
       .eq('user_id', req.user.id)
@@ -318,7 +443,9 @@ router.post(
       const file = req.file;
       if (!file) return res.status(400).json({ error: 'Archivo de logo requerido (field: logo)' });
 
-      const { data: existing } = await supabase
+      const db = dbSeller(req);
+
+      const { data: existing } = await db
         .from('seller_profiles')
         .select('logo_url')
         .eq('user_id', req.user.id)
@@ -326,17 +453,17 @@ router.post(
 
       let logo_url;
       try {
-        logo_url = await uploadStoreLogoBuffer(file.buffer, file.mimetype);
+        logo_url = await uploadStoreLogoBuffer(file.buffer, file.mimetype, db);
       } catch (e) {
         return res.status(400).json({ error: e.message || 'No se pudo procesar el logo' });
       }
 
       // Borrar logo anterior si existía
       if (existing?.logo_url) {
-        await removeStoreLogo(existing.logo_url);
+        await removeStoreLogo(existing.logo_url, db);
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('seller_profiles')
         .update({ logo_url, updated_at: new Date().toISOString() })
         .eq('user_id', req.user.id)
@@ -360,7 +487,8 @@ router.post(
  */
 router.get('/my', authMiddleware, sellerGuard, async (req, res) => {
   try {
-    const { data: listings, error } = await supabase
+    const db = dbSeller(req);
+    const { data: listings, error } = await db
       .from('store_listings')
       .select('id, catalog_item_id, title, url, price, currency, notes, active, created_at, updated_at')
       .eq('user_id', req.user.id)
@@ -371,7 +499,7 @@ router.get('/my', authMiddleware, sellerGuard, async (req, res) => {
 
     // Contar clics para cada listado del vendedor
     const listingIds = listings.map((l) => l.id);
-    const { data: clicks, error: cErr } = await supabase
+    const { data: clicks, error: cErr } = await db
       .from('store_listing_clicks')
       .select('listing_id')
       .in('listing_id', listingIds);
@@ -387,7 +515,7 @@ router.get('/my', authMiddleware, sellerGuard, async (req, res) => {
     const itemIds = [...new Set(listings.map((l) => l.catalog_item_id).filter(Boolean))];
     let itemsById = new Map();
     if (itemIds.length > 0) {
-      const { data: items } = await supabase
+      const { data: items } = await supabasePublic
         .from('slot_catalog_items_with_ratings')
         .select('id, reference, manufacturer, model_name')
         .in('id', itemIds);
@@ -412,6 +540,7 @@ router.get('/my', authMiddleware, sellerGuard, async (req, res) => {
  */
 router.post('/', authMiddleware, sellerGuard, async (req, res) => {
   try {
+    const db = dbSeller(req);
     const catalog_item_id = String(req.body?.catalog_item_id ?? '').trim();
     const title = String(req.body?.title ?? '').trim();
     const url = String(req.body?.url ?? '').trim();
@@ -423,7 +552,7 @@ router.post('/', authMiddleware, sellerGuard, async (req, res) => {
     if (!url) return res.status(400).json({ error: 'url es obligatorio' });
 
     // Verificar que el ítem existe
-    const { data: item, error: iErr } = await supabase
+    const { data: item, error: iErr } = await supabasePublic
       .from('slot_catalog_items')
       .select('id')
       .eq('id', catalog_item_id)
@@ -436,8 +565,11 @@ router.post('/', authMiddleware, sellerGuard, async (req, res) => {
     const currency = String(req.body?.currency ?? 'EUR').trim().toUpperCase() || 'EUR';
     const notes = String(req.body?.notes ?? '').trim() || null;
     const active = req.body?.active !== undefined ? Boolean(req.body.active) : true;
+    const custom_utm_campaign = String(req.body?.custom_utm_campaign ?? '').trim() || null;
+    const conditionRaw = String(req.body?.condition ?? '').trim() || null;
+    const condition = ['new', 'used', 'preorder'].includes(conditionRaw) ? conditionRaw : null;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('store_listings')
       .insert([
         {
@@ -449,6 +581,8 @@ router.post('/', authMiddleware, sellerGuard, async (req, res) => {
           currency,
           notes,
           active,
+          custom_utm_campaign,
+          condition,
         },
       ])
       .select()
@@ -466,10 +600,11 @@ router.post('/', authMiddleware, sellerGuard, async (req, res) => {
  */
 router.put('/:id', authMiddleware, sellerGuard, async (req, res) => {
   try {
+    const db = dbSeller(req);
     const { id } = req.params;
     if (!isUuid(id)) return res.status(400).json({ error: 'ID inválido' });
 
-    const { data: existing, error: eErr } = await supabase
+    const { data: existing, error: eErr } = await db
       .from('store_listings')
       .select('id, user_id')
       .eq('id', id)
@@ -503,8 +638,15 @@ router.put('/:id', authMiddleware, sellerGuard, async (req, res) => {
     if (req.body?.active !== undefined) {
       updates.active = Boolean(req.body.active);
     }
+    if (req.body?.custom_utm_campaign !== undefined) {
+      updates.custom_utm_campaign = String(req.body.custom_utm_campaign).trim() || null;
+    }
+    if (req.body?.condition !== undefined) {
+      const c = String(req.body.condition ?? '').trim() || null;
+      updates.condition = ['new', 'used', 'preorder'].includes(c) ? c : null;
+    }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('store_listings')
       .update(updates)
       .eq('id', id)
@@ -523,10 +665,11 @@ router.put('/:id', authMiddleware, sellerGuard, async (req, res) => {
  */
 router.delete('/:id', authMiddleware, sellerGuard, async (req, res) => {
   try {
+    const db = dbSeller(req);
     const { id } = req.params;
     if (!isUuid(id)) return res.status(400).json({ error: 'ID inválido' });
 
-    const { data: existing, error: eErr } = await supabase
+    const { data: existing, error: eErr } = await db
       .from('store_listings')
       .select('id, user_id')
       .eq('id', id)
@@ -536,7 +679,7 @@ router.delete('/:id', authMiddleware, sellerGuard, async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Listado no encontrado' });
     if (existing.user_id !== req.user.id) return res.status(403).json({ error: 'No autorizado' });
 
-    const { error } = await supabase.from('store_listings').delete().eq('id', id);
+    const { error } = await db.from('store_listings').delete().eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
   } catch (e) {
@@ -584,7 +727,7 @@ router.post('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
       return res.status(404).json({ error: `No se encontró ningún usuario con el email: ${email}` });
     }
 
-    const { data: existing } = await supabase
+    const { data: existing } = await adminClient
       .from('seller_profiles')
       .select('user_id')
       .eq('user_id', targetUser.id)
@@ -596,7 +739,7 @@ router.post('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
       });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from('seller_profiles')
       .insert([
         {
@@ -618,13 +761,16 @@ router.post('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
 });
 
 /**
- * GET /admin/sellers — todos los perfiles de vendedor
+ * GET /admin/sellers — todos los perfiles de vendedor (incluye rejection_reason y admin_notes)
  */
 router.get('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const adminDb = requireAdminDb(res);
+    if (!adminDb) return;
+
+    const { data, error } = await adminDb
       .from('seller_profiles')
-      .select('user_id, store_name, store_description, store_url, logo_url, approved, created_at, updated_at')
+      .select('user_id, store_name, store_description, store_url, logo_url, approved, rejection_reason, admin_notes, reviewed_at, reviewed_by, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) return res.status(500).json({ error: error.message });
@@ -636,16 +782,19 @@ router.get('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
 
 /**
  * POST /admin/sellers/:userId/approve — aprobar o rechazar un vendedor
- * body: { approved: true|false }
+ * body: { approved: true|false, rejection_reason?: string, admin_notes?: string }
  */
 router.post('/admin/sellers/:userId/approve', authMiddleware, adminGuard, async (req, res) => {
   try {
+    const adminDb = requireAdminDb(res);
+    if (!adminDb) return;
+
     const { userId } = req.params;
     if (!isUuid(userId)) return res.status(400).json({ error: 'userId inválido' });
 
     const approved = Boolean(req.body?.approved);
 
-    const { data: existing, error: eErr } = await supabase
+    const { data: existing, error: eErr } = await adminDb
       .from('seller_profiles')
       .select('user_id')
       .eq('user_id', userId)
@@ -654,9 +803,25 @@ router.post('/admin/sellers/:userId/approve', authMiddleware, adminGuard, async 
     if (eErr) return res.status(500).json({ error: eErr.message });
     if (!existing) return res.status(404).json({ error: 'Perfil de vendedor no encontrado' });
 
-    const { data, error } = await supabase
+    const updates = {
+      approved,
+      updated_at:  new Date().toISOString(),
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: req.user.id,
+    };
+
+    if (req.body?.rejection_reason !== undefined) {
+      updates.rejection_reason = approved
+        ? null
+        : (String(req.body.rejection_reason ?? '').trim() || null);
+    }
+    if (req.body?.admin_notes !== undefined) {
+      updates.admin_notes = String(req.body.admin_notes ?? '').trim() || null;
+    }
+
+    const { data, error } = await adminDb
       .from('seller_profiles')
-      .update({ approved, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('user_id', userId)
       .select()
       .single();
@@ -673,12 +838,15 @@ router.post('/admin/sellers/:userId/approve', authMiddleware, adminGuard, async 
  */
 router.get('/admin/all', authMiddleware, adminGuard, async (req, res) => {
   try {
+    const adminDb = requireAdminDb(res);
+    if (!adminDb) return;
+
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '50'), 10) || 50));
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const { data, error, count } = await supabase
+    const { data, error, count } = await adminDb
       .from('store_listings')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -690,7 +858,7 @@ router.get('/admin/all', authMiddleware, adminGuard, async (req, res) => {
     const userIds = [...new Set((data || []).map((l) => l.user_id).filter(Boolean))];
     let profilesById = new Map();
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await adminDb
         .from('seller_profiles')
         .select('user_id, store_name')
         .in('user_id', userIds);
@@ -701,7 +869,7 @@ router.get('/admin/all', authMiddleware, adminGuard, async (req, res) => {
     const itemIds = [...new Set((data || []).map((l) => l.catalog_item_id).filter(Boolean))];
     let itemsById = new Map();
     if (itemIds.length > 0) {
-      const { data: items } = await supabase
+      const { data: items } = await supabasePublic
         .from('slot_catalog_items_with_ratings')
         .select('id, reference, manufacturer, model_name')
         .in('id', itemIds);
@@ -732,12 +900,15 @@ router.get('/admin/all', authMiddleware, adminGuard, async (req, res) => {
  */
 router.get('/admin/clicks', authMiddleware, adminGuard, async (req, res) => {
   try {
+    const adminDb = requireAdminDb(res);
+    if (!adminDb) return;
+
     const days = parseInt(String(req.query.days || '30'), 10) || 30;
     const catalogItemId = String(req.query.catalog_item_id || '').trim();
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    let q = supabase
+    let q = adminDb
       .from('store_listing_clicks')
       .select('listing_id, clicked_at')
       .gte('clicked_at', since);
@@ -755,7 +926,7 @@ router.get('/admin/clicks', authMiddleware, adminGuard, async (req, res) => {
     const listingIds = Object.keys(countById);
     if (listingIds.length === 0) return res.json({ stats: [] });
 
-    let lq = supabase
+    let lq = adminDb
       .from('store_listings')
       .select('id, catalog_item_id, user_id, title, url, active')
       .in('id', listingIds);
@@ -773,10 +944,10 @@ router.get('/admin/clicks', authMiddleware, adminGuard, async (req, res) => {
 
     const [profilesRes, itemsRes] = await Promise.all([
       userIds.length > 0
-        ? supabase.from('seller_profiles').select('user_id, store_name').in('user_id', userIds)
+        ? adminDb.from('seller_profiles').select('user_id, store_name').in('user_id', userIds)
         : Promise.resolve({ data: [] }),
       itemIds.length > 0
-        ? supabase
+        ? supabasePublic
             .from('slot_catalog_items_with_ratings')
             .select('id, reference, manufacturer, model_name')
             .in('id', itemIds)
@@ -799,6 +970,80 @@ router.get('/admin/clicks', authMiddleware, adminGuard, async (req, res) => {
     stats.sort((a, b) => b.click_count - a.click_count);
 
     res.json({ stats, days, since });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ----------------------------------------------------------------
+// Rutas de políticas públicas
+// ----------------------------------------------------------------
+
+/**
+ * GET /public/policies/:slug — obtener texto legal por slug (sin auth)
+ */
+router.get('/public/policies/:slug', async (req, res) => {
+  try {
+    const slug = String(req.params.slug || '').trim();
+    if (!slug) return res.status(400).json({ error: 'slug requerido' });
+
+    const { data, error } = await supabasePublic
+      .from('site_policies')
+      .select('slug, title, content_md, updated_at')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data)  return res.status(404).json({ error: 'Política no encontrada' });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /admin/policies — listar todas las políticas (solo admin)
+ */
+router.get('/admin/policies', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const adminDb = requireAdminDb(res);
+    if (!adminDb) return;
+
+    const { data, error } = await adminDb
+      .from('site_policies')
+      .select('slug, title, content_md, updated_at')
+      .order('slug');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ policies: data ?? [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * PUT /admin/policies/:slug — crear o actualizar una política (solo admin)
+ * body: { title?, content_md? }
+ */
+router.put('/admin/policies/:slug', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const adminDb = requireAdminDb(res);
+    if (!adminDb) return;
+
+    const slug = String(req.params.slug || '').trim();
+    if (!slug) return res.status(400).json({ error: 'slug requerido' });
+
+    const updates = { slug, updated_at: new Date().toISOString() };
+    if (req.body?.title !== undefined)      updates.title      = String(req.body.title      ?? '').trim();
+    if (req.body?.content_md !== undefined) updates.content_md = String(req.body.content_md ?? '').trim();
+
+    const { data, error } = await adminDb
+      .from('site_policies')
+      .upsert(updates, { onConflict: 'slug' })
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

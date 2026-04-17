@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
 import PublicCatalogShell from '../components/PublicCatalogShell';
 import CatalogThirdPartyNotice from '../components/CatalogThirdPartyNotice';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Spinner } from '../components/ui/spinner';
 import { Alert, AlertDescription } from '../components/ui/alert';
@@ -16,93 +17,139 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { catalogSlugify } from '../utils/catalogSlug';
-import { applyPublicCatalogListSeo, clearCatalogItemPageSeo } from '../utils/catalogItemSeo';
-import { Package, Star } from 'lucide-react';
+import {
+  applyPublicCatalogListSeo,
+  clearCatalogItemPageSeo,
+} from '../utils/catalogItemSeo';
+import {
+  parseCatalogPath,
+  buildCatalogPath,
+  migrateLegacyQueryToPath,
+} from '../utils/catalogPath';
+import {
+  VEHICLE_TYPE_SLUG_TO_LABEL,
+  TRACTION_SLUG_TO_LABEL,
+  vehicleTypeToSlug,
+  tractionToSlug,
+} from '../utils/catalogFilterSlugs';
+import { Package, Search, Star, X } from 'lucide-react';
 
-const EMPTY = '__all__';
+const EMPTY   = '__all__';
+const PAGE_SIZE = 24;
+
+// Opciones fijas de ordenación
+const SORT_OPTIONS = [
+  { value: 'manufacturer', label: 'Marca / Referencia' },
+  { value: 'year_desc',    label: 'Año (más reciente)' },
+  { value: 'rating_desc',  label: 'Mejor valorado' },
+  { value: 'newest',       label: 'Añadido recientemente' },
+];
+
+function useDebounce(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 function PublicCatalogList() {
+  const params         = useParams();
+  const navigate       = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [items, setItems] = useState([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [facets, setFacets] = useState({ manufacturers: [], vehicle_types: [], years: [] });
 
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
-  const manufacturer = searchParams.get('manufacturer') || '';
-  const vehicleType = searchParams.get('vehicle_type') || '';
-  const year = searchParams.get('year') || '';
+  // --- Parseo del path SEO ---
+  const pathSegments = useMemo(() => {
+    const wildcard = params['*'] || '';
+    return wildcard ? wildcard.split('/').filter(Boolean) : [];
+  }, [params]);
 
-  const manufacturersOptions = useMemo(() => {
-    const s = new Set(facets.manufacturers);
-    if (manufacturer && !s.has(manufacturer)) s.add(manufacturer);
-    return Array.from(s).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [facets.manufacturers, manufacturer]);
+  const pathFilters = useMemo(() => parseCatalogPath(pathSegments), [pathSegments]);
 
-  const vehicleTypesOptions = useMemo(() => {
-    const s = new Set(facets.vehicle_types);
-    if (vehicleType && !s.has(vehicleType)) s.add(vehicleType);
-    return Array.from(s).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [facets.vehicle_types, vehicleType]);
+  // --- Filtros extra (query string) ---
+  const qParam           = searchParams.get('q')              || '';
+  const motorParam       = searchParams.get('motor_position') || '';
+  const discontinuedParam = searchParams.get('discontinued')  || '';
+  const upcomingParam    = searchParams.get('upcoming_release') || '';
+  const yearFromParam    = searchParams.get('year_from')       || '';
+  const yearToParam      = searchParams.get('year_to')         || '';
+  const sortParam        = searchParams.get('sort')            || 'manufacturer';
+  const pageParam        = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
 
-  const yearsOptions = useMemo(() => {
-    const s = new Set((facets.years || []).map((n) => String(n)));
-    if (year && !s.has(year)) s.add(year);
-    return Array.from(s).sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
-  }, [facets.years, year]);
-
-  const setFacetsFilter = (key, value) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (value === '' || value === EMPTY) {
-        next.delete(key);
-      } else {
-        next.set(key, value);
-      }
-      next.set('page', '1');
-      return next;
-    }, { replace: true });
-  };
-
-  const setPage = (p) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (p <= 1) next.delete('page');
-      else next.set('page', String(p));
-      return next;
-    }, { replace: true });
-  };
+  // Texto de búsqueda local (con debounce)
+  const [qInput, setQInput] = useState(qParam);
+  const debouncedQ = useDebounce(qInput, 300);
+  const isFirstQRender = useRef(true);
 
   useEffect(() => {
+    if (isFirstQRender.current) { isFirstQRender.current = false; return; }
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (debouncedQ) next.set('q', debouncedQ); else next.delete('q');
+      next.delete('page');
+      return next;
+    }, { replace: true });
+  }, [debouncedQ]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sincronizar qInput si el parámetro cambia externamente (p. ej. al limpiar filtros)
+  useEffect(() => { setQInput(qParam); }, [qParam]);
+
+  // --- Datos remotos ---
+  const [items,      setItems]      = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total,      setTotal]      = useState(0);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState(null);
+  const [facets,     setFacets]     = useState({ manufacturers: [], vehicle_types: [], tractions: [], motor_positions: [], years: [] });
+  const [brands,     setBrands]     = useState([]); // { id, name, slug, logo_url }[]
+
+  // --- Redirect 301 legacy (query string → path) ---
+  useEffect(() => {
+    const migration = migrateLegacyQueryToPath(searchParams);
+    if (migration) {
+      const qs = migration.cleanSearchParams.toString();
+      navigate(`${migration.path}${qs ? `?${qs}` : ''}`, { replace: true });
+    }
+  }, []); // solo al montar // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cargar facetas y brands una sola vez
+  useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await api.get('/public/catalog/facets');
-        if (!cancelled) setFacets(data);
-      } catch {
-        if (!cancelled) setFacets({ manufacturers: [], vehicle_types: [], years: [] });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    Promise.all([
+      api.get('/public/catalog/facets').then((r) => r.data).catch(() => ({ manufacturers: [], vehicle_types: [], tractions: [], motor_positions: [], years: [] })),
+      api.get('/public/catalog/brands').then((r) => r.data.brands ?? []).catch(() => []),
+    ]).then(([f, b]) => {
+      if (!cancelled) { setFacets(f); setBrands(b); }
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/public/catalog/items', {
-        params: {
-          page,
-          limit: 24,
-          manufacturer: manufacturer || undefined,
-          vehicle_type: vehicleType || undefined,
-          year: year || undefined,
-        },
-      });
+      const apiParams = {
+        page: pageParam,
+        limit: PAGE_SIZE,
+        sort: sortParam !== 'manufacturer' ? sortParam : undefined,
+      };
+
+      // Filtros básicos del path
+      if (pathFilters.manufacturerSlug) apiParams.manufacturer_slug = pathFilters.manufacturerSlug;
+      if (pathFilters.vehicleTypeSlug)  apiParams.vehicle_type      = pathFilters.vehicleTypeSlug;
+      if (pathFilters.tractionSlug)     apiParams.traction          = pathFilters.tractionSlug;
+      if (pathFilters.year)             apiParams.year              = pathFilters.year;
+
+      // Filtros extra del query string
+      if (qParam)             apiParams.q               = qParam;
+      if (motorParam)         apiParams.motor_position  = motorParam;
+      if (discontinuedParam)  apiParams.discontinued    = discontinuedParam;
+      if (upcomingParam)      apiParams.upcoming_release = upcomingParam;
+      if (yearFromParam)      apiParams.year_from       = yearFromParam;
+      if (yearToParam)        apiParams.year_to         = yearToParam;
+
+      const { data } = await api.get('/public/catalog/items', { params: apiParams });
       setItems(data.items ?? []);
       setTotalPages(data.totalPages ?? 1);
       setTotal(data.total ?? 0);
@@ -112,22 +159,102 @@ function PublicCatalogList() {
     } finally {
       setLoading(false);
     }
-  }, [page, manufacturer, vehicleType, year]);
+  }, [pathFilters, qParam, motorParam, discontinuedParam, upcomingParam, yearFromParam, yearToParam, sortParam, pageParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  useEffect(() => { fetchItems(); }, [fetchItems]);
 
+  // SEO
   useEffect(() => {
-    applyPublicCatalogListSeo();
-    return () => {
-      clearCatalogItemPageSeo();
-    };
-  }, []);
+    const mfgBrand = brands.find((b) => b.slug === pathFilters.manufacturerSlug);
+    const mfgName  = mfgBrand?.name ?? pathFilters.manufacturerSlug ?? null;
+    const vtLabel  = pathFilters.vehicleTypeSlug ? (VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug) : null;
+    const trLabel  = pathFilters.tractionSlug    ? (TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug]        ?? pathFilters.tractionSlug)    : null;
+
+    applyPublicCatalogListSeo({
+      manufacturerName: mfgName,
+      vehicleTypeLabel: vtLabel,
+      tractionLabel:    trLabel,
+      year:             pathFilters.year,
+      total,
+      canonicalPath:    buildCatalogPath(pathFilters),
+    });
+    return clearCatalogItemPageSeo;
+  }, [pathFilters, brands, total]);
+
+  // ---- Helpers para cambiar filtros del PATH ----
+  const setPathFilter = useCallback((key, value) => {
+    const next = { ...pathFilters, [key]: value || null };
+    const path = buildCatalogPath(next);
+    const qs   = new URLSearchParams(searchParams);
+    qs.delete('page');
+    navigate(`${path}${qs.toString() ? `?${qs.toString()}` : ''}`, { replace: true });
+  }, [pathFilters, searchParams, navigate]);
+
+  // ---- Helpers para filtros extra (query string) ----
+  const setQsFilter = useCallback((key, value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value && value !== EMPTY) next.set(key, value); else next.delete(key);
+      next.delete('page');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const setPage = useCallback((p) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (p <= 1) next.delete('page'); else next.set('page', String(p));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const clearAllFilters = () => {
+    navigate('/catalogo', { replace: true });
+    setQInput('');
+  };
+
+  // ---- Opciones de los desplegables ----
+  const manufacturerOptions = useMemo(() => brands, [brands]);
+
+  const vehicleTypeOptions = useMemo(() => {
+    const fromFacets = (facets.vehicle_types || []).map((v) => {
+      const n = typeof v === 'string' ? v : v.name;
+      return { slug: vehicleTypeToSlug(n), label: VEHICLE_TYPE_SLUG_TO_LABEL[vehicleTypeToSlug(n)] ?? n };
+    });
+    // Incluir el activo aunque no esté en facetas
+    if (pathFilters.vehicleTypeSlug && !fromFacets.find((o) => o.slug === pathFilters.vehicleTypeSlug)) {
+      fromFacets.push({ slug: pathFilters.vehicleTypeSlug, label: VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug });
+    }
+    return fromFacets;
+  }, [facets.vehicle_types, pathFilters.vehicleTypeSlug]);
+
+  const tractionOptions = useMemo(() => {
+    const fromFacets = (facets.tractions || []).map((t) => {
+      const n = typeof t === 'string' ? t : t.name;
+      return { slug: tractionToSlug(n), label: TRACTION_SLUG_TO_LABEL[tractionToSlug(n)] ?? n };
+    });
+    if (pathFilters.tractionSlug && !fromFacets.find((o) => o.slug === pathFilters.tractionSlug)) {
+      fromFacets.push({ slug: pathFilters.tractionSlug, label: TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug] ?? pathFilters.tractionSlug });
+    }
+    return fromFacets;
+  }, [facets.tractions, pathFilters.tractionSlug]);
+
+  const motorPositionOptions = useMemo(() => {
+    return (facets.motor_positions || []).map((m) => typeof m === 'string' ? m : m.name);
+  }, [facets.motor_positions]);
+
+  const hasActiveFilters = Boolean(
+    pathFilters.manufacturerSlug || pathFilters.vehicleTypeSlug ||
+    pathFilters.tractionSlug     || pathFilters.year            ||
+    qParam || motorParam || discontinuedParam || upcomingParam  ||
+    yearFromParam || yearToParam
+  );
 
   return (
     <PublicCatalogShell>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+        {/* Encabezado */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Package className="size-8 shrink-0" />
@@ -138,75 +265,223 @@ function PublicCatalogList() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-4 items-end">
-          <div className="space-y-2 min-w-[180px]">
-            <Label>Marca</Label>
-            <Select
-              value={manufacturer || EMPTY}
-              onValueChange={(v) => setFacetsFilter('manufacturer', v === EMPTY ? '' : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={EMPTY}>Todas las marcas</SelectItem>
-                {manufacturersOptions.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Panel de filtros */}
+        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+          {/* Búsqueda libre */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={qInput}
+              onChange={(e) => setQInput(e.target.value)}
+              placeholder="Buscar por referencia, modelo o marca…"
+              className="pl-9"
+            />
+            {qInput && (
+              <button
+                type="button"
+                onClick={() => setQInput('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Limpiar búsqueda"
+              >
+                <X className="size-4" />
+              </button>
+            )}
           </div>
-          <div className="space-y-2 min-w-[180px]">
-            <Label>Tipo</Label>
-            <Select
-              value={vehicleType || EMPTY}
-              onValueChange={(v) => setFacetsFilter('vehicle_type', v === EMPTY ? '' : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={EMPTY}>Todos los tipos</SelectItem>
-                {vehicleTypesOptions.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          {/* Filtros básicos (SEO) */}
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* Marca */}
+            <div className="space-y-1.5 min-w-[160px]">
+              <Label>Marca</Label>
+              <Select
+                value={pathFilters.manufacturerSlug || EMPTY}
+                onValueChange={(v) => setPathFilter('manufacturerSlug', v === EMPTY ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas las marcas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY}>Todas las marcas</SelectItem>
+                  {manufacturerOptions.map((b) => (
+                    <SelectItem key={b.slug || b.name} value={b.slug || b.name.toLowerCase()}>
+                      <span className="flex items-center gap-2">
+                        {b.logo_url && (
+                          <img src={b.logo_url} alt="" className="h-4 w-6 object-contain" />
+                        )}
+                        {b.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tipo */}
+            <div className="space-y-1.5 min-w-[140px]">
+              <Label>Tipo</Label>
+              <Select
+                value={pathFilters.vehicleTypeSlug || EMPTY}
+                onValueChange={(v) => setPathFilter('vehicleTypeSlug', v === EMPTY ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY}>Todos los tipos</SelectItem>
+                  {vehicleTypeOptions.map((o) => (
+                    <SelectItem key={o.slug} value={o.slug}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tracción */}
+            <div className="space-y-1.5 min-w-[130px]">
+              <Label>Tracción</Label>
+              <Select
+                value={pathFilters.tractionSlug || EMPTY}
+                onValueChange={(v) => setPathFilter('tractionSlug', v === EMPTY ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY}>Todas</SelectItem>
+                  {tractionOptions.map((o) => (
+                    <SelectItem key={o.slug} value={o.slug}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Año */}
+            <div className="space-y-1.5 w-[110px]">
+              <Label>Año</Label>
+              <Input
+                type="number"
+                min="1900"
+                max="2100"
+                placeholder="2026"
+                value={pathFilters.year ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  const n = v ? parseInt(v, 10) : null;
+                  setPathFilter('year', Number.isFinite(n) && n >= 1900 && n <= 2100 ? n : null);
+                }}
+              />
+            </div>
           </div>
-          <div className="space-y-2 min-w-[140px]">
-            <Label>Año</Label>
-            <Select
-              value={year || EMPTY}
-              onValueChange={(v) => setFacetsFilter('year', v === EMPTY ? '' : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={EMPTY}>Todos los años</SelectItem>
-                {yearsOptions.map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          {/* Filtros extra (query string) */}
+          <details className="group">
+            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground select-none flex items-center gap-1.5">
+              <span className="text-[10px] border rounded px-1 py-0.5 group-open:hidden">+</span>
+              <span className="text-[10px] border rounded px-1 py-0.5 hidden group-open:inline">−</span>
+              Filtros avanzados
+            </summary>
+            <div className="mt-3 flex flex-wrap gap-3 items-end">
+              {/* Motor */}
+              <div className="space-y-1.5 min-w-[150px]">
+                <Label>Posición motor</Label>
+                <Select
+                  value={motorParam || EMPTY}
+                  onValueChange={(v) => setQsFilter('motor_position', v === EMPTY ? '' : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY}>Todas</SelectItem>
+                    {motorPositionOptions.map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Descatalogado */}
+              <div className="space-y-1.5 min-w-[150px]">
+                <Label>Estado</Label>
+                <Select
+                  value={discontinuedParam || upcomingParam ? (discontinuedParam === 'true' ? 'discontinued' : upcomingParam === 'true' ? 'upcoming' : EMPTY) : EMPTY}
+                  onValueChange={(v) => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.delete('discontinued');
+                      next.delete('upcoming_release');
+                      next.delete('page');
+                      if (v === 'discontinued') next.set('discontinued', 'true');
+                      if (v === 'upcoming')     next.set('upcoming_release', 'true');
+                      return next;
+                    }, { replace: true });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY}>Todos</SelectItem>
+                    <SelectItem value="discontinued">Descatalogados</SelectItem>
+                    <SelectItem value="upcoming">Próximos lanzamientos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Rango de años */}
+              <div className="space-y-1.5">
+                <Label>Rango de años</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" min="1900" max="2100" placeholder="Desde"
+                    className="w-24"
+                    value={yearFromParam}
+                    onChange={(e) => setQsFilter('year_from', e.target.value.trim())}
+                  />
+                  <span className="text-muted-foreground text-sm">–</span>
+                  <Input
+                    type="number" min="1900" max="2100" placeholder="Hasta"
+                    className="w-24"
+                    value={yearToParam}
+                    onChange={(e) => setQsFilter('year_to', e.target.value.trim())}
+                  />
+                </div>
+              </div>
+            </div>
+          </details>
+
+          {/* Fila inferior: ordenación + limpiar */}
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs shrink-0">Ordenar por</Label>
+              <Select
+                value={sortParam}
+                onValueChange={(v) => setQsFilter('sort', v === 'manufacturer' ? '' : v)}
+              >
+                <SelectTrigger className="h-8 text-xs w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={clearAllFilters}
+              >
+                <X className="size-3 mr-1" />
+                Limpiar filtros
+              </Button>
+            )}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              setSearchParams({}, { replace: true });
-            }}
-          >
-            Limpiar filtros
-          </Button>
         </div>
 
+        {/* Resultados */}
         {loading ? (
           <div className="flex justify-center py-16">
             <Spinner className="size-8" />
@@ -220,6 +495,7 @@ function PublicCatalogList() {
             <p className="text-sm text-muted-foreground">
               {total === 0 ? 'Sin resultados' : `${total} resultado${total === 1 ? '' : 's'}`}
             </p>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {items.map((row) => {
                 const slug = catalogSlugify(row.model_name || row.reference);
@@ -245,7 +521,16 @@ function PublicCatalogList() {
                         <p className="font-semibold line-clamp-2 group-hover:text-primary transition-colors">
                           {row.model_name}
                         </p>
-                        <p className="text-sm text-muted-foreground">{row.manufacturer}</p>
+                        <div className="flex items-center gap-1.5">
+                          {row.manufacturer_logo_url && (
+                            <img
+                              src={row.manufacturer_logo_url}
+                              alt=""
+                              className="h-4 w-6 object-contain"
+                            />
+                          )}
+                          <p className="text-sm text-muted-foreground">{row.manufacturer}</p>
+                        </div>
                         {row.rating_avg != null && Number(row.rating_count) > 0 && (
                           <p className="text-xs flex items-center gap-1 text-amber-600 dark:text-amber-500">
                             <Star className="size-3.5 shrink-0 fill-current" aria-hidden />
@@ -279,23 +564,13 @@ function PublicCatalogList() {
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                >
+                <Button variant="outline" size="sm" disabled={pageParam <= 1} onClick={() => setPage(pageParam - 1)}>
                   Anterior
                 </Button>
                 <span className="text-sm text-muted-foreground px-2">
-                  Página {page} / {totalPages}
+                  Página {pageParam} / {totalPages}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                >
+                <Button variant="outline" size="sm" disabled={pageParam >= totalPages} onClick={() => setPage(pageParam + 1)}>
                   Siguiente
                 </Button>
               </div>

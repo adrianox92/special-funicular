@@ -85,25 +85,32 @@ const Navbar = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isApprovedSeller, setIsApprovedSeller] = useState(false);
+  /** Solo usuarios con fila en seller_profiles (pendiente, aprobada o rechazada). */
+  const [hasSellerProfile, setHasSellerProfile] = useState(false);
   const navbarRef = useRef(null);
 
   useEffect(() => {
     if (!user) {
-      setIsApprovedSeller(false);
+      setHasSellerProfile(false);
       return undefined;
     }
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       try {
         const { data } = await api.get('/store-listings/my/profile');
-        if (!cancelled) setIsApprovedSeller(Boolean(data?.approved));
+        if (!cancelled) setHasSellerProfile(data != null && typeof data === 'object');
       } catch {
-        if (!cancelled) setIsApprovedSeller(false);
+        if (!cancelled) setHasSellerProfile(false);
       }
-    })();
+    };
+    load();
+    const onSellerProfileChanged = () => {
+      load();
+    };
+    window.addEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
     return () => {
       cancelled = true;
+      window.removeEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
     };
   }, [user]);
 
@@ -145,7 +152,7 @@ const Navbar = () => {
     { path: '/circuits', label: 'Circuitos', icon: Flag },
     { path: '/inventory', label: 'Inventario', icon: Package },
     { path: '/competitions', label: 'Competiciones', icon: Trophy },
-    ...(isApprovedSeller
+    ...(hasSellerProfile
       ? [{ path: '/seller', label: 'Mis listados', icon: Store }]
       : []),
     { path: '/help', label: 'Ayuda', icon: CircleHelp },
@@ -243,7 +250,7 @@ const Navbar = () => {
                       Mi Perfil
                     </Link>
                   </DropdownMenuItem>
-                  {isApprovedSeller && (
+                  {hasSellerProfile && (
                     <DropdownMenuItem asChild>
                       <Link to="/seller" className="flex items-center gap-2 cursor-pointer">
                         <Store className="size-4" />

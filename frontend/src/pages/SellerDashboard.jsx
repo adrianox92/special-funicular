@@ -60,6 +60,8 @@ const emptyListingForm = {
   currency: 'EUR',
   notes: '',
   active: true,
+  custom_utm_campaign: '',
+  condition: '',
 };
 
 // ----------------------------------------------------------------
@@ -67,9 +69,12 @@ const emptyListingForm = {
 // ----------------------------------------------------------------
 function ProfileSection({ profile, onProfileUpdate }) {
   const [form, setForm] = useState({
-    store_name: profile?.store_name ?? '',
-    store_description: profile?.store_description ?? '',
-    store_url: profile?.store_url ?? '',
+    store_name:                profile?.store_name                ?? '',
+    store_description:         profile?.store_description         ?? '',
+    store_url:                 profile?.store_url                 ?? '',
+    default_utm_source:        profile?.default_utm_source        ?? 'slotdb',
+    default_utm_medium:        profile?.default_utm_medium        ?? 'catalog',
+    affiliate_param_template:  profile?.affiliate_param_template  ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
@@ -78,9 +83,12 @@ function ProfileSection({ profile, onProfileUpdate }) {
 
   useEffect(() => {
     setForm({
-      store_name: profile?.store_name ?? '',
-      store_description: profile?.store_description ?? '',
-      store_url: profile?.store_url ?? '',
+      store_name:               profile?.store_name                ?? '',
+      store_description:        profile?.store_description         ?? '',
+      store_url:                profile?.store_url                 ?? '',
+      default_utm_source:       profile?.default_utm_source        ?? 'slotdb',
+      default_utm_medium:       profile?.default_utm_medium        ?? 'catalog',
+      affiliate_param_template: profile?.affiliate_param_template  ?? '',
     });
   }, [profile]);
 
@@ -93,9 +101,12 @@ function ProfileSection({ profile, onProfileUpdate }) {
     setSaving(true);
     try {
       const { data } = await api.put('/store-listings/my/profile', {
-        store_name: form.store_name.trim(),
-        store_description: form.store_description.trim() || null,
-        store_url: form.store_url.trim() || null,
+        store_name:               form.store_name.trim(),
+        store_description:        form.store_description.trim() || null,
+        store_url:                form.store_url.trim() || null,
+        default_utm_source:       form.default_utm_source.trim() || 'slotdb',
+        default_utm_medium:       form.default_utm_medium.trim() || 'catalog',
+        affiliate_param_template: form.affiliate_param_template.trim() || null,
       });
       onProfileUpdate(data);
       toast.success('Perfil actualizado');
@@ -221,6 +232,49 @@ function ProfileSection({ profile, onProfileUpdate }) {
               onChange={(e) => setForm((f) => ({ ...f, store_url: e.target.value }))}
             />
           </div>
+
+          {/* Configuración de tracking UTM/afiliados */}
+          <details className="border rounded-lg p-3 space-y-3">
+            <summary className="cursor-pointer text-sm font-medium select-none">
+              Configuración de tracking y afiliados
+            </summary>
+            <p className="text-xs text-muted-foreground">
+              Estos valores se añaden automáticamente a todos tus enlaces de listado al hacer clic.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="utm_source" className="text-xs">utm_source</Label>
+                <Input
+                  id="utm_source"
+                  value={form.default_utm_source}
+                  placeholder="slotdb"
+                  onChange={(e) => setForm((f) => ({ ...f, default_utm_source: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="utm_medium" className="text-xs">utm_medium</Label>
+                <Input
+                  id="utm_medium"
+                  value={form.default_utm_medium}
+                  placeholder="catalog"
+                  onChange={(e) => setForm((f) => ({ ...f, default_utm_medium: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="affiliate_tpl" className="text-xs">Parámetro de afiliado (opcional)</Label>
+              <Input
+                id="affiliate_tpl"
+                value={form.affiliate_param_template}
+                placeholder="aff=XYZ123  o  tag=mi-tag"
+                onChange={(e) => setForm((f) => ({ ...f, affiliate_param_template: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Formato: <code className="font-mono">clave=valor</code> sin el símbolo <code className="font-mono">?</code>. Solo se añade si la clave no existe ya en la URL.
+              </p>
+            </div>
+          </details>
+
           <Button type="submit" disabled={saving} size="sm">
             {saving ? <Spinner className="size-4 mr-2" /> : null}
             Guardar perfil
@@ -443,6 +497,8 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
               currency: listing.currency ?? 'EUR',
               notes: listing.notes ?? '',
               active: listing.active ?? true,
+              custom_utm_campaign: listing.custom_utm_campaign ?? '',
+              condition: listing.condition ?? '',
             }
           : emptyListingForm,
       );
@@ -466,13 +522,15 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
     setSaving(true);
     try {
       const body = {
-        catalog_item_id: form.catalog_item_id,
-        title: form.title.trim(),
-        url: form.url.trim(),
-        price: form.price !== '' ? parseFloat(form.price) : null,
-        currency: form.currency.trim().toUpperCase() || 'EUR',
-        notes: form.notes.trim() || null,
-        active: form.active,
+        catalog_item_id:     form.catalog_item_id,
+        title:               form.title.trim(),
+        url:                 form.url.trim(),
+        price:               form.price !== '' ? parseFloat(form.price) : null,
+        currency:            form.currency.trim().toUpperCase() || 'EUR',
+        notes:               form.notes.trim() || null,
+        active:              form.active,
+        custom_utm_campaign: form.custom_utm_campaign?.trim() || null,
+        condition:           form.condition || null,
       };
       let data;
       if (isEdit) {
@@ -577,6 +635,36 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
             />
           </div>
+          {/* Condición */}
+          <div className="space-y-2">
+            <Label htmlFor="listing_condition">Condición (opcional)</Label>
+            <select
+              id="listing_condition"
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              value={form.condition}
+              onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))}
+            >
+              <option value="">Sin especificar</option>
+              <option value="new">Nuevo</option>
+              <option value="used">Usado</option>
+              <option value="preorder">Preventa</option>
+            </select>
+          </div>
+
+          {/* UTM campaign personalizada */}
+          <div className="space-y-2">
+            <Label htmlFor="listing_utm">Campaña UTM personalizada (opcional)</Label>
+            <Input
+              id="listing_utm"
+              placeholder="ej: verano-2026"
+              value={form.custom_utm_campaign}
+              onChange={(e) => setForm((f) => ({ ...f, custom_utm_campaign: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Si lo dejas vacío se usará <code className="font-mono">listing_&lt;id&gt;</code> como campaña.
+            </p>
+          </div>
+
           <div className="flex items-center justify-between rounded-lg border px-3 py-2">
             <Label htmlFor="listing_active" className="cursor-pointer">
               Listado activo (visible en el catálogo)
@@ -754,7 +842,10 @@ export default function SellerDashboard() {
   }, [profile, loadListings]);
 
   const handleProfileUpdate = (updated) => setProfile(updated);
-  const handleProfileCreated = (created) => setProfile(created);
+  const handleProfileCreated = (created) => {
+    setProfile(created);
+    window.dispatchEvent(new CustomEvent('slotdb-seller-profile-updated'));
+  };
 
   const openCreate = () => {
     setEditingListing(null);
@@ -840,12 +931,29 @@ export default function SellerDashboard() {
         <RequestAccessSection onCreated={handleProfileCreated} />
       )}
 
-      {/* Perfil pendiente de aprobación */}
+      {/* Perfil pendiente de aprobación o rechazado */}
       {profile && !profile.approved && (
-        <Alert>
+        <Alert variant={profile.rejection_reason ? 'destructive' : 'default'}>
           <AlertDescription>
-            Tu solicitud de alta como vendedor está <strong>pendiente de aprobación</strong>.
-            Recibirás acceso completo una vez que el equipo la revise.
+            {profile.rejection_reason ? (
+              <>
+                Tu solicitud de alta como vendedor ha sido <strong>rechazada</strong>.
+                <br />
+                <span className="mt-1 block text-sm">Motivo: {profile.rejection_reason}</span>
+                <span className="mt-2 block text-sm">
+                  Revisa las{' '}
+                  <a href="/politicas/seller-terms" className="underline" target="_blank" rel="noopener noreferrer">
+                    condiciones para vendedores
+                  </a>{' '}
+                  y contacta con el equipo si crees que es un error.
+                </span>
+              </>
+            ) : (
+              <>
+                Tu solicitud de alta como vendedor está <strong>pendiente de aprobación</strong>.
+                Recibirás acceso completo una vez que el equipo la revise.
+              </>
+            )}
           </AlertDescription>
         </Alert>
       )}

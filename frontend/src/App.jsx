@@ -35,6 +35,7 @@ import PublicCatalogList from './pages/PublicCatalogList';
 import PublicCatalogDetail from './pages/PublicCatalogDetail';
 import CatalogMySuggestions from './pages/CatalogMySuggestions';
 import ProposeCatalogInsert from './pages/ProposeCatalogInsert';
+import PoliciesPage from './pages/PoliciesPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useCookieConsent } from './context/CookieConsentContext';
 import CookieBanner from './components/CookieBanner';
@@ -79,6 +80,7 @@ const AppContent = () => {
     '/terminos',
     '/contacto',
     '/catalogo',
+    '/politicas',
   ];
   const hasNavbar = user && !noNavbarRoutes.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
 
@@ -125,14 +127,17 @@ const AppContent = () => {
         <Route path="/privacidad" element={<PrivacyPolicy />} />
         <Route path="/terminos" element={<TermsOfService />} />
         <Route path="/contacto" element={<Contact />} />
+        <Route path="/politicas/:slug" element={<PoliciesPage />} />
         <Route path="/slot-race-manager" element={<SlotRaceManagerPage />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
         <Route path="/piloto/:slug" element={<PublicPilotProfile />} />
+        {/* Fichas de catálogo: tienen UUID como primer segmento → deben ir ANTES del wildcard */}
         <Route path="/catalogo/:id/:slug" element={<PublicCatalogDetail />} />
         <Route path="/catalogo/:id" element={<PublicCatalogDetail />} />
-        <Route path="/catalogo" element={<PublicCatalogList />} />
+        {/* Listado con rutas SEO: /catalogo, /catalogo/scalextric, /catalogo/scalextric/rally/2026, etc. */}
+        <Route path="/catalogo/*" element={<PublicCatalogList />} />
 
         <Route
           path="/mis-sugerencias-catalogo"

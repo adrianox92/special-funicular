@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
@@ -253,6 +254,7 @@ function AdminSlotCatalog() {
   // Tiendas
   const [sellers, setSellers] = useState([]);
   const [sellersLoading, setSellersLoading] = useState(false);
+  const [sellersFetchError, setSellersFetchError] = useState(null);
   const [clickStats, setClickStats] = useState([]);
   const [clickStatsLoading, setClickStatsLoading] = useState(false);
   const [clickStatsDays, setClickStatsDays] = useState(30);
@@ -260,6 +262,17 @@ function AdminSlotCatalog() {
   const [createSellerOpen, setCreateSellerOpen] = useState(false);
   const [createSellerForm, setCreateSellerForm] = useState({ email: '', store_name: '', store_description: '', store_url: '' });
   const [createSellerSaving, setCreateSellerSaving] = useState(false);
+  // Diálogo de moderación (rechazo con motivo + notas admin)
+  const [moderationDialogOpen, setModerationDialogOpen] = useState(false);
+  const [moderationTarget, setModerationTarget] = useState(null); // { userId, action: 'approve'|'reject' }
+  const [moderationForm, setModerationForm] = useState({ rejection_reason: '', admin_notes: '' });
+  // Políticas
+  const [policies, setPolicies] = useState([]);
+  const [policiesLoading, setPoliciesLoading] = useState(false);
+  const [policyDialogOpen, setPolicyDialogOpen] = useState(false);
+  const [policyEditSlug, setPolicyEditSlug] = useState('');
+  const [policyForm, setPolicyForm] = useState({ title: '', content_md: '' });
+  const [policySaving, setPolicySaving] = useState(false);
 
   const [brandsAdmin, setBrandsAdmin] = useState([]);
   const [brandsTabLoading, setBrandsTabLoading] = useState(false);
@@ -354,11 +367,16 @@ function AdminSlotCatalog() {
 
   const fetchSellers = useCallback(async () => {
     setSellersLoading(true);
+    setSellersFetchError(null);
     try {
       const { data } = await api.get('/store-listings/admin/sellers');
       setSellers(data.sellers ?? []);
-    } catch {
+    } catch (err) {
       setSellers([]);
+      const msg =
+        err.response?.data?.error || err.message || 'No se pudieron cargar los perfiles de vendedor';
+      setSellersFetchError(msg);
+      toast.error(msg);
     } finally {
       setSellersLoading(false);
     }
@@ -377,17 +395,77 @@ function AdminSlotCatalog() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const approveSeller = async (userId, approved) => {
+  const openModerationDialog = (userId, action) => {
+    const seller = sellers.find((s) => s.user_id === userId);
+    setModerationTarget({ userId, action });
+    setModerationForm({
+      rejection_reason: action === 'reject' ? (seller?.rejection_reason ?? '') : '',
+      admin_notes: seller?.admin_notes ?? '',
+    });
+    setModerationDialogOpen(true);
+  };
+
+  const submitModeration = async () => {
+    if (!moderationTarget) return;
+    const { userId, action } = moderationTarget;
+    const approved = action === 'approve';
     setSellerApproving(userId);
     try {
-      await api.post(`/store-listings/admin/sellers/${userId}/approve`, { approved });
+      const payload = {
+        approved,
+        admin_notes: moderationForm.admin_notes.trim() || null,
+      };
+      if (!approved) {
+        payload.rejection_reason = moderationForm.rejection_reason.trim() || null;
+      }
+      const { data } = await api.post(`/store-listings/admin/sellers/${userId}/approve`, payload);
       setSellers((prev) =>
-        prev.map((s) => (s.user_id === userId ? { ...s, approved } : s)),
+        prev.map((s) => (s.user_id === userId ? { ...s, ...data } : s)),
       );
+      setModerationDialogOpen(false);
+      setModerationTarget(null);
     } catch (err) {
       alert(err.response?.data?.error || 'Error al actualizar el vendedor');
     } finally {
       setSellerApproving(null);
+    }
+  };
+
+  const fetchPolicies = useCallback(async () => {
+    setPoliciesLoading(true);
+    try {
+      const { data } = await api.get('/store-listings/admin/policies');
+      setPolicies(data.policies ?? []);
+    } catch {
+      setPolicies([]);
+    } finally {
+      setPoliciesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin || tab !== 'stores') return;
+    fetchSellers();
+    fetchClickStats(clickStatsDays);
+    fetchPolicies();
+  }, [isAdmin, tab, fetchSellers, fetchClickStats, fetchPolicies, clickStatsDays]);
+
+  const openPolicyEdit = (policy) => {
+    setPolicyEditSlug(policy.slug);
+    setPolicyForm({ title: policy.title ?? '', content_md: policy.content_md ?? '' });
+    setPolicyDialogOpen(true);
+  };
+
+  const savePolicy = async () => {
+    setPolicySaving(true);
+    try {
+      const { data } = await api.put(`/store-listings/admin/policies/${policyEditSlug}`, policyForm);
+      setPolicies((prev) => prev.map((p) => (p.slug === policyEditSlug ? data : p)));
+      setPolicyDialogOpen(false);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al guardar la política');
+    } finally {
+      setPolicySaving(false);
     }
   };
 
@@ -685,13 +763,7 @@ function AdminSlotCatalog() {
             <GitPullRequest className="size-4 mr-1 inline" />
             Colas ({chgReq.length + insReq.length})
           </TabsTrigger>
-          <TabsTrigger
-            value="stores"
-            onClick={() => {
-              if (sellers.length === 0) fetchSellers();
-              if (clickStats.length === 0) fetchClickStats(clickStatsDays);
-            }}
-          >
+          <TabsTrigger value="stores">
             <Store className="size-4 mr-1 inline" />
             Tiendas
           </TabsTrigger>
@@ -1330,9 +1402,19 @@ function AdminSlotCatalog() {
                   <Spinner className="size-5" />
                 </div>
               ) : sellers.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No hay solicitudes de vendedor aún.
-                </p>
+                <div className="py-8 px-4 space-y-3">
+                  {sellersFetchError ? (
+                    <Alert variant="destructive">
+                      <AlertDescription className="text-sm">{sellersFetchError}</AlertDescription>
+                    </Alert>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center">
+                      No hay perfiles de tienda registrados. Si esperabas ver tiendas aprobadas, revisa que el
+                      backend tenga <code className="text-xs">SUPABASE_SERVICE_ROLE_KEY</code> y que la migración{' '}
+                      <code className="text-xs">20260420120000_catalog_pro</code> esté aplicada en Supabase.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -1340,7 +1422,8 @@ function AdminSlotCatalog() {
                       <TableRow>
                         <TableHead>Tienda</TableHead>
                         <TableHead>URL</TableHead>
-                        <TableHead className="text-center">Estado</TableHead>
+                          <TableHead className="text-center">Estado</TableHead>
+                          <TableHead className="hidden md:table-cell">Notas admin</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1367,6 +1450,11 @@ function AdminSlotCatalog() {
                                     {s.store_description}
                                   </p>
                                 )}
+                                {s.rejection_reason && !s.approved && (
+                                  <p className="text-xs text-destructive mt-0.5 truncate max-w-[16rem]">
+                                    Motivo: {s.rejection_reason}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </TableCell>
@@ -1388,11 +1476,16 @@ function AdminSlotCatalog() {
                           <TableCell className="text-center">
                             {s.approved ? (
                               <Badge variant="default" className="text-xs">Aprobado</Badge>
+                            ) : s.reviewed_at ? (
+                              <Badge variant="destructive" className="text-xs">Rechazado</Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs text-muted-foreground">
                                 Pendiente
                               </Badge>
                             )}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-[14rem]">
+                            <span className="line-clamp-2">{s.admin_notes || '—'}</span>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -1400,7 +1493,7 @@ function AdminSlotCatalog() {
                                 <Button
                                   size="sm"
                                   disabled={sellerApproving === s.user_id}
-                                  onClick={() => approveSeller(s.user_id, true)}
+                                  onClick={() => openModerationDialog(s.user_id, 'approve')}
                                 >
                                   <CheckCircle2 className="size-3.5 mr-1.5" />
                                   Aprobar
@@ -1410,7 +1503,7 @@ function AdminSlotCatalog() {
                                   size="sm"
                                   variant="outline"
                                   disabled={sellerApproving === s.user_id}
-                                  onClick={() => approveSeller(s.user_id, false)}
+                                  onClick={() => openModerationDialog(s.user_id, 'reject')}
                                 >
                                   <XCircle className="size-3.5 mr-1.5" />
                                   Revocar
@@ -1533,8 +1626,135 @@ function AdminSlotCatalog() {
               )}
             </CardContent>
           </Card>
+          {/* Políticas públicas */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base">Textos legales (políticas)</CardTitle>
+                <Button variant="outline" size="sm" onClick={fetchPolicies} disabled={policiesLoading}>
+                  {policiesLoading ? 'Cargando…' : 'Actualizar'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {policiesLoading ? (
+                <div className="flex justify-center py-8"><Spinner className="size-5" /></div>
+              ) : policies.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin políticas.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Slug</TableHead>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Última actualización</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {policies.map((p) => (
+                        <TableRow key={p.slug}>
+                          <TableCell className="font-mono text-xs">{p.slug}</TableCell>
+                          <TableCell className="text-sm">{p.title || '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {p.updated_at ? new Date(p.updated_at).toLocaleString('es-ES') : '—'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" onClick={() => openPolicyEdit(p)}>
+                              Editar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
         </TabsContent>
       </Tabs>
+
+      {/* Diálogo: moderación de vendedor (aprobar/rechazar con motivo) */}
+      <Dialog open={moderationDialogOpen} onOpenChange={setModerationDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {moderationTarget?.action === 'approve' ? 'Aprobar tienda' : 'Rechazar / revocar tienda'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {moderationTarget?.action === 'reject' && (
+              <div className="space-y-2">
+                <Label htmlFor="mod_reason">Motivo de rechazo (visible para el vendedor)</Label>
+                <Input
+                  id="mod_reason"
+                  placeholder="Describe el motivo brevemente…"
+                  value={moderationForm.rejection_reason}
+                  onChange={(e) => setModerationForm((f) => ({ ...f, rejection_reason: e.target.value }))}
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="mod_notes">Notas internas (solo admin)</Label>
+              <Input
+                id="mod_notes"
+                placeholder="Notas privadas sobre esta tienda…"
+                value={moderationForm.admin_notes}
+                onChange={(e) => setModerationForm((f) => ({ ...f, admin_notes: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModerationDialogOpen(false)}>Cancelar</Button>
+            <Button
+              variant={moderationTarget?.action === 'reject' ? 'destructive' : 'default'}
+              disabled={sellerApproving === moderationTarget?.userId}
+              onClick={submitModeration}
+            >
+              {sellerApproving === moderationTarget?.userId ? <Spinner className="size-4 mr-2" /> : null}
+              {moderationTarget?.action === 'approve' ? 'Aprobar' : 'Rechazar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: editar política */}
+      <Dialog open={policyDialogOpen} onOpenChange={setPolicyDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar política: <code className="font-mono text-sm">{policyEditSlug}</code></DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="pol_title">Título</Label>
+              <Input
+                id="pol_title"
+                value={policyForm.title}
+                onChange={(e) => setPolicyForm((f) => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pol_content">Contenido (Markdown)</Label>
+              <textarea
+                id="pol_content"
+                className="flex min-h-[200px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={policyForm.content_md}
+                onChange={(e) => setPolicyForm((f) => ({ ...f, content_md: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPolicyDialogOpen(false)}>Cancelar</Button>
+            <Button disabled={policySaving} onClick={savePolicy}>
+              {policySaving ? <Spinner className="size-4 mr-2" /> : null}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo: crear tienda (admin) */}
       <Dialog open={createSellerOpen} onOpenChange={setCreateSellerOpen}>
