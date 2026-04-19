@@ -607,12 +607,6 @@ const TimingsList = () => {
             <div><strong>Total de registros:</strong> {timings.length}</div>
             <div><strong>Combinaciones únicas:</strong> {Object.keys(groupedTimings).length}</div>
             <div><strong>Circuitos únicos:</strong> {Object.keys(circuitRankings).length}</div>
-            <div className="text-right">
-              <strong>Con configuración técnica:</strong> {timings.filter(t => t.setup_snapshot).length}
-              <span className="text-muted-foreground ml-2">
-                ({((timings.filter(t => t.setup_snapshot).length / timings.length) * 100).toFixed(1)}%)
-              </span>
-            </div>
           </div>
         </div>
       )}

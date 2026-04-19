@@ -24,7 +24,6 @@ import {
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import api from '../lib/axios';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import {
   DropdownMenu,
@@ -145,6 +144,10 @@ const Navbar = () => {
 
   const showLicenseAdmin = isLicenseAdminUser(user);
 
+  const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
+    theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
+  }`;
+
   const navItems = [
     { path: '/dashboard', label: 'Inicio', icon: Home },
     { path: '/vehicles', label: 'Vehículos', icon: Car },
@@ -191,11 +194,15 @@ const Navbar = () => {
             e.preventDefault();
             navigate(user ? '/dashboard' : '/');
           }}
-          className="flex shrink-0 items-center gap-2"
+          className="flex shrink-0 items-center"
         >
-          <Trophy className="size-6 text-primary" />
-          <span className="font-bold text-lg">Slot</span>
-          <Badge variant="secondary" className="text-xs">Pro</Badge>
+          <img
+            key={headerLogoSrc}
+            src={headerLogoSrc}
+            alt="Slot Database"
+            className="h-9 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:max-w-[16rem]"
+            decoding="async"
+          />
         </Link>
 
         <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex">

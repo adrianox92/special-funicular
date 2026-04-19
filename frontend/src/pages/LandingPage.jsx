@@ -236,6 +236,14 @@ const FeatureSection = ({ block }) => {
 const LandingPage = () => {
   const { theme, toggleTheme } = useTheme();
 
+  const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
+    theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
+  }`;
+
+  const heroLogoSrc = `${process.env.PUBLIC_URL || ''}/${
+    theme === 'dark' ? 'logo-hero-dark.png' : 'logo-hero-light.png'
+  }`;
+
   React.useEffect(() => {
     applyLandingPageSeo();
   }, []);
@@ -247,12 +255,14 @@ const LandingPage = () => {
         role="banner"
       >
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link
-            to="/"
-            className="text-lg font-bold tracking-tight"
-            aria-label="Slot Collection Pro, inicio"
-          >
-            <span className="font-bold text-foreground">Slot Collection Pro</span>
+          <Link to="/" className="flex shrink-0 items-center">
+            <img
+              key={headerLogoSrc}
+              src={headerLogoSrc}
+              alt="Slot Database"
+              className="h-9 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:max-w-[16rem]"
+              decoding="async"
+            />
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
@@ -298,7 +308,15 @@ const LandingPage = () => {
               id="landing-hero-heading"
               className="text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl"
             >
-              <span className="text-foreground">Slot Collection Pro</span>
+              <span className="block">
+                <img
+                  key={heroLogoSrc}
+                  src={heroLogoSrc}
+                  alt="Slot Database"
+                  className="mx-auto h-auto w-full min-w-[250px] max-w-[min(100%,36rem)] object-contain object-center lg:mx-0 lg:object-left"
+                  decoding="async"
+                />
+              </span>
               <span className="mt-3 block text-2xl font-bold tracking-tight text-foreground md:text-3xl lg:text-4xl">
                 Tu base de datos de slot: Coches, recambios, reglajes y más
               </span>
