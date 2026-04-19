@@ -8,6 +8,7 @@ const { formatSecondsToLapTime } = require('../lib/timingUtils');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const csvTimingParse = require('../lib/csvTimingParse');
 const smartraceCsv = require('../lib/smartraceCsvImport');
+const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -441,16 +442,9 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Error al obtener los tiempos' });
     }
 
-    // Obtener qué timings tienen vueltas individuales (una sola query bulk)
+    // Qué timings tienen vueltas en timing_laps (paginado: evita límite 1000 filas de PostgREST)
     const allTimingIds = timings.map(t => t.id).filter(Boolean);
-    const timingsWithLapsSet = new Set();
-    if (allTimingIds.length > 0) {
-      const { data: lapsData } = await supabase
-        .from('timing_laps')
-        .select('timing_id')
-        .in('timing_id', allTimingIds);
-      (lapsData || []).forEach(l => timingsWithLapsSet.add(l.timing_id));
-    }
+    const timingsWithLapsSet = await fetchTimingIdsWithLaps(supabase, allTimingIds);
 
     // Enriquecer los tiempos con la información del vehículo y posiciones
     let enrichedTimings = timings.map(timing => ({

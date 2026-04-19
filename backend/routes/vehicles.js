@@ -18,6 +18,7 @@ const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicl
 const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFromComponent');
 const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/inventoryStockOps');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
+const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -1250,16 +1251,9 @@ router.get('/:id/timings', async (req, res) => {
       return res.status(500).json({ error: timingsError.message });
     }
 
-    // Enriquecer con has_laps (vueltas individuales en timing_laps)
+    // Enriquecer con has_laps (paginado: evita límite 1000 filas de PostgREST)
     const timingIds = (timings || []).map(t => t.id).filter(Boolean);
-    const timingsWithLapsSet = new Set();
-    if (timingIds.length > 0) {
-      const { data: lapsData } = await supabase
-        .from('timing_laps')
-        .select('timing_id')
-        .in('timing_id', timingIds);
-      (lapsData || []).forEach(l => timingsWithLapsSet.add(l.timing_id));
-    }
+    const timingsWithLapsSet = await fetchTimingIdsWithLaps(supabase, timingIds);
     const enrichedTimings = (timings || []).map(t => ({
       ...t,
       has_laps: timingsWithLapsSet.has(t.id),
