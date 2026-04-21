@@ -395,7 +395,7 @@ competition_categories (id, competition_id, name)
 competition_rules (id, competition_id, rule_type, description, points_structure)
 
 -- Inscripciones públicas
-competition_signups (id, competition_id, name, email, category_id, vehicle)
+competition_signups (id, competition_id, name, email, category_id, vehicle, vehicle_id)
 
 -- Participantes oficiales
 competition_participants (id, competition_id, driver_name, vehicle_id, vehicle_model, category_id)

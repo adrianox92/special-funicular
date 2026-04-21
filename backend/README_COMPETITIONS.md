@@ -118,6 +118,85 @@ Eliminar un participante
 #### `GET /api/competitions/vehicles`
 Obtener vehículos del usuario para seleccionar en competiciones
 
+### Inscripciones de miembros (JWT)
+
+#### `POST /api/competitions/:id/signups`
+
+Un usuario autenticado (típicamente miembro del club) solicita plaza en una
+competición. El cuerpo admite uno u otro campo para el vehículo:
+
+```json
+{
+  "category_id": "uuid-categoría",
+  "vehicle_id": "uuid-vehículo-del-miembro",   // vehículo de SU colección
+  "name": "Nombre opcional"
+}
+```
+
+o bien:
+
+```json
+{
+  "category_id": "uuid-categoría",
+  "vehicle": "Modelo escrito a mano",
+  "name": "Nombre opcional"
+}
+```
+
+Si se envía `vehicle_id`, el backend verifica que pertenece al usuario
+autenticado. Si no se envía `vehicle`, se genera automáticamente un texto
+descriptivo con el fabricante/modelo del vehículo seleccionado.
+
+#### `POST /api/competitions/:id/signups/:signupId/approve`
+
+Convierte la solicitud en participante oficial. Prioridad del vehículo asignado:
+
+1. `vehicle_id` explícito enviado por el organizador (sustituye la elección del miembro).
+2. `vehicle_model` explícito enviado por el organizador (texto libre).
+3. `signup.vehicle_id` si el miembro había elegido uno de su colección.
+4. `signup.vehicle` (texto libre introducido por el miembro).
+
+El organizador no necesita asignar un vehículo de su propia colección cuando el
+miembro ya ha elegido uno: basta con llamar al endpoint sin cuerpo.
+
+### Clubes (JWT `Authorization: Bearer …`)
+
+Base: `/api/clubs`. Requiere el mismo middleware de usuario que el resto de la API.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/clubs` | Crear club (`name`, opcional `license_installations_max`) |
+| `GET` | `/api/clubs/mine` | Lista de clubs del usuario (propietario o miembro) |
+| `GET` | `/api/clubs/:id` | Detalle (solo miembros) |
+| `GET` | `/api/clubs/:id/members` | Miembros |
+| `POST` | `/api/clubs/:id/invite` | Invitación (`expires_in_days` opcional); respuesta incluye `join_url` |
+| `POST` | `/api/clubs/join/:token` | Unirse con token |
+| `DELETE` | `/api/clubs/:id/members/:userId` | Abandonar (`userId` = yo) o expulsar (admin) |
+
+Al crear o editar competición en la web se puede enviar `club_id` opcional (organizador debe ser miembro).
+
+### Sincronización de competiciones (API key `X-API-Key`)
+
+Montado bajo **`/api/sync`** junto al resto de sync; el middleware resuelve `req.user` desde la clave de sincronización.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/sync/competitions` | Competiciones del usuario (organizador) y de sus clubs |
+| `GET` | `/api/sync/competitions/:id` | Detalle: participantes, categorías, reglas, timings |
+| `POST` | `/api/sync/competitions` | Crear competición con UUID opcional `id`, `club_id`, `circuit_id`, etc. |
+| `PUT` | `/api/sync/competitions/:id` | Parche metadatos / `external_status` (`DRAFT`/`RUNNING`/`FINISHED`); conflicto si `updated_at` cliente &lt; servidor |
+| `POST` | `/api/sync/competitions/:id/participants` | `{ "participants": [{ "id"?, "driver_name", "vehicle_id"?, "vehicle_model"? }] }` |
+| `POST` | `/api/sync/competitions/:id/timings` | `{ "timings": [{ "participant_id", "round_number", "best_lap_time", "total_time", "laps", … }] }` formato `mm:ss.mmm`; *media* derivada de `total_time` y `laps` |
+
+**Mapeo rondas (web) ↔ mangas (Slot Race Manager)** — ver también comentario en el cliente `ds200-manager` `src/core/syncService.js`:
+
+- **Simultáneo:** suele usarse **1 manga = 1 ronda** (`heat_number` → `round_number`).
+- **Rally:** muchas mangas (pilotos × carriles); `competitions.rounds` en la web debe ser coherente con el plan de mangas; si `round_number` supera `rounds`, la API rechaza el timing.
+
+### Licencia modo club
+
+`POST /api/license/register` acepta `club_id` opcional: el cupo de instalaciones activas usa `clubs.license_installations_max` y filtra filas en `app_installations` por ese club. Ver `backend/routes/license.js`.
+
 ##  Validaciones
 
 ### Crear Competición

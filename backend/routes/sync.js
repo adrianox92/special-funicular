@@ -168,4 +168,7 @@ router.post('/timings', async (req, res) => {
   }
 });
 
+const syncCompetitionsRoute = require('./syncCompetitions');
+router.use(syncCompetitionsRoute);
+
 module.exports = router;

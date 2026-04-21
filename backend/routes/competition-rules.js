@@ -1,6 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/auth');
+const { requireViewCompetition } = require('../lib/competitionPermissions');
 
 const router = express.Router();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -98,17 +99,8 @@ router.get('/competition/:competitionId', async (req, res) => {
   try {
     const { competitionId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, competitionId);
+    if (!access.ok) return access.respond(res);
 
     const { data, error } = await supabase
       .from('competition_rules')

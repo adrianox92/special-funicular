@@ -20,6 +20,7 @@ import {
   Search,
   Database,
   Store,
+  Building2,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import api from '../lib/axios';
@@ -155,6 +156,7 @@ const Navbar = () => {
     { path: '/circuits', label: 'Circuitos', icon: Flag },
     { path: '/inventory', label: 'Inventario', icon: Package },
     { path: '/competitions', label: 'Competiciones', icon: Trophy },
+    { path: '/clubs', label: 'Clubes', icon: Building2 },
     ...(hasSellerProfile
       ? [{ path: '/seller', label: 'Mis listados', icon: Store }]
       : []),

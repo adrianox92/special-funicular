@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -81,6 +82,7 @@ function averageTimeFromTotalAndLaps(totalTimeStr, lapsStr) {
 const CompetitionTimings = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [competition, setCompetition] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -117,6 +119,11 @@ const CompetitionTimings = () => {
   const [deleteTimingConfirm, setDeleteTimingConfirm] = useState({ open: false, timingId: null });
 
   // Memo: Mapa de participantes por ID
+  const isOrganizer = useMemo(
+    () => Boolean(user?.id && competition?.organizer === user.id),
+    [user?.id, competition?.organizer],
+  );
+
   const participantsMap = useMemo(() => {
     const map = {};
     participants.forEach((p) => {
@@ -570,6 +577,7 @@ const CompetitionTimings = () => {
 
   // Verificar que la competición tenga al menos un participante antes de permitir gestionar tiempos
   if (competition && participants.length === 0) {
+    const showOrganizerEmptyActions = isOrganizer;
     return (
       <div className="mt-4 max-w-4xl mx-auto space-y-4">
         <div className="flex items-center gap-3 mb-4">
@@ -591,8 +599,9 @@ const CompetitionTimings = () => {
           <AlertTitle className="text-lg">Sin Participantes</AlertTitle>
           <AlertDescription>
             <p className="mb-3">
-              No puedes gestionar tiempos hasta que haya al menos un participante
-              registrado.
+              {showOrganizerEmptyActions
+                ? 'No puedes gestionar tiempos hasta que haya al menos un participante registrado.'
+                : 'Aún no hay participantes confirmados en esta competición.'}
             </p>
             <div className="flex items-center justify-center gap-2 mb-3">
               <Badge
@@ -602,16 +611,20 @@ const CompetitionTimings = () => {
                 {participants.length}/{competition.num_slots} participantes
               </Badge>
               <span className="text-muted-foreground">
-                Añade al menos un participante para comenzar
+                {showOrganizerEmptyActions
+                  ? 'Añade al menos un participante para comenzar'
+                  : 'Consulta de nuevo cuando el organizador confirme la lista'}
               </span>
             </div>
-            <Button
-              onClick={() => navigate(`/competitions/${id}/participants`)}
-              className="flex items-center gap-2"
-            >
-              <Users className="size-4" />
-              Añadir Participantes
-            </Button>
+            {showOrganizerEmptyActions && (
+              <Button
+                onClick={() => navigate(`/competitions/${id}/participants`)}
+                className="flex items-center gap-2"
+              >
+                <Users className="size-4" />
+                Añadir Participantes
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       </div>
@@ -675,23 +688,25 @@ const CompetitionTimings = () => {
                   </Button>
                 </>
               )}
-              <Button
-                onClick={() => handleShowModal()}
-                className="flex items-center gap-2"
-                disabled={
-                  participants.length === 0 || isCompetitionComplete()
-                }
-              >
-                <Plus className="size-4" />
-                {isCompetitionComplete()
-                  ? 'Competición Completada'
-                  : 'Registrar Tiempo'}
-                {participants.length > 0 && !isCompetitionComplete() && (
-                  <Badge variant="secondary" className="ml-2">
-                    {participants.length} participantes
-                  </Badge>
-                )}
-              </Button>
+              {isOrganizer && (
+                <Button
+                  onClick={() => handleShowModal()}
+                  className="flex items-center gap-2"
+                  disabled={
+                    participants.length === 0 || isCompetitionComplete()
+                  }
+                >
+                  <Plus className="size-4" />
+                  {isCompetitionComplete()
+                    ? 'Competición Completada'
+                    : 'Registrar Tiempo'}
+                  {participants.length > 0 && !isCompetitionComplete() && (
+                    <Badge variant="secondary" className="ml-2">
+                      {participants.length} participantes
+                    </Badge>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -858,9 +873,11 @@ const CompetitionTimings = () => {
                                   <TableHead className="text-center w-[75px]">
                                     Vuelta
                                   </TableHead>
-                                  <TableHead className="text-center w-[74px]">
-                                    Penal.
-                                  </TableHead>
+                                  {isOrganizer && (
+                                    <TableHead className="text-center w-[74px]">
+                                      Penal.
+                                    </TableHead>
+                                  )}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -961,19 +978,21 @@ const CompetitionTimings = () => {
                                           </Badge>
                                         )}
                                       </TableCell>
-                                      <TableCell className="text-center p-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          title="Editar penalización"
-                                          onClick={() =>
-                                            handleOpenPenaltyModal(timing)
-                                          }
-                                          className="text-amber-600 hover:text-amber-700 p-0 h-auto"
-                                        >
-                                          <Pen className="size-4" />
-                                        </Button>
-                                      </TableCell>
+                                      {isOrganizer && (
+                                        <TableCell className="text-center p-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title="Editar penalización"
+                                            onClick={() =>
+                                              handleOpenPenaltyModal(timing)
+                                            }
+                                            className="text-amber-600 hover:text-amber-700 p-0 h-auto"
+                                          >
+                                            <Pen className="size-4" />
+                                          </Button>
+                                        </TableCell>
+                                      )}
                                     </TableRow>
                                   );
                                 })}
@@ -990,7 +1009,7 @@ const CompetitionTimings = () => {
                                   <TableHead>Dif</TableHead>
                                   <TableHead>Vuelta</TableHead>
                                   <TableHead>V</TableHead>
-                                  <TableHead>Penal.</TableHead>
+                                  {isOrganizer && <TableHead>Penal.</TableHead>}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -1094,19 +1113,21 @@ const CompetitionTimings = () => {
                                       <TableCell className="text-center p-1 text-sm">
                                         {timing.laps}
                                       </TableCell>
-                                      <TableCell className="text-center p-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          title="Editar penalización"
-                                          onClick={() =>
-                                            handleOpenPenaltyModal(timing)
-                                          }
-                                          className="text-amber-600 hover:text-amber-700 p-0 h-auto"
-                                        >
-                                          <Pen className="size-4" />
-                                        </Button>
-                                      </TableCell>
+                                      {isOrganizer && (
+                                        <TableCell className="text-center p-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title="Editar penalización"
+                                            onClick={() =>
+                                              handleOpenPenaltyModal(timing)
+                                            }
+                                            className="text-amber-600 hover:text-amber-700 p-0 h-auto"
+                                          >
+                                            <Pen className="size-4" />
+                                          </Button>
+                                        </TableCell>
+                                      )}
                                     </TableRow>
                                   );
                                 })}

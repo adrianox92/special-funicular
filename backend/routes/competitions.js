@@ -7,6 +7,12 @@ const { handleValidationErrors } = require('../middleware/validateRequest');
 const { v4: uuidv4 } = require('uuid');
 const { calculatePoints } = require('../lib/pointsCalculator');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
+const { deriveCompetitionAverageFromTotalAndLaps } = require('../lib/competitionTimingDerivation');
+const {
+  canViewCompetition,
+  requireViewCompetition,
+  requireManageCompetition,
+} = require('../lib/competitionPermissions');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -142,12 +148,31 @@ const competitionCreateValidators = [
     .optional({ values: 'falsy' })
     .isUUID()
     .withMessage('circuit_id inválido'),
+  body('club_id').optional({ values: 'falsy' }).isUUID().withMessage('club_id inválido'),
 ];
 
 // Crear una nueva competición
 router.post('/', competitionCreateValidators, handleValidationErrors, async (req, res) => {
   try {
-    const { name, num_slots, rounds, circuit_name, circuit_id } = req.body;
+    const { name, num_slots, rounds, circuit_name, circuit_id, club_id } = req.body;
+
+    if (club_id) {
+      const { data: mem } = await supabase
+        .from('club_members')
+        .select('id')
+        .eq('club_id', club_id)
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      const { data: ownClub } = await supabase
+        .from('clubs')
+        .select('id')
+        .eq('id', club_id)
+        .eq('owner_user_id', req.user.id)
+        .maybeSingle();
+      if (!mem && !ownClub) {
+        return res.status(403).json({ error: 'No perteneces a este club' });
+      }
+    }
 
     // Si circuit_id se proporciona, verificar que existe y pertenece al usuario
     let circuitNameToStore = circuit_name ? circuit_name.trim() : null;
@@ -173,7 +198,8 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       num_slots: num_slots,
       rounds: rounds,
       circuit_name: circuitNameToStore,
-      circuit_id: circuit_id || null
+      circuit_id: circuit_id || null,
+      club_id: club_id || null,
     };
 
     const { data, error } = await supabase
@@ -214,7 +240,7 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
 // Obtener todas las competiciones del usuario (como organizador)
 router.get('/my-competitions', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: owned, error: e1 } = await supabase
       .from('competitions')
       .select(`
         *,
@@ -224,16 +250,49 @@ router.get('/my-competitions', async (req, res) => {
       .eq('organizer', req.user.id)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error al obtener competiciones:', error);
-      return res.status(500).json({ error: error.message });
+    if (e1) {
+      console.error('Error al obtener competiciones:', e1);
+      return res.status(500).json({ error: e1.message });
     }
 
-    // Formatear la respuesta para incluir el número de participantes
-    const competitions = data.map(comp => ({
+    const { data: memberships } = await supabase
+      .from('club_members')
+      .select('club_id')
+      .eq('user_id', req.user.id);
+
+    const clubIds = [...new Set((memberships || []).map((m) => m.club_id))];
+    let clubComps = [];
+    if (clubIds.length > 0) {
+      const { data: cc, error: e2 } = await supabase
+        .from('competitions')
+        .select(`
+          *,
+          competition_participants(count),
+          circuits(id, name, num_lanes, lane_lengths)
+        `)
+        .in('club_id', clubIds)
+        .neq('organizer', req.user.id)
+        .order('created_at', { ascending: false });
+      if (e2) {
+        console.error('Error al obtener competiciones de club:', e2);
+        return res.status(500).json({ error: e2.message });
+      }
+      clubComps = cc || [];
+    }
+
+    const byId = new Map();
+    const format = (comp) => ({
       ...comp,
-      participants_count: comp.competition_participants[0]?.count || 0
-    }));
+      participants_count: comp.competition_participants[0]?.count || 0,
+    });
+    for (const comp of owned || []) {
+      byId.set(comp.id, format(comp));
+    }
+    for (const comp of clubComps) {
+      if (!byId.has(comp.id)) byId.set(comp.id, format(comp));
+    }
+
+    const competitions = [...byId.values()].map(({ competition_participants, ...rest }) => rest);
 
     res.json(competitions);
   } catch (error) {
@@ -277,10 +336,14 @@ router.get('/:id', async (req, res) => {
         circuits(id, name, num_lanes, lane_lengths)
       `)
       .eq('id', id)
-      .eq('organizer', req.user.id)
       .single();
 
     if (compError || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    const canView = await canViewCompetition(supabase, req.user.id, competition);
+    if (!canView) {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 
@@ -338,17 +401,9 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { name, num_slots, rounds, circuit_name, circuit_id } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: existingComp, error: checkError } = await supabase
-      .from('competitions')
-      .select('id, num_slots, rounds')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (checkError || !existingComp) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id, 'id, num_slots, rounds, organizer, club_id');
+    if (!access.ok) return access.respond(res);
+    const existingComp = access.competition;
 
     // Validaciones
     if (name && !name.trim()) {
@@ -444,17 +499,8 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: existingComp, error: checkError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (checkError || !existingComp) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     // Eliminar la competición (los participantes se eliminarán automáticamente por CASCADE)
     const { error } = await supabase
@@ -482,17 +528,9 @@ router.post('/:id/participants', async (req, res) => {
     const { id: competitionId } = req.params;
     const { vehicle_id, driver_name, vehicle_model, category_id } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id, num_slots')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, competitionId, 'id, num_slots, organizer, club_id');
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
 
     // Validaciones
     if (!driver_name || !driver_name.trim()) {
@@ -593,17 +631,8 @@ router.get('/:id/participants', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, competitionId);
+    if (!access.ok) return access.respond(res);
 
     // Obtener los participantes
     const { data, error } = await supabase
@@ -633,17 +662,8 @@ router.put('/:id/participants/:participantId', async (req, res) => {
     const { id: competitionId, participantId } = req.params;
     const { vehicle_id, driver_name, vehicle_model, category_id } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, competitionId);
+    if (!access.ok) return access.respond(res);
 
     // Verificar que el participante existe
     const { data: existingParticipant, error: partError } = await supabase
@@ -736,17 +756,8 @@ router.delete('/:id/participants/:participantId', async (req, res) => {
   try {
     const { id: competitionId, participantId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, competitionId);
+    if (!access.ok) return access.respond(res);
 
     // Verificar que el participante existe
     const { data: existingParticipant, error: partError } = await supabase
@@ -783,17 +794,9 @@ router.get('/:id/progress', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Obtener la competición
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id, num_slots, rounds')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, id, 'id, num_slots, rounds, organizer, club_id');
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
 
     // Obtener el número de participantes
     const { count: participantsCount, error: partError } = await supabase
@@ -904,34 +907,6 @@ router.get('/:id/progress', async (req, res) => {
 
 // ==================== TIEMPOS DE COMPETICIÓN ====================
 
-function parseMmSsMmmToSeconds(timeStr) {
-  if (!timeStr || typeof timeStr !== 'string') return null;
-  const match = timeStr.match(/^(\d{2}):(\d{2})\.(\d{3})$/);
-  if (!match) return null;
-  const [, min, sec, ms] = match.map(Number);
-  return min * 60 + sec + ms / 1000;
-}
-
-function formatAverageLapSeconds(seconds) {
-  const avgMinutes = Math.floor(seconds / 60);
-  const avgSeconds = Math.floor(seconds % 60);
-  const avgMilliseconds = Math.floor((seconds % 1) * 1000);
-  return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
-}
-
-/** Promedio por vuelta = tiempo total / vueltas (mismo criterio que el formulario de vehículos). */
-function deriveCompetitionAverageFromTotalAndLaps(total_time, laps) {
-  const lapsNum = typeof laps === 'number' ? laps : parseInt(String(laps), 10);
-  if (!Number.isInteger(lapsNum) || lapsNum <= 0) return null;
-  const totalSec = parseMmSsMmmToSeconds(total_time);
-  if (totalSec === null || totalSec <= 0) return null;
-  const avgSec = totalSec / lapsNum;
-  return {
-    average_time: formatAverageLapSeconds(avgSec),
-    average_time_timestamp: avgSec,
-  };
-}
-
 // Registrar un tiempo de competición
 router.post('/:id/timings', async (req, res) => {
   try {
@@ -952,17 +927,9 @@ router.post('/:id/timings', async (req, res) => {
       round_number 
     } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id, rounds')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, competitionId, 'id, rounds, organizer, club_id');
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
 
     // Verificar que el participante existe y pertenece a esta competición
     const { data: participant, error: partError } = await supabase
@@ -1100,17 +1067,8 @@ router.get('/:id/timings', async (req, res) => {
     const { id: competitionId } = req.params;
     const { round_number, participant_id } = req.query;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, competitionId);
+    if (!access.ok) return access.respond(res);
 
     // Construir la consulta
     let query = supabase
@@ -1186,17 +1144,8 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       circuit_id
     } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, competitionId);
+    if (!access.ok) return access.respond(res);
 
     // Verificar que el tiempo existe y pertenece a esta competición
     const { data: existingTiming, error: timingError } = await supabase
@@ -1348,17 +1297,8 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
   try {
     const { id: competitionId, timingId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, competitionId);
+    if (!access.ok) return access.respond(res);
 
     // Verificar que el tiempo existe y pertenece a esta competición
     const { data: existingTiming, error: timingError } = await supabase
@@ -1417,17 +1357,9 @@ router.get('/:id/export/csv', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('*')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, competitionId, '*');
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
 
     // Obtener participantes
     const { data: participants, error: partError } = await supabase
@@ -1482,17 +1414,9 @@ router.get('/:id/export/pdf', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('*')
-      .eq('id', competitionId)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, competitionId, '*');
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
 
     // Obtener participantes
     const { data: participants, error: partError } = await supabase
@@ -1673,17 +1597,8 @@ router.post('/:id/categories', async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'El nombre de la categoría es requerido' });
@@ -1715,17 +1630,8 @@ router.get('/:id/categories', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     const { data, error } = await supabase
       .from('competition_categories')
@@ -1750,17 +1656,8 @@ router.delete('/:id/categories/:categoryId', async (req, res) => {
   try {
     const { id, categoryId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     const { error } = await supabase
       .from('competition_categories')
@@ -1788,17 +1685,8 @@ router.post('/:id/rules', async (req, res) => {
     const { id } = req.params;
     const { rule_type, description, points_structure } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     if (!rule_type || !['per_round', 'final', 'best_time_per_round'].includes(rule_type)) {
       return res.status(400).json({ error: 'Tipo de regla debe ser "per_round", "final" o "best_time_per_round"' });
@@ -1836,17 +1724,8 @@ router.get('/:id/rules', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireViewCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     const { data, error } = await supabase
       .from('competition_rules')
@@ -1872,17 +1751,8 @@ router.put('/:id/rules/:ruleId', async (req, res) => {
     const { id, ruleId } = req.params;
     const { rule_type, description, points_structure } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     const updateData = {};
     if (rule_type) updateData.rule_type = rule_type;
@@ -1914,17 +1784,8 @@ router.delete('/:id/rules/:ruleId', async (req, res) => {
   try {
     const { id, ruleId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     const { error } = await supabase
       .from('competition_rules')
@@ -1944,28 +1805,154 @@ router.delete('/:id/rules/:ruleId', async (req, res) => {
   }
 });
 
+// Inscripción autenticada (p. ej. miembro del club con JWT)
+router.post(
+  '/:id/signups',
+  body('category_id').isUUID().withMessage('Categoría inválida'),
+  body('vehicle_id').optional({ values: 'falsy' }).isUUID().withMessage('Vehículo inválido'),
+  body('vehicle').optional({ values: 'falsy' }).isString().trim().isLength({ max: 200 }),
+  body('name').optional({ values: 'falsy' }).isString().trim().isLength({ max: 200 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const {
+        category_id: categoryId,
+        vehicle,
+        vehicle_id: vehicleIdBody,
+        name: nameBody,
+      } = req.body;
+
+      const hasVehicleId = typeof vehicleIdBody === 'string' && vehicleIdBody.trim().length > 0;
+      const hasVehicleText = typeof vehicle === 'string' && vehicle.trim().length > 0;
+      if (!hasVehicleId && !hasVehicleText) {
+        return res.status(400).json({
+          error: 'Debes seleccionar un vehículo de tu colección o escribir un modelo.',
+        });
+      }
+
+      const access = await requireViewCompetition(supabase, req.user.id, id, 'id, num_slots, organizer, club_id');
+      if (!access.ok) return access.respond(res);
+      const competition = access.competition;
+
+      const email = (req.user.email || '').trim().toLowerCase();
+      if (!email) {
+        return res.status(400).json({ error: 'Tu cuenta no tiene email; no puedes inscribirte por esta vía.' });
+      }
+
+      const { data: categories, error: catErr } = await supabase
+        .from('competition_categories')
+        .select('id')
+        .eq('id', categoryId)
+        .eq('competition_id', id)
+        .maybeSingle();
+      if (catErr || !categories) {
+        return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+      }
+
+      let vehicleText = hasVehicleText ? String(vehicle).trim() : null;
+      let vehicleIdValue = null;
+      if (hasVehicleId) {
+        const { data: vehicleRow, error: vehicleErr } = await supabase
+          .from('vehicles')
+          .select('id, manufacturer, model, user_id')
+          .eq('id', vehicleIdBody)
+          .maybeSingle();
+        if (vehicleErr || !vehicleRow) {
+          return res.status(400).json({ error: 'Vehículo no encontrado' });
+        }
+        if (vehicleRow.user_id !== req.user.id) {
+          return res
+            .status(403)
+            .json({ error: 'Solo puedes inscribirte con vehículos de tu propia colección.' });
+        }
+        vehicleIdValue = vehicleRow.id;
+        if (!vehicleText) {
+          vehicleText = [vehicleRow.manufacturer, vehicleRow.model].filter(Boolean).join(' ').trim() || 'Vehículo de colección';
+        }
+      }
+
+      const { count: signupsCount, error: countError } = await supabase
+        .from('competition_signups')
+        .select('*', { count: 'exact', head: true })
+        .eq('competition_id', id);
+      if (countError) {
+        console.error('signups count', countError);
+        return res.status(500).json({ error: countError.message });
+      }
+      if ((signupsCount ?? 0) >= competition.num_slots) {
+        return res.status(400).json({ error: 'No hay plazas disponibles en esta competición' });
+      }
+
+      const { data: existingSignup } = await supabase
+        .from('competition_signups')
+        .select('id')
+        .eq('competition_id', id)
+        .eq('email', email)
+        .maybeSingle();
+      if (existingSignup) {
+        return res.status(400).json({ error: 'Ya estás inscrito en esta competición' });
+      }
+
+      const displayName =
+        (nameBody && String(nameBody).trim()) ||
+        (req.user.user_metadata?.full_name && String(req.user.user_metadata.full_name).trim()) ||
+        email.split('@')[0] ||
+        'Piloto';
+
+      const { data: signup, error: signupError } = await supabase
+        .from('competition_signups')
+        .insert([
+          {
+            competition_id: id,
+            name: displayName,
+            email,
+            vehicle: vehicleText,
+            vehicle_id: vehicleIdValue,
+            category_id: categoryId,
+          },
+        ])
+        .select(`*, competition_categories(name), vehicles(id, model, manufacturer, type)`)
+        .single();
+
+      if (signupError) {
+        console.error('signup insert', signupError);
+        return res.status(500).json({ error: signupError.message });
+      }
+
+      res.status(201).json({
+        message: 'Inscripción enviada correctamente',
+        signup: {
+          id: signup.id,
+          name: signup.name,
+          email: signup.email,
+          vehicle: signup.vehicle,
+          vehicle_id: signup.vehicle_id,
+          vehicles: signup.vehicles ?? null,
+          category: signup.competition_categories?.name,
+        },
+      });
+    } catch (error) {
+      console.error('Error en POST /competitions/:id/signups:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
 // Obtener inscripciones de una competición (para el organizador)
 router.get('/:id/signups', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     const { data, error } = await supabase
       .from('competition_signups')
       .select(`
         *,
-        competition_categories(name)
+        competition_categories(name),
+        vehicles(id, model, manufacturer, type)
       `)
       .eq('competition_id', id)
       .order('created_at', { ascending: true });
@@ -1988,19 +1975,10 @@ router.post('/:id/signups/:signupId/approve', async (req, res) => {
     const { id, signupId } = req.params;
     const { vehicle_id, vehicle_model } = req.body;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
+    const access = await requireManageCompetition(supabase, req.user.id, id, 'id, num_slots, organizer, club_id');
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
 
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
-
-    // Obtener la inscripción
     const { data: signup, error: signupError } = await supabase
       .from('competition_signups')
       .select('*')
@@ -2012,7 +1990,6 @@ router.post('/:id/signups/:signupId/approve', async (req, res) => {
       return res.status(404).json({ error: 'Inscripción no encontrada' });
     }
 
-    // Verificar que no exceda el número de plazas
     const { count: participantsCount, error: countError } = await supabase
       .from('competition_participants')
       .select('*', { count: 'exact', head: true })
@@ -2027,19 +2004,32 @@ router.post('/:id/signups/:signupId/approve', async (req, res) => {
       return res.status(400).json({ error: 'No hay plazas disponibles para más participantes' });
     }
 
-    // Crear el participante oficial
+    // Crear el participante oficial. Orden de prioridad para el vehículo:
+    //   1) vehicle_id u override explícito del organizador (por si sustituye la elección del miembro).
+    //   2) vehicle_model texto explícito enviado por el organizador.
+    //   3) vehicle_id elegido por el miembro en la inscripción (su propia colección).
+    //   4) texto libre que haya escrito el miembro en la inscripción.
     const participantData = {
       competition_id: id,
       driver_name: signup.name,
-      category_id: signup.category_id
+      category_id: signup.category_id,
     };
 
-    if (vehicle_id) {
-      participantData.vehicle_id = vehicle_id;
-    } else if (vehicle_model) {
-      participantData.vehicle_model = vehicle_model;
+    const hasOrganizerVehicleId = typeof vehicle_id === 'string' && vehicle_id.trim().length > 0;
+    const hasOrganizerModel = typeof vehicle_model === 'string' && vehicle_model.trim().length > 0;
+
+    if (hasOrganizerVehicleId) {
+      participantData.vehicle_id = vehicle_id.trim();
+    } else if (hasOrganizerModel) {
+      participantData.vehicle_model = vehicle_model.trim();
+    } else if (signup.vehicle_id) {
+      participantData.vehicle_id = signup.vehicle_id;
+    } else if (signup.vehicle && signup.vehicle.trim().length > 0) {
+      participantData.vehicle_model = signup.vehicle.trim();
     } else {
-      participantData.vehicle_model = signup.vehicle;
+      return res
+        .status(400)
+        .json({ error: 'Debes asignar un vehículo para aprobar esta inscripción.' });
     }
 
     const { data: participant, error: participantError } = await supabase
@@ -2076,17 +2066,8 @@ router.delete('/:id/signups/:signupId', async (req, res) => {
   try {
     const { id, signupId } = req.params;
 
-    // Verificar que la competición existe y pertenece al usuario
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id')
-      .eq('id', id)
-      .eq('organizer', req.user.id)
-      .single();
-
-    if (compError || !competition) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
+    const access = await requireManageCompetition(supabase, req.user.id, id);
+    if (!access.ok) return access.respond(res);
 
     const { error } = await supabase
       .from('competition_signups')

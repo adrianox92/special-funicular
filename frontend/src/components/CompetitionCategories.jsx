@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog';
 
-const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
+const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = false }) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -134,10 +134,12 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
             <Tags className="size-4" />
             Categorías ({categories.length})
           </h6>
-          <Button size="sm" onClick={() => openModal()} className="flex items-center gap-1">
-            <Plus className="size-4" />
-            Añadir
-          </Button>
+          {!readOnly && (
+            <Button size="sm" onClick={() => openModal()} className="flex items-center gap-1">
+              <Plus className="size-4" />
+              Añadir
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {error && (
@@ -150,10 +152,12 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
             <div className="text-center py-8">
               <Tags className="size-8 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground mb-4">No hay categorías definidas</p>
-              <Button variant="outline" size="sm" onClick={() => openModal()} className="flex items-center gap-1 mx-auto">
-                <Plus className="size-4" />
-                Crear Primera Categoría
-              </Button>
+              {!readOnly && (
+                <Button variant="outline" size="sm" onClick={() => openModal()} className="flex items-center gap-1 mx-auto">
+                  <Plus className="size-4" />
+                  Crear Primera Categoría
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -163,6 +167,7 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
                   className="flex items-center justify-between p-3 rounded-lg border bg-card"
                 >
                   <Badge variant="secondary">{category.name}</Badge>
+                  {!readOnly && (
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => openModal(category)}>
                       <Pencil className="size-4" />
@@ -176,6 +181,7 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -183,6 +189,7 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
         </CardContent>
       </Card>
 
+      {!readOnly && (
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, categoryId: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -199,7 +206,9 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
 
+      {!readOnly && (
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent>
           <DialogHeader>
@@ -243,6 +252,7 @@ const CompetitionCategories = ({ competitionId, onCategoryChange }) => {
           </form>
         </DialogContent>
       </Dialog>
+      )}
     </>
   );
 };

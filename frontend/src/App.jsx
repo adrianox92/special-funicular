@@ -11,6 +11,7 @@ import AddVehicle from './components/AddVehicle';
 import EditVehicle from './components/EditVehicle';
 import TimingsList from './components/TimingsList';
 import Competitions from './pages/Competitions';
+import Clubs from './pages/Clubs';
 import Circuits from './pages/Circuits';
 import Inventory from './pages/Inventory';
 import CompetitionParticipants from './pages/CompetitionParticipants';
@@ -307,6 +308,28 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <Competitions />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/clubs"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Clubs />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/clubs/join"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Clubs />
               </AuthedShell>
             </PrivateRoute>
           }

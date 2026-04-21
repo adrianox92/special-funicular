@@ -44,8 +44,18 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedSignup, setSelectedSignup] = useState(null);
   const [approveForm, setApproveForm] = useState({ vehicle_id: '', vehicle_model: '' });
+  const [approveMode, setApproveMode] = useState('member');
   const [vehicles, setVehicles] = useState([]);
   const [rejectConfirm, setRejectConfirm] = useState({ open: false, signupId: null });
+
+  const formatMemberVehicle = (signup) => {
+    if (!signup) return '';
+    if (signup.vehicles) {
+      const parts = [signup.vehicles.manufacturer, signup.vehicles.model].filter(Boolean);
+      return parts.join(' ');
+    }
+    return signup.vehicle ?? '';
+  };
 
   const loadSignups = async () => {
     try {
@@ -79,25 +89,44 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
   const openApproveModal = (signup) => {
     setSelectedSignup(signup);
     setApproveForm({ vehicle_id: '', vehicle_model: signup.vehicle || '' });
+    setApproveMode('member');
+    setApproveError(null);
     setShowApproveModal(true);
   };
 
   const handleApproveSignup = async (e) => {
     e.preventDefault();
-    if (!approveForm.vehicle_id && !approveForm.vehicle_model.trim()) {
-      setApproveError('Debes especificar un vehículo');
-      return;
+    let approveData = {};
+    if (approveMode === 'member') {
+      if (!selectedSignup?.vehicle_id && !(selectedSignup?.vehicle || '').trim()) {
+        setApproveError('La inscripción no tiene vehículo; elige otra opción.');
+        return;
+      }
+      approveData = {};
+    } else if (approveMode === 'organizer') {
+      if (!approveForm.vehicle_id) {
+        setApproveError('Selecciona un vehículo de tu colección');
+        return;
+      }
+      approveData = { vehicle_id: approveForm.vehicle_id };
+    } else if (approveMode === 'custom') {
+      if (!approveForm.vehicle_model.trim()) {
+        setApproveError('Escribe el modelo del vehículo');
+        return;
+      }
+      approveData = { vehicle_model: approveForm.vehicle_model.trim() };
     }
     try {
       setApproving(true);
       setApproveError(null);
-      const approveData = approveForm.vehicle_id
-        ? { vehicle_id: approveForm.vehicle_id }
-        : { vehicle_model: approveForm.vehicle_model.trim() };
-      await axios.post(`/competitions/${competitionId}/signups/${selectedSignup.id}/approve`, approveData);
+      await axios.post(
+        `/competitions/${competitionId}/signups/${selectedSignup.id}/approve`,
+        approveData,
+      );
       setShowApproveModal(false);
       setSelectedSignup(null);
       setApproveForm({ vehicle_id: '', vehicle_model: '' });
+      setApproveMode('member');
       loadSignups();
       onSignupApproved?.();
     } catch (err) {
@@ -195,7 +224,10 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground text-sm">
                       <Car className="size-4" />
-                      {signup.vehicle}
+                      {formatMemberVehicle(signup) || signup.vehicle}
+                      {signup.vehicle_id && (
+                        <Badge variant="outline" className="ml-1">De su colección</Badge>
+                      )}
                     </div>
                     {signup.competition_categories && (
                       <div className="flex items-center gap-2 text-muted-foreground text-sm">
@@ -250,7 +282,9 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
               <Check className="size-5" />
               Aprobar Inscripción
             </DialogTitle>
-            <DialogDescription>Asigna un vehículo al participante aprobado</DialogDescription>
+            <DialogDescription>
+              Confirma el vehículo con el que correrá el participante.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleApproveSignup}>
             <div className="space-y-4 py-4">
@@ -264,41 +298,87 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
                   <h6 className="font-medium">Información del solicitante:</h6>
                   <p className="text-sm"><strong>Nombre:</strong> {selectedSignup.name}</p>
                   <p className="text-sm"><strong>Email:</strong> {selectedSignup.email}</p>
-                  <p className="text-sm"><strong>Vehículo propuesto:</strong> {selectedSignup.vehicle}</p>
+                  <p className="text-sm">
+                    <strong>Vehículo propuesto:</strong>{' '}
+                    {formatMemberVehicle(selectedSignup) || selectedSignup.vehicle || '—'}
+                    {selectedSignup.vehicle_id && ' (de su colección)'}
+                  </p>
                   {selectedSignup.competition_categories && (
-                    <p className="text-sm"><strong>Categoría:</strong> {selectedSignup.competition_categories.name}</p>
+                    <p className="text-sm">
+                      <strong>Categoría:</strong> {selectedSignup.competition_categories.name}
+                    </p>
                   )}
                 </div>
               )}
+
               <div className="space-y-2">
                 <Label>Vehículo para la competición</Label>
-                <Select
-                  value={approveForm.vehicle_id}
-                  onValueChange={(v) => setApproveForm({ ...approveForm, vehicle_id: v, vehicle_model: v ? '' : approveForm.vehicle_model })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar vehículo de mi colección" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vehicles.map((v) => (
-                      <SelectItem key={v.id} value={String(v.id)}>
-                        {v.manufacturer} {v.model} ({v.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">O especifica un modelo personalizado abajo</p>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="approveMode"
+                      checked={approveMode === 'member'}
+                      onChange={() => setApproveMode('member')}
+                      className="rounded-full"
+                    />
+                    Usar el propuesto por el miembro
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="approveMode"
+                      checked={approveMode === 'organizer'}
+                      onChange={() => setApproveMode('organizer')}
+                      className="rounded-full"
+                    />
+                    Asignar uno de mi colección
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="approveMode"
+                      checked={approveMode === 'custom'}
+                      onChange={() => setApproveMode('custom')}
+                      className="rounded-full"
+                    />
+                    Escribir modelo personalizado
+                  </label>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="vehicle-model">Modelo personalizado</Label>
-                <Input
-                  id="vehicle-model"
-                  value={approveForm.vehicle_model}
-                  onChange={(e) => setApproveForm({ ...approveForm, vehicle_model: e.target.value, vehicle_id: e.target.value ? '' : approveForm.vehicle_id })}
-                  placeholder="Ej: Scalextric Ferrari F1..."
-                  disabled={!!approveForm.vehicle_id}
-                />
-              </div>
+
+              {approveMode === 'organizer' && (
+                <div className="space-y-2">
+                  <Label>Vehículo de mi colección</Label>
+                  <Select
+                    value={approveForm.vehicle_id}
+                    onValueChange={(v) => setApproveForm({ ...approveForm, vehicle_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar vehículo de mi colección" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehicles.map((v) => (
+                        <SelectItem key={v.id} value={String(v.id)}>
+                          {v.manufacturer} {v.model} ({v.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {approveMode === 'custom' && (
+                <div className="space-y-2">
+                  <Label htmlFor="vehicle-model">Modelo personalizado</Label>
+                  <Input
+                    id="vehicle-model"
+                    value={approveForm.vehicle_model}
+                    onChange={(e) => setApproveForm({ ...approveForm, vehicle_model: e.target.value })}
+                    placeholder="Ej: Scalextric Ferrari F1..."
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowApproveModal(false)}>Cancelar</Button>

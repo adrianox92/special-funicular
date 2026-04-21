@@ -37,6 +37,7 @@ import {
 } from '../components/ui/table';
 import { Spinner } from '../components/ui/spinner';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +52,7 @@ import {
 const CompetitionParticipants = () => {
   const { id: competitionId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [competition, setCompetition] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -82,6 +84,20 @@ const CompetitionParticipants = () => {
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState(null);
 
+  const [memberSignupForm, setMemberSignupForm] = useState({
+    category_id: '',
+    vehicle: '',
+    vehicle_id: '',
+    name: '',
+  });
+  const [memberVehicleSource, setMemberVehicleSource] = useState('own');
+  const [memberSignupLoading, setMemberSignupLoading] = useState(false);
+
+  const isOrganizer = Boolean(user?.id && competition?.organizer === user.id);
+  const signupsFull = competition
+    ? (competition.signups_count || 0) >= competition.num_slots
+    : false;
+
   const loadCompetition = useCallback(async () => {
     try {
       setLoading(true);
@@ -110,6 +126,12 @@ const CompetitionParticipants = () => {
     loadCompetition();
     loadVehicles();
   }, [loadCompetition, loadVehicles]);
+
+  useEffect(() => {
+    if (competition && !isOrganizer && activeTab === 'signups') {
+      setActiveTab('participants');
+    }
+  }, [competition, isOrganizer, activeTab]);
 
   const handleAddParticipant = useCallback(async (e) => {
     e.preventDefault();
@@ -203,6 +225,46 @@ const CompetitionParticipants = () => {
   const handleDeleteParticipant = useCallback((participantId) => {
     setDeleteConfirm({ open: true, participantId });
   }, []);
+
+  const handleMemberSignup = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!memberSignupForm.category_id) {
+        toast.error('Selecciona una categoría');
+        return;
+      }
+      if (memberVehicleSource === 'own' && !memberSignupForm.vehicle_id) {
+        toast.error('Selecciona un vehículo de tu colección');
+        return;
+      }
+      if (memberVehicleSource === 'text' && !memberSignupForm.vehicle?.trim()) {
+        toast.error('Indica el vehículo');
+        return;
+      }
+      try {
+        setMemberSignupLoading(true);
+        const payload = {
+          category_id: memberSignupForm.category_id,
+          ...(memberSignupForm.name?.trim() ? { name: memberSignupForm.name.trim() } : {}),
+        };
+        if (memberVehicleSource === 'own') {
+          payload.vehicle_id = memberSignupForm.vehicle_id;
+        } else {
+          payload.vehicle = memberSignupForm.vehicle.trim();
+        }
+        await axios.post(`/competitions/${competitionId}/signups`, payload);
+        toast.success('Inscripción enviada. El organizador la validará.');
+        setMemberSignupForm({ category_id: '', vehicle: '', vehicle_id: '', name: '' });
+        setMemberVehicleSource('own');
+        loadCompetition();
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'No se pudo enviar la inscripción');
+      } finally {
+        setMemberSignupLoading(false);
+      }
+    },
+    [competitionId, memberSignupForm, memberVehicleSource, loadCompetition],
+  );
 
   const confirmDeleteParticipant = useCallback(async () => {
     if (!deleteConfirm.participantId) return;
@@ -305,11 +367,13 @@ const CompetitionParticipants = () => {
             </Button>
             <div>
               <h1 className="text-2xl font-bold">{competition.name}</h1>
-              <p className="text-muted-foreground text-sm">Gestionar competición</p>
+              <p className="text-muted-foreground text-sm">
+                {isOrganizer ? 'Gestionar competición' : 'Miembro del club — la gestión la lleva el organizador'}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {publicLink && (
+            {isOrganizer && publicLink && (
               <Button
                 variant="outline"
                 size="sm"
@@ -323,23 +387,43 @@ const CompetitionParticipants = () => {
                 Formulario de inscripción
               </Button>
             )}
-            <Button
-              onClick={() => navigate(`/competitions/${competitionId}/timings`)}
-              disabled={!canStartCompetition}
-              title={!canStartCompetition ? 'Necesitas al menos un participante' : 'Gestionar tiempos'}
-            >
-              <Clock className="size-4 mr-2" />
-              Gestionar Tiempos
-              {!canStartCompetition && (
-                <Badge variant="secondary" className="ml-2">Sin participantes</Badge>
-              )}
-              {canStartCompetition && !isFull && (
-                <Badge variant="secondary" className="ml-2">{participants.length} participantes</Badge>
-              )}
-              {isFull && (
-                <Badge variant="default" className="ml-2">Completa</Badge>
-              )}
-            </Button>
+            {!isOrganizer && publicLink && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  window.open(publicLink, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <Link2 className="size-4 mr-2" />
+                Inscripción pública
+              </Button>
+            )}
+            {isOrganizer && (
+              <Button
+                onClick={() => navigate(`/competitions/${competitionId}/timings`)}
+                disabled={!canStartCompetition}
+                title={!canStartCompetition ? 'Necesitas al menos un participante' : 'Gestionar tiempos'}
+              >
+                <Clock className="size-4 mr-2" />
+                Gestionar Tiempos
+                {!canStartCompetition && (
+                  <Badge variant="secondary" className="ml-2">Sin participantes</Badge>
+                )}
+                {canStartCompetition && !isFull && (
+                  <Badge variant="secondary" className="ml-2">{participants.length} participantes</Badge>
+                )}
+                {isFull && (
+                  <Badge variant="default" className="ml-2">Completa</Badge>
+                )}
+              </Button>
+            )}
+            {!isOrganizer && canStartCompetition && (
+              <Button variant="outline" size="sm" onClick={() => navigate(`/competitions/${competitionId}/timings`)}>
+                <Clock className="size-4 mr-2" />
+                Ver tiempos
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -445,15 +529,19 @@ const CompetitionParticipants = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2">
+        <TabsList
+          className={`grid w-full gap-2 ${isOrganizer ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3'}`}
+        >
           <TabsTrigger value="participants" className="flex items-center gap-2">
             <Users className="size-4" />
             Participantes ({participants.length})
           </TabsTrigger>
-          <TabsTrigger value="signups" className="flex items-center gap-2">
-            <Users className="size-4" />
-            Inscripciones ({competition?.signups_count || 0})
-          </TabsTrigger>
+          {isOrganizer && (
+            <TabsTrigger value="signups" className="flex items-center gap-2">
+              <Users className="size-4" />
+              Inscripciones ({competition?.signups_count || 0})
+            </TabsTrigger>
+          )}
           <TabsTrigger value="categories" className="flex items-center gap-2">
             <Tags className="size-4" />
             Categorías ({competition?.categories?.length || 0})
@@ -465,15 +553,117 @@ const CompetitionParticipants = () => {
         </TabsList>
 
         <TabsContent value="participants" className="mt-4">
+          {!isOrganizer && (
+            <Card className="mb-6 border-primary/30">
+              <CardContent className="pt-6 space-y-4">
+                <h5 className="font-semibold">Solicitar plaza</h5>
+                <p className="text-sm text-muted-foreground">
+                  Envía tu inscripción con el email de tu cuenta. El organizador la aprobará cuando corresponda.
+                </p>
+                <form onSubmit={handleMemberSignup} className="space-y-3 max-w-md">
+                  <div className="space-y-2">
+                    <Label>Categoría</Label>
+                    <Select
+                      value={memberSignupForm.category_id}
+                      onValueChange={(v) => setMemberSignupForm((f) => ({ ...f, category_id: v }))}
+                      disabled={signupsFull || !competition.categories?.length}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(competition.categories || []).map((cat) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Vehículo</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="memberVehicleSource"
+                          checked={memberVehicleSource === 'own'}
+                          onChange={() => setMemberVehicleSource('own')}
+                          disabled={signupsFull}
+                          className="rounded-full"
+                        />
+                        De mi colección
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="memberVehicleSource"
+                          checked={memberVehicleSource === 'text'}
+                          onChange={() => setMemberVehicleSource('text')}
+                          disabled={signupsFull}
+                          className="rounded-full"
+                        />
+                        Otro (texto)
+                      </label>
+                    </div>
+                    {memberVehicleSource === 'own' ? (
+                      vehicles.length > 0 ? (
+                        <Select
+                          value={memberSignupForm.vehicle_id}
+                          onValueChange={(v) => setMemberSignupForm((f) => ({ ...f, vehicle_id: v }))}
+                          disabled={signupsFull}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un vehículo de tu colección" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {vehicles.map((v) => (
+                              <SelectItem key={v.id} value={String(v.id)}>
+                                {v.manufacturer} {v.model} ({v.type})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No tienes vehículos en tu colección. Cambia a "Otro (texto)" para escribir un modelo.
+                        </p>
+                      )
+                    ) : (
+                      <Input
+                        value={memberSignupForm.vehicle}
+                        onChange={(e) => setMemberSignupForm((f) => ({ ...f, vehicle: e.target.value }))}
+                        placeholder="Ej: McLaren F1 nº 1"
+                        disabled={signupsFull}
+                      />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nombre en pista (opcional)</Label>
+                    <Input
+                      value={memberSignupForm.name}
+                      onChange={(e) => setMemberSignupForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="Si vacío, usamos tu nombre de perfil o email"
+                      disabled={signupsFull}
+                    />
+                  </div>
+                  <Button type="submit" disabled={memberSignupLoading || signupsFull}>
+                    {memberSignupLoading ? 'Enviando…' : signupsFull ? 'Sin plazas de inscripción' : 'Enviar inscripción'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="flex justify-between items-center mb-4">
             <h5 className="font-semibold">Participantes Confirmados</h5>
-            <Button
-              onClick={() => setShowAddModal(true)}
-              disabled={!competition.categories || competition.categories.length === 0}
-            >
-              <span className="mr-2">+</span>
-              Añadir Participante
-            </Button>
+            {isOrganizer && (
+              <Button
+                onClick={() => setShowAddModal(true)}
+                disabled={!competition.categories || competition.categories.length === 0}
+              >
+                <span className="mr-2">+</span>
+                Añadir Participante
+              </Button>
+            )}
           </div>
 
           {participants.length === 0 ? (
@@ -481,11 +671,15 @@ const CompetitionParticipants = () => {
               <CardContent>
                 <Users className="size-12 mx-auto text-muted-foreground mb-4" />
                 <h4 className="mb-2">No hay participantes</h4>
-                <p className="text-muted-foreground mb-6">Añade el primer participante para empezar</p>
-                <Button onClick={() => setShowAddModal(true)}>
-                  <span className="mr-2">+</span>
-                  Añadir Primer Participante
-                </Button>
+                <p className="text-muted-foreground mb-6">
+                  {isOrganizer ? 'Añade el primer participante para empezar' : 'El organizador aún no ha confirmado participantes.'}
+                </p>
+                {isOrganizer && (
+                  <Button onClick={() => setShowAddModal(true)}>
+                    <span className="mr-2">+</span>
+                    Añadir Primer Participante
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -498,7 +692,7 @@ const CompetitionParticipants = () => {
                     <TableHead>Categoría</TableHead>
                     <TableHead>Vehículo</TableHead>
                     {competition?.rules?.length > 0 && <TableHead>Puntos</TableHead>}
-                    <TableHead>Acciones</TableHead>
+                    {isOrganizer && <TableHead>Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -518,21 +712,23 @@ const CompetitionParticipants = () => {
                         {competition?.rules?.length > 0 && (
                           <TableCell>{participant.points || 0}</TableCell>
                         )}
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => openEditModal(participant)}>
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteParticipant(participant.id)}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                        {isOrganizer && (
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={() => openEditModal(participant)}>
+                                <Pencil className="size-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteParticipant(participant.id)}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -542,16 +738,22 @@ const CompetitionParticipants = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="signups" className="mt-4">
-          <CompetitionSignups competitionId={competitionId} onSignupApproved={loadCompetition} />
-        </TabsContent>
+        {isOrganizer && (
+          <TabsContent value="signups" className="mt-4">
+            <CompetitionSignups competitionId={competitionId} onSignupApproved={loadCompetition} />
+          </TabsContent>
+        )}
 
         <TabsContent value="categories" className="mt-4">
-          <CompetitionCategories competitionId={competitionId} onCategoryChange={loadCompetition} />
+          <CompetitionCategories
+            competitionId={competitionId}
+            onCategoryChange={loadCompetition}
+            readOnly={!isOrganizer}
+          />
         </TabsContent>
 
         <TabsContent value="rules" className="mt-4">
-          <CompetitionRulesPanel competitionId={competitionId} onRuleChange={() => {}} />
+          <CompetitionRulesPanel competitionId={competitionId} onRuleChange={() => {}} readOnly={!isOrganizer} />
         </TabsContent>
       </Tabs>
 

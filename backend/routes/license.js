@@ -1,5 +1,7 @@
 /**
  * Slot Race Manager — registro de instalaciones con X-API-Key
+ * Modo personal: hasta INSTALLATIONS_MAX instalaciones por usuario.
+ * Modo club: cupo compartido por club_id (columna clubs.license_installations_max).
  */
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
@@ -13,9 +15,32 @@ const supabaseAdmin = createClient(
 
 const router = express.Router();
 
+async function resolveClubLicenseScope(userId, clubIdRaw) {
+  if (clubIdRaw == null || clubIdRaw === '') {
+    return { ok: true, clubId: null, max: INSTALLATIONS_MAX };
+  }
+  const clubId = typeof clubIdRaw === 'string' ? clubIdRaw.trim() : String(clubIdRaw);
+  const { data: club } = await supabaseAdmin
+    .from('clubs')
+    .select('id, license_installations_max, owner_user_id')
+    .eq('id', clubId)
+    .maybeSingle();
+  if (!club) return { ok: false, error: 'club_not_found' };
+  const { data: mem } = await supabaseAdmin
+    .from('club_members')
+    .select('id')
+    .eq('club_id', clubId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!mem && club.owner_user_id !== userId) {
+    return { ok: false, error: 'forbidden' };
+  }
+  return { ok: true, clubId, max: club.license_installations_max };
+}
+
 /**
  * POST /register
- * Body: { installation_id: string, label?: string }
+ * Body: { installation_id: string, label?: string, club_id?: uuid }
  */
 router.post('/register', async (req, res) => {
   try {
@@ -24,10 +49,21 @@ router.post('/register', async (req, res) => {
       return res.status(401).json({ error: 'Usuario no resuelto' });
     }
 
-    const { installation_id: installationId, label } = req.body || {};
+    const { installation_id: installationId, label, club_id: clubIdBody } = req.body || {};
     if (!installationId || typeof installationId !== 'string') {
       return res.status(400).json({ error: 'installation_id requerido' });
     }
+
+    const clubScope = await resolveClubLicenseScope(userId, clubIdBody);
+    if (!clubScope.ok) {
+      if (clubScope.error === 'forbidden') {
+        return res.status(403).json({ error: 'No perteneces a este club' });
+      }
+      return res.status(400).json({ error: 'club_id inválido' });
+    }
+
+    const requestedClubId = clubScope.clubId;
+    const clubMax = clubScope.max;
 
     const { data: sub, error: subErr } = await supabaseAdmin
       .from('user_subscriptions')
@@ -51,7 +87,7 @@ router.post('/register', async (req, res) => {
 
     const { data: existing, error: exErr } = await supabaseAdmin
       .from('app_installations')
-      .select('id')
+      .select('id, club_id')
       .eq('user_id', userId)
       .eq('installation_id', installationId)
       .maybeSingle();
@@ -68,12 +104,35 @@ router.post('/register', async (req, res) => {
       if (typeof label === 'string' && label.trim()) {
         patch.label = label.trim();
       }
+      if (requestedClubId && !existing.club_id) {
+        patch.club_id = requestedClubId;
+      }
       await supabaseAdmin.from('app_installations').update(patch).eq('id', existing.id);
+
+      const effectiveClubId = patch.club_id ?? existing.club_id ?? requestedClubId;
+
+      if (effectiveClubId) {
+        const { data: club } = await supabaseAdmin
+          .from('clubs')
+          .select('license_installations_max')
+          .eq('id', effectiveClubId)
+          .maybeSingle();
+        const { count } = await supabaseAdmin
+          .from('app_installations')
+          .select('*', { count: 'exact', head: true })
+          .eq('club_id', effectiveClubId);
+        return res.json({
+          tier: 'club',
+          installations_used: count ?? 0,
+          installations_max: club?.license_installations_max ?? 10,
+        });
+      }
 
       const { count } = await supabaseAdmin
         .from('app_installations')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .is('club_id', null);
 
       return res.json({
         tier: 'full',
@@ -82,10 +141,54 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    if (requestedClubId) {
+      const { count: currentCount, error: cntErr } = await supabaseAdmin
+        .from('app_installations')
+        .select('*', { count: 'exact', head: true })
+        .eq('club_id', requestedClubId);
+
+      if (cntErr) {
+        console.error('license register count club', cntErr);
+        return res.status(500).json({ error: 'Error al contar instalaciones del club' });
+      }
+
+      if ((currentCount ?? 0) >= clubMax) {
+        return res.status(403).json({
+          error: 'installations_limit_exceeded',
+          installations_max: clubMax,
+          installations_used: currentCount ?? 0,
+        });
+      }
+
+      const { error: insErr } = await supabaseAdmin.from('app_installations').insert({
+        user_id: userId,
+        installation_id: installationId,
+        label: typeof label === 'string' && label.trim() ? label.trim() : null,
+        club_id: requestedClubId,
+      });
+
+      if (insErr) {
+        console.error('license register insert', insErr);
+        return res.status(500).json({ error: 'No se pudo registrar la instalación' });
+      }
+
+      const { count: newCount } = await supabaseAdmin
+        .from('app_installations')
+        .select('*', { count: 'exact', head: true })
+        .eq('club_id', requestedClubId);
+
+      return res.json({
+        tier: 'club',
+        installations_used: newCount ?? 0,
+        installations_max: clubMax,
+      });
+    }
+
     const { count: currentCount, error: cntErr } = await supabaseAdmin
       .from('app_installations')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .is('club_id', null);
 
     if (cntErr) {
       console.error('license register count', cntErr);
@@ -104,6 +207,7 @@ router.post('/register', async (req, res) => {
       user_id: userId,
       installation_id: installationId,
       label: typeof label === 'string' && label.trim() ? label.trim() : null,
+      club_id: null,
     });
 
     if (insErr) {
@@ -114,7 +218,8 @@ router.post('/register', async (req, res) => {
     const { count: newCount } = await supabaseAdmin
       .from('app_installations')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .is('club_id', null);
 
     return res.json({
       tier: 'full',
@@ -128,7 +233,7 @@ router.post('/register', async (req, res) => {
 });
 
 /**
- * GET /status?installation_id=...
+ * GET /status?installation_id=...&club_id=... (club_id opcional para primera activación)
  */
 router.get('/status', async (req, res) => {
   try {
@@ -164,7 +269,7 @@ router.get('/status', async (req, res) => {
 
     const { data: row, error: rowErr } = await supabaseAdmin
       .from('app_installations')
-      .select('id')
+      .select('id, club_id')
       .eq('user_id', userId)
       .eq('installation_id', installationId)
       .maybeSingle();
@@ -187,10 +292,28 @@ router.get('/status', async (req, res) => {
       .update({ last_seen_at: new Date().toISOString() })
       .eq('id', row.id);
 
+    if (row.club_id) {
+      const { data: club } = await supabaseAdmin
+        .from('clubs')
+        .select('license_installations_max')
+        .eq('id', row.club_id)
+        .maybeSingle();
+      const { count } = await supabaseAdmin
+        .from('app_installations')
+        .select('*', { count: 'exact', head: true })
+        .eq('club_id', row.club_id);
+      return res.json({
+        tier: 'club',
+        installations_used: count ?? 0,
+        installations_max: club?.license_installations_max ?? 10,
+      });
+    }
+
     const { count } = await supabaseAdmin
       .from('app_installations')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .is('club_id', null);
 
     return res.json({
       tier: 'full',

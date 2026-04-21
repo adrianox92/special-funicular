@@ -43,11 +43,13 @@ const Competitions = () => {
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [circuits, setCircuits] = useState([]);
+  const [clubs, setClubs] = useState([]);
   const [createForm, setCreateForm] = useState({
     name: '',
     num_slots: '',
     rounds: '1',
-    circuit_id: ''
+    circuit_id: '',
+    club_id: ''
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
@@ -78,9 +80,19 @@ const Competitions = () => {
     }
   };
 
+  const loadClubs = async () => {
+    try {
+      const response = await axios.get('/clubs/mine');
+      setClubs(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error('Error al cargar clubes:', err);
+    }
+  };
+
   useEffect(() => {
     loadCompetitions();
     loadCircuits();
+    loadClubs();
   }, []);
 
   const handleCreateCompetition = async (e) => {
@@ -109,11 +121,12 @@ const Competitions = () => {
         name: createForm.name.trim(),
         num_slots: parseInt(createForm.num_slots),
         rounds: parseInt(createForm.rounds),
-        circuit_id: createForm.circuit_id || null
+        circuit_id: createForm.circuit_id || null,
+        club_id: createForm.club_id || null
       });
 
       setShowCreateModal(false);
-      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '' });
+      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '', club_id: '' });
 
       navigate(`/competitions/${response.data.id}/participants`);
     } catch (err) {
@@ -260,6 +273,27 @@ const Competitions = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground">Opcional. Crea circuitos en el apartado Circuitos</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="club_id">Club (opcional)</Label>
+                  <Select
+                    value={createForm.club_id || 'none'}
+                    onValueChange={(v) => setCreateForm({ ...createForm, club_id: v === 'none' ? '' : v })}
+                  >
+                    <SelectTrigger id="club_id">
+                      <SelectValue placeholder="Sin club" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin club</SelectItem>
+                      {clubs.map((club) => (
+                        <SelectItem key={club.id} value={club.id}>{club.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Los miembros del club podrán ver esta competición. Gestiona clubes en el menú Clubes.
+                  </p>
                 </div>
               </div>
               <DialogFooter>

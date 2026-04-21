@@ -20,7 +20,7 @@ import {
 import RuleFormModal from './RuleFormModal';
 import TemplatesDrawer from './TemplatesDrawer';
 
-const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
+const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }) => {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,27 +121,29 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
             <Trophy className="size-4" />
             Reglas de Puntuación ({rules.length})
           </h6>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowTemplatesDrawer(true)}
-              disabled={timesRegistered > 0}
-              className="flex items-center gap-1"
-            >
-              <Wand2 className="size-4" />
-              Aplicar Plantilla
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => openRuleModal()}
-              disabled={timesRegistered > 0}
-              className="flex items-center gap-1"
-            >
-              <Plus className="size-4" />
-              Nueva Regla
-            </Button>
-          </div>
+          {!readOnly && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTemplatesDrawer(true)}
+                disabled={timesRegistered > 0}
+                className="flex items-center gap-1"
+              >
+                <Wand2 className="size-4" />
+                Aplicar Plantilla
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => openRuleModal()}
+                disabled={timesRegistered > 0}
+                className="flex items-center gap-1"
+              >
+                <Plus className="size-4" />
+                Nueva Regla
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {error && (
@@ -149,7 +151,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          {timesRegistered > 0 && (
+          {!readOnly && timesRegistered > 0 && (
             <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="size-4" />
               <AlertDescription>
@@ -162,16 +164,18 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
             <div className="text-center py-8">
               <Trophy className="size-8 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground mb-4">No hay reglas de puntuación definidas</p>
-              <div className="flex gap-2 justify-center flex-wrap">
-                <Button variant="outline" size="sm" onClick={() => setShowTemplatesDrawer(true)} className="flex items-center gap-1">
-                  <Wand2 className="size-4" />
-                  Aplicar Plantilla
-                </Button>
-                <Button size="sm" onClick={() => openRuleModal()} className="flex items-center gap-1">
-                  <Plus className="size-4" />
-                  Crear Primera Regla
-                </Button>
-              </div>
+              {!readOnly && (
+                <div className="flex gap-2 justify-center flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => setShowTemplatesDrawer(true)} className="flex items-center gap-1">
+                    <Wand2 className="size-4" />
+                    Aplicar Plantilla
+                  </Button>
+                  <Button size="sm" onClick={() => openRuleModal()} className="flex items-center gap-1">
+                    <Plus className="size-4" />
+                    Crear Primera Regla
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -197,27 +201,29 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
                         <p className="text-sm text-muted-foreground">{rule.description}</p>
                       )}
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openRuleModal(rule)}
-                        disabled={timesRegistered > 0}
-                        title="Editar regla"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(rule.id)}
-                        disabled={timesRegistered > 0}
-                        title="Eliminar regla"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openRuleModal(rule)}
+                          disabled={timesRegistered > 0}
+                          title="Editar regla"
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(rule.id)}
+                          disabled={timesRegistered > 0}
+                          title="Eliminar regla"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {rule.rule_type === 'best_time_per_round' ? (
@@ -239,6 +245,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
         </CardContent>
       </Card>
 
+      {!readOnly && (
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, ruleId: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -255,7 +262,9 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
 
+      {!readOnly && (
       <RuleFormModal
         show={showRuleModal}
         onHide={() => setShowRuleModal(false)}
@@ -267,7 +276,9 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
         }}
         disabled={timesRegistered > 0}
       />
+      )}
 
+      {!readOnly && (
       <TemplatesDrawer
         show={showTemplatesDrawer}
         onHide={() => setShowTemplatesDrawer(false)}
@@ -278,6 +289,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange }) => {
         }}
         disabled={timesRegistered > 0}
       />
+      )}
     </>
   );
 };

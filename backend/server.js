@@ -76,7 +76,7 @@ function isAllowedOrigin(origin) {
 const corsSyncOptions = {
   origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
@@ -184,7 +184,9 @@ app.use('/api/catalog', catalogRoute);
 app.use('/api/store-listings', storeListingsRoute);
 
 const competitionsRoute = require('./routes/competitions');
+const clubsRoute = require('./routes/clubs');
 app.use('/api/competitions', competitionsRoute);
+app.use('/api/clubs', clubsRoute);
 
 if (process.env.NODE_ENV !== 'production') {
   const swaggerDefinition = {
