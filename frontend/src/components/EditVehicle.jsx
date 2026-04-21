@@ -280,6 +280,10 @@ const EditVehicle = () => {
     }
   }, [getApiBaseUrl, id]);
 
+  const closeQrDialog = useCallback(() => {
+    setShowQrDialog(false);
+  }, []);
+
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
     api.get(`/vehicles/${id}`)
@@ -2001,8 +2005,8 @@ const EditVehicle = () => {
           <DialogHeader>
             <DialogTitle>Código QR — ficha técnica (público)</DialogTitle>
             <DialogDescription>
-              Al escanearlo se abre el PDF de la ficha técnica con los datos actuales del vehículo. La imagen se
-              genera a 512×512 px; al imprimir se limita a 50×50 px.
+              Al escanearlo se abre el PDF de la ficha técnica con los datos actuales del vehículo. Descarga el PNG
+              (512×512 px) para imprimirlo o usarlo donde quieras.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-3 py-2">
@@ -2010,11 +2014,11 @@ const EditVehicle = () => {
             {qrError && <p className="text-sm text-destructive">{qrError}</p>}
             {qrDataUrl && (
               <>
-                <div className="vehicle-qr-print-block flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-2">
                   <img
                     src={qrDataUrl}
                     alt="Código QR para abrir la ficha técnica en PDF"
-                    className="vehicle-qr-img w-48 h-48 sm:w-56 sm:h-56 object-contain rounded border bg-white p-1"
+                    className="w-48 h-48 sm:w-56 sm:h-56 object-contain rounded border bg-white p-1"
                   />
                 </div>
               </>
@@ -2037,10 +2041,7 @@ const EditVehicle = () => {
             >
               Descargar PNG
             </Button>
-            <Button type="button" variant="secondary" disabled={!qrDataUrl} onClick={() => window.print()}>
-              Imprimir
-            </Button>
-            <Button type="button" variant="default" onClick={() => setShowQrDialog(false)}>
+            <Button type="button" variant="default" onClick={closeQrDialog}>
               Cerrar
             </Button>
           </DialogFooter>
