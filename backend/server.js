@@ -193,6 +193,7 @@ const licenseAccountRoute = require('./routes/licenseAccount');
 const helpRoute = require('./routes/help');
 const catalogRoute = require('./routes/catalog');
 const storeListingsRoute = require('./routes/storeListings');
+const changelogRoute = require('./routes/changelog');
 
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
@@ -211,6 +212,7 @@ app.use('/api/pilot-profile', pilotProfileRoute);
 app.use('/api/help', helpRoute);
 app.use('/api/catalog', catalogRoute);
 app.use('/api/store-listings', storeListingsRoute);
+app.use('/api/changelog', changelogRoute);
 
 const competitionsRoute = require('./routes/competitions');
 const clubsRoute = require('./routes/clubs');

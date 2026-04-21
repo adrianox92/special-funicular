@@ -33,6 +33,8 @@ import Contact from './pages/Contact';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
+import Changelog from './pages/Changelog';
+import AdminChangelog from './pages/AdminChangelog';
 import SellerDashboard from './pages/SellerDashboard';
 import PublicCatalogList from './pages/PublicCatalogList';
 import PublicCatalogEntry from './pages/PublicCatalogEntry';
@@ -273,6 +275,17 @@ const AppContent = () => {
         />
 
         <Route
+          path="/changelog"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Changelog />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
           path="/admin/slot-race-licenses"
           element={
             <PrivateRoute>
@@ -289,6 +302,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <AdminSlotCatalog />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/changelog"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <AdminChangelog />
               </AuthedShell>
             </PrivateRoute>
           }

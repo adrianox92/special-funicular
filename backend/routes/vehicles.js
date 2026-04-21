@@ -28,6 +28,8 @@ const VEHICLE_SORT_COLUMNS = {
   created_at: 'created_at',
   total_distance_meters: 'total_distance_meters',
   updated_at: 'updated_at',
+  /** Modelo primero y fabricante como desempate (listado alfabético A-Z / Z-A). */
+  model: 'model',
 };
 
 function parseVehicleCommercialYearFromBody(body) {
@@ -125,6 +127,16 @@ function orderOptsForVehicleSort(column, ascending) {
     return { ascending, nullsFirst: !ascending };
   }
   return { ascending, nullsFirst: false };
+}
+
+/** Aplica ordenación a consultas de listado/export (desempate por fabricante si ordena por modelo). */
+function applyVehicleListSort(query, sortColumn, ascending) {
+  const orderOpts = orderOptsForVehicleSort(sortColumn, ascending);
+  let q = query.order(sortColumn, orderOpts);
+  if (sortColumn === 'model') {
+    q = q.order('manufacturer', orderOpts);
+  }
+  return q;
 }
 
 const VEHICLE_IMAGE_MAX_UPLOAD_BYTES =
@@ -353,13 +365,12 @@ router.get('/export', async (req, res) => {
   try {
     const { manufacturer, type, modified, digital, filterMuseo, filterTaller } = req.query;
     const { column: sortColumn, ascending } = parseVehicleSort(req);
-    const orderOpts = orderOptsForVehicleSort(sortColumn, ascending);
 
-    let query = supabase
-      .from('vehicles')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .order(sortColumn, orderOpts);
+    let query = applyVehicleListSort(
+      supabase.from('vehicles').select('*').eq('user_id', req.user.id),
+      sortColumn,
+      ascending,
+    );
 
     if (manufacturer && String(manufacturer).trim()) {
       query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
@@ -470,7 +481,6 @@ router.get('/', async (req, res) => {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     const { column: sortColumn, ascending } = parseVehicleSort(req);
-    const orderOpts = orderOptsForVehicleSort(sortColumn, ascending);
 
     // Obtener el total de vehículos para la paginación
     const { count, error: countError } = await supabase
@@ -481,12 +491,11 @@ router.get('/', async (req, res) => {
     if (countError) throw countError;
     
     // Obtener los vehículos paginados
-    const { data: vehicles, error: vehiclesError } = await supabase
-      .from('vehicles')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .order(sortColumn, orderOpts)
-      .range(from, to);
+    const { data: vehicles, error: vehiclesError } = await applyVehicleListSort(
+      supabase.from('vehicles').select('*').eq('user_id', req.user.id),
+      sortColumn,
+      ascending,
+    ).range(from, to);
 
     if (vehiclesError) throw vehiclesError;
 

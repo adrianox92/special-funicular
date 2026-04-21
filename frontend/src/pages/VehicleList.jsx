@@ -27,6 +27,7 @@ const SORT_KEYS = new Set([
   'created_at',
   'total_distance_meters',
   'updated_at',
+  'model',
 ]);
 
 const loadStoredSort = () => {
@@ -34,7 +35,8 @@ const loadStoredSort = () => {
     const raw = localStorage.getItem(SORT_STORAGE_KEY);
     if (!raw) return { sort: 'purchase_date', dir: 'desc' };
     const parsed = JSON.parse(raw);
-    const sort = SORT_KEYS.has(parsed.sort) ? parsed.sort : 'purchase_date';
+    const normalizedSort = parsed.sort === 'manufacturer' ? 'model' : parsed.sort;
+    const sort = SORT_KEYS.has(normalizedSort) ? normalizedSort : 'purchase_date';
     const dir = parsed.dir === 'asc' || parsed.dir === 'desc' ? parsed.dir : 'desc';
     return { sort, dir };
   } catch {
@@ -506,6 +508,8 @@ const VehicleList = () => {
                 setCurrentPage(1);
               }}
             >
+              <option value="model|asc">Alfabético — A-Z (modelo, fabricante)</option>
+              <option value="model|desc">Alfabético — Z-A (modelo, fabricante)</option>
               <option value="purchase_date|desc">Fecha de compra — reciente primero</option>
               <option value="purchase_date|asc">Fecha de compra — antigua primero</option>
               <option value="created_at|desc">Fecha de creación — reciente primero</option>

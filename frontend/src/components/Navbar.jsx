@@ -21,8 +21,11 @@ import {
   Database,
   Store,
   Building2,
+  ScrollText,
+  Megaphone,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import { ChangelogBell } from './ChangelogBell';
 import api from '../lib/axios';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -235,6 +238,7 @@ const Navbar = () => {
 
           {user && (
             <>
+              <ChangelogBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-9 w-9 rounded-full">
@@ -259,6 +263,12 @@ const Navbar = () => {
                       Mi Perfil
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/changelog" className="flex items-center gap-2 cursor-pointer">
+                      <ScrollText className="size-4" />
+                      Novedades
+                    </Link>
+                  </DropdownMenuItem>
                   {hasSellerProfile && (
                     <DropdownMenuItem asChild>
                       <Link to="/seller" className="flex items-center gap-2 cursor-pointer">
@@ -280,6 +290,14 @@ const Navbar = () => {
                       <Link to="/admin/slot-catalog" className="flex items-center gap-2 cursor-pointer">
                         <Database className="size-4" />
                         Catálogo slot (admin)
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {showLicenseAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/changelog" className="flex items-center gap-2 cursor-pointer">
+                        <Megaphone className="size-4" />
+                        Changelog (admin)
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -330,6 +348,22 @@ const Navbar = () => {
                   >
                     <Database className="size-4" />
                     Catálogo slot (admin)
+                  </Link>
+                )}
+                <Link
+                  to="/changelog"
+                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                >
+                  <ScrollText className="size-4" />
+                  Novedades
+                </Link>
+                {showLicenseAdmin && (
+                  <Link
+                    to="/admin/changelog"
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Megaphone className="size-4" />
+                    Changelog (admin)
                   </Link>
                 )}
               </nav>
