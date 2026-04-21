@@ -1,16 +1,17 @@
-const { createClient } = require('@supabase/supabase-js');
+const { getServiceClient } = require('../lib/supabaseClients');
 const { hashApiKey } = require('../lib/apiKeyHash');
-
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
 
 const apiKeyAuth = async (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
 
   if (!apiKey) {
     return res.status(401).json({ error: 'No se proporcionó API key. Usa el header X-API-Key.' });
+  }
+
+  const supabaseAdmin = getServiceClient();
+  if (!supabaseAdmin) {
+    console.error('apiKeyAuth: SUPABASE_SERVICE_ROLE_KEY no configurada');
+    return res.status(503).json({ error: 'Error de configuración del servidor' });
   }
 
   try {

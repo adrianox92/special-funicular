@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Download, Trash2, Calendar, MapPin, Gauge } from 'lucide-react';
 import api from '../lib/axios';
-import { formatDistance } from '../utils/formatUtils';
+import { formatDistance, safeVehicleFileBasename } from '../utils/formatUtils';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -55,7 +55,7 @@ const VehicleCard = ({ vehicle, onDelete }) => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `ficha-tecnica-${vehicle.model.toLowerCase().replace(/\s+/g, '-')}.pdf`;
+      link.download = `${safeVehicleFileBasename(vehicle.model)}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();

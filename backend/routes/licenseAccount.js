@@ -2,14 +2,11 @@
  * Slot Race Manager — cuenta web (JWT): estado de licencia e instalaciones
  */
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const { getServiceClient } = require('../lib/supabaseClients');
 
 const INSTALLATIONS_MAX = 3;
 
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
+const supabaseAdmin = getServiceClient();
 
 const router = express.Router();
 

@@ -1,6 +1,6 @@
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('./supabaseClients');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 /**
  * Función para convertir tiempo de vuelta a segundos

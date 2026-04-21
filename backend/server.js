@@ -131,6 +131,33 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.use(express.json({ limit: '1mb' }));
 
+/**
+ * @returns {{ ok: boolean, uptime: number, memory: object, activeHandles: number|null }}
+ */
+function getHealthPayload() {
+  const mem = process.memoryUsage();
+  const activeHandles =
+    typeof process._getActiveHandles === 'function'
+      ? process._getActiveHandles().length
+      : null;
+  return {
+    ok: true,
+    uptime: process.uptime(),
+    memory: {
+      rss: mem.rss,
+      heapTotal: mem.heapTotal,
+      heapUsed: mem.heapUsed,
+      external: mem.external,
+      arrayBuffers: mem.arrayBuffers,
+    },
+    activeHandles,
+  };
+}
+
+app.get('/health', (_req, res) => {
+  res.json(getHealthPayload());
+});
+
 const sitemapHandler = require('./routes/sitemap');
 app.get('/sitemap.xml', sitemapHandler);
 
@@ -140,9 +167,11 @@ const publicPilotRoute = require('./routes/publicPilot');
 const pilotProfileRoute = require('./routes/pilotProfile');
 const contactRoute = require('./routes/contact');
 const publicCatalogRoute = require('./routes/publicCatalog');
+const publicVehicleRoute = require('./routes/publicVehicle');
 app.use('/api/public-signup', publicSignupLimiter, publicCompetitionsRoute);
 app.use('/api/public/pilot', publicSignupLimiter, publicPilotRoute);
 app.use('/api/public/catalog', publicCatalogReadLimiter, publicCatalogRoute);
+app.use('/api/public/vehicles', publicCatalogReadLimiter, publicVehicleRoute);
 app.use('/api/public/contact', contactLimiter, contactRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
@@ -228,8 +257,25 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const PORT = process.env.PORT || 5001;
+const MEMORY_LOG_DISABLED = String(process.env.MEMORY_LOG || '').toLowerCase() === 'off';
+
 if (require.main === module) {
   app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+
+  if (!MEMORY_LOG_DISABLED) {
+    setInterval(() => {
+      const p = getHealthPayload();
+      console.log(
+        '[MEM]',
+        JSON.stringify({
+          uptime: Math.round(p.uptime),
+          rss: p.memory.rss,
+          heapUsed: p.memory.heapUsed,
+          activeHandles: p.activeHandles,
+        }),
+      );
+    }, 5 * 60 * 1000);
+  }
 }
 
 module.exports = app;

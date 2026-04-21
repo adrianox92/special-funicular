@@ -1,4 +1,3 @@
-const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -10,7 +9,8 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const { getAnonClient } = require('../lib/supabaseClients');
+const supabase = getAnonClient();
 
 async function migrateTechnicalSpecs() {
   try {

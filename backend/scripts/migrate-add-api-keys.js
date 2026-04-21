@@ -1,8 +1,9 @@
-const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
 require('dotenv').config();
+
+const { createServerClient } = require('../lib/supabaseClients');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -12,7 +13,7 @@ if (!supabaseUrl || !supabaseKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createServerClient(supabaseUrl, supabaseKey);
 
 async function migrateAddApiKeys() {
   try {

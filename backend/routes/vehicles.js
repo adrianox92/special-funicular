@@ -5,13 +5,13 @@
  */
 const express = require('express');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 const multer = require('multer');
 const authMiddleware = require('../middleware/auth');
 const { removeObjectByPublicUrl, removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const { saveVehicleImagesFromMultipart } = require('../lib/vehicleImageUpload');
 const { tryCopyCatalogImageToVehicleFront } = require('../lib/copyCatalogToVehicleImage');
-const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
+const { buildVehicleSpecsPdfBuffer, safeFilenamePart } = require('../lib/vehicleSpecsPdfBuilder');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
@@ -20,7 +20,7 @@ const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/in
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 /** Columnas permitidas para GET /vehicles y /vehicles/export (ordenación). */
 const VEHICLE_SORT_COLUMNS = {
@@ -1738,53 +1738,21 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
   }
 });
 
-// Endpoint para generar y descargar la ficha técnica en PDF
+// Endpoint para generar y descargar la ficha técnica en PDF (solo propietario)
 router.get('/:id/specs-pdf', async (req, res) => {
   try {
     const vehicleId = req.params.id;
-    // Obtener datos del vehículo
-    const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
-      .select('*')
-      .eq('id', vehicleId)
-      .single();
-    if (vehicleError || !vehicle) {
-      return res.status(404).json({ error: 'Vehículo no encontrado' });
-    }
-    // Obtener imagen principal (misma lógica que listado: three_quarters > left/right > primera disponible)
-    let imageUrl = null;
-    const { data: images, error: imagesError } = await supabase
-      .from('vehicle_images')
-      .select('image_url, view_type')
-      .eq('vehicle_id', vehicleId)
-      .order('created_at', { ascending: true });
-    if (!imagesError && images && images.length > 0) {
-      const threeQuarters = images.find(img => img.view_type === 'three_quarters');
-      if (threeQuarters) {
-        imageUrl = threeQuarters.image_url;
-      } else {
-        const lateral = images.find(img => img.view_type === 'left' || img.view_type === 'right');
-        imageUrl = lateral ? lateral.image_url : images[0].image_url;
-      }
-    }
-    // Obtener especificaciones técnicas y sus componentes
-    const { data: specs, error: specsError } = await supabase
-      .from('technical_specs')
-      .select(`*, components (*)`)
-      .eq('vehicle_id', vehicleId)
-      .order('is_modification', { ascending: true });
-    if (specsError) {
-      throw specsError;
-    }
-    // Separar especificaciones técnicas y modificaciones
-    const technicalSpecs = specs.filter(spec => !spec.is_modification);
-    const modifications = specs.filter(spec => spec.is_modification);
-    // Pasar la imagen al generador de PDF
-    const pdfBuffer = await generateVehicleSpecsPDF({ ...vehicle, image: imageUrl }, technicalSpecs, modifications);
+    const { pdfBuffer, model } = await buildVehicleSpecsPdfBuffer(supabase, vehicleId, {
+      userId: req.user.id,
+    });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=ficha-tecnica-${vehicle.model.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+    const filename = `${safeFilenamePart(model)}.pdf`.replace(/"/g, "'");
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(pdfBuffer);
   } catch (error) {
+    if (error.statusCode === 404) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
     res.status(500).json({ error: 'Error al generar la ficha técnica', details: error.message, stack: error.stack });
   }
 });

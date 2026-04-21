@@ -5,16 +5,13 @@
 const express = require('express');
 const crypto = require('crypto');
 const { body, param } = require('express-validator');
-const { createClient } = require('@supabase/supabase-js');
+const { getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 
 const router = express.Router();
 
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
+const supabaseAdmin = getServiceClient();
 
 function slugifyBase(name) {
   return String(name || '')
@@ -157,6 +154,13 @@ router.get('/:id/members', param('id').isUUID(), handleValidationErrors, async (
     const ok = await userIsClubMember(req.user.id, id);
     if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
 
+    const { data: clubRow, error: clubErr } = await supabaseAdmin
+      .from('clubs')
+      .select('owner_user_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (clubErr || !clubRow) return res.status(404).json({ error: 'Club no encontrado' });
+
     const { data: rows, error } = await supabaseAdmin
       .from('club_members')
       .select('id, user_id, role, joined_at')
@@ -165,12 +169,76 @@ router.get('/:id/members', param('id').isUUID(), handleValidationErrors, async (
 
     if (error) return res.status(500).json({ error: error.message });
 
-    res.json(rows || []);
+    const members = [];
+    for (const row of rows || []) {
+      let email = null;
+      try {
+        const { data: u, error: uErr } = await supabaseAdmin.auth.admin.getUserById(row.user_id);
+        if (uErr) {
+          console.error('GET /clubs/:id/members getUserById', row.user_id, uErr);
+        } else {
+          email = u?.user?.email ?? null;
+        }
+      } catch (authErr) {
+        console.error('GET /clubs/:id/members getUserById', row.user_id, authErr);
+      }
+      members.push({
+        id: row.id,
+        user_id: row.user_id,
+        email,
+        role: row.role,
+        joined_at: row.joined_at,
+        is_owner: row.user_id === clubRow.owner_user_id,
+      });
+    }
+
+    res.json({ members, owner_user_id: clubRow.owner_user_id });
   } catch (e) {
     console.error('GET /clubs/:id/members', e);
     res.status(500).json({ error: e.message });
   }
 });
+
+router.patch(
+  '/:id/members/:userId',
+  param('id').isUUID(),
+  param('userId').isUUID(),
+  body('role').isIn(['admin', 'member']),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, userId } = req.params;
+      const { role } = req.body;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const { data: club } = await supabaseAdmin.from('clubs').select('owner_user_id').eq('id', id).single();
+      if (club?.owner_user_id === userId) {
+        return res.status(400).json({ error: 'No se puede cambiar el rol del propietario del club' });
+      }
+
+      const { data: targetMem, error: memErr } = await supabaseAdmin
+        .from('club_members')
+        .select('id')
+        .eq('club_id', id)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (memErr || !targetMem) return res.status(404).json({ error: 'Miembro no encontrado' });
+
+      const { error: updErr } = await supabaseAdmin
+        .from('club_members')
+        .update({ role })
+        .eq('club_id', id)
+        .eq('user_id', userId);
+
+      if (updErr) return res.status(500).json({ error: updErr.message });
+      res.json({ ok: true, role });
+    } catch (e) {
+      console.error('PATCH /clubs/:id/members/:userId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
 
 router.get('/:id', param('id').isUUID(), handleValidationErrors, async (req, res) => {
   try {

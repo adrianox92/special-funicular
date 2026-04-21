@@ -2,10 +2,10 @@
  * Catálogo slot — solo lectura, sin autenticación.
  */
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 
 const router = express.Router();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 const PUBLIC_SELECT =
   'id, reference, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, image_url, updated_at, rating_avg, rating_count';

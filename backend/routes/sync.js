@@ -1,5 +1,5 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
 const authMiddleware = require('../middleware/auth');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
@@ -7,7 +7,7 @@ const { findOrCreateCircuit } = require('../lib/circuitResolver');
 const { sendTimingNotification, sendTestNotification } = require('../lib/notifier');
 
 const router = express.Router();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 /**
  * POST /api/sync/test-notification

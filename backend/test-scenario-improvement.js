@@ -1,8 +1,12 @@
-const { createClient } = require('@supabase/supabase-js');
-const { updateCircuitPositions, getCircuitRanking } = require('./lib/positionTracker');
 require('dotenv').config();
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const { createServerClient } = require('./lib/supabaseClients');
+const { updateCircuitPositions, getCircuitRanking } = require('./lib/positionTracker');
+
+const supabase = createServerClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 async function testScenarioImprovement() {
   console.log('Probando escenario de mejora de posiciones...\n');

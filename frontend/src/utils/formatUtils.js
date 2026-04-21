@@ -234,3 +234,21 @@ export function formatInventoryCategory(cat) {
   const found = INVENTORY_CATEGORIES.find((c) => c.value === cat);
   return found ? found.label : String(cat);
 }
+
+/**
+ * Nombre de fichero local seguro a partir del nombre del coche (misma lógica que el PDF en el backend).
+ * @param {string|null|undefined} model
+ * @param {{ fallback?: string }} [opts]
+ * @returns {string}
+ */
+export function safeVehicleFileBasename(model, opts = {}) {
+  const fb = opts.fallback ?? 'vehiculo';
+  const raw = String(model ?? '').trim() || fb;
+  const cleaned = raw
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const base = (cleaned || fb).toLowerCase();
+  return base.slice(0, 180);
+}

@@ -3,7 +3,7 @@
  * Rutas bajo /api/sync/competitions (montadas desde sync.js tras apiKeyAuth).
  */
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const { getServiceClient } = require('../lib/supabaseClients');
 const { v4: uuidv4, validate: uuidValidate } = require('uuid');
 const { body, param } = require('express-validator');
 const { handleValidationErrors } = require('../middleware/validateRequest');
@@ -12,10 +12,7 @@ const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR }
 
 const router = express.Router();
 
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
+const supabaseAdmin = getServiceClient();
 
 function generateSlug(name) {
   const baseSlug = String(name || '')

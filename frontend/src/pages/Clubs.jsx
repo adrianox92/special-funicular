@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Link2, LogOut, Loader2 } from 'lucide-react';
+import { Building2, Plus, Link2, LogOut, Loader2, Users } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import { PENDING_CLUB_INVITE_KEY } from '../components/PendingInviteConsumer';
 
 const Clubs = () => {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ const Clubs = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const { data } = await axios.get('/clubs/mine');
@@ -42,11 +43,11 @@ const Clubs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -66,7 +67,32 @@ const Clubs = () => {
         navigate('/clubs', { replace: true });
       }
     })();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, load]);
+
+  /** Invitación guardada en sessionStorage (p. ej. login tras /clubs/join sin sesión). */
+  useEffect(() => {
+    if (!user) return;
+    if (searchParams.get('token')?.trim()) return;
+
+    const stored = sessionStorage.getItem(PENDING_CLUB_INVITE_KEY)?.trim();
+    if (!stored) return;
+
+    (async () => {
+      try {
+        const { data } = await axios.post(`/clubs/join/${encodeURIComponent(stored)}`);
+        sessionStorage.removeItem(PENDING_CLUB_INVITE_KEY);
+        if (data?.already_member) {
+          toast.info('Ya eras miembro de este club');
+        } else {
+          toast.success('Te has unido al club');
+        }
+        load();
+      } catch (e) {
+        sessionStorage.removeItem(PENDING_CLUB_INVITE_KEY);
+        toast.error(e.response?.data?.error || 'No se pudo unir al club');
+      }
+    })();
+  }, [user, searchParams, load]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -208,10 +234,21 @@ const Clubs = () => {
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
                   {canInvite && (
-                    <Button variant="outline" size="sm" className="gap-1" onClick={() => handleInvite(c.id)}>
-                      <Link2 className="size-3.5" />
-                      Invitar (copiar enlace)
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => navigate(`/clubs/${c.id}/members`)}
+                      >
+                        <Users className="size-3.5" />
+                        Miembros
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-1" onClick={() => handleInvite(c.id)}>
+                        <Link2 className="size-3.5" />
+                        Invitar (copiar enlace)
+                      </Button>
+                    </>
                   )}
                   {!isOwner && (
                     <Button

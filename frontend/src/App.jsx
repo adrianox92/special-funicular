@@ -12,6 +12,8 @@ import EditVehicle from './components/EditVehicle';
 import TimingsList from './components/TimingsList';
 import Competitions from './pages/Competitions';
 import Clubs from './pages/Clubs';
+import ClubMembers from './pages/ClubMembers';
+import PendingInviteConsumer from './components/PendingInviteConsumer';
 import Circuits from './pages/Circuits';
 import Inventory from './pages/Inventory';
 import CompetitionParticipants from './pages/CompetitionParticipants';
@@ -121,6 +123,7 @@ const AppContent = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <PendingInviteConsumer />
       <Routes>
         <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
@@ -330,6 +333,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <Clubs />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/clubs/:id/members"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <ClubMembers />
               </AuthedShell>
             </PrivateRoute>
           }

@@ -1,10 +1,10 @@
-const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
 require('dotenv').config();
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const { getAnonClient } = require('../lib/supabaseClients');
+const supabase = getAnonClient();
 
 async function insertRuleTemplates() {
   try {

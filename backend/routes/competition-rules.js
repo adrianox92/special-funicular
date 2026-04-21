@@ -1,10 +1,10 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { requireViewCompetition } = require('../lib/competitionPermissions');
 
 const router = express.Router();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);

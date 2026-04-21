@@ -25,21 +25,21 @@
 const crypto = require('crypto');
 const express = require('express');
 const multer = require('multer');
-const { createClient } = require('@supabase/supabase-js');
+const {
+  getAnonClient,
+  getServiceClient,
+  createUserScopedClient,
+} = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const { processVehicleImageBuffer } = require('../lib/processVehicleImageBuffer');
 const { buildTrackedUrl } = require('../lib/affiliateUrl');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
 /** Anon, sin sesión: lecturas/escrituras que RLS permite al rol anon (p. ej. listados públicos, INSERT de clics). */
-const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
+const supabasePublic = getAnonClient();
 
 /** Service role: bypass RLS. Necesario para el panel admin de tiendas (ver todos los perfiles, notas internas, etc.). */
-const supabaseService = supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
+const supabaseService = getServiceClient();
 
 /**
  * Cliente Supabase con el JWT del usuario que llama a la API.
@@ -47,12 +47,7 @@ const supabaseService = supabaseServiceKey ? createClient(supabaseUrl, supabaseS
  * (p. ej. perfil de tienda pendiente de aprobación).
  */
 function supabaseForUser(req) {
-  const authHeader = req.headers.authorization;
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: authHeader ? { Authorization: authHeader } : {},
-    },
-  });
+  return createUserScopedClient(req.headers.authorization);
 }
 
 /** Operaciones de vendedor: preferir service role si está configurado; si no, JWT del usuario. */
@@ -714,8 +709,10 @@ router.post('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
     if (!serviceKey) {
       return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada' });
     }
-    const { createClient: createAdmin } = require('@supabase/supabase-js');
-    const adminClient = createAdmin(process.env.SUPABASE_URL, serviceKey);
+    const adminClient = getServiceClient();
+    if (!adminClient) {
+      return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada' });
+    }
 
     const { data: userList, error: userErr } = await adminClient.auth.admin.listUsers();
     if (userErr) return res.status(500).json({ error: userErr.message });

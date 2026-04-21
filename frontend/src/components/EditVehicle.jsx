@@ -12,7 +12,9 @@ import {
   Package,
   LayoutPanelLeft,
   Upload,
+  QrCode,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import api from '../lib/axios';
 import TimingEvolutionChart from './charts/TimingEvolutionChart';
 import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
@@ -71,6 +73,7 @@ import {
   formatHistoryDate,
   formatInventoryCategory,
   modificationLineTotal,
+  safeVehicleFileBasename,
 } from '../utils/formatUtils';
 import {
   vehicleComponentTypes as componentTypes,
@@ -241,6 +244,43 @@ const EditVehicle = () => {
   const [inventoryPickerLoading, setInventoryPickerLoading] = useState(false);
   const [inventoryPickerItems, setInventoryPickerItems] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState(null);
+  const [publicPdfUrl, setPublicPdfUrl] = useState('');
+
+  const getApiBaseUrl = useCallback(() => {
+    if (process.env.REACT_APP_API_URL) {
+      return String(process.env.REACT_APP_API_URL).replace(/\/$/, '');
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return 'https://api.slotdatabase.es/api';
+    }
+    return 'http://localhost:5001/api';
+  }, []);
+
+  const openQrDialog = useCallback(async () => {
+    setShowQrDialog(true);
+    setQrError(null);
+    setQrDataUrl(null);
+    setQrLoading(true);
+    try {
+      const base = getApiBaseUrl();
+      const url = `${base}/public/vehicles/${id}/specs-pdf`;
+      setPublicPdfUrl(url);
+      const dataUrl = await QRCode.toDataURL(url, {
+        errorCorrectionLevel: 'M',
+        width: 512,
+        margin: 2,
+      });
+      setQrDataUrl(dataUrl);
+    } catch {
+      setQrError('No se pudo generar el código QR');
+    } finally {
+      setQrLoading(false);
+    }
+  }, [getApiBaseUrl, id]);
 
   useEffect(() => {
     api.get('/circuits').then(r => setCircuits(r.data || [])).catch(() => {});
@@ -1949,8 +1989,72 @@ const EditVehicle = () => {
       )}
 
       <div className="container mt-4">
+      <Dialog
+        open={showQrDialog}
+        onOpenChange={(open) => {
+          setShowQrDialog(open);
+          if (!open) {
+            setQrDataUrl(null);
+            setQrError(null);
+            setPublicPdfUrl('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Código QR — ficha técnica (público)</DialogTitle>
+            <DialogDescription>
+              Al escanearlo se abre el PDF de la ficha técnica con los datos actuales del vehículo. La imagen se
+              genera a 512×512 px; al imprimir se limita a 50×50 px.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-3 py-2">
+            {qrLoading && <Spinner className="size-8" />}
+            {qrError && <p className="text-sm text-destructive">{qrError}</p>}
+            {qrDataUrl && (
+              <>
+                <div className="vehicle-qr-print-block flex flex-col items-center gap-2">
+                  <img
+                    src={qrDataUrl}
+                    alt="Código QR para abrir la ficha técnica en PDF"
+                    className="vehicle-qr-img w-48 h-48 sm:w-56 sm:h-56 object-contain rounded border bg-white p-1"
+                  />
+                </div>
+                {publicPdfUrl && (
+                  <p className="text-xs text-muted-foreground break-all text-center max-w-full">{publicPdfUrl}</p>
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!qrDataUrl}
+              onClick={() => {
+                if (!qrDataUrl || !vehicle) return;
+                const a = document.createElement('a');
+                a.href = qrDataUrl;
+                a.download = `${safeVehicleFileBasename(vehicle.model)}.png`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+              }}
+            >
+              Descargar PNG
+            </Button>
+            <Button type="button" variant="secondary" disabled={!qrDataUrl} onClick={() => window.print()}>
+              Imprimir
+            </Button>
+            <Button type="button" variant="default" onClick={() => setShowQrDialog(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 min-w-0">
           <h2 className="text-2xl font-bold">Editar Vehículo{vehicle.model ? `: ${vehicle.model}` : ''}</h2>
           {vehicle.total_distance_meters != null && vehicle.total_distance_meters > 0 && (
             <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
@@ -1958,9 +2062,20 @@ const EditVehicle = () => {
             </span>
           )}
         </div>
-        <Button variant="secondary" onClick={() => navigate('/vehicles')}>
-          Volver al listado
-        </Button>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={openQrDialog}
+            title="Generar QR de ficha técnica pública (visible en cualquier pestaña)"
+          >
+            <QrCode className="size-4 mr-2" />
+            QR ficha
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/vehicles')}>
+            Volver al listado
+          </Button>
+        </div>
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="mb-6 sm:hidden">

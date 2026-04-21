@@ -1,7 +1,11 @@
+const path = require('path');
+const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const sharp = require('sharp');
 const { modificationLineTotal } = require('../../lib/componentPricing');
+
+const HEADER_LOGO_PATH = path.join(__dirname, '../../assets/logo-header.png');
 
 /** PDFKit solo incrusta JPEG y PNG; las subidas usan WebP por defecto (processVehicleImageBuffer). */
 function isJpegBuffer(buf) {
@@ -9,6 +13,23 @@ function isJpegBuffer(buf) {
 }
 function isPngBuffer(buf) {
   return buf.length >= 8 && buf[0] === 0x89 && buf.toString('ascii', 1, 4) === 'PNG';
+}
+
+let headerLogoBuffer = false; // false = no cargado aún; Buffer | null tras intento
+function getHeaderLogoBuffer() {
+  if (headerLogoBuffer !== false) return headerLogoBuffer;
+  try {
+    if (fs.existsSync(HEADER_LOGO_PATH)) {
+      const buf = fs.readFileSync(HEADER_LOGO_PATH);
+      headerLogoBuffer =
+        buf.length > 0 && (isPngBuffer(buf) || isJpegBuffer(buf)) ? buf : null;
+    } else {
+      headerLogoBuffer = null;
+    }
+  } catch {
+    headerLogoBuffer = null;
+  }
+  return headerLogoBuffer;
 }
 
 async function bufferForPdfKitImage(buf) {
@@ -63,8 +84,25 @@ function drawHeader(doc, genDate) {
   doc.page.margins.top = 0;
   doc.save();
   doc.rect(0, 0, PAGE_WIDTH, HEADER_HEIGHT).fill(COLORS.header);
-  doc.fillColor('white').fontSize(14).font('Helvetica-Bold');
-  doc.text('Slot Collection Pro · Ficha Técnica', MARGIN, 11, { width: 300, lineBreak: false });
+  const logo = getHeaderLogoBuffer();
+  const maxW = 128;
+  const maxH = 22;
+  const yImg = (HEADER_HEIGHT - maxH) / 2;
+  let usedLogo = false;
+  if (logo) {
+    try {
+      doc.image(logo, MARGIN, yImg, { fit: [maxW, maxH] });
+      doc.fillColor('white').fontSize(11).font('Helvetica-Bold');
+      doc.text('· Ficha Técnica', MARGIN + maxW + 6, 12, { width: 220, lineBreak: false });
+      usedLogo = true;
+    } catch {
+      usedLogo = false;
+    }
+  }
+  if (!usedLogo) {
+    doc.fillColor('white').fontSize(14).font('Helvetica-Bold');
+    doc.text('Slot Collection Pro · Ficha Técnica', MARGIN, 11, { width: 300, lineBreak: false });
+  }
   doc.fontSize(10).font('Helvetica');
   doc.text(`Generado: ${genDate}`, PAGE_WIDTH - MARGIN - 120, 13, { width: 120, align: 'right', lineBreak: false });
   doc.restore();

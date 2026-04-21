@@ -1,7 +1,7 @@
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('./supabaseClients');
 const { modificationLineTotal } = require('./componentPricing');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 /**
  * Recalcula total_price y modified del vehículo a partir de modificaciones.

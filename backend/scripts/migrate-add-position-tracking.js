@@ -1,5 +1,6 @@
-const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
+
+const { getAnonClient } = require('../lib/supabaseClients');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
@@ -9,7 +10,7 @@ if (!supabaseUrl || !supabaseKey) {
   process.exit(1);
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 async function migratePositionTracking() {
   console.log('Iniciando migración para añadir seguimiento de posiciones...');

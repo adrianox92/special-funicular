@@ -6,7 +6,7 @@ const express = require('express');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const {
@@ -16,7 +16,7 @@ const {
 } = require('../lib/catalogImageStorage');
 const { catalogContributionsLimiter } = require('../middleware/rateLimits');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 const router = express.Router();
 

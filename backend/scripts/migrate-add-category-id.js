@@ -1,6 +1,8 @@
-const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
 const fs = require('fs');
 const path = require('path');
+const { createServerClient } = require('../lib/supabaseClients');
 
 // Configuración de Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -11,7 +13,7 @@ if (!supabaseUrl || !supabaseKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createServerClient(supabaseUrl, supabaseKey);
 
 async function migrateAddCategoryId() {
   try {

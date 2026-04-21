@@ -84,6 +84,21 @@ html.dark {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Pantalla completa: evita scroll del documento y el “salto” por 100vh en móvil */
+html.presentation-mode {
+  overflow: hidden;
+  overscroll-behavior: none;
+  height: 100%;
+}
+
+html.presentation-mode body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -118,4 +133,27 @@ html.dark {
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: oklch(0.556 0 0 / 0.5);
+}
+
+/* QR ficha técnica: al imprimir solo el recuadro, tamaño máximo 50×50px */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .vehicle-qr-print-block,
+  .vehicle-qr-print-block * {
+    visibility: visible;
+  }
+  .vehicle-qr-print-block {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  .vehicle-qr-img {
+    width: 50px !important;
+    height: 50px !important;
+    max-width: 50px !important;
+    max-height: 50px !important;
+    image-rendering: pixelated;
+  }
 }

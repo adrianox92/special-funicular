@@ -41,11 +41,16 @@ const CompetitionPresentation = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
+  useEffect(() => {
+    document.documentElement.classList.add('presentation-mode');
+    return () => document.documentElement.classList.remove('presentation-mode');
+  }, []);
+
   if (loading) {
     return (
       <div className="presentation-loading">
-        <Spinner className="size-12 text-[#7876c6]" />
-        <p className="mt-3 text-[#b8b8b8]">Cargando competición...</p>
+        <Spinner className="size-12 text-primary" />
+        <p className="mt-3 text-muted-foreground">Cargando competición...</p>
       </div>
     );
   }
@@ -54,7 +59,7 @@ const CompetitionPresentation = () => {
     return (
       <div className="presentation-error">
         <div className="presentation-error-box">
-          <h4 className="text-[#ff6b6b]">Error</h4>
+          <h4 className="text-destructive">Error</h4>
           <p>{error}</p>
         </div>
       </div>
@@ -65,7 +70,7 @@ const CompetitionPresentation = () => {
     return (
       <div className="presentation-error">
         <div className="presentation-error-box">
-          <h4 className="text-amber-400">Competición no encontrada</h4>
+          <h4 className="text-foreground font-semibold">Competición no encontrada</h4>
           <p>La competición solicitada no existe o no está disponible.</p>
         </div>
       </div>

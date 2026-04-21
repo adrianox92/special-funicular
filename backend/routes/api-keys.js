@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
+const { getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { hashApiKey } = require('../lib/apiKeyHash');
 
@@ -13,11 +13,10 @@ function serverConfigError(res, status, logErr, devDetail) {
   return res.status(status).json({ error: message });
 }
 
-let _supabase = null;
 function getSupabase() {
-  if (!_supabase)
-    _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-  return _supabase;
+  const c = getServiceClient();
+  if (!c) throw new Error('SUPABASE_SERVICE_ROLE_KEY no configurada');
+  return c;
 }
 
 router.use(authMiddleware);

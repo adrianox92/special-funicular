@@ -267,9 +267,13 @@ const VehicleDetail = () => {
             </ul>
           </div>
         )}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate('/vehicles')}>Volver al listado</Button>
-          <Button asChild><Link to={`/edit/${id}`}>Editar</Link></Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => navigate('/vehicles')}>
+            Volver al listado
+          </Button>
+          <Button asChild>
+            <Link to={`/edit/${id}`}>Editar</Link>
+          </Button>
         </div>
       </form>
     </div>

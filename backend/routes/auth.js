@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { hashApiKey } = require('../lib/apiKeyHash');
 const { removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const authMiddleware = require('../middleware/auth');
@@ -14,21 +14,16 @@ function serverConfigErrorResponse(res, status, logError, devDetail) {
   return res.status(status).json({ error: message });
 }
 
-let _supabase = null;
-let _supabaseAdmin = null;
-
 function getSupabase() {
-  if (!_supabase) _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-  return _supabase;
+  return getAnonClient();
 }
 
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin)
-    _supabaseAdmin = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-    );
-  return _supabaseAdmin;
+  const c = getServiceClient();
+  if (!c) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY no configurada');
+  }
+  return c;
 }
 
 function generateApiKey() {

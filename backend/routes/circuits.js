@@ -1,9 +1,9 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 router.use(authMiddleware);
 

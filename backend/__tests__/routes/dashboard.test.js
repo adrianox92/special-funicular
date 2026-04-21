@@ -5,6 +5,18 @@ jest.mock('@supabase/supabase-js', () => {
   };
 });
 
+/** Misma API que usa el código real vía backend/lib/supabaseClients.js */
+jest.mock('../../lib/supabaseClients', () => {
+  const { mockSupabase } = require('../mocks/supabase');
+  return {
+    getAnonClient: jest.fn(() => mockSupabase),
+    getServiceClient: jest.fn(() => mockSupabase),
+    getServiceOrAnonClient: jest.fn(() => mockSupabase),
+    createUserScopedClient: jest.fn(() => mockSupabase),
+    createServerClient: jest.fn(() => mockSupabase),
+  };
+});
+
 const request = require('supertest');
 const app = require('../../server');
 const { mockSupabase } = require('../mocks/supabase');
@@ -99,7 +111,8 @@ describe('Dashboard Routes', () => {
       mockSupabase.from.mockImplementation((table) => {
         if (table === 'vehicles') {
           const b = createQueryBuilder();
-          b.eq.mockImplementation(() => Promise.resolve({ data: mockVehicles, error: null }));
+          b.eq.mockReturnThis();
+          b.limit.mockImplementation(() => Promise.resolve({ data: mockVehicles, error: null }));
           return b;
         }
         if (table === 'vehicle_timings') {
@@ -141,10 +154,11 @@ describe('Dashboard Routes', () => {
     });
 
     test('maneja errores de base de datos correctamente', async () => {
-      // Simular error en la consulta de vehículos
+      // Simular error en la consulta de vehículos (.eq().limit() como en dashboard/metrics)
       mockSupabase.from.mockImplementation(() => ({
         select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ data: null, error: new Error('DB Error') })
+        eq: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue({ data: null, error: new Error('DB Error') }),
       }));
 
       const response = await request(app)

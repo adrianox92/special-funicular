@@ -2,7 +2,7 @@
  * Sitemap XML para el sitio público (catálogo). Debe alinearse con
  * `frontend/src/utils/catalogSlug.js` (slug canónico por ítem).
  */
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 
 const PAGE_SIZE = 1000;
 
@@ -63,7 +63,7 @@ function sitemapHandler(_req, res) {
       return;
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = getAnonClient();
 
     /** @type {{ loc: string, lastmod: string }[]} */
     const urls = [

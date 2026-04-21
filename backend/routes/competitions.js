@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
+const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { v4: uuidv4 } = require('uuid');
@@ -14,7 +14,7 @@ const {
   requireManageCompetition,
 } = require('../lib/competitionPermissions');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = getAnonClient();
 
 // Aplicar middleware de autenticación SOLO a las rutas siguientes
 router.use(authMiddleware);
