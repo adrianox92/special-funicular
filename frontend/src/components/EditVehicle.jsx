@@ -2020,9 +2020,6 @@ const EditVehicle = () => {
                     className="vehicle-qr-img w-48 h-48 sm:w-56 sm:h-56 object-contain rounded border bg-white p-1"
                   />
                 </div>
-                {publicPdfUrl && (
-                  <p className="text-xs text-muted-foreground break-all text-center max-w-full">{publicPdfUrl}</p>
-                )}
               </>
             )}
           </div>

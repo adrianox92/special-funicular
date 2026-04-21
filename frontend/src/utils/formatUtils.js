@@ -241,11 +241,19 @@ export function formatInventoryCategory(cat) {
  * @param {{ fallback?: string }} [opts]
  * @returns {string}
  */
+const FORBIDDEN_FILE_NAME_CHARS = new Set('<>:"/\\|?*');
+
 export function safeVehicleFileBasename(model, opts = {}) {
   const fb = opts.fallback ?? 'vehiculo';
   const raw = String(model ?? '').trim() || fb;
   const cleaned = raw
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '')
+    .split('')
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      if (code < 32 || code === 127) return false;
+      return !FORBIDDEN_FILE_NAME_CHARS.has(ch);
+    })
+    .join('')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
