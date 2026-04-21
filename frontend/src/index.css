@@ -135,21 +135,57 @@ html.presentation-mode body {
   background-color: oklch(0.556 0 0 / 0.5);
 }
 
-/* QR ficha técnica: al imprimir solo el recuadro, tamaño máximo 50×50px */
+/*
+ * QR ficha: solo impresión del código a 50×50px.
+ * visibility:hidden deja el hueco en el layout (varias hojas vacías); hacemos colapsar
+ * todo el resto y dejamos solo el bloque fijo en la primera hoja.
+ */
 @media print {
+  @page {
+    size: auto;
+    margin: 10mm;
+  }
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    clip: rect(0, 0, 0, 0) !important;
   }
   .vehicle-qr-print-block,
   .vehicle-qr-print-block * {
-    visibility: visible;
+    visibility: visible !important;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    clip: auto !important;
+    max-height: none !important;
   }
   .vehicle-qr-print-block {
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: fixed !important;
+    left: 10mm !important;
+    top: 10mm !important;
+    width: 50px !important;
+    height: 50px !important;
+    overflow: visible !important;
   }
   .vehicle-qr-img {
+    display: block !important;
     width: 50px !important;
     height: 50px !important;
     max-width: 50px !important;
