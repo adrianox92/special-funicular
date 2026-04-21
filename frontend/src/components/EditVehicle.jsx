@@ -248,7 +248,6 @@ const EditVehicle = () => {
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState(null);
-  const [publicPdfUrl, setPublicPdfUrl] = useState('');
 
   const getApiBaseUrl = useCallback(() => {
     if (process.env.REACT_APP_API_URL) {
@@ -268,7 +267,6 @@ const EditVehicle = () => {
     try {
       const base = getApiBaseUrl();
       const url = `${base}/public/vehicles/${id}/specs-pdf`;
-      setPublicPdfUrl(url);
       const dataUrl = await QRCode.toDataURL(url, {
         errorCorrectionLevel: 'M',
         width: 512,
@@ -1996,7 +1994,6 @@ const EditVehicle = () => {
           if (!open) {
             setQrDataUrl(null);
             setQrError(null);
-            setPublicPdfUrl('');
           }
         }}
       >
