@@ -363,7 +363,7 @@ function parseChangeEffectiveDate(raw) {
 // Endpoint para exportar vehículos (opcionalmente filtrados)
 router.get('/export', async (req, res) => {
   try {
-    const { manufacturer, type, modified, digital, filterMuseo, filterTaller } = req.query;
+    const { manufacturer, type, modified, digital, filterMuseo, filterTaller, scale, scale_factor } = req.query;
     const { column: sortColumn, ascending } = parseVehicleSort(req);
 
     let query = applyVehicleListSort(
@@ -397,6 +397,13 @@ router.get('/export', async (req, res) => {
     } else if (tallerFilter) {
       query = query.eq('taller', true);
     }
+    const scaleParam = scale != null && String(scale).trim() !== '' ? scale : scale_factor;
+    if (scaleParam != null && String(scaleParam).trim() !== '') {
+      const n = parseInt(String(scaleParam).trim(), 10);
+      if (Number.isFinite(n) && n > 0) {
+        query = query.eq('scale_factor', n);
+      }
+    }
 
     const { data: vehicles, error: vehiclesError } = await query;
 
@@ -406,6 +413,30 @@ router.get('/export', async (req, res) => {
   } catch (error) {
     console.error('Error en /vehicles/export:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Denominadores de escala 1:X distintos en la colección del usuario (select de filtro)
+router.get('/scale-factors', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select('scale_factor')
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+
+    const set = new Set();
+    for (const row of data || []) {
+      if (row?.scale_factor == null || row.scale_factor === '') continue;
+      const n = parseInt(String(row.scale_factor), 10);
+      if (Number.isFinite(n) && n > 0) set.add(n);
+    }
+    const scaleFactors = Array.from(set).sort((a, b) => a - b);
+    res.json({ scaleFactors });
+  } catch (err) {
+    console.error('Error en /vehicles/scale-factors:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

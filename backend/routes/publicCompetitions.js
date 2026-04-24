@@ -392,8 +392,11 @@ router.get('/:slug/status', async (req, res) => {
         laps,
         average_time,
         lane,
+        driver,
+        circuit,
         timing_date,
-        penalty_seconds
+        penalty_seconds,
+        did_not_participate
       `)
       .in('participant_id', participants.map(p => p.id))
       .order('round_number', { ascending: true })
@@ -554,8 +557,11 @@ router.get('/:slug/presentation', async (req, res) => {
         laps,
         average_time,
         lane,
+        driver,
+        circuit,
         timing_date,
-        penalty_seconds
+        penalty_seconds,
+        did_not_participate
       `)
       .in('participant_id', participants.map(p => p.id))
       .order('round_number', { ascending: true })

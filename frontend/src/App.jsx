@@ -17,6 +17,7 @@ import PendingInviteConsumer from './components/PendingInviteConsumer';
 import Circuits from './pages/Circuits';
 import Inventory from './pages/Inventory';
 import CompetitionParticipants from './pages/CompetitionParticipants';
+import FavoritePilots from './pages/FavoritePilots';
 import CompetitionTimings from './pages/CompetitionTimings';
 import CompetitionSignup from './pages/CompetitionSignup';
 import CompetitionStatus from './pages/CompetitionStatus';
@@ -379,6 +380,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <CompetitionParticipants />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/pilots/favorites"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <FavoritePilots />
               </AuthedShell>
             </PrivateRoute>
           }

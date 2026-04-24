@@ -23,6 +23,8 @@ import {
   Building2,
   ScrollText,
   Megaphone,
+  Star,
+  ChevronDown,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { ChangelogBell } from './ChangelogBell';
@@ -158,7 +160,15 @@ const Navbar = () => {
     { path: '/timings', label: 'Tiempos', icon: Clock },
     { path: '/circuits', label: 'Circuitos', icon: Flag },
     { path: '/inventory', label: 'Inventario', icon: Package },
-    { path: '/competitions', label: 'Competiciones', icon: Trophy },
+    {
+      path: '/competitions',
+      label: 'Competiciones',
+      icon: Trophy,
+      children: [
+        { path: '/competitions', label: 'Mis competiciones', icon: Trophy },
+        { path: '/pilots/favorites', label: 'Pilotos favoritos', icon: Star },
+      ],
+    },
     { path: '/clubs', label: 'Clubes', icon: Building2 },
     ...(hasSellerProfile
       ? [{ path: '/seller', label: 'Mis listados', icon: Store }]
@@ -166,8 +176,52 @@ const Navbar = () => {
     { path: '/help', label: 'Ayuda', icon: CircleHelp },
   ];
 
+  const isItemActive = (item) => {
+    if (item.children?.length) {
+      return item.children.some((child) => isActive(child.path)) || isActive(item.path);
+    }
+    return isActive(item.path);
+  };
+
   const NavLink = ({ item }) => {
     const Icon = item.icon;
+
+    if (item.children?.length) {
+      const active = isItemActive(item);
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                active
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <Icon className="size-4" />
+              {item.label}
+              <ChevronDown className="size-3 opacity-70" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            {item.children.map((child) => {
+              const ChildIcon = child.icon;
+              return (
+                <DropdownMenuItem key={child.path} asChild>
+                  <Link to={child.path} className="flex items-center gap-2 cursor-pointer">
+                    <ChildIcon className="size-4" />
+                    {child.label}
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+
     return (
       <Link
         to={item.path}
@@ -182,6 +236,50 @@ const Navbar = () => {
         {item.label}
       </Link>
     );
+  };
+
+  const MobileNavItem = ({ item }) => {
+    const Icon = item.icon;
+    if (item.children?.length) {
+      const active = isItemActive(item);
+      return (
+        <div className="space-y-1">
+          <Link
+            to={item.path}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+              active
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            <Icon className="size-4" />
+            {item.label}
+          </Link>
+          <div className="ml-4 flex flex-col gap-1 border-l pl-2">
+            {item.children.map((child) => {
+              const ChildIcon = child.icon;
+              return (
+                <Link
+                  key={child.path}
+                  to={child.path}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                    isActive(child.path)
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )}
+                >
+                  <ChildIcon className="size-4" />
+                  {child.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    return <NavLink item={item} />;
   };
 
   return (
@@ -330,7 +428,7 @@ const Navbar = () => {
               </SheetHeader>
               <nav className="flex flex-col gap-2 mt-6">
                 {navItems.map((item) => (
-                  <NavLink key={item.path} item={item} />
+                  <MobileNavItem key={item.path} item={item} />
                 ))}
                 {showLicenseAdmin && (
                   <Link

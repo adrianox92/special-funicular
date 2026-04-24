@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatTimeDiff } from '../../utils/formatTimeDiff';
 
 const LiveRankingTable = ({ participants }) => {
   // Ordenar participantes por tiempo total + penalizaciones
@@ -65,22 +66,12 @@ const LiveRankingTable = ({ participants }) => {
     }
   };
 
-  // Formatea diferencia en formato +XX.XXX
+  // Formatea diferencia con signo correcto (+/-)
   const formatGap = (seconds) => {
     if (seconds === null || seconds === undefined || isNaN(seconds)) return '-';
-    if (seconds === 0) return '-';
-    
     // Corregir errores de precisión de punto flotante
-    const correctedSeconds = Math.round(seconds * 1000) / 1000;
-    
-    const minutes = Math.floor(correctedSeconds / 60);
-    const remainingSeconds = (correctedSeconds % 60).toFixed(3);
-    
-    if (minutes > 0) {
-      return `+${minutes}:${remainingSeconds.padStart(6, '0')}`;
-    } else {
-      return `+${remainingSeconds}`;
-    }
+    const corrected = Math.round(seconds * 1000) / 1000;
+    return formatTimeDiff(corrected);
   };
 
   // Calcular diferencias

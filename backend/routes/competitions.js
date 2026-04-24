@@ -626,6 +626,213 @@ router.post('/:id/participants', async (req, res) => {
   }
 });
 
+// Añadir participantes en bloque a partir de pilotos favoritos del organizador
+router.post('/:id/participants/bulk-from-favorites', async (req, res) => {
+  try {
+    const { id: competitionId } = req.params;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+
+    if (items.length === 0) {
+      return res.status(400).json({ error: 'Debes indicar al menos un piloto favorito' });
+    }
+
+    const access = await requireManageCompetition(
+      supabase,
+      req.user.id,
+      competitionId,
+      'id, num_slots, organizer, club_id',
+    );
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
+
+    for (const [idx, item] of items.entries()) {
+      if (!item || typeof item !== 'object') {
+        return res.status(400).json({ error: `Item ${idx} inválido` });
+      }
+      if (!item.favorite_id) {
+        return res.status(400).json({ error: `Item ${idx}: favorite_id es requerido` });
+      }
+      if (!item.category_id) {
+        return res.status(400).json({ error: `Item ${idx}: category_id es requerido` });
+      }
+      const src = item.vehicle_source || 'favorite_default';
+      if (!['own', 'text', 'favorite_default'].includes(src)) {
+        return res.status(400).json({ error: `Item ${idx}: vehicle_source no válido` });
+      }
+    }
+
+    const favoriteIds = [...new Set(items.map((i) => i.favorite_id))];
+    const { data: favorites, error: favErr } = await supabase
+      .from('favorite_pilots')
+      .select('id, display_name, default_vehicle_id, default_vehicle_model, owner_user_id')
+      .in('id', favoriteIds)
+      .eq('owner_user_id', req.user.id);
+
+    if (favErr) {
+      console.error('bulk-from-favorites fav lookup', favErr);
+      return res.status(500).json({ error: favErr.message });
+    }
+
+    const favoritesById = new Map((favorites || []).map((f) => [f.id, f]));
+    for (const fid of favoriteIds) {
+      if (!favoritesById.has(fid)) {
+        return res.status(404).json({ error: `Favorito ${fid} no encontrado` });
+      }
+    }
+
+    const categoryIds = [...new Set(items.map((i) => i.category_id))];
+    const { data: categories, error: catErr } = await supabase
+      .from('competition_categories')
+      .select('id')
+      .eq('competition_id', competitionId)
+      .in('id', categoryIds);
+
+    if (catErr) {
+      console.error('bulk-from-favorites cat lookup', catErr);
+      return res.status(500).json({ error: catErr.message });
+    }
+    const validCategoryIds = new Set((categories || []).map((c) => c.id));
+    for (const cid of categoryIds) {
+      if (!validCategoryIds.has(cid)) {
+        return res.status(404).json({ error: `Categoría ${cid} no encontrada en esta competición` });
+      }
+    }
+
+    const ownVehicleIds = items
+      .filter((i) => i.vehicle_source === 'own' && i.vehicle_id)
+      .map((i) => i.vehicle_id);
+    const favoriteOwnVehicleIds = items
+      .filter((i) => i.vehicle_source === 'favorite_default')
+      .map((i) => favoritesById.get(i.favorite_id)?.default_vehicle_id)
+      .filter(Boolean);
+    const allOwnVehicleIds = [...new Set([...ownVehicleIds, ...favoriteOwnVehicleIds])];
+
+    const ownedVehicleIds = new Set();
+    if (allOwnVehicleIds.length > 0) {
+      const { data: ownedVehicles, error: vErr } = await supabase
+        .from('vehicles')
+        .select('id')
+        .in('id', allOwnVehicleIds)
+        .eq('user_id', req.user.id);
+      if (vErr) {
+        console.error('bulk-from-favorites vehicle lookup', vErr);
+        return res.status(500).json({ error: vErr.message });
+      }
+      (ownedVehicles || []).forEach((v) => ownedVehicleIds.add(v.id));
+    }
+
+    const { data: existingSameFavorites, error: existErr } = await supabase
+      .from('competition_participants')
+      .select('id, from_favorite_id')
+      .eq('competition_id', competitionId)
+      .in('from_favorite_id', favoriteIds);
+
+    if (existErr) {
+      console.error('bulk-from-favorites existing lookup', existErr);
+      return res.status(500).json({ error: existErr.message });
+    }
+    const alreadyFavoriteIds = new Set(
+      (existingSameFavorites || []).map((p) => p.from_favorite_id),
+    );
+
+    const { count: currentCount, error: countError } = await supabase
+      .from('competition_participants')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', competitionId);
+    if (countError) {
+      console.error('bulk-from-favorites count', countError);
+      return res.status(500).json({ error: countError.message });
+    }
+
+    const slotsLeft = (competition.num_slots || 0) - (currentCount || 0);
+
+    const toInsert = [];
+    const skipped = [];
+
+    for (const item of items) {
+      const fav = favoritesById.get(item.favorite_id);
+      if (alreadyFavoriteIds.has(item.favorite_id)) {
+        skipped.push({ favorite_id: item.favorite_id, reason: 'Ya añadido previamente' });
+        continue;
+      }
+
+      const src = item.vehicle_source || 'favorite_default';
+      let vehicle_id = null;
+      let vehicle_model = null;
+
+      if (src === 'own') {
+        if (!item.vehicle_id) {
+          skipped.push({ favorite_id: item.favorite_id, reason: 'Falta vehicle_id' });
+          continue;
+        }
+        if (!ownedVehicleIds.has(item.vehicle_id)) {
+          skipped.push({ favorite_id: item.favorite_id, reason: 'Vehículo no pertenece al organizador' });
+          continue;
+        }
+        vehicle_id = item.vehicle_id;
+      } else if (src === 'text') {
+        const trimmed = (item.vehicle_model || '').trim();
+        if (!trimmed) {
+          skipped.push({ favorite_id: item.favorite_id, reason: 'Falta vehicle_model' });
+          continue;
+        }
+        vehicle_model = trimmed;
+      } else {
+        if (fav.default_vehicle_id && ownedVehicleIds.has(fav.default_vehicle_id)) {
+          vehicle_id = fav.default_vehicle_id;
+        } else if (fav.default_vehicle_model && fav.default_vehicle_model.trim()) {
+          vehicle_model = fav.default_vehicle_model.trim();
+        } else {
+          skipped.push({
+            favorite_id: item.favorite_id,
+            reason: 'El favorito no tiene vehículo por defecto; especifica uno',
+          });
+          continue;
+        }
+      }
+
+      const row = {
+        competition_id: competitionId,
+        driver_name: fav.display_name,
+        category_id: item.category_id,
+        registered_by: req.user.id,
+        from_favorite_id: fav.id,
+      };
+      if (vehicle_id) row.vehicle_id = vehicle_id;
+      if (vehicle_model) row.vehicle_model = vehicle_model;
+
+      toInsert.push(row);
+    }
+
+    if (toInsert.length > slotsLeft) {
+      return res.status(400).json({
+        error: `Solo quedan ${slotsLeft} plazas disponibles y se intentan añadir ${toInsert.length}`,
+      });
+    }
+
+    let created = [];
+    if (toInsert.length > 0) {
+      const { data, error } = await supabase
+        .from('competition_participants')
+        .insert(toInsert)
+        .select(`
+          *,
+          vehicles(model, manufacturer)
+        `);
+      if (error) {
+        console.error('bulk-from-favorites insert', error);
+        return res.status(500).json({ error: error.message });
+      }
+      created = data || [];
+    }
+
+    return res.status(201).json({ created, skipped });
+  } catch (error) {
+    console.error('Error en POST /competitions/:id/participants/bulk-from-favorites:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Obtener participantes de una competición
 router.get('/:id/participants', async (req, res) => {
   try {
@@ -924,8 +1131,11 @@ router.post('/:id/timings', async (req, res) => {
       setup_snapshot,
       circuit,
       circuit_id,
-      round_number 
+      round_number,
+      did_not_participate,
     } = req.body;
+
+    const isDnp = Boolean(did_not_participate);
 
     const access = await requireManageCompetition(supabase, req.user.id, competitionId, 'id, rounds, organizer, club_id');
     if (!access.ok) return access.respond(res);
@@ -954,16 +1164,19 @@ router.post('/:id/timings', async (req, res) => {
       if (vehicle?.scale_factor) scaleFactor = vehicle.scale_factor;
     }
 
-    // Validaciones
-    if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
-      return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
-    }
+    // Validaciones de tiempo (saltadas para NP)
+    let derivedAverage = null;
+    if (!isDnp) {
+      if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
+        return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
+      }
 
-    const derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
-    if (!derivedAverage) {
-      return res.status(400).json({
-        error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
-      });
+      derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
+      if (!derivedAverage) {
+        return res.status(400).json({
+          error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
+        });
+      }
     }
 
     if (!round_number || round_number <= 0 || round_number > competition.rounds) {
@@ -987,25 +1200,39 @@ router.post('/:id/timings', async (req, res) => {
     }
 
     // Crear el tiempo
-    const timingData = {
-      participant_id,
-      best_lap_time,
-      total_time,
-      laps,
-      average_time: derivedAverage.average_time,
-      average_time_timestamp: derivedAverage.average_time_timestamp,
-      round_number,
-      timing_date: timing_date || new Date().toISOString().split('T')[0]
-    };
+    const timingData = isDnp
+      ? {
+          participant_id,
+          did_not_participate: true,
+          best_lap_time: '00:00.000',
+          total_time: '00:00.000',
+          laps: 0,
+          average_time: '00:00.000',
+          round_number,
+          timing_date: timing_date || new Date().toISOString().split('T')[0],
+        }
+      : {
+          participant_id,
+          did_not_participate: false,
+          best_lap_time,
+          total_time,
+          laps,
+          average_time: derivedAverage.average_time,
+          average_time_timestamp: derivedAverage.average_time_timestamp,
+          round_number,
+          timing_date: timing_date || new Date().toISOString().split('T')[0],
+        };
 
-    // Campos opcionales
-    if (lane) timingData.lane = lane;
-    if (driver) timingData.driver = driver;
-    if (best_lap_timestamp) timingData.best_lap_timestamp = best_lap_timestamp;
-    if (total_time_timestamp) timingData.total_time_timestamp = total_time_timestamp;
-    if (setup_snapshot) timingData.setup_snapshot = setup_snapshot;
+    // Campos opcionales (no aplican a NP)
+    if (!isDnp) {
+      if (lane) timingData.lane = lane;
+      if (driver) timingData.driver = driver;
+      if (best_lap_timestamp) timingData.best_lap_timestamp = best_lap_timestamp;
+      if (total_time_timestamp) timingData.total_time_timestamp = total_time_timestamp;
+      if (setup_snapshot) timingData.setup_snapshot = setup_snapshot;
+    }
     let circuitLaneLengths = [];
-    if (circuit_id) {
+    if (!isDnp && circuit_id) {
       const { data: circuit, error: circuitError } = await supabase
         .from('circuits')
         .select('name, lane_lengths')
@@ -1017,21 +1244,23 @@ router.post('/:id/timings', async (req, res) => {
         timingData.circuit = circuit.name;
         circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
       }
-    } else if (circuit) {
+    } else if (!isDnp && circuit) {
       timingData.circuit = circuit;
     }
 
-    // Calcular distancia y velocidad
-    const distanceSpeed = calculateDistanceAndSpeed({
-      laps,
-      lane,
-      circuitLaneLengths,
-      totalTimeSeconds: total_time_timestamp,
-      bestLapSeconds: best_lap_timestamp,
-      scaleFactor,
-    });
-    if (distanceSpeed) {
-      Object.assign(timingData, distanceSpeed);
+    // Calcular distancia y velocidad (no aplica a NP)
+    if (!isDnp) {
+      const distanceSpeed = calculateDistanceAndSpeed({
+        laps,
+        lane,
+        circuitLaneLengths,
+        totalTimeSeconds: total_time_timestamp,
+        bestLapSeconds: best_lap_timestamp,
+        scaleFactor,
+      });
+      if (distanceSpeed) {
+        Object.assign(timingData, distanceSpeed);
+      }
     }
 
     const { data, error } = await supabase
@@ -1045,8 +1274,8 @@ router.post('/:id/timings', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    // Actualizar odómetro del vehículo si el participante tiene uno
-    if (participant.vehicle_id) {
+    // Actualizar odómetro del vehículo si el participante tiene uno (no aplica a NP)
+    if (!isDnp && participant.vehicle_id) {
       try {
         await updateVehicleOdometer(supabase, participant.vehicle_id);
       } catch (odometerError) {
@@ -1141,8 +1370,11 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       total_time_timestamp,
       setup_snapshot,
       circuit,
-      circuit_id
+      circuit_id,
+      did_not_participate,
     } = req.body;
+
+    const isDnp = Boolean(did_not_participate);
 
     const access = await requireManageCompetition(supabase, req.user.id, competitionId);
     if (!access.ok) return access.respond(res);
@@ -1181,87 +1413,116 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       if (vehicle?.scale_factor) scaleFactor = vehicle.scale_factor;
     }
 
-    // Validaciones
-    if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
-      return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
-    }
+    // Validaciones de tiempo (saltadas para NP)
+    let derivedAverage = null;
+    if (!isDnp) {
+      if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
+        return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
+      }
 
-    const derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
-    if (!derivedAverage) {
-      return res.status(400).json({
-        error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
-      });
+      derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
+      if (!derivedAverage) {
+        return res.status(400).json({
+          error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
+        });
+      }
     }
 
     // Actualizar el tiempo
-    const updateData = {
-      best_lap_time,
-      total_time,
-      laps,
-      average_time: derivedAverage.average_time,
-      average_time_timestamp: derivedAverage.average_time_timestamp,
-    };
+    const updateData = isDnp
+      ? {
+          did_not_participate: true,
+          best_lap_time: '00:00.000',
+          total_time: '00:00.000',
+          laps: 0,
+          average_time: '00:00.000',
+          average_time_timestamp: null,
+          best_lap_timestamp: null,
+          total_time_timestamp: null,
+          penalty_seconds: 0,
+          track_length_meters: null,
+          total_distance_meters: null,
+          avg_speed_kmh: null,
+          avg_speed_scale_kmh: null,
+          best_lap_speed_kmh: null,
+          best_lap_speed_scale_kmh: null,
+        }
+      : {
+          did_not_participate: false,
+          best_lap_time,
+          total_time,
+          laps,
+          average_time: derivedAverage.average_time,
+          average_time_timestamp: derivedAverage.average_time_timestamp,
+        };
 
-    // Campos opcionales
-    if (lane !== undefined) updateData.lane = lane;
-    if (driver !== undefined) updateData.driver = driver;
-    if (timing_date) updateData.timing_date = timing_date;
-    if (best_lap_timestamp !== undefined) updateData.best_lap_timestamp = best_lap_timestamp;
-    if (total_time_timestamp !== undefined) updateData.total_time_timestamp = total_time_timestamp;
-    if (setup_snapshot !== undefined) updateData.setup_snapshot = setup_snapshot;
-    let circuitLaneLengths = [];
-    if (circuit_id !== undefined) {
-      if (circuit_id) {
-        const { data: circuit, error: circuitError } = await supabase
+    // Campos opcionales y cálculos de circuito/distancia (saltados cuando es NP)
+    if (isDnp) {
+      if (timing_date) updateData.timing_date = timing_date;
+      updateData.lane = null;
+      updateData.driver = null;
+      updateData.setup_snapshot = null;
+      updateData.circuit_id = null;
+      updateData.circuit = null;
+    } else {
+      if (lane !== undefined) updateData.lane = lane;
+      if (driver !== undefined) updateData.driver = driver;
+      if (timing_date) updateData.timing_date = timing_date;
+      if (best_lap_timestamp !== undefined) updateData.best_lap_timestamp = best_lap_timestamp;
+      if (total_time_timestamp !== undefined) updateData.total_time_timestamp = total_time_timestamp;
+      if (setup_snapshot !== undefined) updateData.setup_snapshot = setup_snapshot;
+      let circuitLaneLengths = [];
+      if (circuit_id !== undefined) {
+        if (circuit_id) {
+          const { data: circuit, error: circuitError } = await supabase
+            .from('circuits')
+            .select('name, lane_lengths')
+            .eq('id', circuit_id)
+            .eq('user_id', req.user.id)
+            .single();
+          if (!circuitError && circuit) {
+            updateData.circuit_id = circuit_id;
+            updateData.circuit = circuit.name;
+            circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
+          }
+        } else {
+          updateData.circuit_id = null;
+          updateData.circuit = null;
+        }
+      } else if (circuit !== undefined) {
+        updateData.circuit = circuit;
+      } else if (existingTiming.circuit_id) {
+        const { data: circuit } = await supabase
           .from('circuits')
-          .select('name, lane_lengths')
-          .eq('id', circuit_id)
-          .eq('user_id', req.user.id)
+          .select('lane_lengths')
+          .eq('id', existingTiming.circuit_id)
           .single();
-        if (!circuitError && circuit) {
-          updateData.circuit_id = circuit_id;
-          updateData.circuit = circuit.name;
+        if (circuit) {
           circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
         }
-      } else {
-        updateData.circuit_id = null;
-        updateData.circuit = null;
       }
-    } else if (circuit !== undefined) {
-      updateData.circuit = circuit;
-    } else if (existingTiming.circuit_id) {
-      // Obtener lane_lengths del circuito actual si no se cambió
-      const { data: circuit } = await supabase
-        .from('circuits')
-        .select('lane_lengths')
-        .eq('id', existingTiming.circuit_id)
-        .single();
-      if (circuit) {
-        circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
-      }
-    }
 
-    // Calcular distancia y velocidad (usar valores del body o existentes)
-    const effectiveLane = lane !== undefined ? lane : existingTiming.lane;
-    const effectiveTotalTime = total_time_timestamp ?? existingTiming.total_time_timestamp;
-    const effectiveBestLap = best_lap_timestamp ?? existingTiming.best_lap_timestamp;
-    const distanceSpeed = calculateDistanceAndSpeed({
-      laps,
-      lane: effectiveLane,
-      circuitLaneLengths,
-      totalTimeSeconds: effectiveTotalTime,
-      bestLapSeconds: effectiveBestLap,
-      scaleFactor,
-    });
-    if (distanceSpeed) {
-      Object.assign(updateData, distanceSpeed);
-    } else {
-      updateData.track_length_meters = null;
-      updateData.total_distance_meters = null;
-      updateData.avg_speed_kmh = null;
-      updateData.avg_speed_scale_kmh = null;
-      updateData.best_lap_speed_kmh = null;
-      updateData.best_lap_speed_scale_kmh = null;
+      const effectiveLane = lane !== undefined ? lane : existingTiming.lane;
+      const effectiveTotalTime = total_time_timestamp ?? existingTiming.total_time_timestamp;
+      const effectiveBestLap = best_lap_timestamp ?? existingTiming.best_lap_timestamp;
+      const distanceSpeed = calculateDistanceAndSpeed({
+        laps,
+        lane: effectiveLane,
+        circuitLaneLengths,
+        totalTimeSeconds: effectiveTotalTime,
+        bestLapSeconds: effectiveBestLap,
+        scaleFactor,
+      });
+      if (distanceSpeed) {
+        Object.assign(updateData, distanceSpeed);
+      } else {
+        updateData.track_length_meters = null;
+        updateData.total_distance_meters = null;
+        updateData.avg_speed_kmh = null;
+        updateData.avg_speed_scale_kmh = null;
+        updateData.best_lap_speed_kmh = null;
+        updateData.best_lap_speed_scale_kmh = null;
+      }
     }
 
     const { data, error } = await supabase
@@ -1276,8 +1537,8 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    // Actualizar odómetro del vehículo si el participante tiene uno
-    if (participant.vehicle_id) {
+    // Actualizar odómetro del vehículo si el participante tiene uno (no aplica a NP)
+    if (!isDnp && participant.vehicle_id) {
       try {
         await updateVehicleOdometer(supabase, participant.vehicle_id);
       } catch (odometerError) {

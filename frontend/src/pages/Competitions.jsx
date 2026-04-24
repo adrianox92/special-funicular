@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Calendar, Trophy, Flag, Clock } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -55,6 +55,11 @@ const Competitions = () => {
   const [createError, setCreateError] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, competitionId: null });
 
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesExpanded, setFavoritesExpanded] = useState(false);
+  const [selectedFavorites, setSelectedFavorites] = useState({});
+  const [defaultCategoryName, setDefaultCategoryName] = useState('General');
+
   const navigate = useNavigate();
 
   const loadCompetitions = async () => {
@@ -89,11 +94,46 @@ const Competitions = () => {
     }
   };
 
+  const loadFavorites = async () => {
+    try {
+      const response = await axios.get('/favorite-pilots');
+      setFavorites(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error('Error al cargar favoritos:', err);
+    }
+  };
+
   useEffect(() => {
     loadCompetitions();
     loadCircuits();
     loadClubs();
+    loadFavorites();
   }, []);
+
+  const toggleFavoriteSelection = (favId) => {
+    setSelectedFavorites((prev) => {
+      const next = { ...prev };
+      if (next[favId]) {
+        delete next[favId];
+      } else {
+        const fav = favorites.find((f) => f.id === favId);
+        const defaultSource = fav?.default_vehicle_id || fav?.default_vehicle_model ? 'favorite_default' : 'text';
+        next[favId] = {
+          vehicle_source: defaultSource,
+          vehicle_id: '',
+          vehicle_model: '',
+        };
+      }
+      return next;
+    });
+  };
+
+  const updateFavoriteSelection = (favId, patch) => {
+    setSelectedFavorites((prev) => ({
+      ...prev,
+      [favId]: { ...prev[favId], ...patch },
+    }));
+  };
 
   const handleCreateCompetition = async (e) => {
     e.preventDefault();
@@ -113,6 +153,12 @@ const Competitions = () => {
       return;
     }
 
+    const favoriteItems = Object.entries(selectedFavorites);
+    if (favoriteItems.length > parseInt(createForm.num_slots || '0', 10)) {
+      setCreateError(`Has seleccionado ${favoriteItems.length} favoritos pero solo tienes ${createForm.num_slots} plazas`);
+      return;
+    }
+
     try {
       setCreating(true);
       setCreateError(null);
@@ -125,10 +171,49 @@ const Competitions = () => {
         club_id: createForm.club_id || null
       });
 
+      const competitionId = response.data.id;
+
+      if (favoriteItems.length > 0) {
+        try {
+          const catName = (defaultCategoryName || 'General').trim() || 'General';
+          const catResponse = await axios.post(`/competitions/${competitionId}/categories`, {
+            name: catName,
+          });
+          const categoryId = catResponse.data.id;
+
+          const items = favoriteItems.map(([favorite_id, cfg]) => ({
+            favorite_id,
+            category_id: categoryId,
+            vehicle_source: cfg.vehicle_source,
+            vehicle_id: cfg.vehicle_source === 'own' ? cfg.vehicle_id : undefined,
+            vehicle_model: cfg.vehicle_source === 'text' ? cfg.vehicle_model : undefined,
+          }));
+
+          const bulkResponse = await axios.post(
+            `/competitions/${competitionId}/participants/bulk-from-favorites`,
+            { items },
+          );
+          const created = bulkResponse.data?.created?.length || 0;
+          const skipped = bulkResponse.data?.skipped || [];
+          if (created > 0) {
+            toast.success(`Competición creada con ${created} piloto${created === 1 ? '' : 's'} favorito${created === 1 ? '' : 's'}`);
+          }
+          if (skipped.length > 0) {
+            toast.warning(`${skipped.length} favorito(s) no se pudieron añadir`);
+          }
+        } catch (bulkErr) {
+          console.error('Error añadiendo favoritos:', bulkErr);
+          toast.error(bulkErr.response?.data?.error || 'La competición se creó, pero no se pudieron añadir los favoritos');
+        }
+      }
+
       setShowCreateModal(false);
       setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '', club_id: '' });
+      setSelectedFavorites({});
+      setFavoritesExpanded(false);
+      setDefaultCategoryName('General');
 
-      navigate(`/competitions/${response.data.id}/participants`);
+      navigate(`/competitions/${competitionId}/participants`);
     } catch (err) {
       console.error('Error al crear competición:', err);
       setCreateError(err.response?.data?.error || 'Error al crear la competición');
@@ -195,14 +280,21 @@ const Competitions = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <Dialog open={showCreateModal} onOpenChange={(open) => {
+          setShowCreateModal(open);
+          if (!open) {
+            setSelectedFavorites({});
+            setFavoritesExpanded(false);
+            setDefaultCategoryName('General');
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">
               <Plus className="size-4" />
               Nueva Competición
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nueva Competición</DialogTitle>
               <DialogDescription>Crea una nueva competición para gestionar participantes y tiempos</DialogDescription>
@@ -294,6 +386,125 @@ const Competitions = () => {
                   <p className="text-sm text-muted-foreground">
                     Los miembros del club podrán ver esta competición. Gestiona clubes en el menú Clubes.
                   </p>
+                </div>
+
+                <div className="rounded-md border">
+                  <button
+                    type="button"
+                    onClick={() => setFavoritesExpanded((v) => !v)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent rounded-md"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Star className="size-4 text-primary" />
+                      Añadir pilotos favoritos ahora (opcional)
+                      {Object.keys(selectedFavorites).length > 0 && (
+                        <Badge variant="secondary">{Object.keys(selectedFavorites).length}</Badge>
+                      )}
+                    </span>
+                    {favoritesExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                  </button>
+
+                  {favoritesExpanded && (
+                    <div className="px-3 pb-3 pt-1 space-y-3">
+                      {favorites.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Aún no tienes favoritos.{' '}
+                          <Link to="/pilots/favorites" className="underline">
+                            Crea tu primer favorito
+                          </Link>{' '}
+                          para añadirlos al tirón a tus competiciones.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="default-category">Categoría para los favoritos</Label>
+                            <Input
+                              id="default-category"
+                              value={defaultCategoryName}
+                              onChange={(e) => setDefaultCategoryName(e.target.value)}
+                              placeholder="General"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Se creará una categoría con este nombre y todos los favoritos se añadirán a ella. Podrás crear más categorías después.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            {favorites.map((fav) => {
+                              const selected = selectedFavorites[fav.id];
+                              const hasDefaultVehicle =
+                                !!fav.default_vehicle_id || !!fav.default_vehicle_model;
+                              return (
+                                <div key={fav.id} className="border rounded-md p-2 space-y-2">
+                                  <label className="flex items-start gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!selected}
+                                      onChange={() => toggleFavoriteSelection(fav.id)}
+                                      className="mt-1"
+                                    />
+                                    <div className="flex-1">
+                                      <div className="font-medium text-sm">{fav.display_name}</div>
+                                      {hasDefaultVehicle && (
+                                        <div className="text-xs text-muted-foreground">
+                                          {fav.default_vehicle
+                                            ? `${fav.default_vehicle.manufacturer} ${fav.default_vehicle.model}`
+                                            : fav.default_vehicle_model}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </label>
+
+                                  {selected && (
+                                    <div className="pl-6 space-y-2">
+                                      <div className="flex flex-wrap gap-3 text-xs">
+                                        {hasDefaultVehicle && (
+                                          <label className="flex items-center gap-1 cursor-pointer">
+                                            <input
+                                              type="radio"
+                                              name={`fav-src-${fav.id}`}
+                                              checked={selected.vehicle_source === 'favorite_default'}
+                                              onChange={() =>
+                                                updateFavoriteSelection(fav.id, { vehicle_source: 'favorite_default' })
+                                              }
+                                            />
+                                            Vehículo por defecto
+                                          </label>
+                                        )}
+                                        <label className="flex items-center gap-1 cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`fav-src-${fav.id}`}
+                                            checked={selected.vehicle_source === 'text'}
+                                            onChange={() =>
+                                              updateFavoriteSelection(fav.id, { vehicle_source: 'text' })
+                                            }
+                                          />
+                                          Vehículo (texto)
+                                        </label>
+                                      </div>
+                                      {selected.vehicle_source === 'text' && (
+                                        <Input
+                                          value={selected.vehicle_model}
+                                          onChange={(e) =>
+                                            updateFavoriteSelection(fav.id, {
+                                              vehicle_model: e.target.value,
+                                            })
+                                          }
+                                          placeholder="Modelo de vehículo"
+                                          className="h-8 text-sm"
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <DialogFooter>

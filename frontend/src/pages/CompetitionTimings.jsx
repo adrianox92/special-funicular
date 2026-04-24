@@ -9,7 +9,11 @@ import {
   Users,
   FileSpreadsheet,
   FileText,
-  Pen,
+  Flag,
+  Pencil,
+  Trash2,
+  Ban,
+  Clock,
 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -48,6 +52,8 @@ import {
   TooltipTrigger,
 } from '../components/ui/tooltip';
 import { Spinner } from '../components/ui/spinner';
+import { Switch } from '../components/ui/switch';
+import { formatTimeDiff } from '../utils/formatTimeDiff';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -106,6 +112,7 @@ const CompetitionTimings = () => {
     average_time: '',
     lane: '',
     circuit_id: '',
+    did_not_participate: false,
   });
 
   const [, setRules] = useState([]);
@@ -165,15 +172,21 @@ const CompetitionTimings = () => {
           penalty_seconds: 0,
           best_lap_time: null,
           rounds_completed: 0,
+          rounds_dnp: 0,
           total_laps: 0,
         };
       }
-      // Convertir tiempo total a segundos y sumar penalización
+      // Las rondas NP cuentan como completadas (desbloquean puntos) pero no
+      // contribuyen a tiempo total, mejor vuelta ni vueltas totales.
+      aggregatedData[key].rounds_completed += 1;
+      if (timing.did_not_participate) {
+        aggregatedData[key].rounds_dnp += 1;
+        return;
+      }
       const timeInSeconds = timeStringToSeconds(timing.total_time);
       const penalty = Number(timing.penalty_seconds) || 0;
       aggregatedData[key].total_time_seconds += timeInSeconds + penalty;
       aggregatedData[key].penalty_seconds += penalty;
-      // Actualizar mejor vuelta
       const lapTimeParts = timing.best_lap_time.split(':');
       const lapTimeInSeconds =
         parseFloat(lapTimeParts[0]) * 60 + parseFloat(lapTimeParts[1]);
@@ -187,7 +200,6 @@ const CompetitionTimings = () => {
       ) {
         aggregatedData[key].best_lap_time = timing.best_lap_time;
       }
-      aggregatedData[key].rounds_completed += 1;
       aggregatedData[key].total_laps += timing.laps;
     });
     return Object.values(aggregatedData)
@@ -227,12 +239,13 @@ const CompetitionTimings = () => {
 
   useEffect(() => {
     if (!showModal) return;
+    if (formData.did_not_participate) return;
     const avg = averageTimeFromTotalAndLaps(formData.total_time, formData.laps);
     setFormData((prev) => {
       if ((prev.average_time || '') === (avg || '')) return prev;
       return { ...prev, average_time: avg };
     });
-  }, [showModal, formData.total_time, formData.laps]);
+  }, [showModal, formData.total_time, formData.laps, formData.did_not_participate]);
 
   const loadCompetitionData = async () => {
     try {
@@ -276,18 +289,39 @@ const CompetitionTimings = () => {
     }
   };
 
-  const handleShowModal = (timing = null) => {
+  const handleShowModal = (timing = null, preset = null) => {
     if (timing) {
       setEditingTiming(timing);
+      const isDnp = Boolean(timing.did_not_participate);
       setFormData({
         participant_id: timing.participant_id,
         round_number: timing.round_number,
         circuit_id: timing.circuit_id || '',
-        best_lap_time: timing.best_lap_time,
-        total_time: timing.total_time,
-        laps: timing.laps,
-        average_time: timing.average_time,
+        best_lap_time: isDnp ? '' : timing.best_lap_time,
+        total_time: isDnp ? '' : timing.total_time,
+        laps: isDnp ? '' : timing.laps,
+        average_time: isDnp ? '' : timing.average_time,
         lane: timing.lane || '',
+        did_not_participate: isDnp,
+      });
+    } else if (
+      preset &&
+      preset.participant_id != null &&
+      preset.participant_id !== '' &&
+      preset.round_number != null &&
+      preset.round_number !== ''
+    ) {
+      setEditingTiming(null);
+      setFormData({
+        participant_id: String(preset.participant_id),
+        round_number: String(preset.round_number),
+        best_lap_time: '',
+        total_time: '',
+        laps: '',
+        average_time: '',
+        lane: '',
+        circuit_id: '',
+        did_not_participate: false,
       });
     } else {
       setEditingTiming(null);
@@ -300,6 +334,7 @@ const CompetitionTimings = () => {
         average_time: '',
         lane: '',
         circuit_id: '',
+        did_not_participate: false,
       });
     }
     setShowModal(true);
@@ -317,6 +352,7 @@ const CompetitionTimings = () => {
       average_time: '',
       lane: '',
       circuit_id: '',
+      did_not_participate: false,
     });
   };
 
@@ -335,18 +371,26 @@ const CompetitionTimings = () => {
       return;
     }
 
-    const average_time = averageTimeFromTotalAndLaps(
-      formData.total_time,
-      formData.laps
-    );
-    if (!average_time) {
-      toast.error(
-        'Introduce el tiempo total en formato 00:00.000 y un número de vueltas válido.'
+    let payload;
+    if (formData.did_not_participate) {
+      payload = {
+        participant_id: formData.participant_id,
+        round_number: formData.round_number,
+        did_not_participate: true,
+      };
+    } else {
+      const average_time = averageTimeFromTotalAndLaps(
+        formData.total_time,
+        formData.laps
       );
-      return;
+      if (!average_time) {
+        toast.error(
+          'Introduce el tiempo total en formato 00:00.000 y un número de vueltas válido.'
+        );
+        return;
+      }
+      payload = { ...formData, average_time, did_not_participate: false };
     }
-
-    const payload = { ...formData, average_time };
 
     try {
       if (editingTiming) {
@@ -377,6 +421,22 @@ const CompetitionTimings = () => {
     } catch (error) {
       console.error('Error al eliminar tiempo:', error);
       toast.error(error.response?.data?.error || 'Error al eliminar el tiempo');
+    }
+  };
+
+  // Marcar rápidamente a un participante como No Participado (NP) en una ronda.
+  const handleMarkNP = async (participantId, roundNumber) => {
+    try {
+      await axios.post(`/competitions/${id}/timings`, {
+        participant_id: participantId,
+        round_number: roundNumber,
+        did_not_participate: true,
+      });
+      toast.success('Participante marcado como NP');
+      loadCompetitionData();
+    } catch (error) {
+      console.error('Error al marcar NP:', error);
+      toast.error(error.response?.data?.error || 'Error al marcar NP');
     }
   };
 
@@ -804,10 +864,14 @@ const CompetitionTimings = () => {
               ).map((roundNumber) => {
                 const roundStatus = getRoundStatus(roundNumber);
 
-                // Ordenar por tiempo ajustado
+                // Ordenar por tiempo ajustado. Los NP se mandan al final (no se
+                // ordenan entre sí ni reciben posición competitiva).
                 const sortedTimings = [
                   ...(timingsByRound[roundNumber] || []),
                 ].sort((a, b) => {
+                  if (a.did_not_participate && !b.did_not_participate) return 1;
+                  if (!a.did_not_participate && b.did_not_participate) return -1;
+                  if (a.did_not_participate && b.did_not_participate) return 0;
                   const aAdjusted =
                     (Number(a.total_time_timestamp) || 0) +
                     (Number(a.penalty_seconds) || 0);
@@ -817,10 +881,13 @@ const CompetitionTimings = () => {
                   return aAdjusted - bAdjusted;
                 });
 
-                // Encontrar el mejor tiempo de vuelta de la ronda
+                // Encontrar el mejor tiempo de vuelta de la ronda (ignorando NP)
+                const participatingTimings = sortedTimings.filter(
+                  (t) => !t.did_not_participate
+                );
                 const bestLapTime =
-                  sortedTimings.length > 0
-                    ? sortedTimings.reduce((best, current) => {
+                  participatingTimings.length > 0
+                    ? participatingTimings.reduce((best, current) => {
                         const currentParts = current.best_lap_time.split(':');
                         const bestParts = best.best_lap_time.split(':');
                         const currentTime =
@@ -874,37 +941,30 @@ const CompetitionTimings = () => {
                                     Vuelta
                                   </TableHead>
                                   {isOrganizer && (
-                                    <TableHead className="text-center w-[74px]">
-                                      Penal.
+                                    <TableHead className="text-center w-[140px]">
+                                      Acciones
                                     </TableHead>
                                   )}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {sortedTimings.map((timing, index) => {
+                                  const isDnp = Boolean(timing.did_not_participate);
                                   const isBestLap =
-                                    bestLapTime && timing.id === bestLapTime.id;
+                                    !isDnp && bestLapTime && timing.id === bestLapTime.id;
+                                  const leader = participatingTimings[0];
+                                  const leaderTime = leader
+                                    ? timeStringToSeconds(leader.total_time) +
+                                      (Number(leader.penalty_seconds) || 0)
+                                    : 0;
                                   const currentTime =
                                     timeStringToSeconds(timing.total_time) +
                                     (Number(timing.penalty_seconds) || 0);
-                                  const leaderTime =
-                                    timeStringToSeconds(sortedTimings[0].total_time) +
-                                    (Number(sortedTimings[0].penalty_seconds) || 0);
                                   const diff = currentTime - leaderTime;
                                   const timeDiff =
-                                    index === 0
+                                    isDnp || !leader || timing.id === leader.id
                                       ? '-'
-                                      : (() => {
-                                          const diffMinutes = Math.floor(
-                                            diff / 60
-                                          );
-                                          const diffSeconds = (
-                                            diff % 60
-                                          ).toFixed(3);
-                                          return diffMinutes > 0
-                                            ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}`
-                                            : `+${diffSeconds}`;
-                                        })();
+                                      : formatTimeDiff(diff);
                                   const base = timeStringToSeconds(
                                     timing.total_time
                                   );
@@ -916,18 +976,27 @@ const CompetitionTimings = () => {
                                   return (
                                     <TableRow key={timing.id}>
                                       <TableCell className="text-center p-1 text-sm">
-                                        <Badge
-                                          variant={
-                                            index === 0 ? 'default' : 'secondary'
-                                          }
-                                          className={
-                                            index === 0
-                                              ? 'bg-green-600 hover:bg-green-600'
-                                              : ''
-                                          }
-                                        >
-                                          {index + 1}
-                                        </Badge>
+                                        {isDnp ? (
+                                          <Badge
+                                            variant="secondary"
+                                            className="bg-muted text-muted-foreground"
+                                          >
+                                            NP
+                                          </Badge>
+                                        ) : (
+                                          <Badge
+                                            variant={
+                                              index === 0 ? 'default' : 'secondary'
+                                            }
+                                            className={
+                                              index === 0
+                                                ? 'bg-green-600 hover:bg-green-600'
+                                                : ''
+                                            }
+                                          >
+                                            {index + 1}
+                                          </Badge>
+                                        )}
                                       </TableCell>
                                       <TableCell
                                         className="text-center p-1 text-sm break-words"
@@ -937,7 +1006,9 @@ const CompetitionTimings = () => {
                                         )}
                                       </TableCell>
                                       <TableCell className="font-bold text-center p-1 text-sm">
-                                        {penalty > 0 ? (
+                                        {isDnp ? (
+                                          <span className="text-muted-foreground">—</span>
+                                        ) : penalty > 0 ? (
                                           <Tooltip>
                                             <TooltipTrigger asChild>
                                               <span className="cursor-pointer">
@@ -968,29 +1039,90 @@ const CompetitionTimings = () => {
                                             : ''
                                         }`}
                                       >
-                                        {formatTime(timing.best_lap_time)}
-                                        {isBestLap && (
-                                          <Badge
-                                            variant="secondary"
-                                            className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-200"
-                                          >
-                                            <Trophy className="size-3" aria-hidden />
-                                          </Badge>
+                                        {isDnp ? (
+                                          <span className="text-muted-foreground">—</span>
+                                        ) : (
+                                          <>
+                                            {formatTime(timing.best_lap_time)}
+                                            {isBestLap && (
+                                              <Badge
+                                                variant="secondary"
+                                                className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-200"
+                                              >
+                                                <Trophy className="size-3" aria-hidden />
+                                              </Badge>
+                                            )}
+                                          </>
                                         )}
                                       </TableCell>
                                       {isOrganizer && (
                                         <TableCell className="text-center p-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            title="Editar penalización"
-                                            onClick={() =>
-                                              handleOpenPenaltyModal(timing)
-                                            }
-                                            className="text-amber-600 hover:text-amber-700 p-0 h-auto"
-                                          >
-                                            <Pen className="size-4" />
-                                          </Button>
+                                          <div className="flex items-center justify-center gap-1">
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  aria-label="Editar tiempo"
+                                                  onClick={() =>
+                                                    handleShowModal(timing)
+                                                  }
+                                                  className="text-blue-600 hover:text-blue-700 p-0 h-auto"
+                                                >
+                                                  <Pencil className="size-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                Editar tiempo
+                                              </TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span className="inline-flex">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    aria-label="Editar penalización"
+                                                    onClick={() =>
+                                                      handleOpenPenaltyModal(
+                                                        timing
+                                                      )
+                                                    }
+                                                    disabled={isDnp}
+                                                    className="text-amber-600 hover:text-amber-700 p-0 h-auto disabled:opacity-40"
+                                                  >
+                                                    <Flag className="size-4" />
+                                                  </Button>
+                                                </span>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                {isDnp
+                                                  ? 'No aplica penalización en NP'
+                                                  : 'Editar penalización'}
+                                              </TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  aria-label="Eliminar tiempo"
+                                                  onClick={() =>
+                                                    setDeleteTimingConfirm({
+                                                      open: true,
+                                                      timingId: timing.id,
+                                                    })
+                                                  }
+                                                  className="text-destructive hover:text-destructive/80 p-0 h-auto"
+                                                >
+                                                  <Trash2 className="size-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                Eliminar tiempo
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </div>
                                         </TableCell>
                                       )}
                                     </TableRow>
@@ -1009,34 +1141,27 @@ const CompetitionTimings = () => {
                                   <TableHead>Dif</TableHead>
                                   <TableHead>Vuelta</TableHead>
                                   <TableHead>V</TableHead>
-                                  {isOrganizer && <TableHead>Penal.</TableHead>}
+                                  {isOrganizer && <TableHead>Acciones</TableHead>}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {sortedTimings.map((timing, index) => {
+                                  const isDnp = Boolean(timing.did_not_participate);
                                   const isBestLap =
-                                    bestLapTime && timing.id === bestLapTime.id;
+                                    !isDnp && bestLapTime && timing.id === bestLapTime.id;
+                                  const leader = participatingTimings[0];
+                                  const leaderTime = leader
+                                    ? timeStringToSeconds(leader.total_time) +
+                                      (Number(leader.penalty_seconds) || 0)
+                                    : 0;
                                   const currentTime =
                                     timeStringToSeconds(timing.total_time) +
                                     (Number(timing.penalty_seconds) || 0);
-                                  const leaderTime =
-                                    timeStringToSeconds(sortedTimings[0].total_time) +
-                                    (Number(sortedTimings[0].penalty_seconds) || 0);
                                   const diff = currentTime - leaderTime;
                                   const timeDiff =
-                                    index === 0
+                                    isDnp || !leader || timing.id === leader.id
                                       ? '-'
-                                      : (() => {
-                                          const diffMinutes = Math.floor(
-                                            diff / 60
-                                          );
-                                          const diffSeconds = (
-                                            diff % 60
-                                          ).toFixed(3);
-                                          return diffMinutes > 0
-                                            ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}`
-                                            : `+${diffSeconds}`;
-                                        })();
+                                      : formatTimeDiff(diff);
                                   const base = timeStringToSeconds(
                                     timing.total_time
                                   );
@@ -1048,18 +1173,27 @@ const CompetitionTimings = () => {
                                   return (
                                     <TableRow key={timing.id}>
                                       <TableCell className="text-center p-1 text-sm">
-                                        <Badge
-                                          variant={
-                                            index === 0 ? 'default' : 'secondary'
-                                          }
-                                          className={
-                                            index === 0
-                                              ? 'bg-green-600 hover:bg-green-600'
-                                              : ''
-                                          }
-                                        >
-                                          {index + 1}
-                                        </Badge>
+                                        {isDnp ? (
+                                          <Badge
+                                            variant="secondary"
+                                            className="bg-muted text-muted-foreground"
+                                          >
+                                            NP
+                                          </Badge>
+                                        ) : (
+                                          <Badge
+                                            variant={
+                                              index === 0 ? 'default' : 'secondary'
+                                            }
+                                            className={
+                                              index === 0
+                                                ? 'bg-green-600 hover:bg-green-600'
+                                                : ''
+                                            }
+                                          >
+                                            {index + 1}
+                                          </Badge>
+                                        )}
                                       </TableCell>
                                       <TableCell
                                         className="text-center p-1 text-sm break-words"
@@ -1069,7 +1203,9 @@ const CompetitionTimings = () => {
                                         )}
                                       </TableCell>
                                       <TableCell className="font-bold text-center p-1 text-sm">
-                                        {penalty > 0 ? (
+                                        {isDnp ? (
+                                          <span className="text-muted-foreground">—</span>
+                                        ) : penalty > 0 ? (
                                           <Tooltip>
                                             <TooltipTrigger asChild>
                                               <span className="cursor-pointer">
@@ -1100,32 +1236,97 @@ const CompetitionTimings = () => {
                                             : ''
                                         }`}
                                       >
-                                        {formatTime(timing.best_lap_time)}
-                                        {isBestLap && (
-                                          <Badge
-                                            variant="secondary"
-                                            className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-200"
-                                          >
-                                            <Trophy className="size-3" aria-hidden />
-                                          </Badge>
+                                        {isDnp ? (
+                                          <span className="text-muted-foreground">—</span>
+                                        ) : (
+                                          <>
+                                            {formatTime(timing.best_lap_time)}
+                                            {isBestLap && (
+                                              <Badge
+                                                variant="secondary"
+                                                className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-200"
+                                              >
+                                                <Trophy className="size-3" aria-hidden />
+                                              </Badge>
+                                            )}
+                                          </>
                                         )}
                                       </TableCell>
                                       <TableCell className="text-center p-1 text-sm">
-                                        {timing.laps}
+                                        {isDnp ? (
+                                          <span className="text-muted-foreground">—</span>
+                                        ) : (
+                                          timing.laps
+                                        )}
                                       </TableCell>
                                       {isOrganizer && (
                                         <TableCell className="text-center p-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            title="Editar penalización"
-                                            onClick={() =>
-                                              handleOpenPenaltyModal(timing)
-                                            }
-                                            className="text-amber-600 hover:text-amber-700 p-0 h-auto"
-                                          >
-                                            <Pen className="size-4" />
-                                          </Button>
+                                          <div className="flex items-center justify-center gap-1">
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  aria-label="Editar tiempo"
+                                                  onClick={() =>
+                                                    handleShowModal(timing)
+                                                  }
+                                                  className="text-blue-600 hover:text-blue-700 p-0 h-auto"
+                                                >
+                                                  <Pencil className="size-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                Editar tiempo
+                                              </TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span className="inline-flex">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    aria-label="Editar penalización"
+                                                    onClick={() =>
+                                                      handleOpenPenaltyModal(
+                                                        timing
+                                                      )
+                                                    }
+                                                    disabled={isDnp}
+                                                    className="text-amber-600 hover:text-amber-700 p-0 h-auto disabled:opacity-40"
+                                                  >
+                                                    <Flag className="size-4" />
+                                                  </Button>
+                                                </span>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                {isDnp
+                                                  ? 'No aplica penalización en NP'
+                                                  : 'Editar penalización'}
+                                              </TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  aria-label="Eliminar tiempo"
+                                                  onClick={() =>
+                                                    setDeleteTimingConfirm({
+                                                      open: true,
+                                                      timingId: timing.id,
+                                                    })
+                                                  }
+                                                  className="text-destructive hover:text-destructive/80 p-0 h-auto"
+                                                >
+                                                  <Trash2 className="size-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                Eliminar tiempo
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </div>
                                         </TableCell>
                                       )}
                                     </TableRow>
@@ -1140,6 +1341,75 @@ const CompetitionTimings = () => {
                           No hay tiempos registrados
                         </p>
                       )}
+
+                      {isOrganizer && !isCompetitionComplete() && (() => {
+                        const pending = getAvailableParticipantsForRound(
+                          String(roundNumber)
+                        );
+                        if (pending.length === 0) return null;
+                        return (
+                          <div className="mt-4 border-t pt-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-2">
+                              Pendientes en esta ronda
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {pending.map((p) => (
+                                <div
+                                  key={p.id}
+                                  className="inline-flex items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1 text-xs"
+                                >
+                                  <span className="font-medium">
+                                    {p.driver_name}
+                                  </span>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label={`Registrar tiempo para ${p.driver_name} en la ronda ${roundNumber}`}
+                                        onClick={() =>
+                                          handleShowModal(null, {
+                                            participant_id: p.id,
+                                            round_number: roundNumber,
+                                          })
+                                        }
+                                        className="h-6 px-1.5 text-blue-600 hover:text-blue-700"
+                                      >
+                                        <Clock className="size-3 mr-1" />
+                                        Tiempos
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Abrir el formulario con esta ronda y este
+                                      piloto ya elegidos
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label="Marcar como No Participado (NP)"
+                                        onClick={() =>
+                                          handleMarkNP(p.id, roundNumber)
+                                        }
+                                        className="h-6 px-1.5 text-destructive hover:text-destructive/80"
+                                      >
+                                        <Ban className="size-3 mr-1" />
+                                        NP
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Marcar NP: no corrió esta ronda, 0 puntos
+                                      y sin tiempos válidos
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 );
@@ -1190,21 +1460,39 @@ const CompetitionTimings = () => {
                             </TableHeader>
                             <TableBody>
                               {timingsByParticipant[participant.id].map(
-                                (timing) => (
-                                  <TableRow key={timing.id}>
-                                    <TableCell>{timing.round_number}</TableCell>
-                                    <TableCell>
-                                      {formatTime(timing.best_lap_time)}
-                                    </TableCell>
-                                    <TableCell>
-                                      {formatTime(timing.total_time)}
-                                    </TableCell>
-                                    <TableCell>
-                                      {formatTime(timing.average_time)}
-                                    </TableCell>
-                                    <TableCell>{timing.laps}</TableCell>
-                                  </TableRow>
-                                )
+                                (timing) => {
+                                  const isDnp = Boolean(
+                                    timing.did_not_participate
+                                  );
+                                  return (
+                                    <TableRow key={timing.id}>
+                                      <TableCell>{timing.round_number}</TableCell>
+                                      {isDnp ? (
+                                        <TableCell colSpan={4}>
+                                          <Badge
+                                            variant="secondary"
+                                            className="bg-muted text-muted-foreground"
+                                          >
+                                            NP — No participó
+                                          </Badge>
+                                        </TableCell>
+                                      ) : (
+                                        <>
+                                          <TableCell>
+                                            {formatTime(timing.best_lap_time)}
+                                          </TableCell>
+                                          <TableCell>
+                                            {formatTime(timing.total_time)}
+                                          </TableCell>
+                                          <TableCell>
+                                            {formatTime(timing.average_time)}
+                                          </TableCell>
+                                          <TableCell>{timing.laps}</TableCell>
+                                        </>
+                                      )}
+                                    </TableRow>
+                                  );
+                                }
                               )}
                             </TableBody>
                           </Table>
@@ -1250,35 +1538,18 @@ const CompetitionTimings = () => {
                           const leaderDiff =
                             index === 0
                               ? '-'
-                              : (() => {
-                                  const leaderTime =
-                                    aggregatedTimes[0].total_time_seconds;
-                                  const currentTime =
-                                    data.total_time_seconds;
-                                  const diff = currentTime - leaderTime;
-                                  const diffMinutes = Math.floor(diff / 60);
-                                  const diffSeconds = (diff % 60).toFixed(3);
-                                  return diffMinutes > 0
-                                    ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}`
-                                    : `+${diffSeconds}`;
-                                })();
+                              : formatTimeDiff(
+                                  data.total_time_seconds -
+                                    aggregatedTimes[0].total_time_seconds
+                                );
 
                           const previousDiff =
                             index === 0
                               ? '-'
-                              : (() => {
-                                  const previousTime =
-                                    aggregatedTimes[index - 1]
-                                      .total_time_seconds;
-                                  const currentTime =
-                                    data.total_time_seconds;
-                                  const diff = currentTime - previousTime;
-                                  const diffMinutes = Math.floor(diff / 60);
-                                  const diffSeconds = (diff % 60).toFixed(3);
-                                  return diffMinutes > 0
-                                    ? `+${diffMinutes}:${diffSeconds.padStart(6, '0')}`
-                                    : `+${diffSeconds}`;
-                                })();
+                              : formatTimeDiff(
+                                  data.total_time_seconds -
+                                    aggregatedTimes[index - 1].total_time_seconds
+                                );
 
                           const base =
                             data.total_time_seconds - data.penalty_seconds;
@@ -1379,7 +1650,8 @@ const CompetitionTimings = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4 py-4">
-                {!editingTiming && (
+                {!editingTiming &&
+                  !(formData.round_number && formData.participant_id) && (
                   <Alert className="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100">
                     <AlertDescription>
                       <strong>Consejo:</strong> Selecciona primero la ronda y
@@ -1419,49 +1691,100 @@ const CompetitionTimings = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="participant_id">Participante *</Label>
-                    <Select
-                      value={formData.participant_id ? String(formData.participant_id) : undefined}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, participant_id: value })
+                    {(() => {
+                      const available = formData.round_number
+                        ? getAvailableParticipantsForRound(formData.round_number)
+                        : participants;
+                      // Al editar, incluir el piloto actual aunque ya tenga tiempo
+                      // registrado para esa ronda.
+                      let selectable = available;
+                      if (editingTiming) {
+                        const current = participantsMap[editingTiming.participant_id];
+                        if (
+                          current &&
+                          !available.some((p) => p.id === current.id)
+                        ) {
+                          selectable = [current, ...available];
+                        }
                       }
-                      disabled={!formData.round_number}
-                    >
-                      <SelectTrigger id="participant_id">
-                        <SelectValue
-                          placeholder={
-                            !formData.round_number
-                              ? 'Selecciona primero una ronda'
-                              : 'Seleccionar participante'
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableParticipantsForRound(
-                          formData.round_number
-                        ).map((participant) => (
-                          <SelectItem
-                            key={participant.id}
-                            value={String(participant.id)}
+                      return (
+                        <>
+                          <Select
+                            value={
+                              formData.participant_id
+                                ? String(formData.participant_id)
+                                : undefined
+                            }
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, participant_id: value })
+                            }
+                            disabled={!formData.round_number || Boolean(editingTiming)}
                           >
-                            {participant.driver_name} -{' '}
-                            {getVehicleInfo(participant.id)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formData.round_number &&
-                      getAvailableParticipantsForRound(
-                        formData.round_number
-                      ).length === 0 && (
-                        <p className="text-sm text-amber-600">
-                          Todos los participantes ya tienen tiempo registrado
-                          para esta ronda
-                        </p>
-                      )}
+                            <SelectTrigger id="participant_id">
+                              <SelectValue
+                                placeholder={
+                                  !formData.round_number
+                                    ? 'Selecciona primero una ronda'
+                                    : 'Seleccionar participante'
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {selectable.map((participant) => (
+                                <SelectItem
+                                  key={participant.id}
+                                  value={String(participant.id)}
+                                >
+                                  {participant.driver_name} -{' '}
+                                  {getVehicleInfo(participant.id)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {!editingTiming &&
+                            formData.round_number &&
+                            available.length === 0 && (
+                              <p className="text-sm text-amber-600">
+                                Todos los participantes ya tienen tiempo
+                                registrado para esta ronda
+                              </p>
+                            )}
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="sm:col-span-2 flex items-center justify-between rounded-md border bg-muted/40 p-3">
+                    <div>
+                      <Label htmlFor="did_not_participate" className="font-medium">
+                        No participó en esta ronda (NP)
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        El piloto recibirá 0 puntos en esta ronda y sus tiempos no contarán para la clasificación general.
+                      </p>
+                    </div>
+                    <Switch
+                      id="did_not_participate"
+                      checked={formData.did_not_participate}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          did_not_participate: checked,
+                          ...(checked && {
+                            best_lap_time: '',
+                            total_time: '',
+                            laps: '',
+                            average_time: '',
+                            lane: '',
+                            circuit_id: '',
+                          }),
+                        })
+                      }
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="best_lap_time">Mejor Vuelta *</Label>
+                    <Label htmlFor="best_lap_time">Mejor Vuelta {!formData.did_not_participate && '*'}</Label>
                     <Input
                       id="best_lap_time"
                       type="text"
@@ -1473,12 +1796,13 @@ const CompetitionTimings = () => {
                         })
                       }
                       placeholder="00:00.000"
-                      required
+                      required={!formData.did_not_participate}
+                      disabled={formData.did_not_participate}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="total_time">Tiempo Total *</Label>
+                    <Label htmlFor="total_time">Tiempo Total {!formData.did_not_participate && '*'}</Label>
                     <Input
                       id="total_time"
                       type="text"
@@ -1490,12 +1814,13 @@ const CompetitionTimings = () => {
                         })
                       }
                       placeholder="00:00.000"
-                      required
+                      required={!formData.did_not_participate}
+                      disabled={formData.did_not_participate}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="laps">Número de Vueltas *</Label>
+                    <Label htmlFor="laps">Número de Vueltas {!formData.did_not_participate && '*'}</Label>
                     <Input
                       id="laps"
                       type="number"
@@ -1503,7 +1828,8 @@ const CompetitionTimings = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, laps: e.target.value })
                       }
-                      required
+                      required={!formData.did_not_participate}
+                      disabled={formData.did_not_participate}
                     />
                   </div>
 
@@ -1516,6 +1842,7 @@ const CompetitionTimings = () => {
                       value={formData.average_time}
                       placeholder="00:00.000"
                       className="bg-muted"
+                      disabled={formData.did_not_participate}
                     />
                     <p className="text-xs text-muted-foreground">
                       Tiempo total dividido entre el número de vueltas. Se guarda automáticamente al registrar.
@@ -1531,6 +1858,7 @@ const CompetitionTimings = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, lane: e.target.value })
                       }
+                      disabled={formData.did_not_participate}
                     />
                   </div>
 
@@ -1541,6 +1869,7 @@ const CompetitionTimings = () => {
                       onValueChange={(v) =>
                         setFormData({ ...formData, circuit_id: v === 'none' ? '' : v })
                       }
+                      disabled={formData.did_not_participate}
                     >
                       <SelectTrigger id="circuit_id">
                         <SelectValue placeholder="Seleccionar circuito (opcional)" />
@@ -1573,7 +1902,13 @@ const CompetitionTimings = () => {
                 >
                   {isCompetitionComplete()
                     ? 'Competición Completada'
-                    : 'Registrar Tiempo'}
+                    : formData.did_not_participate
+                      ? editingTiming
+                        ? 'Guardar NP'
+                        : 'Registrar NP'
+                      : editingTiming
+                        ? 'Guardar Tiempo'
+                        : 'Registrar Tiempo'}
                 </Button>
               </DialogFooter>
             </form>

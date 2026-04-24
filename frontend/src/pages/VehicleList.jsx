@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import VehicleCard from '../components/VehicleCard';
 import VehicleTable from '../components/VehicleTable';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { ArrowDownUp, Download, Plus, ChevronDown, LayoutGrid, Table as TableIco
 import { formatDistance } from '../utils/formatUtils';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
+import { formatScaleLabel, mergeScaleDenominators } from '../data/vehicleScales';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '../components/ui/input';
@@ -50,7 +51,7 @@ const saveSort = (next) => {
   } catch {}
 };
 
-const defaultFilters = { manufacturer: '', type: '', modified: '', digital: '', filterMuseo: false, filterTaller: false };
+const defaultFilters = { manufacturer: '', type: '', modified: '', digital: '', scale: '', filterMuseo: false, filterTaller: false };
 
 /** @param {URLSearchParams} searchParams */
 function parseFiltersFromSearchParams(searchParams) {
@@ -67,6 +68,11 @@ function parseFiltersFromSearchParams(searchParams) {
   if (man != null && String(man).trim() !== '') patches.manufacturer = String(man).slice(0, 200);
   const typ = searchParams.get('type');
   if (typ != null && String(typ).trim() !== '') patches.type = typ;
+  const sc = searchParams.get('scale');
+  if (sc != null && String(sc).trim() !== '') {
+    const n = parseInt(String(sc).trim(), 10);
+    if (Number.isFinite(n) && n > 0 && n <= 9999) patches.scale = String(n);
+  }
   return Object.keys(patches).length ? { ...defaultFilters, ...patches } : null;
 }
 
@@ -80,6 +86,12 @@ const loadStoredFilters = () => {
       type: typeof parsed.type === 'string' ? parsed.type : '',
       modified: typeof parsed.modified === 'string' ? parsed.modified : '',
       digital: typeof parsed.digital === 'string' ? parsed.digital : '',
+      scale: (() => {
+        const s = parsed.scale;
+        if (s == null || s === '') return '';
+        const n = parseInt(String(s), 10);
+        return Number.isFinite(n) && n > 0 && n <= 9999 ? String(n) : '';
+      })(),
       filterMuseo: Boolean(parsed.filterMuseo),
       filterTaller: Boolean(parsed.filterTaller),
     };
@@ -107,7 +119,10 @@ const applyFilters = (list, filters) => {
         : filters.filterMuseo
           ? v.museo
           : v.taller;
-    return m && t && mo && d && museoTaller;
+    const sc = filters.scale
+      ? Number(v.scale_factor) === Number(filters.scale)
+      : true;
+    return m && t && mo && d && museoTaller && sc;
   });
 };
 
@@ -116,6 +131,7 @@ const VehicleList = () => {
   const [searchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
+  const [userScaleDenominators, setUserScaleDenominators] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
@@ -169,7 +185,26 @@ const VehicleList = () => {
     saveFilters(fromUrl);
   }, [searchParams]);
 
-  const hasActiveFilters = !!(filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.filterMuseo || filters.filterTaller);
+  const loadUserScaleDenominators = useCallback(async () => {
+    try {
+      const { data } = await api.get('/vehicles/scale-factors');
+      const arr = Array.isArray(data?.scaleFactors) ? data.scaleFactors : [];
+      setUserScaleDenominators(arr.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0));
+    } catch (e) {
+      console.error('Error al cargar escalas de la colección:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUserScaleDenominators();
+  }, [loadUserScaleDenominators]);
+
+  const scaleDenominatorOptions = useMemo(
+    () => mergeScaleDenominators(userScaleDenominators, filters.scale),
+    [userScaleDenominators, filters.scale],
+  );
+
+  const hasActiveFilters = !!(filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.scale !== '' || filters.filterMuseo || filters.filterTaller);
 
   const sortQuery = `sort=${encodeURIComponent(listSort.sort)}&dir=${encodeURIComponent(listSort.dir)}`;
 
@@ -246,6 +281,7 @@ const VehicleList = () => {
     setVehicles(prev => prev.filter(v => v.id !== vehicleId));
     setFiltered(prev => prev.filter(v => v.id !== vehicleId));
     if (hasActiveFilters) setAllVehicles(prev => prev.filter(v => v.id !== vehicleId));
+    void loadUserScaleDenominators();
   };
 
   const handlePageChange = (page) => setCurrentPage(page);
@@ -266,6 +302,7 @@ const VehicleList = () => {
         if (filters.digital) params.set('digital', filters.digital);
         if (filters.filterMuseo) params.set('filterMuseo', 'true');
         if (filters.filterTaller) params.set('filterTaller', 'true');
+        if (filters.scale) params.set('scale', filters.scale);
       }
       params.set('sort', listSort.sort);
       params.set('dir', listSort.dir);
@@ -421,6 +458,26 @@ const VehicleList = () => {
               <option value="">Todos los tipos</option>
               {VEHICLE_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Escala */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="filter-scale" className="text-xs font-medium text-muted-foreground">
+              Escala
+            </label>
+            <select
+              id="filter-scale"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={filters.scale}
+              onChange={(e) => setFilters({ ...filters, scale: e.target.value })}
+            >
+              <option value="">Todas las escalas</option>
+              {scaleDenominatorOptions.map((d) => (
+                <option key={d} value={String(d)}>
+                  {formatScaleLabel(d)}
+                </option>
               ))}
             </select>
           </div>
