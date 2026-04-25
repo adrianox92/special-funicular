@@ -2,7 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { getAnonClient } = require('../lib/supabaseClients');
 const supabase = getAnonClient();
-const { calculatePoints } = require('../lib/pointsCalculator');
+const {
+  calculatePoints,
+  lapTimeStringToSeconds,
+  isUsableBestLapTimeString
+} = require('../lib/pointsCalculator');
 
 /**
  * @swagger
@@ -431,12 +435,17 @@ router.get('/:slug/status', async (req, res) => {
       rules
     });
 
-    // Calcular mejor vuelta global
+    // Mejor vuelta global: solo rondas con participación real (no NP, no 00:00.000)
     let globalBestLap = null;
     let globalBestLapParticipant = null;
-    
+    let globalBestLapSeconds = null;
+
     timings.forEach(timing => {
-      if (!globalBestLap || timing.best_lap_time < globalBestLap) {
+      if (timing.did_not_participate) return;
+      if (!isUsableBestLapTimeString(timing.best_lap_time)) return;
+      const sec = lapTimeStringToSeconds(timing.best_lap_time);
+      if (globalBestLapSeconds == null || sec < globalBestLapSeconds) {
+        globalBestLapSeconds = sec;
         globalBestLap = timing.best_lap_time;
         globalBestLapParticipant = participants.find(p => p.id === timing.participant_id);
       }
@@ -605,6 +614,12 @@ router.get('/:slug/presentation', async (req, res) => {
         });
       }
 
+      const hasParticipated = (participant.timings || []).some(t => t && !t.did_not_participate);
+      let bestLapSeconds = null;
+      if (hasParticipated && isUsableBestLapTimeString(participant.best_lap_time)) {
+        bestLapSeconds = lapTimeStringToSeconds(participant.best_lap_time);
+      }
+
       return {
         id: participant.participant_id,
         driver_name: participant.driver_name,
@@ -612,8 +627,7 @@ router.get('/:slug/presentation', async (req, res) => {
         vehicle_brand: participant.vehicle_info.split(' ')[0], // Fabricante
         total_time_timestamp: participant.total_time_seconds,
         penalties: participant.penalty_seconds,
-        best_lap: participant.best_lap_time ? 
-          (parseFloat(participant.best_lap_time.split(':')[0]) * 60 + parseFloat(participant.best_lap_time.split(':')[1])) : null,
+        best_lap: bestLapSeconds,
         position: participant.position,
         rounds: rounds
       };

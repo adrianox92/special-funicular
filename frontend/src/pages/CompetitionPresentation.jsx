@@ -77,15 +77,17 @@ const CompetitionPresentation = () => {
     );
   }
 
-  // Calcular mejor vuelta absoluta
+  // Mejor vuelta absoluta: solo pilotos con al menos una ronda disputada (best_lap > 0 en API)
   const bestLap = participants.reduce((best, participant) => {
-    if (participant.best_lap && (!best || participant.best_lap < best)) {
-      return participant.best_lap;
-    }
+    const lap = participant.best_lap;
+    if (lap == null || Number.isNaN(Number(lap)) || lap <= 0) return best;
+    if (best == null || lap < best) return lap;
     return best;
   }, null);
 
-  const bestLapParticipant = participants.find(p => p.best_lap === bestLap);
+  const bestLapParticipant = participants.find(
+    (p) => p.best_lap != null && p.best_lap > 0 && p.best_lap === bestLap
+  );
 
   return (
     <div className="presentation-container">

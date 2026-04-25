@@ -1,5 +1,22 @@
 // Calculadora de puntos centralizada para competiciones
 
+/** @param {string|null|undefined} str */
+function lapTimeStringToSeconds(str) {
+  if (!str || typeof str !== 'string') return null;
+  const parts = str.split(':');
+  if (parts.length < 2) return null;
+  const min = parseFloat(parts[0]);
+  const rest = parseFloat(parts[1]);
+  if (Number.isNaN(min) || Number.isNaN(rest)) return null;
+  return min * 60 + rest;
+}
+
+/** Válido para estadísticas: participó y la marca no es el centinela 00:00.000. */
+function isUsableBestLapTimeString(str) {
+  const s = lapTimeStringToSeconds(str);
+  return s != null && s > 0;
+}
+
 /**
  * Calcula los puntos de los participantes según las reglas y los tiempos.
  * @param {Object} params
@@ -123,9 +140,13 @@ function calculatePoints({ competition, participants, timings, rules }) {
       const penalty = Number(timing.penalty_seconds) || 0;
       totalTimeSeconds += timeInSeconds + penalty;
       totalPenalty += penalty;
-      // Actualizar mejor vuelta
-      if (!bestLapTime || timing.best_lap_time < bestLapTime) {
-        bestLapTime = timing.best_lap_time;
+      // Actualizar mejor vuelta (ignorar centinela 00:00.000 y datos inválidos)
+      if (isUsableBestLapTimeString(timing.best_lap_time)) {
+        const curLap = lapTimeStringToSeconds(timing.best_lap_time);
+        const bestSoFar = bestLapTime != null ? lapTimeStringToSeconds(bestLapTime) : null;
+        if (bestSoFar == null || curLap < bestSoFar) {
+          bestLapTime = timing.best_lap_time;
+        }
       }
       totalLaps += timing.laps;
     });
@@ -180,4 +201,8 @@ function calculatePoints({ competition, participants, timings, rules }) {
   };
 }
 
-module.exports = { calculatePoints }; 
+module.exports = {
+  calculatePoints,
+  lapTimeStringToSeconds,
+  isUsableBestLapTimeString
+}; 
