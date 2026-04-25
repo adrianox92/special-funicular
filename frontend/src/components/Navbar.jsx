@@ -82,6 +82,50 @@ function NavbarSearchTrigger({ className, onOpen }) {
   );
 }
 
+function MobileNavItem({ item, isItemActive, isActive, NavLink }) {
+  const Icon = item.icon;
+  if (item.children?.length) {
+    const active = isItemActive(item);
+    return (
+      <div className="space-y-1">
+        <Link
+          to={item.path}
+          className={cn(
+            'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+            active
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+          )}
+        >
+          <Icon className="size-4" />
+          {item.label}
+        </Link>
+        <div className="ml-4 flex flex-col gap-1 border-l pl-2">
+          {item.children.map((child) => {
+            const ChildIcon = child.icon;
+            return (
+              <Link
+                key={child.path}
+                to={child.path}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  isActive(child.path)
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <ChildIcon className="size-4" />
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return <NavLink item={item} />;
+}
+
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { setOpen: openCommandPalette } = useCommandPalette();
@@ -238,50 +282,6 @@ const Navbar = () => {
     );
   };
 
-  const MobileNavItem = ({ item }) => {
-    const Icon = item.icon;
-    if (item.children?.length) {
-      const active = isItemActive(item);
-      return (
-        <div className="space-y-1">
-          <Link
-            to={item.path}
-            className={cn(
-              'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-              active
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-            )}
-          >
-            <Icon className="size-4" />
-            {item.label}
-          </Link>
-          <div className="ml-4 flex flex-col gap-1 border-l pl-2">
-            {item.children.map((child) => {
-              const ChildIcon = child.icon;
-              return (
-                <Link
-                  key={child.path}
-                  to={child.path}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                    isActive(child.path)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  )}
-                >
-                  <ChildIcon className="size-4" />
-                  {child.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-    return <NavLink item={item} />;
-  };
-
   return (
     <header
       ref={navbarRef}
@@ -428,7 +428,13 @@ const Navbar = () => {
               </SheetHeader>
               <nav className="flex flex-col gap-2 mt-6">
                 {navItems.map((item) => (
-                  <MobileNavItem key={item.path} item={item} />
+                  <MobileNavItem
+                    key={item.path}
+                    item={item}
+                    isItemActive={isItemActive}
+                    isActive={isActive}
+                    NavLink={NavLink}
+                  />
                 ))}
                 {showLicenseAdmin && (
                   <Link

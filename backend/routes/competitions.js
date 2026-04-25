@@ -526,7 +526,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/participants', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
-    const { vehicle_id, driver_name, vehicle_model, category_id } = req.body;
+    const { vehicle_id, driver_name, vehicle_model, category_id, team_name } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user.id, competitionId, 'id, num_slots, organizer, club_id');
     if (!access.ok) return access.respond(res);
@@ -603,6 +603,10 @@ router.post('/:id/participants', async (req, res) => {
       participantData.vehicle_id = vehicle_id;
     } else {
       participantData.vehicle_model = vehicle_model.trim();
+    }
+
+    if (team_name != null && String(team_name).trim()) {
+      participantData.team_name = String(team_name).trim();
     }
 
     const { data, error } = await supabase
@@ -867,7 +871,7 @@ router.get('/:id/participants', async (req, res) => {
 router.put('/:id/participants/:participantId', async (req, res) => {
   try {
     const { id: competitionId, participantId } = req.params;
-    const { vehicle_id, driver_name, vehicle_model, category_id } = req.body;
+    const { vehicle_id, driver_name, vehicle_model, category_id, team_name } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user.id, competitionId);
     if (!access.ok) return access.respond(res);
@@ -928,6 +932,12 @@ router.put('/:id/participants/:participantId', async (req, res) => {
     const updateData = {};
     if (driver_name) updateData.driver_name = driver_name.trim();
     if (category_id) updateData.category_id = category_id;
+    if (team_name !== undefined) {
+      updateData.team_name =
+        team_name == null || (typeof team_name === 'string' && !team_name.trim())
+          ? null
+          : String(team_name).trim();
+    }
     if (vehicle_id) {
       updateData.vehicle_id = vehicle_id;
       updateData.vehicle_model = null;

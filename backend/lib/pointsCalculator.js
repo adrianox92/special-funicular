@@ -154,9 +154,15 @@ function calculatePoints({ competition, participants, timings, rules }) {
     const totalMinutes = Math.floor(totalTimeSeconds / 60);
     const totalSeconds = (totalTimeSeconds % 60).toFixed(3);
     const totalTimeFormatted = totalTimeSeconds > 0 ? `${String(totalMinutes).padStart(2, '0')}:${totalSeconds.padStart(6, '0')}` : null;
+    const teamNameRaw = p.team_name;
+    const teamName =
+      teamNameRaw != null && String(teamNameRaw).trim()
+        ? String(teamNameRaw).trim()
+        : null;
     return {
       participant_id: p.id,
       driver_name: p.driver_name,
+      team_name: teamName,
       vehicle_info: p.vehicles ? `${p.vehicles.manufacturer} ${p.vehicles.model}` : p.vehicle_model,
       rounds_completed: roundsCompleted,
       rounds_dnp: roundsDnp,
