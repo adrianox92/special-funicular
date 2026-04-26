@@ -1210,6 +1210,7 @@ function AdminSlotCatalog() {
                         <TableRow>
                           <TableHead>Ítem</TableHead>
                           <TableHead className="min-w-[280px]">Cambios propuestos</TableHead>
+                          <TableHead className="whitespace-nowrap">Solicitante</TableHead>
                           <TableHead className="whitespace-nowrap">Recibida</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
@@ -1281,6 +1282,9 @@ function AdminSlotCatalog() {
                                 </ul>
                               )}
                             </TableCell>
+                            <TableCell className="align-top text-xs break-all max-w-[14rem]">
+                              {r.submitter_email ?? '—'}
+                            </TableCell>
                             <TableCell className="align-top text-xs text-muted-foreground whitespace-nowrap">
                               {r.created_at
                                 ? new Date(r.created_at).toLocaleString('es-ES', {
@@ -1321,6 +1325,7 @@ function AdminSlotCatalog() {
                           <TableHead>Año</TableHead>
                           <TableHead className="whitespace-nowrap">Desc. / próx.</TableHead>
                           <TableHead className="w-16">Img.</TableHead>
+                          <TableHead className="text-xs max-w-[14rem]">Solicitante</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1351,6 +1356,9 @@ function AdminSlotCatalog() {
                               ) : (
                                 <span className="text-xs text-muted-foreground">—</span>
                               )}
+                            </TableCell>
+                            <TableCell className="text-xs break-all max-w-[14rem] align-top">
+                              {r.submitter_email ?? '—'}
                             </TableCell>
                             <TableCell className="text-right space-x-2">
                               <Button size="sm" onClick={() => approveIns(r.id)}>Aprobar</Button>

@@ -6,7 +6,7 @@ const express = require('express');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const {
@@ -484,11 +484,7 @@ function proposedPatchToFallbackDiffs(patch, brandNameById) {
 const CATALOG_ITEM_SUMMARY_SELECT =
   'id, reference, manufacturer_id, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, image_url';
 
-/**
- * Añade resumen del ítem y lista de cambios respecto al estado actual (admin).
- */
-async function enrichChangeRequestsForAdmin(rows) {
-  if (!rows?.length) return rows || [];
+async function fetchChangeRequestCatalogItemsById(rows) {
   const itemIds = [...new Set(rows.map((r) => r.catalog_item_id).filter(Boolean))];
   let itemsById = new Map();
   if (itemIds.length) {
@@ -497,11 +493,42 @@ async function enrichChangeRequestsForAdmin(rows) {
       .select(CATALOG_ITEM_SUMMARY_SELECT)
       .in('id', itemIds);
     if (error) {
-      console.warn('[catalog] enrichChangeRequestsForAdmin items', error.message);
+      console.warn('[catalog] fetchChangeRequestCatalogItemsById', error.message);
     } else {
       itemsById = new Map((items || []).map((it) => [it.id, it]));
     }
   }
+  return itemsById;
+}
+
+function toCatalogItemSummary(item) {
+  if (!item) return null;
+  return {
+    id: item.id,
+    reference: item.reference ?? null,
+    manufacturer: item.manufacturer ?? null,
+    model_name: item.model_name ?? null,
+  };
+}
+
+/**
+ * Resumen de ficha para listados (p. ej. GET /my-requests).
+ */
+async function attachCatalogItemSummariesToChangeRequests(rows) {
+  if (!rows?.length) return rows || [];
+  const itemsById = await fetchChangeRequestCatalogItemsById(rows);
+  return rows.map((r) => ({
+    ...r,
+    catalog_item_summary: toCatalogItemSummary(itemsById.get(r.catalog_item_id) ?? null),
+  }));
+}
+
+/**
+ * Añade resumen del ítem y lista de cambios respecto al estado actual (admin).
+ */
+async function enrichChangeRequestsForAdmin(rows) {
+  if (!rows?.length) return rows || [];
+  const itemsById = await fetchChangeRequestCatalogItemsById(rows);
 
   const brandIds = new Set();
   for (const r of rows) {
@@ -521,20 +548,41 @@ async function enrichChangeRequestsForAdmin(rows) {
     const field_diffs = item
       ? computeCatalogChangeFieldDiffs(item, r.proposed_patch, brandNameById)
       : proposedPatchToFallbackDiffs(r.proposed_patch, brandNameById);
-    const catalog_item_summary = item
-      ? {
-          id: item.id,
-          reference: item.reference ?? null,
-          manufacturer: item.manufacturer ?? null,
-          model_name: item.model_name ?? null,
-        }
-      : null;
     return {
       ...r,
-      catalog_item_summary,
+      catalog_item_summary: toCatalogItemSummary(item),
       field_diffs,
     };
   });
+}
+
+/**
+ * Email del usuario que envió la solicitud (requiere SUPABASE_SERVICE_ROLE_KEY).
+ */
+async function attachSubmitterEmails(rows) {
+  if (!rows?.length) return rows || [];
+  const adminClient = getServiceClient();
+  if (!adminClient) {
+    return rows.map((r) => ({ ...r, submitter_email: null }));
+  }
+  const ids = [...new Set(rows.map((r) => r.submitted_by).filter(Boolean))];
+  const emailById = new Map();
+  await Promise.all(
+    ids.map(async (uid) => {
+      try {
+        const { data, error } = await adminClient.auth.admin.getUserById(uid);
+        if (!error && data?.user?.email) {
+          emailById.set(uid, data.user.email);
+        }
+      } catch (err) {
+        console.warn('[catalog] submitter email', uid, err.message);
+      }
+    }),
+  );
+  return rows.map((r) => ({
+    ...r,
+    submitter_email: r.submitted_by ? emailById.get(r.submitted_by) ?? null : null,
+  }));
 }
 
 router.use(authMiddleware);
@@ -609,9 +657,10 @@ router.get('/my-requests', async (req, res) => {
     ]);
     if (chg.error) return res.status(500).json({ error: chg.error.message });
     if (ins.error) return res.status(500).json({ error: ins.error.message });
+    const changeRows = await attachCatalogItemSummariesToChangeRequests(chg.data ?? []);
     const insertRows = await enrichInsertRequestsWithBrandNames(ins.data ?? []);
     res.json({
-      change_requests: chg.data ?? [],
+      change_requests: changeRows,
       insert_requests: insertRows,
     });
   } catch (e) {
@@ -1070,7 +1119,8 @@ router.get('/change-requests', adminGuard, async (req, res) => {
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
     const enriched = await enrichChangeRequestsForAdmin(data ?? []);
-    res.json({ requests: enriched });
+    const withEmail = await attachSubmitterEmails(enriched);
+    res.json({ requests: withEmail });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1290,7 +1340,8 @@ router.get('/insert-requests', adminGuard, async (req, res) => {
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
     const rows = await enrichInsertRequestsWithBrandNames(data ?? []);
-    res.json({ requests: rows });
+    const withEmail = await attachSubmitterEmails(rows);
+    res.json({ requests: withEmail });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

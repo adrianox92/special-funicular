@@ -88,10 +88,24 @@ export default function CatalogMySuggestions() {
                   <TableBody>
                     {changeReq.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className="font-mono text-sm">
-                          <Link to={`/catalogo/${r.catalog_item_id}`} className="text-primary hover:underline">
-                            {r.catalog_item_id}
-                          </Link>
+                        <TableCell>
+                          {r.catalog_item_summary ? (
+                            <div className="space-y-0.5">
+                              <Link
+                                to={`/catalogo/${r.catalog_item_summary.id}`}
+                                className="font-mono text-sm text-primary hover:underline"
+                              >
+                                {r.catalog_item_summary.reference ?? '—'}
+                              </Link>
+                              <div className="text-xs text-muted-foreground">
+                                {r.catalog_item_summary.manufacturer} — {r.catalog_item_summary.model_name}
+                              </div>
+                            </div>
+                          ) : r.catalog_item_id ? (
+                            <span className="text-xs text-muted-foreground">Ficha no disponible</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>{statusLabel[r.status] ?? r.status}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
