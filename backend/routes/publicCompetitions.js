@@ -2,7 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { getAnonClient } = require('../lib/supabaseClients');
 const supabase = getAnonClient();
-const { calculatePoints } = require('../lib/pointsCalculator');
+const {
+  calculatePoints,
+  lapTimeStringToSeconds,
+  isUsableBestLapTimeString
+} = require('../lib/pointsCalculator');
 
 /**
  * @swagger
@@ -127,6 +131,7 @@ const { calculatePoints } = require('../lib/pointsCalculator');
  *                         type: string
  *                       team_name:
  *                         type: string
+ *                         nullable: true
  *                       vehicle_name:
  *                         type: string
  *                       vehicle_brand:
@@ -136,7 +141,10 @@ const { calculatePoints } = require('../lib/pointsCalculator');
  *                       penalties:
  *                         type: number
  *                       best_lap:
- *                         type: string
+ *                         type: number
+ *                         nullable: true
+ *                       points:
+ *                         type: integer
  *                       position:
  *                         type: integer
  *                       rounds:
@@ -146,8 +154,11 @@ const { calculatePoints } = require('../lib/pointsCalculator');
  *                           properties:
  *                             round_number:
  *                               type: integer
+ *                             did_not_participate:
+ *                               type: boolean
  *                             time_timestamp:
  *                               type: number
+ *                               nullable: true
  *                             penalty_seconds:
  *                               type: number
  *       404:
@@ -369,6 +380,7 @@ router.get('/:slug/status', async (req, res) => {
       .select(`
         id,
         driver_name,
+        team_name,
         vehicle_model,
         vehicles(model, manufacturer)
       `)
@@ -392,8 +404,11 @@ router.get('/:slug/status', async (req, res) => {
         laps,
         average_time,
         lane,
+        driver,
+        circuit,
         timing_date,
-        penalty_seconds
+        penalty_seconds,
+        did_not_participate
       `)
       .in('participant_id', participants.map(p => p.id))
       .order('round_number', { ascending: true })
@@ -428,12 +443,17 @@ router.get('/:slug/status', async (req, res) => {
       rules
     });
 
-    // Calcular mejor vuelta global
+    // Mejor vuelta global: solo rondas con participación real (no NP, no 00:00.000)
     let globalBestLap = null;
     let globalBestLapParticipant = null;
-    
+    let globalBestLapSeconds = null;
+
     timings.forEach(timing => {
-      if (!globalBestLap || timing.best_lap_time < globalBestLap) {
+      if (timing.did_not_participate) return;
+      if (!isUsableBestLapTimeString(timing.best_lap_time)) return;
+      const sec = lapTimeStringToSeconds(timing.best_lap_time);
+      if (globalBestLapSeconds == null || sec < globalBestLapSeconds) {
+        globalBestLapSeconds = sec;
         globalBestLap = timing.best_lap_time;
         globalBestLapParticipant = participants.find(p => p.id === timing.participant_id);
       }
@@ -507,7 +527,7 @@ router.get('/:slug/presentation', async (req, res) => {
   try {
     const { slug } = req.params;
     
-    // Obtener la competición por public_slug
+    // Obtener la competición por public_slug (circuit_name o relación circuits)
     const { data: competition, error: compError } = await supabase
       .from('competitions')
       .select(`
@@ -516,6 +536,8 @@ router.get('/:slug/presentation', async (req, res) => {
         num_slots,
         rounds,
         circuit_name,
+        circuit_id,
+        circuits ( name ),
         created_at
       `)
       .eq('public_slug', slug)
@@ -525,12 +547,24 @@ router.get('/:slug/presentation', async (req, res) => {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 
+    const embeddedCircuit =
+      competition.circuits == null
+        ? null
+        : Array.isArray(competition.circuits)
+          ? competition.circuits[0]
+          : competition.circuits;
+    const circuitDisplayName =
+      (competition.circuit_name && String(competition.circuit_name).trim()) ||
+      (embeddedCircuit && embeddedCircuit.name) ||
+      null;
+
     // Obtener participantes oficiales
     const { data: participants, error: partError } = await supabase
       .from('competition_participants')
       .select(`
         id,
         driver_name,
+        team_name,
         vehicle_model,
         vehicles(model, manufacturer)
       `)
@@ -554,8 +588,11 @@ router.get('/:slug/presentation', async (req, res) => {
         laps,
         average_time,
         lane,
+        driver,
+        circuit,
         timing_date,
-        penalty_seconds
+        penalty_seconds,
+        did_not_participate
       `)
       .in('participant_id', participants.map(p => p.id))
       .order('round_number', { ascending: true })
@@ -591,36 +628,51 @@ router.get('/:slug/presentation', async (req, res) => {
       const rounds = [];
       for (let i = 1; i <= competition.rounds; i++) {
         const roundTiming = participant.timings.find(t => t.round_number === i);
+        const isDnp = Boolean(roundTiming?.did_not_participate);
         rounds.push({
           round_number: i,
-          time_timestamp: roundTiming ? 
-            (parseFloat(roundTiming.total_time.split(':')[0]) * 60 + parseFloat(roundTiming.total_time.split(':')[1])) : null,
+          did_not_participate: isDnp,
+          time_timestamp: roundTiming && !isDnp
+            ? (parseFloat(roundTiming.total_time.split(':')[0]) * 60 + parseFloat(roundTiming.total_time.split(':')[1]))
+            : null,
           penalty_seconds: roundTiming ? Number(roundTiming.penalty_seconds) || 0 : 0
         });
+      }
+
+      const hasParticipated = (participant.timings || []).some(t => t && !t.did_not_participate);
+      let bestLapSeconds = null;
+      if (hasParticipated && isUsableBestLapTimeString(participant.best_lap_time)) {
+        bestLapSeconds = lapTimeStringToSeconds(participant.best_lap_time);
       }
 
       return {
         id: participant.participant_id,
         driver_name: participant.driver_name,
+        team_name: participant.team_name,
         vehicle_name: participant.vehicle_info.split(' ').slice(1).join(' '), // Modelo
         vehicle_brand: participant.vehicle_info.split(' ')[0], // Fabricante
         total_time_timestamp: participant.total_time_seconds,
         penalties: participant.penalty_seconds,
-        best_lap: participant.best_lap_time ? 
-          (parseFloat(participant.best_lap_time.split(':')[0]) * 60 + parseFloat(participant.best_lap_time.split(':')[1])) : null,
+        best_lap: bestLapSeconds,
         position: participant.position,
+        points: participant.points ?? 0,
         rounds: rounds
       };
     });
+
+    const totalRequiredTimes = participants.length * competition.rounds;
+    const isCompleted =
+      totalRequiredTimes > 0 && timings.length >= totalRequiredTimes;
 
     // Preparar respuesta
     const response = {
       competition: {
         id: competition.id,
         name: competition.name,
-        circuit_name: competition.circuit_name,
+        circuit_name: circuitDisplayName,
         rounds: competition.rounds,
-        created_at: competition.created_at
+        created_at: competition.created_at,
+        status: isCompleted ? 'finished' : 'active',
       },
       participants: presentationParticipants
     };

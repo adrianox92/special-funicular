@@ -5,12 +5,13 @@ const CompetitionHeader = ({ competition }) => {
   const getStatusText = (status) => {
     switch (status) {
       case 'active':
-        return 'En Curso';
+        return 'En curso';
       case 'finished':
         return 'Finalizada';
       case 'pending':
         return 'Pendiente';
       default:
+        // Valores inesperados o ausentes: no asumir «en curso»
         return 'Desconocido';
     }
   };
@@ -36,31 +37,29 @@ const CompetitionHeader = ({ competition }) => {
             <Trophy className="title-icon" />
             {competition.name}
           </h1>
-          <div className="competition-meta">
-            <span className="rounds-info">
-              <Flag className="meta-icon" />
-              {competition.rounds} {competition.rounds === 1 ? 'Ronda' : 'Rondas'}
+          <div className="competition-meta presentation-competition-meta">
+            <span className="rounds-info meta-pill">
+              <Flag className="meta-icon" aria-hidden />
+              <span>
+                {competition.rounds} {competition.rounds === 1 ? 'ronda' : 'rondas'}
+              </span>
             </span>
+
             {competition.category && (
-              <span className="category-info">
-                <Users className="meta-icon" />
-                {competition.category}
+              <span className="category-info meta-pill">
+                <Users className="meta-icon" aria-hidden />
+                <span>{competition.category}</span>
               </span>
             )}
+
             <span className={`status-badge ${getStatusClass(competition.status)}`}>
               {getStatusText(competition.status)}
             </span>
           </div>
         </div>
-        
-        {competition.circuit_name && (
-          <div className="circuit-info">
-            <span className="circuit-name">{competition.circuit_name}</span>
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
-export default CompetitionHeader; 
+export default CompetitionHeader;

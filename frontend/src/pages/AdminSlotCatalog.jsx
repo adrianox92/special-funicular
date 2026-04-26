@@ -1142,7 +1142,7 @@ function AdminSlotCatalog() {
             <CardContent className="space-y-4 max-w-lg">
               <div className="space-y-2">
                 <Label>Archivo</Label>
-                <Input type="file" accept=".csv,.xlsx,.xls" onChange={e => setImportFile(e.target.files?.[0] || null)} />
+                <Input type="file" accept=".csv,.xlsx,.xlsm,.xlsb,.xls,.xltx,.xltm" onChange={e => setImportFile(e.target.files?.[0] || null)} />
               </div>
               <div className="space-y-2">
                 <Label>Si la referencia y la marca ya existen</Label>

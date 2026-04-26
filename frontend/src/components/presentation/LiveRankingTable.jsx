@@ -1,36 +1,29 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { formatTimeDiff } from '../../utils/formatTimeDiff';
 
 const LiveRankingTable = ({ participants }) => {
-  // Ordenar participantes por tiempo total + penalizaciones
-  const sortedParticipants = [...participants].sort((a, b) => {
-    const timeA = a.total_time_timestamp || 0;
-    const timeB = b.total_time_timestamp || 0;
-    
-    // Si ambos tienen tiempo, ordenar por tiempo
-    if (timeA > 0 && timeB > 0) {
-      return timeA - timeB;
-    }
-    
-    // Si solo A tiene tiempo, A va primero
-    if (timeA > 0 && timeB === 0) {
-      return -1;
-    }
-    
-    // Si solo B tiene tiempo, B va primero
-    if (timeA === 0 && timeB > 0) {
-      return 1;
-    }
-    
-    // Si ninguno tiene tiempo, mantener orden original
-    return 0;
-  });
-
-  // Filtrar participantes sin tiempo (opcional - comentar si quieres mostrarlos al final)
-  const participantsWithTime = sortedParticipants.filter(p => (p.total_time_timestamp || 0) > 0);
+  /** Mismo criterio que la clasificación pública: puntos → tiempo (orden del API / calculatePoints). */
+  const orderedParticipants = useMemo(() => {
+    return [...participants].sort((a, b) => {
+      const posA = Number(a.position);
+      const posB = Number(b.position);
+      if (Number.isFinite(posA) && Number.isFinite(posB)) {
+        return posA - posB;
+      }
+      const timeA = a.total_time_timestamp || 0;
+      const timeB = b.total_time_timestamp || 0;
+      if (timeA > 0 && timeB > 0) return timeA - timeB;
+      if (timeA > 0 && timeB === 0) return -1;
+      if (timeA === 0 && timeB > 0) return 1;
+      return 0;
+    });
+  }, [participants]);
 
   // Formatea segundos (float o int) a mm:ss.mmm
   const formatTime = (timestamp) => {
-    if (timestamp === null || timestamp === undefined || isNaN(timestamp)) return '--:--.---';
+    if (timestamp === null || timestamp === undefined || isNaN(timestamp) || Number(timestamp) <= 0) {
+      return '—';
+    }
     const totalMs = Math.round(Number(timestamp) * 1000);
     const minutes = Math.floor(totalMs / 60000);
     const seconds = Math.floor((totalMs % 60000) / 1000);
@@ -42,7 +35,7 @@ const LiveRankingTable = ({ participants }) => {
 
   // Formatea mejor vuelta (float o string) a mm:ss.mmm
   const formatBestLap = (bestLap) => {
-    if (!bestLap || isNaN(Number(bestLap))) return '--:--.---';
+    if (!bestLap || isNaN(Number(bestLap)) || Number(bestLap) <= 0) return '—';
     const lap = Number(bestLap);
     const minutes = Math.floor(lap / 60);
     const seconds = Math.floor(lap % 60);
@@ -65,46 +58,32 @@ const LiveRankingTable = ({ participants }) => {
     }
   };
 
-  // Formatea diferencia en formato +XX.XXX
   const formatGap = (seconds) => {
-    if (seconds === null || seconds === undefined || isNaN(seconds)) return '-';
-    if (seconds === 0) return '-';
-    
-    // Corregir errores de precisión de punto flotante
-    const correctedSeconds = Math.round(seconds * 1000) / 1000;
-    
-    const minutes = Math.floor(correctedSeconds / 60);
-    const remainingSeconds = (correctedSeconds % 60).toFixed(3);
-    
-    if (minutes > 0) {
-      return `+${minutes}:${remainingSeconds.padStart(6, '0')}`;
-    } else {
-      return `+${remainingSeconds}`;
-    }
+    if (seconds === null || seconds === undefined || isNaN(seconds)) return '—';
+    const corrected = Math.round(seconds * 1000) / 1000;
+    return formatTimeDiff(corrected);
   };
 
-  // Calcular diferencias
-  const participantsWithGaps = participantsWithTime.map((participant, index) => {
-    const totalTime = participant.total_time_timestamp || 0; // Ya incluye penalizaciones
-    
-    // Diferencia con el líder
+  const showPointsColumn = orderedParticipants.some(
+    (p) => p.points !== undefined && p.points !== null
+  );
+
+  const participantsWithGaps = orderedParticipants.map((participant, index) => {
+    const cur = participant.total_time_timestamp || 0;
+    const leader = orderedParticipants[0]?.total_time_timestamp || 0;
+    const prev =
+      index > 0 ? orderedParticipants[index - 1].total_time_timestamp || 0 : 0;
+
     let leaderGap = null;
-    if (index > 0 && participantsWithTime[0].total_time_timestamp > 0) {
-      const leaderTime = participantsWithTime[0].total_time_timestamp || 0; // Ya incluye penalizaciones
-      if (totalTime > 0 && leaderTime > 0) {
-        leaderGap = totalTime - leaderTime;
-      }
+    if (index > 0 && leader > 0 && cur > 0) {
+      leaderGap = cur - leader;
     }
-    
-    // Diferencia con el anterior
+
     let previousGap = null;
-    if (index > 0 && participantsWithTime[index - 1].total_time_timestamp > 0) {
-      const previousTime = participantsWithTime[index - 1].total_time_timestamp || 0; // Ya incluye penalizaciones
-      if (totalTime > 0 && previousTime > 0) {
-        previousGap = totalTime - previousTime;
-      }
+    if (index > 0 && prev > 0 && cur > 0) {
+      previousGap = cur - prev;
     }
-    
+
     return {
       ...participant,
       leaderGap,
@@ -114,8 +93,10 @@ const LiveRankingTable = ({ participants }) => {
 
   return (
     <div className="live-ranking-table">
-      <h2 className="table-title">Clasificación en Vivo</h2>
-      
+      <div className="table-title-block">
+        <h2 className="table-title">Clasificación general</h2>
+        <p className="table-subtitle">Orden por puntos y tiempo · Se actualiza automáticamente</p>
+      </div>
       <div className="table-container">
         <table className="ranking-table">
           <thead>
@@ -128,16 +109,18 @@ const LiveRankingTable = ({ participants }) => {
               <th className="best-lap-col">Mejor Vuelta</th>
               <th className="gap-leader-col">Dif. Líder</th>
               <th className="gap-previous-col">Dif. Anterior</th>
+              {showPointsColumn && <th className="points-col">Puntos</th>}
             </tr>
           </thead>
           <tbody>
-            {participantsWithGaps.map((participant, index) => {
-              const position = index + 1;
+            {participantsWithGaps.map((participant) => {
+              const position = Number(participant.position) || 0;
+              const dispPos = position > 0 ? position : '—';
 
               return (
                 <tr key={participant.id} className={getPositionClass(position)}>
                   <td className="position-cell">
-                    <span className="position-number">{position}</span>
+                    <span className="position-number">{dispPos}</span>
                   </td>
                   <td className="driver-cell">
                     <div className="driver-info">
@@ -172,14 +155,23 @@ const LiveRankingTable = ({ participants }) => {
                   </td>
                   <td className="gap-leader-cell">
                     <span className="gap-leader">
-                      {formatGap(participant.leaderGap)}
+                      {participant.leaderGap == null
+                        ? '—'
+                        : formatGap(participant.leaderGap)}
                     </span>
                   </td>
                   <td className="gap-previous-cell">
                     <span className="gap-previous">
-                      {formatGap(participant.previousGap)}
+                      {participant.previousGap == null
+                        ? '—'
+                        : formatGap(participant.previousGap)}
                     </span>
                   </td>
+                  {showPointsColumn && (
+                    <td className="points-cell">
+                      {participant.points != null ? participant.points : '—'}
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -190,4 +182,4 @@ const LiveRankingTable = ({ participants }) => {
   );
 };
 
-export default LiveRankingTable; 
+export default LiveRankingTable;

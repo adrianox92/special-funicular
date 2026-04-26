@@ -1,9 +1,9 @@
 import React from 'react';
-import { CheckCircle, Clock, Pause, ListOrdered } from 'lucide-react';
+import { CheckCircle, Clock, Pause, ListOrdered, Ban } from 'lucide-react';
 
 const RoundProgressGrid = ({ competition, participants }) => {
   const formatTime = (timestamp) => {
-    if (!timestamp) return '--:--';
+    if (timestamp == null || timestamp === '' || !timestamp) return '--:--';
     const minutes = Math.floor(timestamp / 60);
     const seconds = Math.floor(timestamp % 60);
     const milliseconds = Math.floor((timestamp % 1) * 100);
@@ -16,8 +16,12 @@ const RoundProgressGrid = ({ competition, participants }) => {
     if (!round) {
       return 'pending';
     }
+
+    if (round.did_not_participate) {
+      return 'dnp';
+    }
     
-    if (round.time_timestamp) {
+    if (round.time_timestamp != null && round.time_timestamp > 0) {
       return 'completed';
     }
     
@@ -28,6 +32,8 @@ const RoundProgressGrid = ({ competition, participants }) => {
     switch (status) {
       case 'completed':
         return <CheckCircle />;
+      case 'dnp':
+        return <Ban />;
       case 'in-progress':
         return <Clock />;
       case 'pending':
@@ -40,6 +46,8 @@ const RoundProgressGrid = ({ competition, participants }) => {
     switch (status) {
       case 'completed':
         return 'round-completed';
+      case 'dnp':
+        return 'round-dnp';
       case 'in-progress':
         return 'round-in-progress';
       case 'pending':
@@ -50,10 +58,13 @@ const RoundProgressGrid = ({ competition, participants }) => {
 
   return (
     <div className="round-progress-grid">
-      <h2 className="grid-title">
-        <ListOrdered className="grid-icon" />
-        Progreso por Rondas
-      </h2>
+      <div className="grid-title-block">
+        <h2 className="grid-title">
+          <ListOrdered className="grid-icon" />
+          Progreso por rondas
+        </h2>
+        <p className="grid-subtitle">Estado de cada tanda · Leyenda al pie</p>
+      </div>
       
       <div className="grid-container">
         <div className="grid-header">
@@ -79,12 +90,16 @@ const RoundProgressGrid = ({ competition, participants }) => {
                 const roundNumber = i + 1;
                 const status = getRoundStatus(participant, roundNumber);
                 const round = participant.rounds?.find(r => r.round_number === roundNumber);
+                const isDnp = status === 'dnp';
                 
                 return (
                   <div key={roundNumber} className={`round-cell ${getStatusClass(status)}`}>
                     <div className="round-content">
                       <span className="round-icon">{getStatusIcon(status)}</span>
-                      {round?.time_timestamp && (
+                      {isDnp && (
+                        <span className="round-np-label">NP</span>
+                      )}
+                      {!isDnp && round?.time_timestamp != null && round.time_timestamp > 0 && (
                         <span className="round-time">
                           {formatTime(round.time_timestamp)}
                         </span>
@@ -104,6 +119,10 @@ const RoundProgressGrid = ({ competition, participants }) => {
           <span className="legend-text">Completada</span>
         </div>
         <div className="legend-item">
+          <Ban className="legend-icon" />
+          <span className="legend-text">NP (no participó)</span>
+        </div>
+        <div className="legend-item">
           <Clock className="legend-icon" />
           <span className="legend-text">En progreso</span>
         </div>
@@ -116,4 +135,4 @@ const RoundProgressGrid = ({ competition, participants }) => {
   );
 };
 
-export default RoundProgressGrid; 
+export default RoundProgressGrid;

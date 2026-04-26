@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Spinner } from '../components/ui/spinner';
+import { formatTimeDiff } from '../utils/formatTimeDiff';
 
 const CompetitionStatus = () => {
   const { slug } = useParams();
@@ -31,6 +32,7 @@ const CompetitionStatus = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [roundDetail, setRoundDetail] = useState(null);
   const [rules, setRules] = useState([]);
 
   useEffect(() => {
@@ -81,6 +83,27 @@ const CompetitionStatus = () => {
   };
 
   const handlePresentationMode = () => navigate(`/competitions/presentation/${slug}`);
+
+  const roundTotalAdjustedSeconds = (timing) => {
+    const base = timeStringToSeconds(timing.total_time);
+    const penalty = Number(timing.penalty_seconds) || 0;
+    return base + penalty;
+  };
+
+  const roundChipLabel = (timing) => {
+    if (timing.did_not_participate) return 'NP';
+    const penalty = Number(timing.penalty_seconds) || 0;
+    if (penalty > 0) {
+      return secondsToTimeString(roundTotalAdjustedSeconds(timing));
+    }
+    return timing.total_time || '-';
+  };
+
+  const roundPenaltyTitle = (timing) => {
+    const penalty = Number(timing.penalty_seconds) || 0;
+    if (penalty <= 0) return undefined;
+    return `Original: ${timing.total_time} + ${penalty.toFixed(3)}s penalización`;
+  };
 
   if (loading) {
     return (
@@ -236,16 +259,15 @@ const CompetitionStatus = () => {
                     let leaderDiff = '-';
                     let previousDiff = '-';
                     if (idx > 0 && participants[0].total_time) {
-                      const diff = totalTimeSeconds - timeStringToSeconds(participants[0].total_time);
-                      const m = Math.floor(diff / 60);
-                      const s = (diff % 60).toFixed(3);
-                      leaderDiff = m > 0 ? `+${m}:${s.padStart(6, '0')}` : `+${s}`;
+                      leaderDiff = formatTimeDiff(
+                        totalTimeSeconds - timeStringToSeconds(participants[0].total_time)
+                      );
                     }
                     if (idx > 0 && participants[idx - 1].total_time) {
-                      const diff = totalTimeSeconds - timeStringToSeconds(participants[idx - 1].total_time);
-                      const m = Math.floor(diff / 60);
-                      const s = (diff % 60).toFixed(3);
-                      previousDiff = m > 0 ? `+${m}:${s.padStart(6, '0')}` : `+${s}`;
+                      previousDiff = formatTimeDiff(
+                        totalTimeSeconds -
+                          timeStringToSeconds(participants[idx - 1].total_time)
+                      );
                     }
                     return (
                       <TableRow key={participant.participant_id}>
@@ -342,19 +364,29 @@ const CompetitionStatus = () => {
                           <small className="text-muted-foreground block mb-2">Tiempos por ronda:</small>
                           <div className="grid grid-cols-2 gap-2">
                             {participant.timings.map((timing) => (
-                              <div key={timing.id} className="round-timing-chip rounded p-2 text-center">
+                              <button
+                                key={timing.id}
+                                type="button"
+                                className="round-timing-chip rounded border border-border bg-muted/40 p-2 text-center transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                onClick={() =>
+                                  setRoundDetail({ driverName: participant.driver_name, timing })
+                                }
+                                aria-label={`Ver detalle ronda ${timing.round_number}, ${participant.driver_name}`}
+                              >
                                 <small className="font-semibold block">R{timing.round_number}</small>
                                 <small className="text-muted-foreground">
-                                  {Number(timing.penalty_seconds) > 0 ? (
-                                    <span title={`Original: ${secondsToTimeString(timeStringToSeconds(timing.total_time))}`} className="cursor-help">
-                                      {timing.total_time}{' '}
+                                  {timing.did_not_participate ? (
+                                    <span className="text-muted-foreground">NP</span>
+                                  ) : Number(timing.penalty_seconds) > 0 ? (
+                                    <span title={roundPenaltyTitle(timing)} className="cursor-help">
+                                      {roundChipLabel(timing)}{' '}
                                       <AlertTriangle className="inline size-3.5 align-middle text-amber-600" aria-hidden />
                                     </span>
                                   ) : (
-                                    timing.total_time
+                                    roundChipLabel(timing)
                                   )}
                                 </small>
-                              </div>
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -393,6 +425,102 @@ const CompetitionStatus = () => {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPdfModal(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!roundDetail} onOpenChange={(open) => !open && setRoundDetail(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {roundDetail
+                ? `Ronda ${roundDetail.timing.round_number} — ${roundDetail.driverName}`
+                : ''}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Detalle de tiempos y datos de la ronda seleccionada
+            </DialogDescription>
+          </DialogHeader>
+          {roundDetail && (
+            <div className="space-y-3 text-sm">
+              {roundDetail.timing.did_not_participate ? (
+                <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                  NP — No participó
+                </Badge>
+              ) : (
+                <dl className="grid gap-2">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Mejor vuelta</dt>
+                    <dd className="font-medium tabular-nums">{formatTime(roundDetail.timing.best_lap_time)}</dd>
+                  </div>
+                  {Number(roundDetail.timing.penalty_seconds) > 0 ? (
+                    <>
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-muted-foreground">Tiempo sin penalización</dt>
+                        <dd className="font-medium tabular-nums">{formatTime(roundDetail.timing.total_time)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-muted-foreground">Penalización</dt>
+                        <dd className="font-medium tabular-nums text-amber-700 dark:text-amber-500">
+                          +{Number(roundDetail.timing.penalty_seconds).toFixed(3)} s
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-4 border-t border-border pt-2 mt-1">
+                        <dt className="text-muted-foreground font-medium">Tiempo total</dt>
+                        <dd className="font-semibold tabular-nums">
+                          <span className="inline-flex items-center gap-1">
+                            {secondsToTimeString(roundTotalAdjustedSeconds(roundDetail.timing))}
+                            <AlertTriangle className="size-3.5 shrink-0 text-amber-600" aria-hidden />
+                          </span>
+                        </dd>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Tiempo total</dt>
+                      <dd className="font-medium tabular-nums">{formatTime(roundDetail.timing.total_time)}</dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Media</dt>
+                    <dd className="font-medium tabular-nums">{formatTime(roundDetail.timing.average_time)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Vueltas</dt>
+                    <dd className="font-medium">{roundDetail.timing.laps ?? '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Carril</dt>
+                    <dd className="font-medium">{roundDetail.timing.lane ?? '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Fecha</dt>
+                    <dd className="font-medium">
+                      {roundDetail.timing.timing_date
+                        ? formatDate(roundDetail.timing.timing_date)
+                        : '—'}
+                    </dd>
+                  </div>
+                  {roundDetail.timing.driver ? (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Piloto (registro)</dt>
+                      <dd className="font-medium text-right break-words">{roundDetail.timing.driver}</dd>
+                    </div>
+                  ) : null}
+                  {roundDetail.timing.circuit ? (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Circuito (registro)</dt>
+                      <dd className="font-medium text-right break-words">{roundDetail.timing.circuit}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoundDetail(null)}>
+              Cerrar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

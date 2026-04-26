@@ -16,10 +16,10 @@
         "linkLabel": "Ir a Circuitos"
       },
       {
-        "title": "Añade tus vehículos",
-        "body": "Desde Vehículos puedes crear fichas con fotos, tipo, modificaciones y más. Una ficha completa mejora métricas e informes.",
-        "linkTo": "/vehicles/new",
-        "linkLabel": "Añadir vehículo"
+        "title": "Añade tus vehículos o impórtalos desde un fichero",
+        "body": "Desde Vehículos puedes crear fichas con fotos, tipo, modificaciones y más, o subir un CSV/Excel: el sistema sugiere el mapeo de columnas, muestra una vista previa y respeta posibles filas de cabecera o columnas vacías. Una ficha completa mejora métricas e informes.",
+        "linkTo": "/vehicles",
+        "linkLabel": "Ir a Vehículos"
       },
       {
         "title": "Registra tiempos de sesión",
@@ -35,7 +35,7 @@
       },
       {
         "title": "Opcional: competiciones",
-        "body": "Crea un evento, gestiona participantes y tiempos. Hay URLs públicas para inscripción y seguimiento.",
+        "body": "Crea un evento, gestiona participantes y tiempos. Hay URLs públicas para inscripción y seguimiento. En el menú, «Competiciones» abre un submenú: «Mis competiciones» y «Pilotos favoritos» (lista de pilotos habituales para dar de alta sin depender solo del enlace público).",
         "linkTo": "/competitions",
         "linkLabel": "Ir a Competiciones"
       },
@@ -72,25 +72,28 @@
       "id": "vehiculos",
       "title": "Vehículos",
       "pathBadge": "/vehicles",
-      "description": "Catálogo de coches: alta, edición, filtros y exportación.",
-      "intro": "Puedes ver la lista en cuadrícula o tabla, filtrar por fabricante, tipo, modificado/analógico-digital, y marcar criterios como museo o taller. Los filtros se guardan en este navegador para la próxima visita.",
+      "description": "Catálogo de coches: alta, edición, importación masiva (CSV/Excel), filtros y exportación.",
+      "intro": "Puedes ver la lista en cuadrícula o tabla, filtrar por fabricante, tipo, modificado/analógico-digital, y marcar criterios como museo o taller. Los filtros se guardan en este navegador para la próxima visita. Además, desde el listado puedes importar muchos vehículos a la vez con un asistente que lee la hoja (incluida cabecera en filas bajo filas en blanco o columnas vacías) y alinea el mapeo con las letras de columna de Excel o Numbers.",
       "steps": [
         "Ve a Vehículos en el menú.",
-        "Pulsa «Añadir vehículo» (o entra en la ruta de nuevo vehículo).",
-        "Completa nombre, tipo, fabricante y el resto de campos que quieras registrar.",
-        "Opcional: sube imágenes (vistas del coche) desde la ficha.",
-        "Guarda. Podrás abrir la ficha después para añadir especificaciones técnicas, componentes, mantenimiento y tiempos."
+        "Alta individual: «Añadir vehículo» (o la ruta de nuevo vehículo), completa el formulario, opcional: fotos, y guarda.",
+        "Importación: en el listado de Vehículos pulsa «Importar» (junto a Exportar CSV), elige un CSV o Excel (.xlsx, .xlsm, .xlsb, .xls, .xltx, .xltm). Opcional: índice de hoja en libros con varias pestañas.",
+        "Revisa el mapeo: el sistema sugiere qué columna de tu fichero encaja con cada campo (modelo, marca, tipo, tracción, fechas, etc.). Puedes ignorar columnas. Obligatorio en el mapeo solo marca y modelo; el resto es opcional. La vista previa se actualiza al cambiar el mapeo.",
+        "Trata los duplicados: puedes omitir filas que coincidan con lo que ya tienes, importarlas igual, o actualizar registros existentes según el modo que elijas (referencia+fabricante o fabricante+modelo).",
+        "Confirma la importación. Si no mapeaste el tipo u otros datos que en el formulario de alta suelen ser obligatorios, la app te avisa para completarlos editando la ficha tras importar.",
+        "Tras el alta, abre la ficha del vehículo para añadir especificaciones, componentes, mantenimiento y tiempos."
       ],
       "tips": [
         "Cada vehículo tiene una ficha detallada (componentes, mantenimiento, tiempos asociados, etc.).",
         "«Añadir vehículo» y la edición usan el mismo modelo de datos: cuanto más completa la ficha, mejores métricas en Inicio y Tiempos.",
-        "En la pestaña «Tabla de Tiempos» de la ficha puedes importar sesiones desde CSV o JSON con «Importar sesiones»; se asignan automáticamente a ese vehículo (mismo flujo que en el listado global de Tiempos).",
+        "Fechas y año en el importador: la fecha de compra se guarda como AAAA-MM-DD; acepta ISO, formato europeo d/m/a o d-m-a, seriales de Excel, un año suelto (1 de enero de ese año) y el serial en texto. El año de comercialización se guarda como número (año solo, fecha completa o serial de Excel). Si un valor no se reconoce, la vista previa muestra un aviso en esa fila.",
+        "En la pestaña «Tabla de Tiempos» de la ficha puedes importar sesiones desde CSV o JSON con «Importar sesiones»; se asignan automáticamente a ese vehículo (mismo flujo que en el listado global de Tiempos). Eso es distinto de la importación de **fichas de vehículo** desde el listado.",
         "La exportación y la paginación respetan filtros y límites que configures en pantalla."
       ],
       "gotchas": [],
       "linkTo": "/vehicles",
       "linkLabel": "Ir a Vehículos",
-      "keywords": ["vehículo", "vehiculos", "coche", "coches", "añadir", "alta", "ficha", "catálogo", "filtros", "fotos", "imágenes"]
+      "keywords": ["vehículo", "vehiculos", "coche", "coches", "añadir", "alta", "ficha", "catálogo", "filtros", "fotos", "imágenes", "importar", "importación", "csv", "excel", "xlsx", "mapeo", "duplicados", "vista previa", "fechas", "año de comercialización", "marca", "modelo"]
     },
     {
       "id": "tiempos",
@@ -161,22 +164,34 @@
       "id": "competiciones",
       "title": "Competiciones",
       "pathBadge": "/competitions",
-      "description": "Eventos con plazas, rondas, circuito, participantes y gestión de tiempos.",
-      "intro": "Crea competiciones indicando nombre, plazas, número de rondas y, opcionalmente, circuito. Tras crearla, accedes a la gestión de participantes (inscripciones, categorías, reglas) y a la pantalla de tiempos de la competición. Existen URLs públicas para inscripción, estado y presentación usando el identificador (slug) del evento; no requieren iniciar sesión en la web principal.",
+      "description": "Eventos con plazas, rondas, circuito, participantes, pilotos favoritos y gestión de tiempos.",
+      "intro": "En el menú principal, «Competiciones» es un submenú: «Mis competiciones» (listado y creación) y «Pilotos favoritos» (lista personal de pilotos habituales para dar de alta sin depender solo del enlace público). Crea competiciones indicando nombre, plazas, número de rondas y, opcionalmente, circuito o club. Al crear un evento puedes, de forma opcional, marcar pilotos favoritos para añadirlos como participantes confirmados de inmediato (se crea una categoría con el nombre que indiques, por defecto «General»). En la pantalla de participantes puedes añadir manualmente, usar el modo «Favorito» en el alta individual, o «Añadir desde favoritos» para varios a la vez; cuando el número de participantes confirmados alcanza el cupo de plazas, los botones de añadir participante y de añadir desde favoritos se deshabilitan hasta que liberes plazas. Tras crearla, accedes a la gestión de participantes (inscripciones, categorías, reglas) y a la pantalla de tiempos de la competición. Existen URLs públicas para inscripción, estado y presentación usando el identificador (slug) del evento; no requieren iniciar sesión en la web principal. Si eres organizador, en la vista por rondas puedes registrar tiempos, editarlos, aplicar penalizaciones, marcar «No participó» (NP) y usar accesos rápidos para pilotos pendientes en cada ronda.",
       "steps": [
-        "En Competiciones, crea un evento nuevo con los datos básicos.",
+        "Menú «Competiciones»: elige «Mis competiciones» o «Pilotos favoritos». En Pilotos favoritos mantienes tu lista (nombre, vehículo por defecto opcional, notas y, si quieres, vínculo al perfil público de otro piloto mediante su slug, con validación opcional).",
+        "En Mis competiciones, crea un evento nuevo con nombre, plazas, rondas y datos básicos.",
+        "Opcional al crear: despliega «Añadir pilotos favoritos ahora», marca favoritos y la fuente de vehículo por fila; se creará la categoría indicada y se darán de alta como participantes confirmados.",
+        "En Participantes del evento: categorías, inscripciones si aplica, alta manual, modo Favorito o «Añadir desde favoritos» en bloque; los ya añadidos desde un favorito no se duplican desde ese mismo favorito.",
         "Asocia un circuito si lo necesitas (debe existir en Circuitos).",
         "Gestiona participantes y tiempos desde las pantallas del evento.",
+        "En Tiempos de la competición, pestaña «Vista por Rondas»: registra tiempos con el botón general o, por cada piloto que aún no tenga tiempo en esa ronda, usa «Tiempos» en la lista «Pendientes en esta ronda» para abrir el formulario ya con la ronda y el piloto elegidos.",
+        "Para corregir un tiempo ya guardado, en la fila del piloto usa el icono de lápiz (editar tiempo); el modal muestra el piloto correcto y no bloquea la selección como si fuera un alta nueva.",
+        "Penalizaciones: botón con icono de bandera; abre un cuadro para sumar segundos al tiempo total. No aplica a filas marcadas como NP. Pasa el ratón sobre los botones de acción para ver descripciones breves.",
+        "No participó (NP): activa el interruptor en el formulario de tiempo o el botón «NP» junto a un pendiente. Ese piloto suma 0 puntos en esa ronda, pero la ronda sigue contando como registrada para él a efectos de completar la ronda y desbloquear puntos para el resto.",
         "Comparte las URLs públicas de inscripción o estado con quien corresponda."
       ],
       "tips": [
+        "Los pilotos favoritos son privados: solo tú ves tu lista; sirve para repetir alineaciones sin reescribir datos.",
+        "Si vinculas un favorito al slug público de un piloto, puedes validar que exista antes de guardar; el nombre que guardas en el favorito sigue siendo el que tú indiques.",
+        "Necesitas al menos una categoría para añadir participantes manualmente; al incorporar favoritos al crear el evento se crea esa categoría automáticamente.",
         "Necesitas circuitos creados si quieres asociar uno al crear la competición.",
-        "Desde la lista puedes abrir participantes y tiempos según el flujo de cada evento."
+        "Desde la lista puedes abrir participantes y tiempos según el flujo de cada evento.",
+        "En clasificación y vistas públicas, las columnas de diferencia respecto al líder o al anterior muestran el signo correcto (+ más lento, − más rápido) aunque el orden de la tabla sea por puntos.",
+        "Eliminar un tiempo de una ronda vuelve a dejar al piloto como pendiente en esa ronda; puedes volver a darle tiempo o marcarle NP."
       ],
       "gotchas": [],
       "linkTo": "/competitions",
       "linkLabel": "Ir a Competiciones",
-      "keywords": ["competición", "competiciones", "evento", "participantes", "inscripción", "rondas"]
+      "keywords": ["competición", "competiciones", "evento", "participantes", "inscripción", "rondas", "favoritos", "pilotos favoritos", "slug", "cupo", "plazas", "menú", "submenú", "NP", "no participado", "penalización", "editar tiempo", "pendientes", "organizador", "tiempos"]
     },
     {
       "id": "configuracion",
@@ -347,6 +362,47 @@
       "linkLabel": "Ir a Competiciones"
     },
     {
+      "id": "pilotos-favoritos",
+      "question": "¿Qué son los pilotos favoritos y cómo los uso en una competición?",
+      "keywords": ["favoritos", "pilotos", "habituales", "amigos", "lista", "competición", "slug"],
+      "answerSteps": [
+        "En el menú, abre «Competiciones» y elige «Pilotos favoritos» (ruta /pilots/favorites). Ahí das de alta pilotos habituales con nombre, vehículo por defecto opcional, notas y, si quieres, el slug del perfil público de otro usuario para validar el enlace.",
+        "Al crear una competición puedes desplegar «Añadir pilotos favoritos ahora»: se crea una categoría (por defecto «General» o el nombre que pongas) y los seleccionados pasan a participantes confirmados sin depender solo del enlace de inscripción.",
+        "En la pantalla Participantes de un evento puedes «Añadir desde favoritos» en bloque o usar el modo «Favorito» al añadir un participante individual. No se duplica el mismo favorito si ya está dado de alta en esa competición."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/pilots/favorites",
+      "linkLabel": "Ir a Pilotos favoritos"
+    },
+    {
+      "id": "cupo-competicion",
+      "question": "¿Por qué no puedo añadir más participantes a una competición?",
+      "keywords": ["cupo", "plazas", "completo", "límite", "participantes", "añadir"],
+      "answerSteps": [
+        "Cada competición tiene un número máximo de plazas definido al crearla.",
+        "Los participantes confirmados no pueden superar ese cupo: cuando se alcanza, los botones «Añadir Participante» y «Añadir desde favoritos» se deshabilitan.",
+        "Para incorporar a alguien nuevo, libera una plaza (por ejemplo eliminando un participante confirmado) o crea otra competición con más plazas."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Ir a Competiciones"
+    },
+    {
+      "id": "competicion-tiempos-np-penalizacion",
+      "question": "¿Cómo edito tiempos, marco NP o pongo penalizaciones en una competición?",
+      "keywords": ["competición", "tiempos", "editar", "NP", "no participado", "penalización", "pendientes", "organizador", "ronda", "puntos"],
+      "answerSteps": [
+        "Abre la competición como organizador y entra en la gestión de tiempos. En «Vista por Rondas», cada fila tiene acciones: lápiz (editar tiempo), bandera (penalización en segundos) y papelera (eliminar ese registro de la ronda). Los tooltips describen cada acción.",
+        "Si un piloto aún no tiene tiempo en esa ronda, aparece en «Pendientes en esta ronda»: el botón «Tiempos» abre el formulario con la ronda y el piloto ya seleccionados; «NP» lo marca como no participado sin tiempos válidos.",
+        "También puedes registrar un tiempo nuevo o NP desde el formulario general; al editar un tiempo existente el piloto sale correctamente seleccionado.",
+        "NP: ese piloto obtiene 0 puntos en esa ronda; la ronda cuenta igualmente como completada para él y el resto puede recibir puntos de ronda cuando todos tengan registro (tiempo o NP).",
+        "Las tablas de clasificación muestran diferencias de tiempo con signo coherente (+ o −) respecto al líder o al anterior, aunque el orden sea por puntos."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Ir a Competiciones"
+    },
+    {
       "id": "cambiar-contrasena",
       "question": "¿Cómo cambio mi contraseña?",
       "keywords": ["contraseña", "password", "cuenta", "google"],
@@ -405,6 +461,34 @@
         "En la sección Vehículos puedes usar la exportación respetando los filtros y la paginación que tengas activos.",
         "Ajusta filtros antes si solo quieres un subconjunto de la colección.",
         "La exportación refleja lo que ves según los límites configurados en pantalla."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Ir a Vehículos"
+    },
+    {
+      "id": "importar-vehiculos",
+      "question": "¿Cómo importo vehículos desde Excel o CSV?",
+      "keywords": [
+        "importar",
+        "vehículos",
+        "excel",
+        "csv",
+        "xlsx",
+        "hoja",
+        "mapeo",
+        "columnas",
+        "vista previa",
+        "duplicados",
+        "plantilla"
+      ],
+      "answerSteps": [
+        "Abre Vehículos y pulsa «Importar» (junto a «Exportar CSV»). Elige un fichero CSV o Excel admitido; si el libro tiene varias hojas, indica el índice de la pestaña (Excel).",
+        "El asistente detecta filas y cabeceras aunque haya filas en blanco arriba o columnas vacías; las letras de columna (A, B, C…) se alinean con lo que verías en Excel o Numbers al mapear.",
+        "Revisa o ajusta el mapeo: qué columna de tu fichero corresponde a modelo, marca, tipo, fechas, referencia, etc. Puedes dejar columnas en «ignorar». En el mapeo solo son obligatorias marca y modelo; el resto es opcional.",
+        "Mira la vista previa: se actualiza al cambiar el mapeo. Elige cómo tratar duplicados respecto a tu colección (omitir, importar o actualizar) y confirma.",
+        "Sobre el tipo: en el formulario de alta un vehículo a mano el tipo es obligatorio; en la importación no. Si no lo mapeas o queda vacío, completa el tipo editando la ficha después de importar. Las fechas de compra y el año de comercialización aceptan varios formatos (ISO, europeo, serial Excel) y se guardan en el formato de la app.",
+        "Revisa en la ayuda, sección Vehículos, el detalle de formatos y del flujo completo."
       ],
       "sectionId": "vehiculos",
       "linkTo": "/vehicles",

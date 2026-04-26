@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Clock, User, Car, X } from 'lucide-react';
+import { Trophy, User, Car, X } from 'lucide-react';
 
 const BestLapHighlight = ({ bestLap, participant }) => {
   // Formatea mejor vuelta (float o string) a mm:ss.mmm
@@ -19,8 +19,9 @@ const BestLapHighlight = ({ bestLap, participant }) => {
       <div className="best-lap-highlight">
         <h2 className="highlight-title">
           <Trophy className="highlight-icon" />
-          Mejor Vuelta
+          Mejor vuelta de la prueba
         </h2>
+        <p className="highlight-subtitle">Récord de vuelta entre todos los participantes</p>
         <div className="highlight-content">
           <div className="no-best-lap">
             <X className="no-lap-icon" />
@@ -32,22 +33,17 @@ const BestLapHighlight = ({ bestLap, participant }) => {
   }
 
   return (
-    <div className="best-lap-highlight">
+    <div className="best-lap-highlight best-lap-highlight--has-lap">
       <h2 className="highlight-title">
         <Trophy className="highlight-icon" />
-        Mejor Vuelta
+        Mejor vuelta de la prueba
       </h2>
-      
+      <p className="highlight-subtitle">Récord de vuelta entre todos los participantes</p>
       <div className="highlight-content">
+        <div className="best-lap-hero-time" aria-label={`Mejor vuelta ${formatBestLap(bestLap)}`}>
+          {formatBestLap(bestLap)}
+        </div>
         <div className="best-lap-info">
-          <div className="best-lap-time">
-            <p className="time-label">
-              <Clock className="label-icon" />
-              Tiempo <span className="time-value">{formatBestLap(bestLap)}</span>
-            </p>
-            
-          </div>
-          
           <div className="best-lap-pilot">
             <p className="pilot-label">
               <User className="label-icon" />

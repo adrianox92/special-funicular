@@ -216,8 +216,10 @@ app.use('/api/changelog', changelogRoute);
 
 const competitionsRoute = require('./routes/competitions');
 const clubsRoute = require('./routes/clubs');
+const favoritePilotsRoute = require('./routes/favoritePilots');
 app.use('/api/competitions', competitionsRoute);
 app.use('/api/clubs', clubsRoute);
+app.use('/api/favorite-pilots', favoritePilotsRoute);
 
 if (process.env.NODE_ENV !== 'production') {
   const swaggerDefinition = {

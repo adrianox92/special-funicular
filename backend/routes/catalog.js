@@ -15,6 +15,8 @@ const {
   removeCatalogObjectByPublicUrl,
 } = require('../lib/catalogImageStorage');
 const { catalogContributionsLimiter } = require('../middleware/rateLimits');
+const { isExcelImportFile, normalizeBlankColumnHeaders } = require('../lib/vehicleImport');
+const { parseImportCommercialReleaseYear } = require('../lib/importDateParse');
 
 const supabase = getAnonClient();
 
@@ -56,27 +58,7 @@ function parseOptionalYear(raw) {
 
 /** Año desde texto, número o fecha ISO / serial Excel (import CSV/Excel). */
 function parseYearFromImportCell(raw) {
-  if (raw == null || raw === '') return null;
-  if (typeof raw === 'number' && Number.isFinite(raw)) {
-    const n = Math.floor(raw);
-    if (n >= 1900 && n <= 2100) return n;
-    if (raw > 200 && raw < 60000) {
-      const epochMs = Date.UTC(1899, 11, 30);
-      const d = new Date(epochMs + raw * 86400000);
-      const y = d.getUTCFullYear();
-      if (y >= 1900 && y <= 2100) return y;
-    }
-    return null;
-  }
-  const s = String(raw).trim();
-  const n = parseInt(s, 10);
-  if (Number.isFinite(n) && n >= 1900 && n <= 2100) return n;
-  const iso = s.slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-    const y = parseInt(iso.slice(0, 4), 10);
-    if (y >= 1900 && y <= 2100) return y;
-  }
-  return null;
+  return parseImportCommercialReleaseYear(raw);
 }
 
 function parseYearFromBody(raw) {
@@ -1604,12 +1586,7 @@ router.post('/import', adminGuard, upload.single('file'), async (req, res) => {
         skip_empty_lines: true,
         trim: true,
       });
-    } else if (
-      mime.includes('spreadsheet') ||
-      mime.includes('excel') ||
-      name.toLowerCase().endsWith('.xlsx') ||
-      name.toLowerCase().endsWith('.xls')
-    ) {
+    } else if (isExcelImportFile(mime, name)) {
       const wb = XLSX.read(file.buffer, { type: 'buffer' });
       const sn = wb.SheetNames[sheetIndex];
       if (!sn) return res.status(400).json({ error: 'Hoja no encontrada' });
@@ -1620,7 +1597,15 @@ router.post('/import', adminGuard, upload.single('file'), async (req, res) => {
         error: 'Importación PDF no está soportada; exporta a CSV o Excel e importa de nuevo.',
       });
     } else {
-      return res.status(400).json({ error: 'Formato no soportado. Usa CSV o Excel (.xlsx/.xls).' });
+      return res.status(400).json({
+        error:
+          'Formato no soportado. Usa CSV o Excel (.xlsx, .xlsm, .xlsb, .xls, .xltx, .xltm).',
+      });
+    }
+
+    if (rows.length > 0) {
+      const normalized = normalizeBlankColumnHeaders(rows);
+      rows = normalized.rows;
     }
 
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');

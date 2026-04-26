@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { Radio, Users, Clock3 } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionHeader from '../components/presentation/CompetitionHeader';
 import LiveRankingTable from '../components/presentation/LiveRankingTable';
@@ -14,32 +15,30 @@ const CompetitionPresentation = () => {
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const response = await axios.get(`/public-signup/${slug}/presentation`);
       setCompetition(response.data.competition);
       setParticipants(response.data.participants);
       setError(null);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching competition data:', err);
       setError('Error al cargar los datos de la competición');
     } finally {
       setLoading(false);
     }
-  };
+  }, [slug]);
 
   useEffect(() => {
     fetchData();
-
-    // Auto-actualización cada 10 segundos
     const interval = setInterval(() => {
       fetchData();
     }, 10000);
-
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [fetchData]);
 
   useEffect(() => {
     document.documentElement.classList.add('presentation-mode');
@@ -77,19 +76,50 @@ const CompetitionPresentation = () => {
     );
   }
 
-  // Calcular mejor vuelta absoluta
+  // Mejor vuelta absoluta: solo pilotos con al menos una ronda disputada (best_lap > 0 en API)
   const bestLap = participants.reduce((best, participant) => {
-    if (participant.best_lap && (!best || participant.best_lap < best)) {
-      return participant.best_lap;
-    }
+    const lap = participant.best_lap;
+    if (lap == null || Number.isNaN(Number(lap)) || lap <= 0) return best;
+    if (best == null || lap < best) return lap;
     return best;
   }, null);
 
-  const bestLapParticipant = participants.find(p => p.best_lap === bestLap);
+  const bestLapParticipant = participants.find(
+    (p) => p.best_lap != null && p.best_lap > 0 && p.best_lap === bestLap
+  );
+
+  const timeLabel = lastUpdated
+    ? lastUpdated.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : '—';
 
   return (
     <div className="presentation-container">
       <div className="presentation-content">
+        <div className="presentation-live-bar" aria-live="polite">
+          <div className="presentation-live-bar-left">
+            <span className="presentation-live-pill" title="La clasificación se actualiza sola">
+              <Radio className="presentation-live-pill-icon" aria-hidden />
+              <span className="presentation-live-dot" aria-hidden />
+              <span>En directo</span>
+            </span>
+            <span className="presentation-live-meta">
+              <Users className="presentation-live-meta-icon" aria-hidden />
+              {participants.length}{' '}
+              {participants.length === 1 ? 'piloto' : 'pilotos'}
+            </span>
+          </div>
+          <div className="presentation-live-bar-right">
+            <span className="presentation-live-refresh" title="Última actualización de datos">
+              <Clock3 className="presentation-live-meta-icon" aria-hidden />
+              Actualizado {timeLabel}
+            </span>
+          </div>
+        </div>
+
         <CompetitionHeader competition={competition} />
         
         <div className="presentation-main">

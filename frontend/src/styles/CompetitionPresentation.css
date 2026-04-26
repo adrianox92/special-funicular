@@ -1,5 +1,15 @@
 /* Modo presentación: mismos tokens que el resto de la app (primary, secondary, card, muted, destructive) */
 
+html.presentation-mode {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+html.presentation-mode .presentation-container {
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
 .presentation-container {
   position: fixed;
   inset: 0;
@@ -19,9 +29,10 @@
   position: absolute;
   inset: 0;
   background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, color-mix(in oklch, var(--primary) 14%, transparent) 0%, transparent 55%),
     radial-gradient(circle at 18% 85%, color-mix(in oklch, var(--primary) 10%, transparent) 0%, transparent 52%),
     radial-gradient(circle at 82% 18%, color-mix(in oklch, var(--primary) 8%, transparent) 0%, transparent 48%),
-    radial-gradient(circle at 45% 45%, color-mix(in oklch, var(--muted-foreground) 6%, transparent) 0%, transparent 42%);
+    radial-gradient(circle at 45% 45%, color-mix(in oklch, var(--muted-foreground) 5%, transparent) 0%, transparent 45%);
   pointer-events: none;
 }
 
@@ -31,18 +42,114 @@
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 1rem;
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(0.75rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   position: relative;
   z-index: 1;
   min-height: 0;
   overflow: hidden;
+  gap: 0;
 }
 
 @media (min-width: 640px) {
   .presentation-content {
-    padding: 1.5rem;
+    padding: max(1.25rem, env(safe-area-inset-top, 0px)) 1.5rem max(1.25rem, env(safe-area-inset-bottom, 0px)) 1.5rem;
   }
+}
+
+/* Barra de estado: lectura rápida en sala / proyector */
+.presentation-live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: calc(var(--radius) + 6px);
+  background: color-mix(in oklch, var(--card) 75%, var(--background));
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--primary) 12%, transparent), 0 8px 24px oklch(0 0 0 / 0.06);
+  flex-shrink: 0;
+}
+
+.presentation-live-bar-left,
+.presentation-live-bar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  min-width: 0;
+}
+
+.presentation-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 800;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--primary-foreground);
+  background: linear-gradient(
+    135deg,
+    var(--primary),
+    color-mix(in oklch, var(--primary) 70%, var(--foreground))
+  );
+  padding: 0.35rem 0.75rem 0.35rem 0.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 2px 8px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+
+.presentation-live-pill-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
+.presentation-live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px color-mix(in oklch, #fff 40%, transparent);
+  animation: presentation-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes presentation-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(0.92);
+  }
+}
+
+.presentation-live-meta,
+.presentation-live-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.presentation-live-refresh {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.presentation-live-meta-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--primary);
+  opacity: 0.9;
 }
 
 /* Loading y Error States */
@@ -116,13 +223,16 @@
 
 /* Header de la Competición */
 .competition-header {
-  background: color-mix(in oklch, var(--card) 82%, transparent);
-  border-radius: calc(var(--radius) + 8px);
+  background: color-mix(in oklch, var(--card) 86%, var(--background));
+  border-radius: calc(var(--radius) + 10px);
   padding: 1.25rem 1.5rem;
-  margin-bottom: 1rem;
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px oklch(0 0 0 / 0.08);
+  margin-bottom: 0.25rem;
+  margin-top: 0.15rem;
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in oklch, var(--border) 90%, var(--primary));
+  box-shadow:
+    0 1px 0 color-mix(in oklch, var(--primary) 8%, transparent),
+    0 12px 40px oklch(0 0 0 / 0.08);
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
@@ -194,6 +304,19 @@
   color: var(--primary);
 }
 
+/* Metadatos modo presentación (rondas, categoría, estado) */
+.presentation-competition-meta {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.65rem 0.75rem;
+  line-height: 1.3;
+}
+
+.presentation-competition-meta .meta-pill {
+  min-height: 2.5rem;
+  box-sizing: border-box;
+}
+
 .rounds-info,
 .category-info {
   background: color-mix(in oklch, var(--muted) 70%, transparent);
@@ -252,35 +375,10 @@
   border: 1px solid var(--border);
 }
 
-.circuit-info {
-  text-align: right;
-  background: color-mix(in oklch, var(--muted) 65%, transparent);
-  padding: 1rem;
-  border-radius: calc(var(--radius) + 4px);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 1px 2px oklch(0 0 0 / 0.05);
-}
-
-.circuit-name {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--primary);
-  display: block;
-  margin-bottom: 0.25rem;
-}
-
-/* Icono tipo bandera (equivalente visual a lucide Flag) */
-.circuit-info::before {
-  content: '';
-  display: block;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-bottom: 0.25rem;
-  margin-left: auto;
-  background-color: var(--primary);
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 22V15h.01M4 15V5c0-.55.45-1 1-1h0c1.66 0 3.21.81 4.2 2.17C10.15 6.28 11.79 7 13.5 7H20c.55 0 1 .45 1 1v8c0 .55-.45 1-1 1h-6.5c-1.71 0-3.35.72-4.29 1.83A4.98 4.98 0 0 1 5 19h0c-.55 0-1-.45-1-1z'/%3E%3C/svg%3E") center / contain no-repeat;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 22V15h.01M4 15V5c0-.55.45-1 1-1h0c1.66 0 3.21.81 4.2 2.17C10.15 6.28 11.79 7 13.5 7H20c.55 0 1 .45 1 1v8c0 .55-.45 1-1 1h-6.5c-1.71 0-3.35.72-4.29 1.83A4.98 4.98 0 0 1 5 19h0c-.55 0-1-.45-1-1z'/%3E%3C/svg%3E") center / contain no-repeat;
+.status-unknown {
+  background: color-mix(in oklch, var(--muted) 80%, transparent);
+  color: var(--muted-foreground);
+  border: 1px dashed var(--border);
 }
 
 /* Layout Principal */
@@ -290,6 +388,7 @@
   gap: 1rem;
   min-height: 0;
   overflow: hidden;
+  margin-top: 0.5rem;
 }
 
 @media (min-width: 640px) {
@@ -323,12 +422,14 @@
 
 /* Tabla de Ranking en Vivo */
 .live-ranking-table {
-  background: color-mix(in oklch, var(--card) 82%, transparent);
-  border-radius: calc(var(--radius) + 8px);
+  background: color-mix(in oklch, var(--card) 86%, var(--background));
+  border-radius: calc(var(--radius) + 10px);
   padding: 1rem 1.25rem 1.25rem;
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px oklch(0 0 0 / 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in oklch, var(--border) 92%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklch, var(--primary) 6%, transparent),
+    0 12px 36px oklch(0 0 0 / 0.07);
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -357,14 +458,27 @@
   );
 }
 
-.table-title {
-  font-size: clamp(1.25rem, 4vw, 2.5rem);
-  font-weight: 700;
-  margin: 0 0 1rem 0;
-  text-align: center;
-  color: var(--foreground);
-  letter-spacing: -0.01em;
+.table-title-block {
   flex-shrink: 0;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.table-title {
+  font-size: clamp(1.35rem, 3.8vw, 2.25rem);
+  font-weight: 800;
+  margin: 0 0 0.35rem 0;
+  color: var(--foreground);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.table-subtitle {
+  margin: 0;
+  font-size: clamp(0.75rem, 1.8vw, 0.9375rem);
+  font-weight: 500;
+  color: var(--muted-foreground);
+  letter-spacing: 0.02em;
 }
 
 .table-container {
@@ -373,14 +487,18 @@
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: calc(var(--radius) + 4px);
-  background: color-mix(in oklch, var(--muted) 40%, transparent);
+  background: color-mix(in oklch, var(--muted) 40%, var(--background));
   border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--foreground) 5%, transparent),
+    0 1px 0 color-mix(in oklch, var(--background) 50%, transparent);
 }
 
 .ranking-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 1rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .ranking-table th {
@@ -410,6 +528,14 @@
 
 .ranking-table tbody tr:hover {
   background: color-mix(in oklch, var(--accent) 35%, transparent);
+}
+
+.ranking-table tbody tr:nth-child(even) {
+  background: color-mix(in oklch, var(--muted) 25%, transparent);
+}
+
+.ranking-table tbody tr:nth-child(even):hover {
+  background: color-mix(in oklch, var(--accent) 40%, transparent);
 }
 
 /* Posiciones destacadas */
@@ -484,12 +610,14 @@
 
 /* Mejor Vuelta Highlight */
 .best-lap-highlight {
-  background: color-mix(in oklch, var(--card) 82%, transparent);
-  border-radius: calc(var(--radius) + 8px);
+  background: color-mix(in oklch, var(--card) 86%, var(--background));
+  border-radius: calc(var(--radius) + 10px);
   padding: 1.25rem 1.5rem;
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px oklch(0 0 0 / 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in oklch, var(--border) 92%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklch, var(--primary) 6%, transparent),
+    0 12px 36px oklch(0 0 0 / 0.07);
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
@@ -516,15 +644,58 @@
 }
 
 .highlight-title {
-  font-size: clamp(1.125rem, 3vw, 1.5rem);
-  font-weight: 700;
-  margin: 0 0 1rem 0;
+  font-size: clamp(1.125rem, 2.5vw, 1.4rem);
+  font-weight: 800;
+  margin: 0 0 0.35rem 0;
   text-align: center;
   color: var(--foreground);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.highlight-subtitle {
+  margin: 0 0 1.25rem 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  line-height: 1.4;
+  padding: 0 0.5rem;
+}
+
+.best-lap-highlight--has-lap .highlight-content {
+  padding-top: 0.25rem;
+}
+
+.best-lap-hero-time {
+  font-size: clamp(2.25rem, 8vw, 3.5rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-align: center;
+  margin: 0 0 1.25rem 0;
+  color: var(--primary);
+  text-shadow: 0 0 40px color-mix(in oklch, var(--primary) 35%, transparent);
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', 'Courier New', monospace;
+}
+
+@supports (background-clip: text) {
+  .best-lap-hero-time {
+    background: linear-gradient(
+      180deg,
+      var(--primary),
+      color-mix(in oklch, var(--primary) 50%, var(--foreground))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 .highlight-icon {
@@ -654,12 +825,14 @@
 
 /* Round Progress Grid */
 .round-progress-grid {
-  background: color-mix(in oklch, var(--card) 82%, transparent);
-  border-radius: calc(var(--radius) + 8px);
+  background: color-mix(in oklch, var(--card) 86%, var(--background));
+  border-radius: calc(var(--radius) + 10px);
   padding: 1rem 1.25rem 1.25rem;
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px oklch(0 0 0 / 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in oklch, var(--border) 92%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklch, var(--primary) 6%, transparent),
+    0 12px 36px oklch(0 0 0 / 0.07);
   position: relative;
   overflow: hidden;
   flex: 1 1 auto;
@@ -688,17 +861,31 @@
   );
 }
 
+.grid-title-block {
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
 .grid-title {
-  font-size: clamp(1.125rem, 3.5vw, 2rem);
-  font-weight: 700;
-  margin: 0 0 1rem 0;
+  font-size: clamp(1.2rem, 2.8vw, 1.75rem);
+  font-weight: 800;
+  margin: 0 0 0.35rem 0;
   text-align: center;
   color: var(--foreground);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  flex-shrink: 0;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.grid-subtitle {
+  margin: 0;
+  font-size: clamp(0.75rem, 1.8vw, 0.875rem);
+  font-weight: 500;
+  color: var(--muted-foreground);
 }
 
 .grid-icon {
@@ -846,6 +1033,23 @@
   color: var(--muted-foreground);
 }
 
+/* NP: ronda contada sin tiempo válido (misma idea que en gestión de tiempos) */
+.round-dnp {
+  color: color-mix(in oklch, var(--muted-foreground) 85%, var(--foreground));
+}
+
+.round-dnp .round-icon {
+  color: var(--muted-foreground);
+}
+
+.round-np-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  font-family: system-ui, sans-serif;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -905,6 +1109,13 @@
   color: var(--muted-foreground);
 }
 
+.points-col,
+.points-cell {
+  text-align: center;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .presentation-main {
@@ -926,6 +1137,15 @@
 }
 
 @media (max-width: 768px) {
+  .presentation-live-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .presentation-live-bar-right {
+    justify-content: flex-start;
+  }
+
   .competition-meta {
     flex-direction: column;
     align-items: flex-start;
@@ -938,14 +1158,8 @@
     text-align: center;
   }
 
-  .circuit-info {
-    text-align: center;
-    width: 100%;
-  }
-
-  .circuit-info::before {
-    margin-left: auto;
-    margin-right: auto;
+  .presentation-competition-meta {
+    justify-content: center;
   }
 
   .ranking-table {
