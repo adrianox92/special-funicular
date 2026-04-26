@@ -3,7 +3,7 @@ import VehicleCard from '../components/VehicleCard';
 import VehicleTable from '../components/VehicleTable';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
-import { ArrowDownUp, Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon, SlidersHorizontal } from 'lucide-react';
+import { ArrowDownUp, Download, Plus, ChevronDown, LayoutGrid, Table as TableIcon, SlidersHorizontal, Upload } from 'lucide-react';
 import { formatDistance } from '../utils/formatUtils';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
@@ -17,6 +17,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
+import VehicleImportDialog from '../components/VehicleImportDialog';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const ALL_VEHICLES_LIMIT = 10000;
@@ -160,6 +161,7 @@ const VehicleList = () => {
   const [viewMode, setViewMode] = useState(() => {
     try { return localStorage.getItem('vehicleViewMode') || 'grid'; } catch { return 'grid'; }
   });
+  const [importOpen, setImportOpen] = useState(false);
   const [narrowPagination, setNarrowPagination] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false
   );
@@ -282,6 +284,15 @@ const VehicleList = () => {
     setFiltered(prev => prev.filter(v => v.id !== vehicleId));
     if (hasActiveFilters) setAllVehicles(prev => prev.filter(v => v.id !== vehicleId));
     void loadUserScaleDenominators();
+  };
+
+  const handleImportedVehicles = () => {
+    void loadUserScaleDenominators();
+    if (hasActiveFilters) {
+      void loadAllVehicles();
+    } else {
+      void loadVehicles(currentPage, pageSize);
+    }
   };
 
   const handlePageChange = (page) => setCurrentPage(page);
@@ -414,6 +425,10 @@ const VehicleList = () => {
           <Button variant="outline" onClick={exportToCSV}>
             <Download className="size-4 mr-2" />
             Exportar CSV
+          </Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="size-4 mr-2" />
+            Importar
           </Button>
           <Button onClick={() => navigate('/vehicles/new')}>
             <Plus className="size-4 mr-2" />
@@ -628,6 +643,12 @@ const VehicleList = () => {
           </select>
         </div>
       </div>
+
+      <VehicleImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={handleImportedVehicles}
+      />
     </div>
   );
 };

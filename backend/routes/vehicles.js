@@ -19,6 +19,7 @@ const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFr
 const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/inventoryStockOps');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
+const vehicleImport = require('../lib/vehicleImport');
 
 const supabase = getAnonClient();
 
@@ -62,6 +63,198 @@ function parseVehicleSort(req) {
   const dirRaw = String(req.query.dir || 'desc').toLowerCase();
   const ascending = dirRaw === 'asc';
   return { column: VEHICLE_SORT_COLUMNS[sortKey], ascending };
+}
+
+/**
+ * Alta de vehículo desde importación (misma semántica que POST / sin imágenes).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} userId
+ * @param {Record<string, unknown>} v — valores ya normalizados por vehicleImport.mapRowToVehicleValues
+ */
+async function insertVehicleFromImportValues(supabaseClient, userId, v) {
+  const priceNum = v.price == null || v.price === '' ? null : Number(v.price);
+  const total_price = v.modified ? null : priceNum != null ? priceNum : null;
+  const scaleFactor =
+    v.scale_factor === '' || v.scale_factor == null ? DEFAULT_SCALE_FACTOR : parseInt(String(v.scale_factor), 10);
+
+  const commercial_release_year_val =
+    v.commercial_release_year != null && v.commercial_release_year !== ''
+      ? parseInt(String(v.commercial_release_year).trim(), 10)
+      : null;
+  const yearOk =
+    commercial_release_year_val != null &&
+    Number.isFinite(commercial_release_year_val) &&
+    commercial_release_year_val >= 1900 &&
+    commercial_release_year_val <= 2100;
+
+  const catalog_item_id_val =
+    v.catalog_item_id === '' || v.catalog_item_id == null ? null : String(v.catalog_item_id).trim();
+
+  let catalogRow = null;
+  if (catalog_item_id_val) {
+    const { data: cr } = await supabaseClient
+      .from('slot_catalog_items_with_ratings')
+      .select('*')
+      .eq('id', catalog_item_id_val)
+      .maybeSingle();
+    catalogRow = cr;
+  }
+
+  const traction_val =
+    v.traction != null && String(v.traction).trim() !== ''
+      ? String(v.traction).trim()
+      : catalogRow?.traction != null && String(catalogRow.traction).trim() !== ''
+        ? String(catalogRow.traction).trim()
+        : null;
+  const motor_position_val =
+    v.motor_position != null && String(v.motor_position).trim() !== ''
+      ? parseOptionalMotorPosition(v.motor_position)
+      : parseOptionalMotorPosition(catalogRow?.motor_position);
+
+  const { data, error } = await supabaseClient
+    .from('vehicles')
+    .insert([
+      {
+        model: v.model,
+        manufacturer: v.manufacturer,
+        type: v.type,
+        traction: traction_val,
+        motor_position: motor_position_val,
+        price: priceNum,
+        total_price,
+        purchase_date: v.purchase_date || null,
+        purchase_place: v.purchase_place || null,
+        modified: Boolean(v.modified),
+        digital: Boolean(v.digital),
+        museo: Boolean(v.museo),
+        taller: Boolean(v.taller),
+        anotaciones: v.anotaciones ?? null,
+        reference: v.reference ?? null,
+        scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
+        commercial_release_year: yearOk ? commercial_release_year_val : null,
+        catalog_item_id: catalog_item_id_val,
+        user_id: userId,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  try {
+    await tryCopyCatalogImageToVehicleFront(supabaseClient, data.id, catalogRow, null);
+  } catch (e) {
+    console.warn('[vehicles import] tryCopyCatalogImageToVehicleFront', e.message);
+  }
+  return data;
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} userId
+ * @param {string} vehicleId
+ * @param {Record<string, unknown>} v
+ */
+async function updateVehicleFromImportValues(supabaseClient, userId, vehicleId, v) {
+  const priceNum = v.price == null || v.price === '' ? null : Number(v.price);
+  const total_price = v.modified ? null : priceNum != null ? priceNum : null;
+  const scaleFactor =
+    v.scale_factor === '' || v.scale_factor == null ? DEFAULT_SCALE_FACTOR : parseInt(String(v.scale_factor), 10);
+
+  const commercial_release_year_val =
+    v.commercial_release_year != null && v.commercial_release_year !== ''
+      ? parseInt(String(v.commercial_release_year).trim(), 10)
+      : null;
+  const yearOk =
+    commercial_release_year_val != null &&
+    Number.isFinite(commercial_release_year_val) &&
+    commercial_release_year_val >= 1900 &&
+    commercial_release_year_val <= 2100;
+
+  const catalog_item_id_val =
+    v.catalog_item_id === '' || v.catalog_item_id == null ? null : String(v.catalog_item_id).trim();
+
+  let catalogRow = null;
+  if (catalog_item_id_val) {
+    const { data: cr } = await supabaseClient
+      .from('slot_catalog_items_with_ratings')
+      .select('*')
+      .eq('id', catalog_item_id_val)
+      .maybeSingle();
+    catalogRow = cr;
+  }
+
+  const traction_val =
+    v.traction != null && String(v.traction).trim() !== ''
+      ? String(v.traction).trim()
+      : catalogRow?.traction != null && String(catalogRow.traction).trim() !== ''
+        ? String(catalogRow.traction).trim()
+        : null;
+  const motor_position_val =
+    v.motor_position != null && String(v.motor_position).trim() !== ''
+      ? parseOptionalMotorPosition(v.motor_position)
+      : parseOptionalMotorPosition(catalogRow?.motor_position);
+
+  const { data, error } = await supabaseClient
+    .from('vehicles')
+    .update({
+      model: v.model,
+      manufacturer: v.manufacturer,
+      type: v.type,
+      traction: traction_val,
+      motor_position: motor_position_val,
+      price: priceNum,
+      total_price,
+      purchase_date: v.purchase_date || null,
+      purchase_place: v.purchase_place || null,
+      modified: Boolean(v.modified),
+      digital: Boolean(v.digital),
+      museo: Boolean(v.museo),
+      taller: Boolean(v.taller),
+      anotaciones: v.anotaciones ?? null,
+      reference: v.reference ?? null,
+      scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
+      commercial_release_year: yearOk ? commercial_release_year_val : null,
+      catalog_item_id: catalog_item_id_val,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', vehicleId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseClient
+ * @param {string} userId
+ * @param {Record<string, unknown>} v
+ * @returns {Promise<string|null>}
+ */
+async function findDuplicateVehicleId(supabaseClient, userId, v) {
+  const ref = v.reference != null && String(v.reference).trim() !== '' ? String(v.reference).trim() : null;
+  if (ref) {
+    const { data, error } = await supabaseClient
+      .from('vehicles')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('reference', ref)
+      .eq('manufacturer', v.manufacturer)
+      .limit(1);
+    if (error) return null;
+    return data?.[0]?.id ?? null;
+  }
+  const { data, error } = await supabaseClient
+    .from('vehicles')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('manufacturer', v.manufacturer)
+    .eq('model', v.model)
+    .limit(1);
+  if (error) return null;
+  return data?.[0]?.id ?? null;
 }
 
 /** Solo campos editables del formulario; evita enviar id, user_id, odómetro, etc. desde multipart mal parseado. */
@@ -157,6 +350,22 @@ const upload = multer({
     }
   },
 });
+
+const VEHICLE_IMPORT_MAX_BYTES = 8 * 1024 * 1024;
+const uploadVehicleImport = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: VEHICLE_IMPORT_MAX_BYTES },
+});
+
+function runVehicleImportUpload(req, res, next) {
+  uploadVehicleImport.single('file')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'El archivo supera 8 MB.' });
+    }
+    return res.status(400).json({ error: err.message || 'Error al subir el archivo' });
+  });
+}
 
 /** multipart field `images`; respuestas 413/400 para límites y tipo */
 function runVehicleImageUpload(req, res, next) {
@@ -437,6 +646,232 @@ router.get('/scale-factors', async (req, res) => {
   } catch (err) {
     console.error('Error en /vehicles/scale-factors:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+const MAX_VEHICLE_IMPORT_ROWS = 5000;
+const PREVIEW_ROWS_LIMIT = 150;
+
+function normalizeVehicleImportMappingPayload(raw) {
+  const out = {};
+  for (const f of vehicleImport.VEHICLE_IMPORT_TARGET_FIELDS) {
+    out[f.key] = null;
+  }
+  if (!raw || typeof raw !== 'object') return out;
+  for (const k of Object.keys(raw)) {
+    if (!Object.prototype.hasOwnProperty.call(out, k)) continue;
+    const v = raw[k];
+    if (v === '' || v == null || v === vehicleImport.IGNORE_FIELD) out[k] = null;
+    else out[k] = String(v);
+  }
+  return out;
+}
+
+/**
+ * POST /api/vehicles/import-preview — multipart: file, sheetIndex (opcional)
+ * Devuelve cabeceras, mapeo sugerido y vista previa de filas.
+ */
+router.post('/import-preview', runVehicleImportUpload, async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file || !file.buffer) {
+      return res.status(400).json({ error: 'Archivo requerido (campo: file)' });
+    }
+    const sheetIndex = Math.max(0, parseInt(String(req.body.sheetIndex ?? req.query.sheetIndex ?? '0'), 10) || 0);
+    const { rows, headers, sheetName, firstDataRow1Based } = vehicleImport.parseImportFileBuffer(
+      file.buffer,
+      {
+        mimetype: file.mimetype,
+        originalname: file.originalname,
+        sheetIndex,
+      },
+    );
+    if (rows.length > MAX_VEHICLE_IMPORT_ROWS) {
+      return res.status(400).json({
+        error: `El archivo supera el máximo de ${MAX_VEHICLE_IMPORT_ROWS} filas de datos.`,
+      });
+    }
+    const suggestedMapping = vehicleImport.inferColumnMapping(headers, rows);
+    const sampleDataRows = vehicleImport.collectSampleDataRowsForPreview(rows, PREVIEW_ROWS_LIMIT, {
+      firstDataRow1Based,
+    });
+    const previewFull = vehicleImport.buildPreviewResults(rows, suggestedMapping, { firstDataRow1Based });
+    const preview = previewFull
+      .filter((p) => !p.skip)
+      .slice(0, PREVIEW_ROWS_LIMIT)
+      .map((p) => ({
+        index: p.index,
+        sheetRow: p.sheetRow,
+        ok: p.ok,
+        errors: p.errors,
+        warnings: p.warnings,
+        values: p.values,
+      }));
+
+    res.json({
+      headers,
+      sheetName: sheetName ?? null,
+      suggestedMapping,
+      targetFields: vehicleImport.VEHICLE_IMPORT_TARGET_FIELDS,
+      suggestAfterImport: vehicleImport.suggestAfterImportForMapping(suggestedMapping),
+      rowCount: rows.length,
+      firstDataRow1Based,
+      preview,
+      sampleDataRows,
+    });
+  } catch (err) {
+    if (err.code === 'SHEET_NOT_FOUND') {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.code === 'UNSUPPORTED_FORMAT') {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error('POST /vehicles/import-preview:', err);
+    res.status(500).json({ error: err.message || 'Error al analizar el archivo' });
+  }
+});
+
+/**
+ * POST /api/vehicles/preview-mapped — JSON: { mapping, sampleDataRows }
+ * Recalcula la vista previa según el mapeo (misma lógica que al importar).
+ */
+router.post('/preview-mapped', async (req, res) => {
+  try {
+    const { mapping: raw, sampleDataRows } = req.body || {};
+    if (!Array.isArray(sampleDataRows) || sampleDataRows.length === 0) {
+      return res.status(400).json({ error: 'sampleDataRows (array no vacío) es requerido' });
+    }
+    if (sampleDataRows.length > 200) {
+      return res.status(400).json({ error: 'Máximo 200 filas de muestra' });
+    }
+    for (const item of sampleDataRows) {
+      if (!item || typeof item.data !== 'object' || item.data == null) {
+        return res.status(400).json({ error: 'Cada fila de muestra debe incluir { data: { ... } }' });
+      }
+    }
+    const norm = normalizeVehicleImportMappingPayload(raw);
+    const preview = vehicleImport.mapSampleRowsToPreviewItems(sampleDataRows, norm);
+    res.json({
+      preview,
+      suggestAfterImport: vehicleImport.suggestAfterImportForMapping(norm),
+    });
+  } catch (err) {
+    console.error('POST /vehicles/preview-mapped:', err);
+    res.status(500).json({ error: err.message || 'Error al generar la vista previa' });
+  }
+});
+
+/**
+ * POST /api/vehicles/import — multipart: file, mapping (JSON), duplicateMode (skip|import|update), sheetIndex
+ */
+router.post('/import', runVehicleImportUpload, async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file || !file.buffer) {
+      return res.status(400).json({ error: 'Archivo requerido (campo: file)' });
+    }
+    let mappingObj;
+    try {
+      mappingObj = JSON.parse(req.body.mapping || '{}');
+    } catch {
+      return res.status(400).json({ error: 'mapping debe ser un JSON válido' });
+    }
+    const mapping = normalizeVehicleImportMappingPayload(mappingObj);
+
+    const duplicateMode = String(req.body.duplicateMode || req.query.duplicateMode || 'skip').toLowerCase();
+    if (!['skip', 'import', 'update'].includes(duplicateMode)) {
+      return res.status(400).json({ error: 'duplicateMode debe ser skip, import o update' });
+    }
+    const sheetIndex = Math.max(0, parseInt(String(req.body.sheetIndex ?? req.query.sheetIndex ?? '0'), 10) || 0);
+
+    const { rows, headers, sheetName, firstDataRow1Based } = vehicleImport.parseImportFileBuffer(
+      file.buffer,
+      {
+        mimetype: file.mimetype,
+        originalname: file.originalname,
+        sheetIndex,
+      },
+    );
+    if (rows.length > MAX_VEHICLE_IMPORT_ROWS) {
+      return res.status(400).json({
+        error: `El archivo supera el máximo de ${MAX_VEHICLE_IMPORT_ROWS} filas de datos.`,
+      });
+    }
+
+    const results = {
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [],
+    };
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const emptyRow = Object.values(row).every(
+        (v) => v == null || (typeof v === 'string' && v.trim() === '') || v === '',
+      );
+      if (emptyRow) continue;
+
+      const { values, errors, warnings } = vehicleImport.mapRowToVehicleValues(row, mapping);
+      const sheetRow = i + firstDataRow1Based;
+      if (errors.length > 0) {
+        results.failed += 1;
+        results.errors.push({ sheetRow, message: errors.join('; '), warnings });
+        continue;
+      }
+
+      const dupId = await findDuplicateVehicleId(supabase, req.user.id, values);
+      if (dupId) {
+        if (duplicateMode === 'skip') {
+          results.skipped += 1;
+          continue;
+        }
+        if (duplicateMode === 'import') {
+          try {
+            await insertVehicleFromImportValues(supabase, req.user.id, values);
+            results.inserted += 1;
+          } catch (e) {
+            results.failed += 1;
+            results.errors.push({ sheetRow, message: e.message || String(e) });
+          }
+          continue;
+        }
+        if (duplicateMode === 'update') {
+          try {
+            await updateVehicleFromImportValues(supabase, req.user.id, dupId, values);
+            results.updated += 1;
+          } catch (e) {
+            results.failed += 1;
+            results.errors.push({ sheetRow, message: e.message || String(e) });
+          }
+          continue;
+        }
+      } else {
+        try {
+          await insertVehicleFromImportValues(supabase, req.user.id, values);
+          results.inserted += 1;
+        } catch (e) {
+          results.failed += 1;
+          results.errors.push({ sheetRow, message: e.message || String(e) });
+        }
+      }
+    }
+
+    res.json({
+      ...results,
+      sheetName: sheetName ?? null,
+      totalRows: rows.length,
+    });
+  } catch (err) {
+    if (err.code === 'SHEET_NOT_FOUND') {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.code === 'UNSUPPORTED_FORMAT') {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error('POST /vehicles/import:', err);
+    res.status(500).json({ error: err.message || 'Error al importar' });
   }
 });
 
