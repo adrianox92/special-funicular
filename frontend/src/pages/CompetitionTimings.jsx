@@ -175,8 +175,7 @@ const CompetitionTimings = () => {
     return map;
   }, [timings]);
 
-  // Función para calcular tiempos agregados por participante
-  const getAggregatedTimes = () => {
+  const aggregatedTimes = useMemo(() => {
     const aggregatedData = {};
     timings.forEach((timing) => {
       const key = String(timing.participant_id);
@@ -242,12 +241,7 @@ const CompetitionTimings = () => {
             data.rounds_completed >= (competition?.rounds || 0),
         };
       });
-  };
-
-  const aggregatedTimes = useMemo(
-    () => getAggregatedTimes(),
-    [timings, competition, pointsByParticipant]
-  );
+  }, [timings, competition, pointsByParticipant]);
 
   /** Mismo criterio que la clasificación agregada: puntos → tiempo. */
   const participantsDisplayOrder = useMemo(() => {
