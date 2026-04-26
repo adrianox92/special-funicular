@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import axios from '../lib/axios';
@@ -36,8 +36,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import { useAuth } from '../context/AuthContext';
+import { isLicenseAdminUser } from '../lib/licenseAdmin';
+
+const COMPETITIONS_DEBUG_ORG_KEY = 'scalextric_competitions_for_organizer';
+
+function isUuidString(s) {
+  return (
+    typeof s === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s.trim())
+  );
+}
 
 const Competitions = () => {
+  const { user } = useAuth();
+  const isLicenseAdmin = isLicenseAdminUser(user);
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -60,21 +73,41 @@ const Competitions = () => {
   const [selectedFavorites, setSelectedFavorites] = useState({});
   const [defaultCategoryName, setDefaultCategoryName] = useState('General');
 
+  const [debugOrganizerId, setDebugOrganizerId] = useState(null);
+  const [debugOrganizerInput, setDebugOrganizerInput] = useState('');
+  const [debugLookupLoading, setDebugLookupLoading] = useState(false);
+
   const navigate = useNavigate();
 
-  const loadCompetitions = async () => {
+  useEffect(() => {
+    if (!isLicenseAdmin) return;
+    try {
+      const stored = sessionStorage.getItem(COMPETITIONS_DEBUG_ORG_KEY);
+      if (stored && isUuidString(stored)) {
+        setDebugOrganizerId(stored.trim());
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }, [isLicenseAdmin]);
+
+  const loadCompetitions = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/competitions/my-competitions');
+      const params = {};
+      if (debugOrganizerId) {
+        params.for_organizer = debugOrganizerId;
+      }
+      const response = await axios.get('/competitions/my-competitions', { params });
       setCompetitions(response.data);
       setError(null);
     } catch (err) {
       console.error('Error al cargar competiciones:', err);
-      setError('Error al cargar las competiciones');
+      setError(err.response?.data?.error || 'Error al cargar las competiciones');
     } finally {
       setLoading(false);
     }
-  };
+  }, [debugOrganizerId]);
 
   const loadCircuits = async () => {
     try {
@@ -105,6 +138,9 @@ const Competitions = () => {
 
   useEffect(() => {
     loadCompetitions();
+  }, [loadCompetitions]);
+
+  useEffect(() => {
     loadCircuits();
     loadClubs();
     loadFavorites();
@@ -248,6 +284,56 @@ const Competitions = () => {
     });
   };
 
+  const applyDebugOrganizerView = async () => {
+    const raw = debugOrganizerInput.trim();
+    if (!raw) {
+      toast.error('Introduce un email o UUID de organizador');
+      return;
+    }
+    try {
+      setDebugLookupLoading(true);
+      let uid = null;
+      if (raw.includes('@')) {
+        const { data } = await axios.get('/license-account/admin/lookup', {
+          params: { email: raw },
+        });
+        uid = data?.user_id;
+        if (!uid) {
+          toast.error('Usuario no encontrado');
+          return;
+        }
+      } else if (isUuidString(raw)) {
+        uid = raw.trim();
+      } else {
+        toast.error('Formato inválido: usa email o UUID');
+        return;
+      }
+      setDebugOrganizerId(uid);
+      try {
+        sessionStorage.setItem(COMPETITIONS_DEBUG_ORG_KEY, uid);
+      } catch (_) {
+        /* ignore */
+      }
+      setDebugOrganizerInput('');
+      toast.success('Mostrando competiciones de ese organizador');
+    } catch (e) {
+      console.error(e);
+      toast.error(e.response?.data?.error || 'No se pudo resolver el usuario');
+    } finally {
+      setDebugLookupLoading(false);
+    }
+  };
+
+  const clearDebugOrganizerView = () => {
+    setDebugOrganizerId(null);
+    try {
+      sessionStorage.removeItem(COMPETITIONS_DEBUG_ORG_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+    toast.message('Vista restablecida a tus competiciones');
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -261,7 +347,11 @@ const Competitions = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold">Mis Competiciones</h1>
-          <p className="text-muted-foreground">Gestiona tus competiciones y participantes</p>
+          <p className="text-muted-foreground">
+            {isLicenseAdmin && debugOrganizerId
+              ? `Modo depuración: competiciones del organizador ${debugOrganizerId}`
+              : 'Gestiona tus competiciones y participantes'}
+          </p>
         </div>
         <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, competitionId: null })}>
           <AlertDialogContent>
@@ -529,6 +619,46 @@ const Competitions = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {isLicenseAdmin && (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 space-y-3">
+            <p className="text-sm font-medium">Depuración (admin)</p>
+            <p className="text-xs text-muted-foreground">
+              Ver la lista de competiciones como si fueras otro organizador (email o UUID). Requiere{' '}
+              <code className="text-xs bg-muted px-1 rounded">LICENSE_ADMIN_EMAILS</code> en el servidor.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="debug-organizer">Email o UUID del organizador</Label>
+                <Input
+                  id="debug-organizer"
+                  placeholder="correo@ejemplo.com o uuid"
+                  value={debugOrganizerInput}
+                  onChange={(e) => setDebugOrganizerInput(e.target.value)}
+                  disabled={debugLookupLoading}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={debugLookupLoading}
+                onClick={applyDebugOrganizerView}
+              >
+                {debugLookupLoading ? 'Buscando…' : 'Aplicar'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!debugOrganizerId}
+                onClick={clearDebugOrganizerView}
+              >
+                Restablecer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <Alert variant="destructive">

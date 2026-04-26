@@ -1,11 +1,19 @@
 const express = require('express');
 const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
+const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 
 const router = express.Router();
 const supabase = getAnonClient();
 
 router.use(authMiddleware);
+
+function isUuid(id) {
+  return (
+    typeof id === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  );
+}
 
 /**
  * @swagger
@@ -21,10 +29,23 @@ router.use(authMiddleware);
  */
 router.get('/', async (req, res) => {
   try {
+    let ownerId = req.user.id;
+    const rawOwner = req.query.owner_user_id;
+    if (rawOwner != null && String(rawOwner).trim() !== '') {
+      const oid = String(rawOwner).trim();
+      if (!isUuid(oid)) {
+        return res.status(400).json({ error: 'owner_user_id inválido' });
+      }
+      if (oid !== req.user.id && !isLicenseAdminUser(req.user)) {
+        return res.status(403).json({ error: 'No autorizado' });
+      }
+      ownerId = oid;
+    }
+
     const { data, error } = await supabase
       .from('circuits')
       .select('*')
-      .eq('user_id', req.user.id)
+      .eq('user_id', ownerId)
       .order('name', { ascending: true });
 
     if (error) {

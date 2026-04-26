@@ -1,7 +1,7 @@
 const express = require('express');
 const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
-const { requireViewCompetition } = require('../lib/competitionPermissions');
+const { requireViewCompetition, canManageCompetition } = require('../lib/competitionPermissions');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -99,7 +99,7 @@ router.get('/competition/:competitionId', async (req, res) => {
   try {
     const { competitionId } = req.params;
 
-    const access = await requireViewCompetition(supabase, req.user.id, competitionId);
+    const access = await requireViewCompetition(supabase, req.user, competitionId);
     if (!access.ok) return access.respond(res);
 
     const { data, error } = await supabase
@@ -201,15 +201,13 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: 'El ID de la competición es requerido para las reglas' });
       }
 
-      // Verificar que la competición existe y pertenece al usuario
       const { data: competition, error: compError } = await supabase
         .from('competitions')
-        .select('id')
+        .select('id, organizer')
         .eq('id', competition_id)
-        .eq('organizer', req.user.id)
-        .single();
+        .maybeSingle();
 
-      if (compError || !competition) {
+      if (compError || !competition || !canManageCompetition(req.user, competition)) {
         return res.status(404).json({ error: 'Competición no encontrada' });
       }
     }
@@ -316,15 +314,13 @@ router.put('/:id', async (req, res) => {
         return res.status(403).json({ error: 'No tienes permisos para editar esta plantilla' });
       }
     } else {
-      // Para reglas de competición, verificar que el usuario es el organizador
       const { data: competition, error: compError } = await supabase
         .from('competitions')
-        .select('id')
+        .select('id, organizer')
         .eq('id', existingRule.competition_id)
-        .eq('organizer', req.user.id)
-        .single();
+        .maybeSingle();
 
-      if (compError || !competition) {
+      if (compError || !competition || !canManageCompetition(req.user, competition)) {
         return res.status(403).json({ error: 'No tienes permisos para editar esta regla' });
       }
     }
@@ -413,15 +409,13 @@ router.delete('/:id', async (req, res) => {
         return res.status(403).json({ error: 'No tienes permisos para eliminar esta plantilla' });
       }
     } else {
-      // Para reglas de competición, verificar que el usuario es el organizador
       const { data: competition, error: compError } = await supabase
         .from('competitions')
-        .select('id')
+        .select('id, organizer')
         .eq('id', existingRule.competition_id)
-        .eq('organizer', req.user.id)
-        .single();
+        .maybeSingle();
 
-      if (compError || !competition) {
+      if (compError || !competition || !canManageCompetition(req.user, competition)) {
         return res.status(403).json({ error: 'No tienes permisos para eliminar esta regla' });
       }
     }
@@ -503,15 +497,13 @@ router.post('/apply-template/:templateId', async (req, res) => {
       return res.status(404).json({ error: 'Plantilla no encontrada' });
     }
 
-    // Verificar que la competición existe y pertenece al usuario
     const { data: competition, error: compError } = await supabase
       .from('competitions')
-      .select('id')
+      .select('id, organizer')
       .eq('id', competition_id)
-      .eq('organizer', req.user.id)
-      .single();
+      .maybeSingle();
 
-    if (compError || !competition) {
+    if (compError || !competition || !canManageCompetition(req.user, competition)) {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 

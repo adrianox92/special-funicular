@@ -38,6 +38,7 @@ import {
 import { Spinner } from '../components/ui/spinner';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,7 +102,9 @@ const CompetitionParticipants = () => {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState(null);
 
-  const isOrganizer = Boolean(user?.id && competition?.organizer === user.id);
+  const canUseOrganizerTools = Boolean(
+    (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
+  );
   const signupsFull = competition
     ? (competition.signups_count || 0) >= competition.num_slots
     : false;
@@ -124,18 +127,24 @@ const CompetitionParticipants = () => {
     }
   }, [competitionId]);
 
-  const loadFavorites = useCallback(async () => {
+  const loadFavorites = useCallback(async (organizerId) => {
+    if (!organizerId) return;
     try {
-      const response = await axios.get('/favorite-pilots');
+      const response = await axios.get('/favorite-pilots', {
+        params: { owner_user_id: organizerId },
+      });
       setFavorites(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Error al cargar favoritos:', err);
     }
   }, []);
 
-  const loadVehicles = useCallback(async () => {
+  const loadVehicles = useCallback(async (organizerId) => {
+    if (!organizerId) return;
     try {
-      const response = await axios.get('/competitions/vehicles');
+      const response = await axios.get('/competitions/vehicles', {
+        params: { garage_user_id: organizerId },
+      });
       setVehicles(response.data);
     } catch (err) {
       console.error('Error al cargar vehículos:', err);
@@ -144,15 +153,20 @@ const CompetitionParticipants = () => {
 
   useEffect(() => {
     loadCompetition();
-    loadVehicles();
-    loadFavorites();
-  }, [loadCompetition, loadVehicles, loadFavorites]);
+  }, [loadCompetition]);
 
   useEffect(() => {
-    if (competition && !isOrganizer && activeTab === 'signups') {
+    if (competition?.organizer) {
+      loadVehicles(competition.organizer);
+      loadFavorites(competition.organizer);
+    }
+  }, [competition?.organizer, loadVehicles, loadFavorites]);
+
+  useEffect(() => {
+    if (competition && !canUseOrganizerTools && activeTab === 'signups') {
       setActiveTab('participants');
     }
-  }, [competition, isOrganizer, activeTab]);
+  }, [competition, canUseOrganizerTools, activeTab]);
 
   const handleAddParticipant = useCallback(async (e) => {
     e.preventDefault();
@@ -508,6 +522,13 @@ const CompetitionParticipants = () => {
 
   return (
     <div className="space-y-6">
+      {isLicenseAdminUser(user) && competition.organizer && user?.id !== competition.organizer && (
+        <Alert>
+          <AlertDescription>
+            Modo depuración (admin): ves esta competición con permisos de organizador; el organizador es otra cuenta.
+          </AlertDescription>
+        </Alert>
+      )}
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, participantId: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -536,12 +557,12 @@ const CompetitionParticipants = () => {
             <div>
               <h1 className="text-2xl font-bold">{competition.name}</h1>
               <p className="text-muted-foreground text-sm">
-                {isOrganizer ? 'Gestionar competición' : 'Miembro del club — la gestión la lleva el organizador'}
+                {canUseOrganizerTools ? 'Gestionar competición' : 'Miembro del club — la gestión la lleva el organizador'}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {isOrganizer && publicLink && (
+            {canUseOrganizerTools && publicLink && (
               <Button
                 variant="outline"
                 size="sm"
@@ -555,7 +576,7 @@ const CompetitionParticipants = () => {
                 Formulario de inscripción
               </Button>
             )}
-            {!isOrganizer && publicLink && (
+            {!canUseOrganizerTools && publicLink && (
               <Button
                 variant="outline"
                 size="sm"
@@ -567,7 +588,7 @@ const CompetitionParticipants = () => {
                 Inscripción pública
               </Button>
             )}
-            {isOrganizer && (
+            {canUseOrganizerTools && (
               <Button
                 onClick={() => navigate(`/competitions/${competitionId}/timings`)}
                 disabled={!canStartCompetition}
@@ -586,7 +607,7 @@ const CompetitionParticipants = () => {
                 )}
               </Button>
             )}
-            {!isOrganizer && canStartCompetition && (
+            {!canUseOrganizerTools && canStartCompetition && (
               <Button variant="outline" size="sm" onClick={() => navigate(`/competitions/${competitionId}/timings`)}>
                 <Clock className="size-4 mr-2" />
                 Ver tiempos
@@ -698,13 +719,13 @@ const CompetitionParticipants = () => {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList
-          className={`grid w-full gap-2 ${isOrganizer ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3'}`}
+          className={`grid w-full gap-2 ${canUseOrganizerTools ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3'}`}
         >
           <TabsTrigger value="participants" className="flex items-center gap-2">
             <Users className="size-4" />
             Participantes ({participants.length})
           </TabsTrigger>
-          {isOrganizer && (
+          {canUseOrganizerTools && (
             <TabsTrigger value="signups" className="flex items-center gap-2">
               <Users className="size-4" />
               Inscripciones ({competition?.signups_count || 0})
@@ -721,7 +742,7 @@ const CompetitionParticipants = () => {
         </TabsList>
 
         <TabsContent value="participants" className="mt-4">
-          {!isOrganizer && (
+          {!canUseOrganizerTools && (
             <Card className="mb-6 border-primary/30">
               <CardContent className="pt-6 space-y-4">
                 <h5 className="font-semibold">Solicitar plaza</h5>
@@ -823,7 +844,7 @@ const CompetitionParticipants = () => {
 
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
             <h5 className="font-semibold">Participantes Confirmados</h5>
-            {isOrganizer && (
+            {canUseOrganizerTools && (
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
@@ -853,9 +874,9 @@ const CompetitionParticipants = () => {
                 <Users className="size-12 mx-auto text-muted-foreground mb-4" />
                 <h4 className="mb-2">No hay participantes</h4>
                 <p className="text-muted-foreground mb-6">
-                  {isOrganizer ? 'Añade el primer participante para empezar' : 'El organizador aún no ha confirmado participantes.'}
+                  {canUseOrganizerTools ? 'Añade el primer participante para empezar' : 'El organizador aún no ha confirmado participantes.'}
                 </p>
-                {isOrganizer && (
+                {canUseOrganizerTools && (
                   <Button
                     onClick={() => setShowAddModal(true)}
                     disabled={participantsFull || !competition.categories || competition.categories.length === 0}
@@ -876,7 +897,7 @@ const CompetitionParticipants = () => {
                     <TableHead>Categoría</TableHead>
                     <TableHead>Vehículo</TableHead>
                     {competition?.rules?.length > 0 && <TableHead>Puntos</TableHead>}
-                    {isOrganizer && <TableHead>Acciones</TableHead>}
+                    {canUseOrganizerTools && <TableHead>Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -896,7 +917,7 @@ const CompetitionParticipants = () => {
                         {competition?.rules?.length > 0 && (
                           <TableCell>{participant.points || 0}</TableCell>
                         )}
-                        {isOrganizer && (
+                        {canUseOrganizerTools && (
                           <TableCell>
                             <div className="flex gap-2">
                               <Button variant="outline" size="sm" onClick={() => openEditModal(participant)}>
@@ -922,7 +943,7 @@ const CompetitionParticipants = () => {
           )}
         </TabsContent>
 
-        {isOrganizer && (
+        {canUseOrganizerTools && (
           <TabsContent value="signups" className="mt-4">
             <CompetitionSignups competitionId={competitionId} onSignupApproved={loadCompetition} />
           </TabsContent>
@@ -932,12 +953,12 @@ const CompetitionParticipants = () => {
           <CompetitionCategories
             competitionId={competitionId}
             onCategoryChange={loadCompetition}
-            readOnly={!isOrganizer}
+            readOnly={!canUseOrganizerTools}
           />
         </TabsContent>
 
         <TabsContent value="rules" className="mt-4">
-          <CompetitionRulesPanel competitionId={competitionId} onRuleChange={() => {}} readOnly={!isOrganizer} />
+          <CompetitionRulesPanel competitionId={competitionId} onRuleChange={() => {}} readOnly={!canUseOrganizerTools} />
         </TabsContent>
       </Tabs>
 

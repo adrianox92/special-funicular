@@ -1,7 +1,10 @@
 /**
  * Permisos de competición: organizador vs miembros del club (lectura).
- * La gestión (reglas, participantes, etc.) sigue siendo solo `organizer`.
+ * La gestión (reglas, participantes, etc.) sigue siendo solo `organizer`,
+ * salvo administradores de licencia (`LICENSE_ADMIN_EMAILS`) para depuración.
  */
+
+const { isLicenseAdminUser } = require('./licenseAdminAuth');
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
@@ -19,11 +22,13 @@ async function fetchCompetitionAccess(supabase, competitionId, select = 'id, org
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {string} userId
+ * @param {{ id?: string, email?: string } | null | undefined} user
  * @param {{ organizer?: string|null, club_id?: string|null }} competition
  */
-async function canViewCompetition(supabase, userId, competition) {
-  if (!competition || !userId) return false;
+async function canViewCompetition(supabase, user, competition) {
+  if (!competition || !user?.id) return false;
+  if (isLicenseAdminUser(user)) return true;
+  const userId = user.id;
   if (competition.organizer === userId) return true;
   if (!competition.club_id) return false;
   const { data: mem } = await supabase
@@ -43,21 +48,23 @@ async function canViewCompetition(supabase, userId, competition) {
 }
 
 /**
- * @param {string} userId
+ * @param {{ id?: string, email?: string } | null | undefined} user
  * @param {{ organizer?: string|null }} competition
  */
-function canManageCompetition(userId, competition) {
-  return Boolean(competition && userId && competition.organizer === userId);
+function canManageCompetition(user, competition) {
+  if (!competition || !user?.id) return false;
+  if (isLicenseAdminUser(user)) return true;
+  return competition.organizer === user.id;
 }
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {string} userId
+ * @param {{ id?: string, email?: string } | null | undefined} user
  * @param {string} competitionId
  * @param {string} [select]
  * @returns {Promise<{ ok: true, competition: object } | { ok: false, respond: (res: import('express').Response) => void }>}
  */
-async function requireViewCompetition(supabase, userId, competitionId, select = 'id, organizer, club_id') {
+async function requireViewCompetition(supabase, user, competitionId, select = 'id, organizer, club_id') {
   const { competition, error } = await fetchCompetitionAccess(supabase, competitionId, select);
   if (error || !competition) {
     return {
@@ -65,7 +72,7 @@ async function requireViewCompetition(supabase, userId, competitionId, select = 
       respond: (res) => res.status(404).json({ error: 'Competición no encontrada' }),
     };
   }
-  const view = await canViewCompetition(supabase, userId, competition);
+  const view = await canViewCompetition(supabase, user, competition);
   if (!view) {
     return {
       ok: false,
@@ -77,15 +84,15 @@ async function requireViewCompetition(supabase, userId, competitionId, select = 
 
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {string} userId
+ * @param {{ id?: string, email?: string } | null | undefined} user
  * @param {string} competitionId
  * @param {string} [select]
  * @returns {Promise<{ ok: true, competition: object } | { ok: false, respond: (res: import('express').Response) => void }>}
  */
-async function requireManageCompetition(supabase, userId, competitionId, select = 'id, organizer, club_id') {
-  const r = await requireViewCompetition(supabase, userId, competitionId, select);
+async function requireManageCompetition(supabase, user, competitionId, select = 'id, organizer, club_id') {
+  const r = await requireViewCompetition(supabase, user, competitionId, select);
   if (!r.ok) return r;
-  if (!canManageCompetition(userId, r.competition)) {
+  if (!canManageCompetition(user, r.competition)) {
     return {
       ok: false,
       respond: (res) => res.status(404).json({ error: 'Competición no encontrada' }),

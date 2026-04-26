@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -142,9 +143,12 @@ const CompetitionTimings = () => {
   const [deleteTimingConfirm, setDeleteTimingConfirm] = useState({ open: false, timingId: null });
 
   // Memo: Mapa de participantes por ID
-  const isOrganizer = useMemo(
-    () => Boolean(user?.id && competition?.organizer === user.id),
-    [user?.id, competition?.organizer],
+  const canUseOrganizerTools = useMemo(
+    () =>
+      Boolean(
+        (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
+      ),
+    [user?.id, user?.email, competition?.organizer],
   );
 
   const participantsMap = useMemo(() => {
@@ -191,8 +195,7 @@ const CompetitionTimings = () => {
           total_laps: 0,
         };
       }
-      // Las rondas NP cuentan como completadas (desbloquean puntos) pero no
-      // contribuyen a tiempo total, mejor vuelta ni vueltas totales.
+      // Cada fila en BD cuenta como ronda registrada (incluye NP).
       aggregatedData[key].rounds_completed += 1;
       if (timing.did_not_participate) {
         aggregatedData[key].rounds_dnp += 1;
@@ -224,8 +227,10 @@ const CompetitionTimings = () => {
         }
         if (a.total_time_seconds && !b.total_time_seconds) return -1;
         if (!a.total_time_seconds && b.total_time_seconds) return 1;
-        if (a.rounds_completed !== b.rounds_completed) {
-          return b.rounds_completed - a.rounds_completed;
+        const racedA = a.rounds_completed - a.rounds_dnp;
+        const racedB = b.rounds_completed - b.rounds_dnp;
+        if (racedA !== racedB) {
+          return racedB - racedA;
         }
         return 0;
       })
@@ -238,7 +243,8 @@ const CompetitionTimings = () => {
           position: index + 1,
           total_time_formatted: totalTimeFormatted,
           has_completed_all_rounds:
-            data.rounds_completed >= (competition?.rounds || 0),
+            data.rounds_completed - data.rounds_dnp >=
+            (competition?.rounds || 0),
         };
       });
   }, [timings, competition, pointsByParticipant]);
@@ -279,21 +285,22 @@ const CompetitionTimings = () => {
   const loadCompetitionData = async () => {
     try {
       setLoading(true);
-      // Llamadas en paralelo
+      const compResponse = await axios.get(`/competitions/${id}`);
+      const organizerId = compResponse.data?.organizer;
       const [
-        compResponse,
         partResponse,
         timingsResponse,
         progressResponse,
         rulesResponse,
         circuitsResponse,
       ] = await Promise.all([
-        axios.get(`/competitions/${id}`),
         axios.get(`/competitions/${id}/participants`),
         axios.get(`/competitions/${id}/timings`),
         axios.get(`/competitions/${id}/progress`),
         axios.get(`/competitions/${id}/rules`),
-        axios.get('/circuits'),
+        organizerId
+          ? axios.get('/circuits', { params: { owner_user_id: organizerId } })
+          : axios.get('/circuits'),
       ]);
       setCompetition(compResponse.data);
       setParticipants(partResponse.data);
@@ -674,7 +681,7 @@ const CompetitionTimings = () => {
 
   // Verificar que la competición tenga al menos un participante antes de permitir gestionar tiempos
   if (competition && participants.length === 0) {
-    const showOrganizerEmptyActions = isOrganizer;
+    const showOrganizerEmptyActions = canUseOrganizerTools;
     return (
       <div className="mt-4 max-w-4xl mx-auto space-y-4">
         <div className="flex items-center gap-3 mb-4">
@@ -748,6 +755,13 @@ const CompetitionTimings = () => {
       </AlertDialog>
 
       <div className="mt-4 max-w-7xl mx-auto space-y-4">
+        {isLicenseAdminUser(user) && competition?.organizer && user?.id !== competition.organizer && (
+          <Alert>
+            <AlertDescription>
+              Modo depuración (admin): gestionas tiempos con permisos de organizador; el circuito y datos son los del organizador de la competición.
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Header */}
         <div className="flex flex-col gap-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -785,7 +799,7 @@ const CompetitionTimings = () => {
                   </Button>
                 </>
               )}
-              {isOrganizer && (
+              {canUseOrganizerTools && (
                 <Button
                   onClick={() => handleShowModal()}
                   className="flex items-center gap-2"
@@ -971,7 +985,7 @@ const CompetitionTimings = () => {
                                   <TableHead className="text-center w-[75px]">
                                     Vuelta
                                   </TableHead>
-                                  {isOrganizer && (
+                                  {canUseOrganizerTools && (
                                     <TableHead className="text-center w-[140px]">
                                       Acciones
                                     </TableHead>
@@ -1085,7 +1099,7 @@ const CompetitionTimings = () => {
                                           </>
                                         )}
                                       </TableCell>
-                                      {isOrganizer && (
+                                      {canUseOrganizerTools && (
                                         <TableCell className="text-center p-1">
                                           <div className="flex items-center justify-center gap-1">
                                             <Tooltip>
@@ -1171,7 +1185,7 @@ const CompetitionTimings = () => {
                                   <TableHead>Dif</TableHead>
                                   <TableHead>Vuelta</TableHead>
                                   <TableHead>V</TableHead>
-                                  {isOrganizer && <TableHead>Acciones</TableHead>}
+                                  {canUseOrganizerTools && <TableHead>Acciones</TableHead>}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -1288,7 +1302,7 @@ const CompetitionTimings = () => {
                                           timing.laps
                                         )}
                                       </TableCell>
-                                      {isOrganizer && (
+                                      {canUseOrganizerTools && (
                                         <TableCell className="text-center p-1">
                                           <div className="flex items-center justify-center gap-1">
                                             <Tooltip>
@@ -1371,7 +1385,7 @@ const CompetitionTimings = () => {
                         </p>
                       )}
 
-                      {isOrganizer && !isCompetitionComplete() && (() => {
+                      {canUseOrganizerTools && !isCompetitionComplete() && (() => {
                         const pending = getAvailableParticipantsForRound(
                           String(roundNumber)
                         );
@@ -1645,7 +1659,7 @@ const CompetitionTimings = () => {
                               </TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className="bg-blue-600/20 text-blue-800 dark:text-blue-200">
-                                  {data.rounds_completed}/
+                                  {data.rounds_completed - data.rounds_dnp}/
                                   {competition?.rounds || 0}
                                 </Badge>
                               </TableCell>

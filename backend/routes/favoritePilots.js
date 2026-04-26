@@ -8,6 +8,7 @@ const { body, param } = require('express-validator');
 const { getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
+const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 const {
   normalizePilotSlug,
   isValidPilotSlug,
@@ -17,6 +18,13 @@ const router = express.Router();
 const supabaseAdmin = getServiceClient();
 
 router.use(authMiddleware);
+
+function isUuid(id) {
+  return (
+    typeof id === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  );
+}
 
 async function resolveLinkedSlug(rawSlug) {
   const slug = normalizePilotSlug(rawSlug);
@@ -65,6 +73,19 @@ function sanitizeText(value, maxLen) {
  */
 router.get('/', async (req, res) => {
   try {
+    let ownerId = req.user.id;
+    const rawOwner = req.query.owner_user_id;
+    if (rawOwner != null && String(rawOwner).trim() !== '') {
+      const oid = String(rawOwner).trim();
+      if (!isUuid(oid)) {
+        return res.status(400).json({ error: 'owner_user_id inválido' });
+      }
+      if (oid !== req.user.id && !isLicenseAdminUser(req.user)) {
+        return res.status(403).json({ error: 'No autorizado' });
+      }
+      ownerId = oid;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('favorite_pilots')
       .select(`
@@ -79,7 +100,7 @@ router.get('/', async (req, res) => {
         updated_at,
         vehicles:default_vehicle_id ( id, model, manufacturer )
       `)
-      .eq('owner_user_id', req.user.id)
+      .eq('owner_user_id', ownerId)
       .order('display_name', { ascending: true });
 
     if (error) {
