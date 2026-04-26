@@ -85,6 +85,22 @@ function averageTimeFromTotalAndLaps(totalTimeStr, lapsStr) {
   return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
 }
 
+/** Misma lógica que en backend: ignorar 00:00.000 e inválidos. */
+function lapTimeStringToSeconds(str) {
+  if (!str || typeof str !== 'string') return null;
+  const parts = str.split(':');
+  if (parts.length < 2) return null;
+  const min = parseFloat(parts[0]);
+  const rest = parseFloat(parts[1]);
+  if (Number.isNaN(min) || Number.isNaN(rest)) return null;
+  return min * 60 + rest;
+}
+
+function isUsableBestLapTimeString(str) {
+  const s = lapTimeStringToSeconds(str);
+  return s != null && s > 0;
+}
+
 const CompetitionTimings = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -187,28 +203,32 @@ const CompetitionTimings = () => {
       const penalty = Number(timing.penalty_seconds) || 0;
       aggregatedData[key].total_time_seconds += timeInSeconds + penalty;
       aggregatedData[key].penalty_seconds += penalty;
-      const lapTimeParts = timing.best_lap_time.split(':');
-      const lapTimeInSeconds =
-        parseFloat(lapTimeParts[0]) * 60 + parseFloat(lapTimeParts[1]);
-      if (
-        !aggregatedData[key].best_lap_time ||
-        lapTimeInSeconds <
-          (() => {
-            const bestParts = aggregatedData[key].best_lap_time.split(':');
-            return parseFloat(bestParts[0]) * 60 + parseFloat(bestParts[1]);
-          })()
-      ) {
-        aggregatedData[key].best_lap_time = timing.best_lap_time;
+      if (isUsableBestLapTimeString(timing.best_lap_time)) {
+        const curLap = lapTimeStringToSeconds(timing.best_lap_time);
+        const bestSoFar =
+          aggregatedData[key].best_lap_time != null
+            ? lapTimeStringToSeconds(aggregatedData[key].best_lap_time)
+            : null;
+        if (bestSoFar == null || (curLap != null && curLap < bestSoFar)) {
+          aggregatedData[key].best_lap_time = timing.best_lap_time;
+        }
       }
       aggregatedData[key].total_laps += timing.laps;
     });
     return Object.values(aggregatedData)
       .sort((a, b) => {
-        const aCompleted = a.rounds_completed >= (competition?.rounds || 0);
-        const bCompleted = b.rounds_completed >= (competition?.rounds || 0);
-        if (aCompleted && !bCompleted) return -1;
-        if (!aCompleted && bCompleted) return 1;
-        return a.total_time_seconds - b.total_time_seconds;
+        const ptsA = pointsByParticipant[a.participant_id] ?? 0;
+        const ptsB = pointsByParticipant[b.participant_id] ?? 0;
+        if (ptsA !== ptsB) return ptsB - ptsA;
+        if (a.total_time_seconds && b.total_time_seconds) {
+          return a.total_time_seconds - b.total_time_seconds;
+        }
+        if (a.total_time_seconds && !b.total_time_seconds) return -1;
+        if (!a.total_time_seconds && b.total_time_seconds) return 1;
+        if (a.rounds_completed !== b.rounds_completed) {
+          return b.rounds_completed - a.rounds_completed;
+        }
+        return 0;
       })
       .map((data, index) => {
         const totalMinutes = Math.floor(data.total_time_seconds / 60);
@@ -224,12 +244,27 @@ const CompetitionTimings = () => {
       });
   };
 
-  // Memo: getAggregatedTimes
   const aggregatedTimes = useMemo(
     () => getAggregatedTimes(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [timings, competition]
+    [timings, competition, pointsByParticipant]
   );
+
+  /** Mismo criterio que la clasificación agregada: puntos → tiempo. */
+  const participantsDisplayOrder = useMemo(() => {
+    const seen = new Set();
+    const ordered = [];
+    for (const row of aggregatedTimes) {
+      const p = participants.find((x) => x.id === row.participant_id);
+      if (p && !seen.has(p.id)) {
+        seen.add(p.id);
+        ordered.push(p);
+      }
+    }
+    for (const p of participants) {
+      if (!seen.has(p.id)) ordered.push(p);
+    }
+    return ordered;
+  }, [participants, aggregatedTimes]);
 
   // Cargar datos de la competición
   useEffect(() => {
@@ -509,6 +544,14 @@ const CompetitionTimings = () => {
     if (!match) return 0;
     const [, min, sec, ms] = match.map(Number);
     return min * 60 + sec + ms / 1000;
+  }
+
+  /** Tiempo de carrera + penalización; usa total_time si falta total_time_timestamp. */
+  function adjustedRaceTimeSeconds(timing) {
+    if (timing.did_not_participate) return null;
+    const base =
+      Number(timing.total_time_timestamp) || timeStringToSeconds(timing.total_time);
+    return base + (Number(timing.penalty_seconds) || 0);
   }
 
   // Función para convertir segundos a mm:ss.mmm
@@ -872,32 +915,26 @@ const CompetitionTimings = () => {
                   if (a.did_not_participate && !b.did_not_participate) return 1;
                   if (!a.did_not_participate && b.did_not_participate) return -1;
                   if (a.did_not_participate && b.did_not_participate) return 0;
-                  const aAdjusted =
-                    (Number(a.total_time_timestamp) || 0) +
-                    (Number(a.penalty_seconds) || 0);
-                  const bAdjusted =
-                    (Number(b.total_time_timestamp) || 0) +
-                    (Number(b.penalty_seconds) || 0);
-                  return aAdjusted - bAdjusted;
+                  const aAdj = adjustedRaceTimeSeconds(a) ?? 0;
+                  const bAdj = adjustedRaceTimeSeconds(b) ?? 0;
+                  return aAdj - bAdj;
                 });
 
-                // Encontrar el mejor tiempo de vuelta de la ronda (ignorando NP)
+                // Encontrar el mejor tiempo de vuelta de la ronda (ignorando NP y 00:00.000)
                 const participatingTimings = sortedTimings.filter(
                   (t) => !t.did_not_participate
                 );
+                const withUsableLap = participatingTimings.filter((t) =>
+                  isUsableBestLapTimeString(t.best_lap_time)
+                );
                 const bestLapTime =
-                  participatingTimings.length > 0
-                    ? participatingTimings.reduce((best, current) => {
-                        const currentParts = current.best_lap_time.split(':');
-                        const bestParts = best.best_lap_time.split(':');
-                        const currentTime =
-                          parseFloat(currentParts[0]) * 60 +
-                          parseFloat(currentParts[1]);
-                        const bestTime =
-                          parseFloat(bestParts[0]) * 60 +
-                          parseFloat(bestParts[1]);
-                        return currentTime < bestTime ? current : best;
-                      })
+                  withUsableLap.length > 0
+                    ? withUsableLap.reduce((best, current) => {
+                        const cur = lapTimeStringToSeconds(current.best_lap_time);
+                        const bestS = lapTimeStringToSeconds(best.best_lap_time);
+                        if (cur == null || bestS == null) return best;
+                        return cur < bestS ? current : best;
+                      }, withUsableLap[0])
                     : null;
 
                 return (
@@ -954,12 +991,11 @@ const CompetitionTimings = () => {
                                     !isDnp && bestLapTime && timing.id === bestLapTime.id;
                                   const leader = participatingTimings[0];
                                   const leaderTime = leader
-                                    ? timeStringToSeconds(leader.total_time) +
-                                      (Number(leader.penalty_seconds) || 0)
+                                    ? adjustedRaceTimeSeconds(leader) ?? 0
                                     : 0;
-                                  const currentTime =
-                                    timeStringToSeconds(timing.total_time) +
-                                    (Number(timing.penalty_seconds) || 0);
+                                  const currentTime = isDnp
+                                    ? 0
+                                    : adjustedRaceTimeSeconds(timing) ?? 0;
                                   const diff = currentTime - leaderTime;
                                   const timeDiff =
                                     isDnp || !leader || timing.id === leader.id
@@ -1151,12 +1187,11 @@ const CompetitionTimings = () => {
                                     !isDnp && bestLapTime && timing.id === bestLapTime.id;
                                   const leader = participatingTimings[0];
                                   const leaderTime = leader
-                                    ? timeStringToSeconds(leader.total_time) +
-                                      (Number(leader.penalty_seconds) || 0)
+                                    ? adjustedRaceTimeSeconds(leader) ?? 0
                                     : 0;
-                                  const currentTime =
-                                    timeStringToSeconds(timing.total_time) +
-                                    (Number(timing.penalty_seconds) || 0);
+                                  const currentTime = isDnp
+                                    ? 0
+                                    : adjustedRaceTimeSeconds(timing) ?? 0;
                                   const diff = currentTime - leaderTime;
                                   const timeDiff =
                                     isDnp || !leader || timing.id === leader.id
@@ -1419,7 +1454,7 @@ const CompetitionTimings = () => {
 
           <TabsContent value="participants" className="mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {participants.map((participant) => {
+              {participantsDisplayOrder.map((participant) => {
                 const completedRounds =
                   timingsByParticipant[participant.id]?.length || 0;
                 const totalRounds = competition?.rounds || 0;
@@ -1582,7 +1617,9 @@ const CompetitionTimings = () => {
                                 {getVehicleInfo(data.participant_id)}
                               </TableCell>
                               <TableCell className="text-amber-600 font-bold">
-                                {formatTime(data.best_lap_time)}
+                                {isUsableBestLapTimeString(data.best_lap_time)
+                                  ? formatTime(data.best_lap_time)
+                                  : '—'}
                               </TableCell>
                               <TableCell className="font-bold">
                                 {penalty > 0 ? (
@@ -1620,7 +1657,7 @@ const CompetitionTimings = () => {
                               </TableCell>
                               <TableCell>{data.total_laps}</TableCell>
                               <TableCell>
-                                {pointsByParticipant[data.id] || 0}
+                                {pointsByParticipant[data.participant_id] ?? 0}
                               </TableCell>
                             </TableRow>
                           );
