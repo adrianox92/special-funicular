@@ -148,7 +148,7 @@ const CompetitionTimings = () => {
       Boolean(
         (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
       ),
-    [user?.id, user?.email, competition?.organizer],
+    [user, competition?.organizer],
   );
 
   const participantsMap = useMemo(() => {
