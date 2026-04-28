@@ -3,7 +3,7 @@ import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Download, Trash2, Calendar, MapPin, Gauge } from 'lucide-react';
+import { CopyPlus, Download, Trash2, Calendar, MapPin, Gauge } from 'lucide-react';
 import api from '../lib/axios';
 import { formatDistance, safeVehicleFileBasename } from '../utils/formatUtils';
 import { toast } from 'sonner';
@@ -18,11 +18,13 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog';
 import placeholderImage from '../assets/images/placeholder.png';
+import DuplicateVehicleDialog from './DuplicateVehicleDialog';
 
-const VehicleCard = ({ vehicle, onDelete }) => {
+const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
   const navigate = useNavigate();
   const imgRef = useRef(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [duplicateVehicle, setDuplicateVehicle] = useState(null);
 
   useEffect(() => {
     if (imgRef.current) {
@@ -48,6 +50,11 @@ const VehicleCard = ({ vehicle, onDelete }) => {
     }
   };
 
+  const handleDuplicate = (e) => {
+    e.stopPropagation();
+    setDuplicateVehicle(vehicle);
+  };
+
   const handleDownloadSpecs = async (e) => {
     e.stopPropagation();
     try {
@@ -67,6 +74,14 @@ const VehicleCard = ({ vehicle, onDelete }) => {
 
   return (
     <>
+      <DuplicateVehicleDialog
+        vehicle={duplicateVehicle}
+        open={duplicateVehicle != null}
+        onOpenChange={(open) => {
+          if (!open) setDuplicateVehicle(null);
+        }}
+        onSuccess={() => onDuplicateSuccess?.()}
+      />
       <AlertDialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -89,6 +104,9 @@ const VehicleCard = ({ vehicle, onDelete }) => {
         <Badge className="absolute top-2 left-2 z-10">Modificado</Badge>
       )}
       <div className="absolute top-2 right-2 z-10 flex gap-1">
+        <Button size="sm" variant="secondary" onClick={handleDuplicate} title="Duplicar vehículo">
+          <CopyPlus className="size-4" />
+        </Button>
         <Button size="sm" onClick={handleDownloadSpecs} title="Descargar ficha técnica">
           <Download className="size-4" />
         </Button>

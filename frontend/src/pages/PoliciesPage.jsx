@@ -38,11 +38,6 @@ function renderMarkdown(md) {
   return html;
 }
 
-const POLICY_TITLES = {
-  'seller-terms':       'Condiciones para vendedores',
-  'listing-guidelines': 'Guía de publicación de listados',
-};
-
 export default function PoliciesPage() {
   const { slug } = useParams();
   const [policy, setPolicy]   = useState(null);
@@ -68,10 +63,14 @@ export default function PoliciesPage() {
   }, [slug]);
 
   useEffect(() => {
+    const FALLBACK_TITLES = {
+      'seller-terms': 'Condiciones para vendedores',
+      'listing-guidelines': 'Guía de publicación de listados',
+    };
     if (policy?.title) {
       document.title = `${policy.title} | Slot Collection Pro`;
-    } else if (slug && POLICY_TITLES[slug]) {
-      document.title = `${POLICY_TITLES[slug]} | Slot Collection Pro`;
+    } else if (slug && FALLBACK_TITLES[slug]) {
+      document.title = `${FALLBACK_TITLES[slug]} | Slot Collection Pro`;
     } else {
       document.title = `Políticas | Slot Collection Pro`;
     }

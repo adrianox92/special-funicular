@@ -36,7 +36,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import {
@@ -193,6 +197,12 @@ const Navbar = () => {
   };
 
   const showLicenseAdmin = isLicenseAdminUser(user);
+
+  const licenseAdminMenuItems = [
+    { to: '/admin/slot-race-licenses', label: 'Licencias SRM', icon: Shield },
+    { to: '/admin/slot-catalog', label: 'Catálogo slot', icon: Database },
+    { to: '/admin/changelog', label: 'Changelog', icon: Megaphone },
+  ];
 
   const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
     theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
@@ -376,28 +386,24 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   )}
                   {showLicenseAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin/slot-race-licenses" className="flex items-center gap-2 cursor-pointer">
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="gap-2">
                         <Shield className="size-4" />
-                        Admin licencias SRM
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  {showLicenseAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin/slot-catalog" className="flex items-center gap-2 cursor-pointer">
-                        <Database className="size-4" />
-                        Catálogo slot (admin)
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  {showLicenseAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin/changelog" className="flex items-center gap-2 cursor-pointer">
-                        <Megaphone className="size-4" />
-                        Changelog (admin)
-                      </Link>
-                    </DropdownMenuItem>
+                        Administración
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent className="w-52">
+                          {licenseAdminMenuItems.map(({ to, label, icon: Icon }) => (
+                            <DropdownMenuItem key={to} asChild>
+                              <Link to={to} className="flex cursor-pointer items-center gap-2">
+                                <Icon className="size-4" />
+                                {label}
+                              </Link>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
                   )}
                   <DropdownMenuItem asChild>
                     <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
@@ -437,22 +443,29 @@ const Navbar = () => {
                   />
                 ))}
                 {showLicenseAdmin && (
-                  <Link
-                    to="/admin/slot-race-licenses"
-                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <Shield className="size-4" />
-                    Admin licencias SRM
-                  </Link>
-                )}
-                {showLicenseAdmin && (
-                  <Link
-                    to="/admin/slot-catalog"
-                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <Database className="size-4" />
-                    Catálogo slot (admin)
-                  </Link>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground">
+                      <Shield className="size-4" />
+                      Administración
+                    </div>
+                    <div className="ml-4 flex flex-col gap-1 border-l pl-2">
+                      {licenseAdminMenuItems.map(({ to, label, icon: Icon }) => (
+                        <Link
+                          key={to}
+                          to={to}
+                          className={cn(
+                            'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                            isActive(to)
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                          )}
+                        >
+                          <Icon className="size-4" />
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 <Link
                   to="/changelog"
@@ -461,15 +474,6 @@ const Navbar = () => {
                   <ScrollText className="size-4" />
                   Novedades
                 </Link>
-                {showLicenseAdmin && (
-                  <Link
-                    to="/admin/changelog"
-                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <Megaphone className="size-4" />
-                    Changelog (admin)
-                  </Link>
-                )}
               </nav>
             </SheetContent>
           </Sheet>

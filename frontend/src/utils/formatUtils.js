@@ -246,7 +246,7 @@ const FORBIDDEN_FILE_NAME_CHARS = new Set('<>:"/\\|?*');
 export function safeVehicleFileBasename(model, opts = {}) {
   const fb = opts.fallback ?? 'vehiculo';
   const raw = String(model ?? '').trim() || fb;
-  const cleaned = raw
+  let cleaned = raw
     .split('')
     .filter((ch) => {
       const code = ch.charCodeAt(0);
@@ -255,8 +255,9 @@ export function safeVehicleFileBasename(model, opts = {}) {
     })
     .join('')
     .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/-+/g, '-');
+  while (cleaned.startsWith('-')) cleaned = cleaned.slice(1);
+  while (cleaned.endsWith('-')) cleaned = cleaned.slice(0, -1);
   const base = (cleaned || fb).toLowerCase();
   return base.slice(0, 180);
 }

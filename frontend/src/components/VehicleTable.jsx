@@ -10,7 +10,7 @@ import {
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Download, Trash2 } from 'lucide-react';
+import { CopyPlus, Download, Trash2 } from 'lucide-react';
 import api from '../lib/axios';
 import { formatDistance, safeVehicleFileBasename } from '../utils/formatUtils';
 import { toast } from 'sonner';
@@ -31,8 +31,9 @@ import {
   TooltipTrigger,
 } from './ui/tooltip';
 import placeholderImage from '../assets/images/placeholder.png';
+import DuplicateVehicleDialog from './DuplicateVehicleDialog';
 
-const VehicleTableRow = ({ vehicle, onDelete }) => {
+const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
   const navigate = useNavigate();
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
@@ -50,6 +51,11 @@ const VehicleTableRow = ({ vehicle, onDelete }) => {
       console.error('Error al eliminar vehículo:', error);
       toast.error('Error al eliminar el vehículo');
     }
+  };
+
+  const handleDuplicate = (e) => {
+    e.stopPropagation();
+    if (onDuplicate) onDuplicate(vehicle);
   };
 
   const handleDownloadSpecs = async (e) => {
@@ -165,8 +171,11 @@ const VehicleTableRow = ({ vehicle, onDelete }) => {
             ? formatDistance(vehicle.total_distance_meters)
             : '-'}
         </TableCell>
-        <TableCell className="w-20 p-2" onClick={(e) => e.stopPropagation()}>
+        <TableCell className="min-w-[7.5rem] p-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex gap-1">
+            <Button size="icon" variant="ghost" className="size-8" onClick={handleDuplicate} title="Duplicar vehículo">
+              <CopyPlus className="size-4" />
+            </Button>
             <Button size="icon" variant="ghost" className="size-8" onClick={handleDownloadSpecs} title="Descargar ficha técnica">
               <Download className="size-4" />
             </Button>
@@ -180,27 +189,44 @@ const VehicleTableRow = ({ vehicle, onDelete }) => {
   );
 };
 
-const VehicleTable = ({ vehicles, onDelete }) => {
+const VehicleTable = ({ vehicles, onDelete, onDuplicateSuccess }) => {
+  const [duplicateVehicle, setDuplicateVehicle] = useState(null);
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-12"></TableHead>
-          <TableHead>Modelo</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Estado</TableHead>
-          <TableHead>Precio</TableHead>
-          <TableHead>Compra</TableHead>
-          <TableHead>Odómetro</TableHead>
-          <TableHead className="w-20 text-right">Acciones</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {vehicles.map((vehicle) => (
-          <VehicleTableRow key={vehicle.id} vehicle={vehicle} onDelete={onDelete} />
-        ))}
-      </TableBody>
-    </Table>
+    <>
+      <DuplicateVehicleDialog
+        vehicle={duplicateVehicle}
+        open={duplicateVehicle != null}
+        onOpenChange={(open) => {
+          if (!open) setDuplicateVehicle(null);
+        }}
+        onSuccess={() => onDuplicateSuccess?.()}
+      />
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-12"></TableHead>
+            <TableHead>Modelo</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Precio</TableHead>
+            <TableHead>Compra</TableHead>
+            <TableHead>Odómetro</TableHead>
+            <TableHead className="min-w-[7.5rem] text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {vehicles.map((vehicle) => (
+            <VehicleTableRow
+              key={vehicle.id}
+              vehicle={vehicle}
+              onDelete={onDelete}
+              onDuplicate={setDuplicateVehicle}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 };
 

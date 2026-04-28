@@ -599,12 +599,12 @@ const VehicleList = () => {
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {displayVehicles.map(vehicle => (
-            <VehicleCard key={vehicle.id} vehicle={vehicle} onDelete={handleDeleteVehicle} />
+            <VehicleCard key={vehicle.id} vehicle={vehicle} onDelete={handleDeleteVehicle} onDuplicateSuccess={handleImportedVehicles} />
           ))}
         </div>
       ) : (
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <VehicleTable vehicles={displayVehicles} onDelete={handleDeleteVehicle} />
+          <VehicleTable vehicles={displayVehicles} onDelete={handleDeleteVehicle} onDuplicateSuccess={handleImportedVehicles} />
         </div>
       )}
 
