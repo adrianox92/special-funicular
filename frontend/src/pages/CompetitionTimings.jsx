@@ -10,6 +10,7 @@ import {
   Users,
   FileSpreadsheet,
   FileText,
+  Table2,
   Flag,
   Pencil,
   Trash2,
@@ -630,6 +631,28 @@ const CompetitionTimings = () => {
     }
   };
 
+  const handleExportXLSX = async () => {
+    try {
+      const response = await axios.get(`/competitions/${id}/export/xlsx`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `competicion_${competition.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      toast.error('Error al exportar los datos a Excel');
+    }
+  };
+
   const handleOpenPenaltyModal = (timing) => {
     setPenaltyTiming(timing);
     setPenaltyValue(timing.penalty_seconds || 0);
@@ -796,6 +819,14 @@ const CompetitionTimings = () => {
                   >
                     <FileText className="size-4" />
                     PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleExportXLSX}
+                    className="flex items-center gap-2"
+                  >
+                    <Table2 className="size-4" />
+                    Excel
                   </Button>
                 </>
               )}

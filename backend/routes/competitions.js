@@ -8,6 +8,10 @@ const { v4: uuidv4 } = require('uuid');
 const { calculatePoints } = require('../lib/pointsCalculator');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { deriveCompetitionAverageFromTotalAndLaps } = require('../lib/competitionTimingDerivation');
+const { loadCompetitionExportById } = require('../lib/competitionExportPayload');
+const { generateCompetitionCSV, safeFilenamePart } = require('../lib/competitionCsvGenerator');
+const { generateCompetitionXLSX } = require('../lib/competitionXlsxGenerator');
+const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
 const {
   canViewCompetition,
   requireViewCompetition,
@@ -1664,51 +1668,25 @@ router.get('/:id/export/csv', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
 
-    const access = await requireViewCompetition(supabase, req.user, competitionId, '*');
+    const access = await requireViewCompetition(supabase, req.user, competitionId, 'id');
     if (!access.ok) return access.respond(res);
-    const competition = access.competition;
 
-    // Obtener participantes
-    const { data: participants, error: partError } = await supabase
-      .from('competition_participants')
-      .select(`
-        *,
-        vehicles(model, manufacturer)
-      `)
-      .eq('competition_id', competitionId)
-      .order('created_at', { ascending: true });
-
-    if (partError) {
-      console.error('Error al obtener participantes:', partError);
-      return res.status(500).json({ error: partError.message });
+    const loaded = await loadCompetitionExportById(supabase, competitionId);
+    if (loaded.error) {
+      console.error('export csv load:', loaded.error);
+      return res.status(500).json({ error: loaded.error.message || 'Error al cargar datos' });
     }
+    const { competition, payload } = loaded;
 
-    // Obtener todos los tiempos
-    const { data: timings, error: timingsError } = await supabase
-      .from('competition_timings')
-      .select(`
-        *,
-        competition_participants!inner(
-          id,
-          competition_id
-        )
-      `)
-      .eq('competition_participants.competition_id', competitionId)
-      .order('round_number', { ascending: true })
-      .order('created_at', { ascending: true });
+    const csvData = generateCompetitionCSV(payload);
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
 
-    if (timingsError) {
-      console.error('Error al obtener tiempos:', timingsError);
-      return res.status(500).json({ error: timingsError.message });
-    }
-
-    // Generar datos para CSV
-    const csvData = generateCompetitionCSV(competition, participants, timings);
-
-    // Configurar headers para descarga
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename=competicion_${competition.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
-
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=competicion_${base}_${day}.csv`
+    );
     res.send(csvData);
   } catch (error) {
     console.error('Error en GET /competitions/:id/export/csv:', error);
@@ -1721,52 +1699,25 @@ router.get('/:id/export/pdf', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
 
-    const access = await requireViewCompetition(supabase, req.user, competitionId, '*');
+    const access = await requireViewCompetition(supabase, req.user, competitionId, 'id');
     if (!access.ok) return access.respond(res);
-    const competition = access.competition;
 
-    // Obtener participantes
-    const { data: participants, error: partError } = await supabase
-      .from('competition_participants')
-      .select(`
-        *,
-        vehicles(model, manufacturer)
-      `)
-      .eq('competition_id', competitionId)
-      .order('created_at', { ascending: true });
-
-    if (partError) {
-      console.error('Error al obtener participantes:', partError);
-      return res.status(500).json({ error: partError.message });
+    const loaded = await loadCompetitionExportById(supabase, competitionId);
+    if (loaded.error) {
+      console.error('export pdf load:', loaded.error);
+      return res.status(500).json({ error: loaded.error.message || 'Error al cargar datos' });
     }
+    const { competition, payload } = loaded;
 
-    // Obtener todos los tiempos
-    const { data: timings, error: timingsError } = await supabase
-      .from('competition_timings')
-      .select(`
-        *,
-        competition_participants!inner(
-          id,
-          competition_id
-        )
-      `)
-      .eq('competition_participants.competition_id', competitionId)
-      .order('round_number', { ascending: true })
-      .order('created_at', { ascending: true });
+    const pdfBuffer = await generateCompetitionPDF(competition, payload.participants, payload.timings, {
+      sortedParticipants: payload.sortedParticipants,
+      rules: payload.rules,
+    });
 
-    if (timingsError) {
-      console.error('Error al obtener tiempos:', timingsError);
-      return res.status(500).json({ error: timingsError.message });
-    }
-
-    // Generar PDF
-    const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
-    const pdfBuffer = await generateCompetitionPDF(competition, participants, timings);
-
-    // Configurar headers para descarga
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=competicion_${competition.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
-
+    res.setHeader('Content-Disposition', `attachment; filename=competicion_${base}_${day}.pdf`);
     res.send(pdfBuffer);
   } catch (error) {
     console.error('Error en GET /competitions/:id/export/pdf:', error);
@@ -1774,127 +1725,36 @@ router.get('/:id/export/pdf', async (req, res) => {
   }
 });
 
-// Función auxiliar para generar CSV
-function generateCompetitionCSV(competition, participants, timings) {
-  const formatTime = (seconds) => {
-    if (typeof seconds !== 'number' || isNaN(seconds)) return null;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = (seconds % 60).toFixed(3);
-    return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
-  };
+// Exportar datos de competición en Excel (.xlsx)
+router.get('/:id/export/xlsx', async (req, res) => {
+  try {
+    const { id: competitionId } = req.params;
 
-  const getVehicleInfo = (participant) => {
-    if (participant.vehicles) {
-      return `${participant.vehicles.manufacturer} ${participant.vehicles.model}`;
-    } else if (participant.vehicle_model) {
-      return participant.vehicle_model;
+    const access = await requireViewCompetition(supabase, req.user, competitionId, 'id');
+    if (!access.ok) return access.respond(res);
+
+    const loaded = await loadCompetitionExportById(supabase, competitionId);
+    if (loaded.error) {
+      console.error('export xlsx load:', loaded.error);
+      return res.status(500).json({ error: loaded.error.message || 'Error al cargar datos' });
     }
-    return 'Sin vehículo';
-  };
+    const { competition, payload } = loaded;
 
-  // Crear mapa de participantes para acceso rápido
-  const participantsMap = {};
-  participants.forEach(p => {
-    participantsMap[p.id] = p;
-  });
+    const buf = generateCompetitionXLSX(payload);
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
 
-  // Calcular estadísticas por participante
-  const participantStats = {};
-  participants.forEach(participant => {
-    const participantTimings = timings.filter(t => t.participant_id === participant.id);
-    
-    if (participantTimings.length > 0) {
-      const bestLap = Math.min(...participantTimings.map(t => parseFloat(t.best_lap_time) || Infinity));
-      const totalLaps = participantTimings.reduce((sum, t) => sum + (parseInt(t.laps) || 0), 0);
-      const totalTime = participantTimings.reduce((sum, t) => sum + (parseFloat(t.total_time) || 0), 0);
-      
-      participantStats[participant.id] = {
-        bestLap: bestLap === Infinity ? 0 : bestLap,
-        totalLaps,
-        totalTime,
-        roundsCompleted: participantTimings.length
-      };
-    } else {
-      participantStats[participant.id] = {
-        bestLap: 0,
-        totalLaps: 0,
-        totalTime: 0,
-        roundsCompleted: 0
-      };
-    }
-  });
-
-  // Ordenar participantes por mejor vuelta
-  const sortedParticipants = participants.sort((a, b) => {
-    const aBestLap = participantStats[a.id].bestLap;
-    const bBestLap = participantStats[b.id].bestLap;
-    if (aBestLap === 0 && bBestLap === 0) return 0;
-    if (aBestLap === 0) return 1;
-    if (bBestLap === 0) return -1;
-    return aBestLap - bBestLap;
-  });
-
-  // Generar CSV
-  let csvContent = '';
-
-  // Encabezado de la competición
-  csvContent += `Competición: ${competition.name}\n`;
-  csvContent += `Circuito: ${competition.circuit_name || 'No especificado'}\n`;
-  csvContent += `Rondas: ${competition.rounds}\n`;
-  csvContent += `Participantes: ${participants.length}\n`;
-  csvContent += `Fecha de exportación: ${new Date().toLocaleDateString('es-ES')}\n\n`;
-
-  // Ranking general
-  csvContent += '=== RANKING GENERAL ===\n';
-  csvContent += 'Posición,Piloto,Vehículo,Mejor Vuelta,Vueltas Totales,Tiempo Total,Penalización Total (s),Tiempo Ajustado,Rondas Completadas\n';
-  
-  sortedParticipants.forEach((participant, index) => {
-    const stats = participantStats[participant.id];
-    const participantTimings = timings.filter(t => t.participant_id === participant.id);
-    const totalPenalty = participantTimings.reduce((sum, t) => sum + (Number(t.penalty_seconds) || 0), 0);
-    const adjustedTotal = stats.totalTime + totalPenalty;
-    csvContent += `${index + 1},`;
-    csvContent += `"${participant.driver_name}",`;
-    csvContent += `"${getVehicleInfo(participant)}",`;
-    csvContent += `${formatTime(stats.bestLap)},`;
-    csvContent += `${stats.totalLaps},`;
-    csvContent += `${formatTime(stats.totalTime)},`;
-    csvContent += `${totalPenalty.toFixed(3)},`;
-    csvContent += `${formatTime(adjustedTotal)},`;
-    csvContent += `${stats.roundsCompleted}\n`;
-  });
-
-  csvContent += '\n';
-
-  // Datos por ronda
-  csvContent += '=== DATOS POR RONDA ===\n';
-  csvContent += 'Ronda,Piloto,Vehículo,Mejor Vuelta,Vueltas,Tiempo Total,Penalización (s),Tiempo Ajustado,Tiempo Promedio,Carril\n';
-  
-  for (let round = 1; round <= competition.rounds; round++) {
-    const roundTimings = timings.filter(t => t.round_number === round);
-    
-    roundTimings.forEach(timing => {
-      const participant = participantsMap[timing.participant_id];
-      if (participant) {
-        const penalty = Number(timing.penalty_seconds) || 0;
-        const totalTime = Number(timing.total_time_timestamp) || 0;
-        const adjustedTotal = totalTime + penalty;
-        csvContent += `${round},`;
-        csvContent += `"${participant.driver_name}",`;
-        csvContent += `"${getVehicleInfo(participant)}",`;
-        csvContent += `${formatTime(timing.best_lap_time)},`;
-        csvContent += `${timing.laps},`;
-        csvContent += `${formatTime(totalTime)},`;
-        csvContent += `${penalty.toFixed(3)},`;
-        csvContent += `${formatTime(adjustedTotal)},`;
-        csvContent += `${formatTime(timing.average_time)},`;
-        csvContent += `${timing.lane || ''}\n`;
-      }
-    });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader('Content-Disposition', `attachment; filename=competicion_${base}_${day}.xlsx`);
+    res.send(buf);
+  } catch (error) {
+    console.error('Error en GET /competitions/:id/export/xlsx:', error);
+    res.status(500).json({ error: error.message });
   }
-
-  return csvContent;
-}
+});
 
 // ==================== CATEGORÍAS DE COMPETICIÓN ====================
 

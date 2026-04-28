@@ -2,11 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getAnonClient } = require('../lib/supabaseClients');
 const supabase = getAnonClient();
-const {
-  calculatePoints,
-  lapTimeStringToSeconds,
-  isUsableBestLapTimeString
-} = require('../lib/pointsCalculator');
+const { loadCompetitionExportByPublicSlug } = require('../lib/competitionExportPayload');
+const { generateCompetitionCSV, safeFilenamePart } = require('../lib/competitionCsvGenerator');
+const { generateCompetitionXLSX } = require('../lib/competitionXlsxGenerator');
+const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
 
 /**
  * @swagger
@@ -170,6 +169,99 @@ const {
 // Ruta de prueba simple
 router.get('/test', (req, res) => {
   res.json({ message: 'Ruta pública funcionando correctamente' });
+});
+
+function competitionExportCompleted(payload) {
+  const need = payload.participants.length * payload.competition.rounds;
+  return need > 0 && payload.timings.length >= need;
+}
+
+async function sendPublicExportError(res, err) {
+  const st = err && err.statusCode ? err.statusCode : 500;
+  const msg =
+    err && err.message ? err.message : 'Error interno';
+  return res.status(st).json({ error: msg });
+}
+
+router.get('/:slug/export/csv', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const loaded = await loadCompetitionExportByPublicSlug(supabase, slug);
+    if (loaded.error) {
+      return sendPublicExportError(res, loaded.error);
+    }
+    const { competition, payload } = loaded;
+    if (!competitionExportCompleted(payload)) {
+      return res.status(400).json({
+        error: 'La competición no está finalizada; no hay resultados completos para exportar.',
+      });
+    }
+    const csvData = generateCompetitionCSV(payload);
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=competicion_${base}_${day}.csv`);
+    res.send(csvData);
+  } catch (error) {
+    console.error('GET /public-signup/:slug/export/csv:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/:slug/export/pdf', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const loaded = await loadCompetitionExportByPublicSlug(supabase, slug);
+    if (loaded.error) {
+      return sendPublicExportError(res, loaded.error);
+    }
+    const { competition, payload } = loaded;
+    if (!competitionExportCompleted(payload)) {
+      return res.status(400).json({
+        error: 'La competición no está finalizada; no hay resultados completos para exportar.',
+      });
+    }
+    const pdfBuffer = await generateCompetitionPDF(competition, payload.participants, payload.timings, {
+      sortedParticipants: payload.sortedParticipants,
+      rules: payload.rules,
+    });
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=competicion_${base}_${day}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('GET /public-signup/:slug/export/pdf:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/:slug/export/xlsx', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const loaded = await loadCompetitionExportByPublicSlug(supabase, slug);
+    if (loaded.error) {
+      return sendPublicExportError(res, loaded.error);
+    }
+    const { competition, payload } = loaded;
+    if (!competitionExportCompleted(payload)) {
+      return res.status(400).json({
+        error: 'La competición no está finalizada; no hay resultados completos para exportar.',
+      });
+    }
+    const buf = generateCompetitionXLSX(payload);
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader('Content-Disposition', `attachment; filename=competicion_${base}_${day}.xlsx`);
+    res.send(buf);
+  } catch (error) {
+    console.error('GET /public-signup/:slug/export/xlsx:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Endpoint público para obtener información de competición para inscripción

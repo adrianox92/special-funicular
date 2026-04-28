@@ -1,11 +1,19 @@
-const path = require('path');
-const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const sharp = require('sharp');
 const { modificationLineTotal } = require('../../lib/componentPricing');
-
-const HEADER_LOGO_PATH = path.join(__dirname, '../../assets/logo-header.png');
+const {
+  COLORS,
+  MARGIN,
+  PAGE_WIDTH,
+  CONTENT_WIDTH,
+  HEADER_HEIGHT,
+  drawHeader,
+  drawFooter,
+  drawSectionTitle,
+  drawInfoTable,
+  toDisplayString,
+} = require('./pdfLayoutPrimitives');
 
 /** PDFKit solo incrusta JPEG y PNG; las subidas usan WebP por defecto (processVehicleImageBuffer). */
 function isJpegBuffer(buf) {
@@ -13,23 +21,6 @@ function isJpegBuffer(buf) {
 }
 function isPngBuffer(buf) {
   return buf.length >= 8 && buf[0] === 0x89 && buf.toString('ascii', 1, 4) === 'PNG';
-}
-
-let headerLogoBuffer = false; // false = no cargado aún; Buffer | null tras intento
-function getHeaderLogoBuffer() {
-  if (headerLogoBuffer !== false) return headerLogoBuffer;
-  try {
-    if (fs.existsSync(HEADER_LOGO_PATH)) {
-      const buf = fs.readFileSync(HEADER_LOGO_PATH);
-      headerLogoBuffer =
-        buf.length > 0 && (isPngBuffer(buf) || isJpegBuffer(buf)) ? buf : null;
-    } else {
-      headerLogoBuffer = null;
-    }
-  } catch {
-    headerLogoBuffer = null;
-  }
-  return headerLogoBuffer;
 }
 
 async function bufferForPdfKitImage(buf) {
@@ -41,20 +32,6 @@ async function bufferForPdfKitImage(buf) {
     return null;
   }
 }
-
-// Paleta de colores
-const COLORS = {
-  header: '#1a1a2e',
-  accent: '#e94560',
-  rowAlt: '#f5f5f5',
-  text: '#1a1a2e',
-  textMuted: '#666666',
-  border: '#dddddd',
-};
-
-const MARGIN = 50;
-const PAGE_WIDTH = 595;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
 function formatDistance(meters) {
   if (meters == null || isNaN(meters)) return '-';
@@ -75,89 +52,6 @@ function getComponentShortDescription(component) {
   if (component.size) desc += desc ? `, ${component.size}` : component.size;
   if (component.color) desc += desc ? `, ${component.color}` : component.color;
   return desc || '-';
-}
-
-const HEADER_HEIGHT = 36;
-
-function drawHeader(doc, genDate) {
-  const savedTop = doc.page.margins.top;
-  doc.page.margins.top = 0;
-  doc.save();
-  doc.rect(0, 0, PAGE_WIDTH, HEADER_HEIGHT).fill(COLORS.header);
-  const logo = getHeaderLogoBuffer();
-  const maxW = 128;
-  const maxH = 22;
-  const yImg = (HEADER_HEIGHT - maxH) / 2;
-  let usedLogo = false;
-  if (logo) {
-    try {
-      doc.image(logo, MARGIN, yImg, { fit: [maxW, maxH] });
-      doc.fillColor('white').fontSize(11).font('Helvetica-Bold');
-      doc.text('· Ficha Técnica', MARGIN + maxW + 6, 12, { width: 220, lineBreak: false });
-      usedLogo = true;
-    } catch {
-      usedLogo = false;
-    }
-  }
-  if (!usedLogo) {
-    doc.fillColor('white').fontSize(14).font('Helvetica-Bold');
-    doc.text('Slot Collection Pro · Ficha Técnica', MARGIN, 11, { width: 300, lineBreak: false });
-  }
-  doc.fontSize(10).font('Helvetica');
-  doc.text(`Generado: ${genDate}`, PAGE_WIDTH - MARGIN - 120, 13, { width: 120, align: 'right', lineBreak: false });
-  doc.restore();
-  doc.page.margins.top = savedTop;
-}
-
-function drawFooter(doc, pageNum, totalPages, odometer, genDate) {
-  const PAGE_HEIGHT = 841.89;
-  const footerY = PAGE_HEIGHT - 28;
-  const savedBottom = doc.page.margins.bottom;
-  doc.page.margins.bottom = 0;
-  doc.save();
-  doc.strokeColor(COLORS.border).lineWidth(0.5);
-  doc.moveTo(MARGIN, footerY - 6).lineTo(PAGE_WIDTH - MARGIN, footerY - 6).stroke();
-  doc.fillColor(COLORS.textMuted).fontSize(9).font('Helvetica');
-  doc.text(`Odómetro: ${odometer}`, MARGIN, footerY, { lineBreak: false });
-  doc.text(`Página ${pageNum} de ${totalPages}`, PAGE_WIDTH / 2 - 30, footerY, { width: 60, align: 'center', lineBreak: false });
-  doc.text(genDate, PAGE_WIDTH - MARGIN - 100, footerY, { width: 100, align: 'right', lineBreak: false });
-  doc.restore();
-  doc.page.margins.bottom = savedBottom;
-}
-
-function drawSectionTitle(doc, text) {
-  const y = doc.y;
-  doc.save();
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 24).fill(COLORS.header);
-  doc.fillColor('white').fontSize(12).font('Helvetica-Bold');
-  doc.text(text, MARGIN + 8, y + 6, { width: CONTENT_WIDTH - 16 });
-  doc.restore();
-  doc.y = y + 32;
-}
-
-function toDisplayString(value) {
-  if (value == null || value === '' || value === 'null' || value === 'undefined') return '-';
-  return String(value);
-}
-
-function drawInfoTable(doc, rows) {
-  const col1Width = 140;
-  const col2Width = CONTENT_WIDTH - col1Width;
-  let y = doc.y;
-
-  rows.forEach(([label, value], i) => {
-    const displayValue = toDisplayString(value);
-    const rowHeight = 18;
-    if (i % 2 === 1) {
-      doc.rect(MARGIN, y, CONTENT_WIDTH, rowHeight).fill(COLORS.rowAlt);
-    }
-    doc.fillColor(COLORS.textMuted).fontSize(10).font('Helvetica');
-    doc.text(String(label), MARGIN + 8, y + 4, { width: col1Width - 16 });
-    doc.fillColor(COLORS.text).font('Helvetica');
-    doc.text(displayValue, MARGIN + col1Width + 8, y + 4, { width: col2Width - 16 });
-    y += rowHeight;
-  });
-  doc.y = y + 12;
 }
 
 function drawBadges(doc, vehicle) {
@@ -439,8 +333,8 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
       const totalPages = doc.bufferedPageRange().count;
       for (let i = 0; i < totalPages; i++) {
         doc.switchToPage(i);
-        drawHeader(doc, genDate);
-        drawFooter(doc, i + 1, totalPages, odometer, genDate);
+        drawHeader(doc, genDate, 'Ficha Técnica');
+        drawFooter(doc, i + 1, totalPages, genDate, `Odómetro: ${odometer}`);
       }
 
       doc.end();

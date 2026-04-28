@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Flag, Clock, Check, Download, Tv, Star, Route, AlertTriangle } from 'lucide-react';
+import { Trophy, Users, Flag, Clock, Check, Tv, Star, Route, AlertTriangle, FileSpreadsheet, FileText, Table2 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
@@ -24,6 +24,22 @@ import {
 } from '../components/ui/table';
 import { Spinner } from '../components/ui/spinner';
 import { formatTimeDiff } from '../utils/formatTimeDiff';
+import { toast } from 'sonner';
+
+async function toastBlobError(err, fallback) {
+  try {
+    const data = err.response?.data;
+    if (data instanceof Blob) {
+      const t = await data.text();
+      const j = JSON.parse(t);
+      if (j?.error && typeof j.error === 'string') {
+        toast.error(j.error);
+        return;
+      }
+    }
+  } catch (_) {}
+  toast.error(err.response?.data?.error || fallback);
+}
 
 const CompetitionStatus = () => {
   const { slug } = useParams();
@@ -31,7 +47,6 @@ const CompetitionStatus = () => {
   const [competitionData, setCompetitionData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showPdfModal, setShowPdfModal] = useState(false);
   const [roundDetail, setRoundDetail] = useState(null);
   const [rules, setRules] = useState([]);
 
@@ -83,6 +98,60 @@ const CompetitionStatus = () => {
   };
 
   const handlePresentationMode = () => navigate(`/competitions/presentation/${slug}`);
+
+  const triggerBlobDownload = (data, filename) => {
+    const blob = data instanceof Blob ? data : new Blob([data]);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const response = await axios.get(`/public-signup/${slug}/export/csv`, { responseType: 'blob' });
+      const name =
+        competitionData?.competition?.name?.replace(/[^a-zA-Z0-9]/g, '_') ||
+        slug ||
+        'competicion';
+      triggerBlobDownload(response.data, `competicion_${name}_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (err) {
+      console.error(err);
+      await toastBlobError(err, 'Error al exportar CSV');
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const response = await axios.get(`/public-signup/${slug}/export/pdf`, { responseType: 'blob' });
+      const name =
+        competitionData?.competition?.name?.replace(/[^a-zA-Z0-9]/g, '_') ||
+        slug ||
+        'competicion';
+      triggerBlobDownload(response.data, `competicion_${name}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error(err);
+      await toastBlobError(err, 'Error al exportar PDF');
+    }
+  };
+
+  const handleExportXlsx = async () => {
+    try {
+      const response = await axios.get(`/public-signup/${slug}/export/xlsx`, { responseType: 'blob' });
+      const name =
+        competitionData?.competition?.name?.replace(/[^a-zA-Z0-9]/g, '_') ||
+        slug ||
+        'competicion';
+      triggerBlobDownload(response.data, `competicion_${name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      console.error(err);
+      await toastBlobError(err, 'Error al exportar Excel');
+    }
+  };
 
   const roundTotalAdjustedSeconds = (timing) => {
     const base = timeStringToSeconds(timing.total_time);
@@ -228,10 +297,20 @@ const CompetitionStatus = () => {
               Modo Presentación
             </Button>
             {isCompleted && (
-              <Button variant="outline" size="sm" onClick={() => setShowPdfModal(true)}>
-                <Download className="size-4 mr-1" />
-                Exportar PDF
-              </Button>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={handleExportCsv}>
+                  <FileSpreadsheet className="size-4 mr-1" />
+                  CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportPdf}>
+                  <FileText className="size-4 mr-1" />
+                  PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportXlsx}>
+                  <Table2 className="size-4 mr-1" />
+                  Excel
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -414,20 +493,6 @@ const CompetitionStatus = () => {
           </AlertDescription>
         </Alert>
       )}
-
-      <Dialog open={showPdfModal} onOpenChange={setShowPdfModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Exportar Resultados</DialogTitle>
-            <DialogDescription>
-              Funcionalidad de exportación PDF en desarrollo. Permitirá descargar un reporte completo de la competición.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPdfModal(false)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!roundDetail} onOpenChange={(open) => !open && setRoundDetail(null)}>
         <DialogContent className="max-w-md">

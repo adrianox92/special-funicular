@@ -1,286 +1,227 @@
 const PDFDocument = require('pdfkit');
+const {
+  COLORS,
+  MARGIN,
+  PAGE_WIDTH,
+  PAGE_HEIGHT,
+  CONTENT_WIDTH,
+  HEADER_HEIGHT,
+  drawHeader,
+  drawFooter,
+  drawSectionTitle,
+  drawInfoTable,
+  drawAccentDataTable,
+} = require('./pdfLayoutPrimitives');
+const { isUsableBestLapTimeString, lapTimeStringToSeconds } = require('../../lib/pointsCalculator');
 
-function formatTime(time) {
-  if (!time) return '-';
-  // Si ya está en formato mm:ss.mmm, devolver tal cual
-  if (typeof time === 'string' && time.includes(':')) return time.replace('.', ',');
-  // Si es número de segundos, convertir a mm:ss.mmm
-  const t = typeof time === 'number' ? time : parseFloat(time);
-  if (isNaN(t)) return '-';
+function formatTime(value) {
+  if (value == null || value === '') return '-';
+  if (typeof value === 'string' && value.includes(':')) return value.replace('.', ',');
+  const t = typeof value === 'number' ? value : parseFloat(value);
+  if (Number.isNaN(t)) return '-';
   const minutes = Math.floor(t / 60);
   const seconds = (t % 60).toFixed(3);
   return `${minutes}:${seconds.padStart(6, '0')}`.replace('.', ',');
 }
 
-function getVehicleInfo(participant) {
-  if (participant.vehicles) {
-    return `${participant.vehicles.manufacturer} ${participant.vehicles.model}`;
-  } else if (participant.vehicle_model) {
-    return participant.vehicle_model;
-  }
-  return 'Sin vehículo';
+function formatDiffShort(leaderSec, curSec) {
+  if (leaderSec == null || curSec == null) return '-';
+  const d = curSec - leaderSec;
+  if (d <= 0 || Number.isNaN(d)) return '-';
+  const minutes = Math.floor(d / 60);
+  const sec = (d % 60).toFixed(3);
+  return `+${String(minutes).padStart(2, '0')}:${sec.padStart(6, '0')}`.replace('.', ',');
 }
 
-function drawTableRow(doc, x, y, colWidths, rowData, options = {}) {
-  // Calcula la altura máxima de la fila
-  const heights = rowData.map((cell, i) =>
-    doc.heightOfString(cell, { width: colWidths[i], ...options })
-  );
-  const rowHeight = Math.max(...heights, 16);
-
-  // Escribe cada celda
-  let colX = x;
-  rowData.forEach((cell, i) => {
-    if (options.bold) doc.font('Helvetica-Bold');
-    else doc.font('Helvetica');
-    doc.fontSize(options.fontSize || 9)
-      .text(cell, colX, y, { width: colWidths[i], continued: false });
-    colX += colWidths[i];
-  });
-
-  // Línea inferior (eliminada)
-  // if (options.underline) {
-  //   doc.moveTo(x, y + rowHeight).lineTo(x + colWidths.reduce((a, b) => a + b, 0), y + rowHeight).stroke();
-  // }
-
-  return rowHeight;
+function competitionTitleLeftLine(competitionName) {
+  const n = competitionName ? String(competitionName).slice(0, 80) : 'Competición';
+  return `Resultados - ${n}`;
 }
 
-async function generateCompetitionPDF(competition, participants, timings) {
+/**
+ * @param {object} competition
+ * @param {Array} participants — filas competition_participants (no usado salvo compat; el ranking va en sorted)
+ * @param {Array} timings
+ * @param {object} opts
+ * @param {Array} opts.sortedParticipants — de calculatePoints
+ * @param {Array} [opts.rules]
+ */
+async function generateCompetitionPDF(competition, _participants, timings, opts = {}) {
+  const sortedParticipants = opts.sortedParticipants || [];
+  const rules = opts.rules || [];
+  const hasPoints =
+    rules.length > 0 || sortedParticipants.some((p) => (p.points || 0) > 0);
+  const leaderSec = sortedParticipants[0]?.total_time_seconds ?? null;
+
   return new Promise((resolve, reject) => {
     try {
+      const genDate = new Date().toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
       const doc = new PDFDocument({
         size: 'A4',
-        margin: 50,
-        bufferPages: true
+        margins: { top: HEADER_HEIGHT + 20, bottom: 44, left: MARGIN, right: MARGIN },
+        bufferPages: true,
       });
 
       const chunks = [];
-      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Título principal
-      doc.font('Helvetica-Bold').fontSize(24)
-         .text('Reporte de Competición', { align: 'center' })
-         .moveDown(1.5);
+      doc.fillColor(COLORS.text);
 
-      // Información de la competición en dos columnas, con más espacio vertical
-      doc.font('Helvetica-Bold').fontSize(16).text(competition.name, { align: 'center' });
-      doc.moveDown(1);
-      doc.font('Helvetica').fontSize(12);
-      const infoX = 80;
-      let infoY = doc.y;
-      const labelWidth = 90;
-      const valueX = infoX + labelWidth + 10;
-      const lineHeight = 18;
-      doc.text('Circuito:', infoX, infoY);
-      doc.text(competition.circuit_name || 'No especificado', valueX, infoY);
-      infoY += lineHeight;
-      doc.text('Rondas:', infoX, infoY);
-      doc.text(competition.rounds.toString(), valueX, infoY);
-      infoY += lineHeight;
-      doc.text('Participantes:', infoX, infoY);
-      doc.text(participants.length.toString(), valueX, infoY);
-      infoY += lineHeight;
-      doc.text('Fecha:', infoX, infoY);
-      doc.text(new Date().toLocaleDateString('es-ES'), valueX, infoY);
-      doc.moveDown(4);
+      drawSectionTitle(doc, 'Datos generales');
+      drawInfoTable(doc, [
+        ['Competición', competition.name],
+        ['Circuito', competition.circuit_name || 'No especificado'],
+        ['Rondas', String(competition.rounds)],
+        ['Participantes', String(sortedParticipants.length)],
+      ]);
 
-      // Calcular estadísticas por participante
-      const participantStats = {};
-      participants.forEach(participant => {
-        const participantTimings = timings.filter(t => t.participant_id === participant.id);
-        
-        if (participantTimings.length > 0) {
-          const bestLap = Math.min(...participantTimings.map(t => parseFloat(t.best_lap_time) || Infinity));
-          const totalLaps = participantTimings.reduce((sum, t) => sum + (parseInt(t.laps) || 0), 0);
-          const totalTime = participantTimings.reduce((sum, t) => sum + (parseFloat(t.total_time) || 0), 0);
-          
-          participantStats[participant.id] = {
-            bestLap: bestLap === Infinity ? 0 : bestLap,
-            totalLaps,
-            totalTime,
-            roundsCompleted: participantTimings.length
-          };
-        } else {
-          participantStats[participant.id] = {
-            bestLap: 0,
-            totalLaps: 0,
-            totalTime: 0,
-            roundsCompleted: 0
-          };
-        }
-      });
+      doc.moveDown(0.5);
 
-      // Ordenar participantes por mejor vuelta
-      const sortedParticipants = participants.slice().sort((a, b) => {
-        const aBestLap = participantStats[a.id].bestLap;
-        const bBestLap = participantStats[b.id].bestLap;
-        if (aBestLap === 0 && bBestLap === 0) return 0;
-        if (aBestLap === 0) return 1;
-        if (bBestLap === 0) return -1;
-        return aBestLap - bBestLap;
-      });
+      drawSectionTitle(doc, 'Clasificación general');
 
-      // RANKING GENERAL
-      doc.font('Helvetica-Bold').fontSize(16)
-         .text('RANKING GENERAL', { align: 'center' })
-         .moveDown(0.7);
+      const rankHeaders = hasPoints
+        ? ['Pos.', 'Piloto', 'Vehic.', 'Rond.', 'Mejor', 'Total', 'Pen.', 'Dif.lider', 'Dif.ant.', 'Pts']
+        : ['Pos.', 'Piloto', 'Vehic.', 'Rond.', 'Mejor', 'Total', 'Pen.', 'Dif.lider', 'Dif.ant.'];
 
-      // Tabla de ranking
-      const tableX = 50;
-      let tableY = doc.y;
-      const colWidths = [25, 70, 90, 50, 40, 60, 40];
-      const headers = ['Pos', 'Piloto', 'Vehículo', 'Mejor Vuelta', 'Vueltas', 'Tiempo Total', 'Rondas'];
-      drawTableRow(doc, tableX, tableY, colWidths, headers, { bold: true, fontSize: 8 });
-      tableY += 18;
+      const colWidthsRank = hasPoints
+        ? [34, 86, 86, 32, 48, 48, 38, 52, 52, 32]
+        : [38, 90, 90, 34, 50, 50, 40, 56, 56];
 
-      sortedParticipants.forEach((participant, index) => {
-        if (tableY > 750) {
-          doc.addPage();
-          tableY = 50;
-          drawTableRow(doc, tableX, tableY, colWidths, headers, { bold: true, fontSize: 8 });
-          tableY += 18;
-        }
-        const stats = participantStats[participant.id];
-        const rowData = [
-          `${index + 1}º`,
-          participant.driver_name,
-          getVehicleInfo(participant),
-          formatTime(stats.bestLap),
-          stats.totalLaps.toString(),
-          formatTime(stats.totalTime),
-          stats.roundsCompleted.toString()
+      const rowsRank = sortedParticipants.map((p, index) => {
+        const prev = index > 0 ? sortedParticipants[index - 1] : null;
+        const pen = p.penalty_seconds != null ? Number(p.penalty_seconds).toFixed(1) : '0';
+        const base = [
+          String(p.position),
+          p.driver_name || '-',
+          (p.vehicle_info || '-').slice(0, 42),
+          String(p.rounds_completed),
+          formatTime(p.best_lap_time),
+          p.total_time || '-',
+          pen,
+          formatDiffShort(leaderSec, p.total_time_seconds),
+          prev && prev.total_time_seconds != null && p.total_time_seconds != null
+            ? formatDiffShort(prev.total_time_seconds, p.total_time_seconds)
+            : '-',
         ];
-        const rowHeight = drawTableRow(doc, tableX, tableY, colWidths, rowData, { fontSize: 8 });
-        tableY += rowHeight + 1;
+        if (hasPoints) base.push(String(p.points != null ? p.points : 0));
+        return base;
       });
 
-      doc.moveDown(2);
+      drawAccentDataTable(doc, colWidthsRank, rankHeaders, rowsRank, {
+        fontSize: 8,
+        minYForNewPage: 100,
+        headerRowHeight: 28,
+      });
 
-      // DATOS POR RONDA
       doc.addPage();
-      doc.font('Helvetica-Bold').fontSize(16)
-         .text('DATOS POR RONDA', { align: 'center' })
-         .moveDown(0.7);
+
+      drawSectionTitle(doc, 'Datos por ronda');
 
       for (let round = 1; round <= competition.rounds; round++) {
-        if (doc.y > 650) {
-          doc.addPage();
-          doc.font('Helvetica-Bold').fontSize(16).text('DATOS POR RONDA (continuación)', { align: 'center' }).moveDown(0.7);
+        let roundTimings = timings.filter((t) => t.round_number === round);
+        roundTimings = roundTimings.slice().sort((a, b) => {
+          const ae = lapTimeStringToSeconds(a.best_lap_time);
+          const be = lapTimeStringToSeconds(b.best_lap_time);
+          if (ae == null && be == null) return 0;
+          if (ae == null) return 1;
+          if (be == null) return -1;
+          return ae - be;
+        });
+
+        doc.fillColor(COLORS.text).fontSize(11).font('Helvetica-Bold');
+        doc.text(`Ronda ${round}`, MARGIN, doc.y, { width: CONTENT_WIDTH });
+        doc.moveDown(0.4);
+        doc.font('Helvetica');
+
+        if (roundTimings.length === 0) {
+          doc.fillColor(COLORS.textMuted).fontSize(10);
+          doc.text('Sin tiempos registrados en esta ronda.', MARGIN, doc.y);
+          doc.moveDown(1.2);
+          continue;
         }
-        doc.font('Helvetica-Bold').fontSize(12)
-           .text(`Ronda ${round}`, { align: 'center' })
-           .moveDown(0.3);
 
-        const roundTimings = timings.filter(t => t.round_number === round);
-        if (roundTimings.length > 0) {
-          const roundColWidths = [70, 90, 50, 40, 60, 60, 30];
-          const roundHeaders = ['Piloto', 'Vehículo', 'Mejor Vuelta', 'Vueltas', 'Tiempo Total', 'Tiempo Prom.', 'Carril'];
-          let roundY = doc.y;
-          drawTableRow(doc, tableX, roundY, roundColWidths, roundHeaders, { bold: true, fontSize: 8 });
-          roundY += 16;
+        const hRound = ['Piloto', 'Vehic.', 'NP', 'Mejor', 'Vueltas', 'Total', 'Pen.', 'Carril'];
+        const wRound = [100, 120, 28, 48, 32, 48, 32, 32];
+        const rowsR = roundTimings.map((timing) => {
+          const sp = sortedParticipants.find((x) => x.participant_id === timing.participant_id);
+          return [
+            sp ? sp.driver_name : '-',
+            sp ? String(sp.vehicle_info || '-').slice(0, 36) : '-',
+            timing.did_not_participate ? 'Sí' : 'No',
+            formatTime(timing.best_lap_time),
+            String(timing.laps != null ? timing.laps : ''),
+            formatTime(timing.total_time),
+            Number(timing.penalty_seconds) ? Number(timing.penalty_seconds).toFixed(1) : '0',
+            timing.lane || '-',
+          ];
+        });
 
-          // Ordenar tiempos de la ronda por mejor vuelta
-          const sortedRoundTimings = roundTimings.slice().sort((a, b) => {
-            const aBestLap = parseFloat(a.best_lap_time) || Infinity;
-            const bBestLap = parseFloat(b.best_lap_time) || Infinity;
-            return aBestLap - bBestLap;
-          });
-
-          sortedRoundTimings.forEach((timing) => {
-            if (roundY > 750) {
-              doc.addPage();
-              roundY = 50;
-              drawTableRow(doc, tableX, roundY, roundColWidths, roundHeaders, { bold: true, fontSize: 8 });
-              roundY += 16;
-            }
-            const participant = participants.find(p => p.id === timing.participant_id);
-            if (participant) {
-              const rowData = [
-                participant.driver_name,
-                getVehicleInfo(participant),
-                formatTime(timing.best_lap_time),
-                timing.laps.toString(),
-                formatTime(timing.total_time),
-                formatTime(timing.average_time),
-                timing.lane || '-'
-              ];
-              const rowHeight = drawTableRow(doc, tableX, roundY, roundColWidths, rowData, { fontSize: 8 });
-              roundY += rowHeight + 1;
-            }
-          });
-          doc.y = roundY + 8;
-        } else {
-          doc.font('Helvetica').fontSize(11)
-             .text('No hay datos registrados para esta ronda', { align: 'center' });
-          doc.moveDown(1);
-        }
+        drawAccentDataTable(doc, wRound, hRound, rowsR, {
+          fontSize: 8,
+          minYForNewPage: 110,
+          headerRowHeight: 26,
+        });
+        doc.moveDown(0.3);
       }
 
-      // ESTADÍSTICAS ADICIONALES
       doc.addPage();
-      doc.font('Helvetica-Bold').fontSize(16)
-         .text('ESTADÍSTICAS ADICIONALES', { align: 'center' })
-         .moveDown(0.7);
+      drawSectionTitle(doc, 'Estadísticas');
 
-      // Mejor vuelta de la competición
-      const allBestLaps = timings
-        .map(t => parseFloat(t.best_lap_time))
-        .filter(t => !isNaN(t) && t > 0);
-      
-      if (allBestLaps.length > 0) {
-        const overallBestLap = Math.min(...allBestLaps);
-        const bestLapTiming = timings.find(t => parseFloat(t.best_lap_time) === overallBestLap);
-        const bestLapParticipant = participants.find(p => p.id === bestLapTiming.participant_id);
+      const allBest = timings
+        .filter((t) => !t.did_not_participate && isUsableBestLapTimeString(t.best_lap_time))
+        .map((t) => ({ t, sec: lapTimeStringToSeconds(t.best_lap_time) }))
+        .filter((x) => x.sec != null);
 
-        doc.font('Helvetica-Bold').fontSize(12)
-           .text('Mejor Vuelta de la Competición', { align: 'left' })
-           .moveDown(0.3);
-
-        doc.font('Helvetica').fontSize(11);
-        doc.text(`Piloto: ${bestLapParticipant.driver_name}`);
-        doc.text(`Vehículo: ${getVehicleInfo(bestLapParticipant)}`);
-        doc.text(`Tiempo: ${formatTime(overallBestLap)}`);
-        doc.text(`Ronda: ${bestLapTiming.round_number}`);
-        doc.text(`Carril: ${bestLapTiming.lane || 'No especificado'}`);
-        doc.moveDown(1);
+      if (allBest.length > 0) {
+        const best = allBest.reduce((a, b) => (a.sec <= b.sec ? a : b));
+        const sp = sortedParticipants.find((x) => x.participant_id === best.t.participant_id);
+        doc.fillColor(COLORS.text).fontSize(11).font('Helvetica-Bold');
+        doc.text('Mejor vuelta de la competición', MARGIN, doc.y);
+        doc.moveDown(0.3);
+        doc.font('Helvetica').fontSize(10);
+        doc.text(`Piloto: ${sp ? sp.driver_name : '-'}`);
+        doc.text(`Tiempo: ${formatTime(best.t.best_lap_time)}`);
+        doc.text(`Ronda: ${best.t.round_number}`);
+        doc.moveDown(0.8);
       }
 
-      // Participante con más vueltas
-      const participantWithMostLaps = sortedParticipants.reduce((max, participant) => {
-        const stats = participantStats[participant.id];
-        const maxStats = participantStats[max.id];
-        return stats.totalLaps > maxStats.totalLaps ? participant : max;
-      });
-      const mostLapsStats = participantStats[participantWithMostLaps.id];
+      const mostLaps = sortedParticipants.slice().sort((a, b) => (b.total_laps || 0) - (a.total_laps || 0))[0];
+      if (mostLaps && (mostLaps.total_laps || 0) > 0) {
+        doc.font('Helvetica-Bold').fontSize(11).fillColor(COLORS.text);
+        doc.text('Más vueltas completadas', MARGIN, doc.y);
+        doc.moveDown(0.3);
+        doc.font('Helvetica').fontSize(10);
+        doc.text(`Piloto: ${mostLaps.driver_name}`);
+        doc.text(`Vueltas totales: ${mostLaps.total_laps}`);
+        doc.moveDown(0.8);
+      }
 
-      doc.font('Helvetica-Bold').fontSize(12)
-         .text('Más Vueltas Completadas', { align: 'left' })
-         .moveDown(0.3);
-      doc.font('Helvetica').fontSize(11);
-      doc.text(`Piloto: ${participantWithMostLaps.driver_name}`);
-      doc.text(`Vehículo: ${getVehicleInfo(participantWithMostLaps)}`);
-      doc.text(`Vueltas totales: ${mostLapsStats.totalLaps}`);
-      doc.text(`Rondas completadas: ${mostLapsStats.roundsCompleted}`);
-      doc.moveDown(1);
+      const mostRounds = sortedParticipants.slice().sort((a, b) => (b.rounds_completed || 0) - (a.rounds_completed || 0))[0];
+      if (mostRounds) {
+        doc.font('Helvetica-Bold').fontSize(11);
+        doc.text('Más rondas registradas', MARGIN, doc.y);
+        doc.moveDown(0.3);
+        doc.font('Helvetica').fontSize(10);
+        doc.text(`Piloto: ${mostRounds.driver_name}`);
+        doc.text(`Rondas: ${mostRounds.rounds_completed} / ${competition.rounds}`);
+      }
 
-      // Participante con más rondas completadas
-      const participantWithMostRounds = sortedParticipants.reduce((max, participant) => {
-        const stats = participantStats[participant.id];
-        const maxStats = participantStats[max.id];
-        return stats.roundsCompleted > maxStats.roundsCompleted ? participant : max;
-      });
-      const mostRoundsStats = participantStats[participantWithMostRounds.id];
-
-      doc.font('Helvetica-Bold').fontSize(12)
-         .text('Más Rondas Completadas', { align: 'left' })
-         .moveDown(0.3);
-      doc.font('Helvetica').fontSize(11);
-      doc.text(`Piloto: ${participantWithMostRounds.driver_name}`);
-      doc.text(`Vehículo: ${getVehicleInfo(participantWithMostRounds)}`);
-      doc.text(`Rondas completadas: ${mostRoundsStats.roundsCompleted}/${competition.rounds}`);
+      const totalPages = doc.bufferedPageRange().count;
+      const leftFoot = competitionTitleLeftLine(competition.name);
+      for (let i = 0; i < totalPages; i++) {
+        doc.switchToPage(i);
+        drawHeader(doc, genDate, 'Resultados de competición');
+        drawFooter(doc, i + 1, totalPages, genDate, leftFoot);
+      }
 
       doc.end();
     } catch (error) {
@@ -290,4 +231,4 @@ async function generateCompetitionPDF(competition, participants, timings) {
   });
 }
 
-module.exports = { generateCompetitionPDF }; 
+module.exports = { generateCompetitionPDF };
