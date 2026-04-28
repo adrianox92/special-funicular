@@ -2003,10 +2003,9 @@ const EditVehicle = () => {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Código QR — ficha técnica (público)</DialogTitle>
+            <DialogTitle>Código QR — ficha técnica</DialogTitle>
             <DialogDescription>
-              Al escanearlo se abre el PDF de la ficha técnica con los datos actuales del vehículo. Descarga el PNG
-              (512×512 px) para imprimirlo o usarlo donde quieras.
+            Pégalo en la urna y consulta sus características al instante. Descarga el PNG (512×512 px) para imprimirlo.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-3 py-2">

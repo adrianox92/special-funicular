@@ -36,6 +36,7 @@ import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
 import Changelog from './pages/Changelog';
 import AdminChangelog from './pages/AdminChangelog';
+import AdminPlatformDashboard from './pages/AdminPlatformDashboard';
 import SellerDashboard from './pages/SellerDashboard';
 import PublicCatalogList from './pages/PublicCatalogList';
 import PublicCatalogEntry from './pages/PublicCatalogEntry';
@@ -314,6 +315,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <AdminChangelog />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/dashboard"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <AdminPlatformDashboard />
               </AuthedShell>
             </PrivateRoute>
           }

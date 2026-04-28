@@ -55,6 +55,7 @@ export function getDocumentTitle(pathname) {
   if (p === '/admin/slot-race-licenses') return withBrand('Admin licencias SRM');
   if (p === '/admin/slot-catalog') return withBrand('Catálogo slot (admin)');
   if (p === '/admin/changelog') return withBrand('Changelog (admin)');
+  if (p === '/admin/dashboard') return withBrand('Métricas de plataforma (admin)');
   if (p === '/changelog') return withBrand('Novedades');
 
   if (p === '/privacidad') return withBrand('Política de privacidad');
