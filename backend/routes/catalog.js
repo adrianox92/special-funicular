@@ -125,6 +125,36 @@ function parseOptionalBoolFromImportCell(raw) {
   return false;
 }
 
+function normCatalogDorsal(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim();
+  return s === '' ? null : s;
+}
+
+function parseCatalogLimitedEditionTotal(raw) {
+  if (raw == null || raw === '') return null;
+  const n = parseInt(String(raw).trim(), 10);
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+/** Primer valor no vacío de la fila de importación por lista de nombres de columna posibles. */
+function catalogImportPick(row, aliases) {
+  for (const name of aliases) {
+    if (!Object.prototype.hasOwnProperty.call(row, name)) continue;
+    const v = row[name];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+  }
+  const lowerMap = new Map();
+  for (const k of Object.keys(row)) {
+    lowerMap.set(String(k).trim().toLowerCase(), row[k]);
+  }
+  for (const name of aliases) {
+    const v = lowerMap.get(String(name).trim().toLowerCase());
+    if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+  }
+  return undefined;
+}
+
 function adminGuard(req, res, next) {
   if (!assertLicenseAdmin(req, res)) return;
   next();
@@ -150,6 +180,11 @@ function catalogYearPresent(y) {
   return Number.isFinite(n) && n >= 1900 && n <= 2100;
 }
 
+function catalogDorsalPresent(d) {
+  if (d == null || d === '') return false;
+  return String(d).trim() !== '';
+}
+
 function catalogCompletenessFilled(row) {
   return {
     model_name: row.model_name != null && String(row.model_name).trim() !== '',
@@ -171,6 +206,7 @@ function computeCatalogDashboardStats(rows) {
   let withoutTraction = 0;
   let withoutMotor = 0;
   let withoutYear = 0;
+  let withoutDorsal = 0;
 
   for (const row of rows) {
     const f = catalogCompletenessFilled(row);
@@ -196,6 +232,7 @@ function computeCatalogDashboardStats(rows) {
     if (!f.traction) withoutTraction += 1;
     if (!f.motor_position) withoutMotor += 1;
     if (!catalogYearPresent(row.commercial_release_year)) withoutYear += 1;
+    if (!catalogDorsalPresent(row.dorsal)) withoutDorsal += 1;
   }
 
   const pctRatio = (num, den) => (den > 0 ? Math.round((num / den) * 10000) / 100 : 0);
@@ -211,6 +248,7 @@ function computeCatalogDashboardStats(rows) {
       withoutTraction,
       withoutMotor,
       withoutYear,
+      withoutDorsal,
     },
     weights: {
       ...CATALOG_COMPLETENESS_WEIGHTS,
@@ -226,7 +264,7 @@ async function fetchAllSlotCatalogRowsForStats() {
   for (;;) {
     const { data, error } = await supabase
       .from('slot_catalog_items')
-      .select('model_name, vehicle_type, traction, motor_position, image_url, commercial_release_year')
+      .select('model_name, vehicle_type, traction, motor_position, image_url, commercial_release_year, dorsal')
       .order('id', { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw new Error(error.message);
@@ -380,6 +418,42 @@ function computeCatalogChangeFieldDiffs(item, patch, brandNameById) {
     });
   }
 
+  const curDorsal = item ? normOptionalStr(item.dorsal) : null;
+  const propDorsal = normOptionalStr(patch.dorsal);
+  if (item && curDorsal !== propDorsal) {
+    changes.push({
+      field: 'dorsal',
+      label: 'Dorsal',
+      before: curDorsal ?? '—',
+      after: propDorsal ?? '—',
+    });
+  }
+
+  const curLe = item ? Boolean(item.limited_edition) : null;
+  const propLe = Boolean(patch.limited_edition);
+  if (item && curLe !== propLe) {
+    changes.push({
+      field: 'limited_edition',
+      label: 'Edición limitada',
+      before: curLe ? 'Sí' : 'No',
+      after: propLe ? 'Sí' : 'No',
+    });
+  }
+
+  const curLt = item && item.limited_edition_total != null ? Number(item.limited_edition_total) : null;
+  const propLt =
+    patch.limited_edition_total !== undefined && patch.limited_edition_total !== null && patch.limited_edition_total !== ''
+      ? parseCatalogLimitedEditionTotal(patch.limited_edition_total)
+      : null;
+  if (item && curLt !== propLt) {
+    changes.push({
+      field: 'limited_edition_total',
+      label: 'Tirada (ed. limitada)',
+      before: curLt != null ? String(curLt) : '—',
+      after: propLt != null ? String(propLt) : '—',
+    });
+  }
+
   const curImg = item ? normOptionalStr(item.image_url) : null;
   const propImg = normOptionalStr(patch.image_url);
   if (item && curImg !== propImg) {
@@ -450,6 +524,27 @@ function proposedPatchToFallbackDiffs(patch, brandNameById) {
       after: patch.upcoming_release ? 'Sí' : 'No',
     });
   }
+  const d0 = normOptionalStr(patch.dorsal);
+  if (d0) {
+    changes.push({ field: 'dorsal', label: 'Dorsal', before: '—', after: d0 });
+  }
+  if (patch.limited_edition !== undefined) {
+    changes.push({
+      field: 'limited_edition',
+      label: 'Edición limitada',
+      before: '—',
+      after: patch.limited_edition ? 'Sí' : 'No',
+    });
+  }
+  const lt0 = parseCatalogLimitedEditionTotal(patch.limited_edition_total);
+  if (lt0 != null) {
+    changes.push({
+      field: 'limited_edition_total',
+      label: 'Tirada (ed. limitada)',
+      before: '—',
+      after: String(lt0),
+    });
+  }
   const img = normOptionalStr(patch.image_url);
   if (img) {
     changes.push({
@@ -464,7 +559,7 @@ function proposedPatchToFallbackDiffs(patch, brandNameById) {
 }
 
 const CATALOG_ITEM_SUMMARY_SELECT =
-  'id, reference, manufacturer_id, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, image_url';
+  'id, reference, manufacturer_id, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, image_url';
 
 async function fetchChangeRequestCatalogItemsById(rows) {
   const itemIds = [...new Set(rows.map((r) => r.catalog_item_id).filter(Boolean))];
@@ -593,7 +688,7 @@ router.get('/search', async (req, res) => {
     }
     const pattern = `%${escapeIlikePattern(q)}%`;
     const sel =
-      'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, image_url';
+      'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, image_url';
     const [r1, r2, r3, r4] = await Promise.all([
       supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('reference', pattern).limit(20),
       supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('manufacturer', pattern).limit(20),
@@ -631,7 +726,7 @@ router.get('/my-requests', async (req, res) => {
       supabase
         .from('slot_catalog_insert_requests')
         .select(
-          'id, proposed_reference, proposed_manufacturer_id, proposed_model_name, proposed_vehicle_type, proposed_traction, proposed_motor_position, proposed_commercial_release_year, proposed_discontinued, proposed_upcoming_release, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
+          'id, proposed_reference, proposed_manufacturer_id, proposed_model_name, proposed_vehicle_type, proposed_traction, proposed_motor_position, proposed_commercial_release_year, proposed_discontinued, proposed_upcoming_release, proposed_dorsal, proposed_limited_edition, proposed_limited_edition_total, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
         )
         .eq('submitted_by', uid)
         .order('created_at', { ascending: false })
@@ -793,6 +888,8 @@ router.get('/items', adminGuard, async (req, res) => {
       q = q.or(
         'commercial_release_year.is.null,commercial_release_year.lt.1900,commercial_release_year.gt.2100',
       );
+    } else if (missing === 'dorsal') {
+      q = q.or('dorsal.is.null,dorsal.eq.');
     }
     q = q.order('reference', { ascending: true }).range(from, to);
 
@@ -843,6 +940,10 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
     );
     const discontinued = parseBodyBool(req.body.discontinued);
     const upcoming_release = parseBodyBool(req.body.upcoming_release);
+    const dorsal = normCatalogDorsal(req.body.dorsal);
+    let limited_edition = parseBodyBool(req.body.limited_edition);
+    let limited_edition_total = parseCatalogLimitedEditionTotal(req.body.limited_edition_total);
+    if (!limited_edition) limited_edition_total = null;
 
     if (!reference || !manufacturer_id || !model_name) {
       return res.status(400).json({
@@ -873,6 +974,9 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
           commercial_release_year,
           discontinued,
           upcoming_release,
+          dorsal,
+          limited_edition,
+          limited_edition_total,
           image_url,
           updated_at: new Date().toISOString(),
         },
@@ -932,6 +1036,17 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
       req.body.upcoming_release !== undefined
         ? parseBodyBool(req.body.upcoming_release)
         : Boolean(existing.upcoming_release);
+    const dorsal =
+      req.body.dorsal !== undefined ? normCatalogDorsal(req.body.dorsal) : normCatalogDorsal(existing.dorsal);
+    let limited_edition =
+      req.body.limited_edition !== undefined
+        ? parseBodyBool(req.body.limited_edition)
+        : Boolean(existing.limited_edition);
+    let limited_edition_total =
+      req.body.limited_edition_total !== undefined
+        ? parseCatalogLimitedEditionTotal(req.body.limited_edition_total)
+        : parseCatalogLimitedEditionTotal(existing.limited_edition_total);
+    if (!limited_edition) limited_edition_total = null;
 
     let image_url = existing.image_url;
     const img = req.files?.image?.[0];
@@ -962,6 +1077,9 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
         commercial_release_year,
         discontinued,
         upcoming_release,
+        dorsal,
+        limited_edition,
+        limited_edition_total,
         image_url,
         updated_at: new Date().toISOString(),
       })
@@ -1045,6 +1163,24 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
         req.body.upcoming_release !== undefined
           ? parseBodyBool(req.body.upcoming_release)
           : Boolean(item.upcoming_release),
+      dorsal:
+        req.body.dorsal !== undefined ? normCatalogDorsal(req.body.dorsal) : normCatalogDorsal(item.dorsal),
+      limited_edition:
+        req.body.limited_edition !== undefined
+          ? parseBodyBool(req.body.limited_edition)
+          : Boolean(item.limited_edition),
+      limited_edition_total: (() => {
+        let le =
+          req.body.limited_edition !== undefined
+            ? parseBodyBool(req.body.limited_edition)
+            : Boolean(item.limited_edition);
+        let lt =
+          req.body.limited_edition_total !== undefined
+            ? parseCatalogLimitedEditionTotal(req.body.limited_edition_total)
+            : parseCatalogLimitedEditionTotal(item.limited_edition_total);
+        if (!le) lt = null;
+        return lt;
+      })(),
       image_url: item.image_url,
     };
 
@@ -1152,6 +1288,18 @@ router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) 
         discontinued: patch.discontinued !== undefined ? Boolean(patch.discontinued) : Boolean(item.discontinued),
         upcoming_release:
           patch.upcoming_release !== undefined ? Boolean(patch.upcoming_release) : Boolean(item.upcoming_release),
+        dorsal: patch.dorsal !== undefined ? normCatalogDorsal(patch.dorsal) : normCatalogDorsal(item.dorsal),
+        limited_edition:
+          patch.limited_edition !== undefined ? Boolean(patch.limited_edition) : Boolean(item.limited_edition),
+        limited_edition_total: (() => {
+          const le =
+            patch.limited_edition !== undefined ? Boolean(patch.limited_edition) : Boolean(item.limited_edition);
+          const lt =
+            patch.limited_edition_total !== undefined
+              ? parseCatalogLimitedEditionTotal(patch.limited_edition_total)
+              : parseCatalogLimitedEditionTotal(item.limited_edition_total);
+          return le ? lt : null;
+        })(),
         image_url: patch.image_url ?? null,
         updated_at: new Date().toISOString(),
       })
@@ -1243,6 +1391,14 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
     const proposed_upcoming_release = parseBodyBool(
       req.body.proposed_upcoming_release ?? req.body.upcoming_release,
     );
+    const proposed_dorsal = normCatalogDorsal(req.body.proposed_dorsal ?? req.body.dorsal);
+    let proposed_limited_edition = parseBodyBool(
+      req.body.proposed_limited_edition ?? req.body.limited_edition,
+    );
+    let proposed_limited_edition_total = parseCatalogLimitedEditionTotal(
+      req.body.proposed_limited_edition_total ?? req.body.limited_edition_total,
+    );
+    if (!proposed_limited_edition) proposed_limited_edition_total = null;
 
     if (!proposed_reference || !proposed_manufacturer_id || !proposed_model_name) {
       return res.status(400).json({
@@ -1285,6 +1441,9 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
           proposed_commercial_release_year,
           proposed_discontinued,
           proposed_upcoming_release,
+          proposed_dorsal,
+          proposed_limited_edition,
+          proposed_limited_edition_total,
           proposed_image_url,
           submitted_by: req.user.id,
           status: 'pending',
@@ -1358,6 +1517,13 @@ router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) 
           commercial_release_year: row.proposed_commercial_release_year ?? null,
           discontinued: Boolean(row.proposed_discontinued),
           upcoming_release: Boolean(row.proposed_upcoming_release),
+          dorsal: normCatalogDorsal(row.proposed_dorsal),
+          limited_edition: Boolean(row.proposed_limited_edition),
+          limited_edition_total: (() => {
+            const le = Boolean(row.proposed_limited_edition);
+            const lt = parseCatalogLimitedEditionTotal(row.proposed_limited_edition_total);
+            return le ? lt : null;
+          })(),
           image_url: row.proposed_image_url,
           updated_at: new Date().toISOString(),
         },
@@ -1467,6 +1633,25 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
     const upcoming_release = parseOptionalBoolFromImportCell(
       r.upcoming_release ?? r.proximo_lanzamiento ?? r['próximo_lanzamiento'] ?? r.próximo_lanzamiento ?? '',
     );
+    const dorsal = normCatalogDorsal(
+      catalogImportPick(r, ['dorsal', 'numero_dorsal', 'nº_dorsal', 'Numero dorsal', 'Dorsal']),
+    );
+    const leRaw = catalogImportPick(r, [
+      'limited_edition',
+      'edicion_limitada',
+      'edición_limitada',
+      'Edición limitada',
+      'Edicion limitada',
+    ]);
+    let limited_edition = leRaw !== undefined ? parseOptionalBoolFromImportCell(leRaw) : false;
+    const ltRaw = catalogImportPick(r, [
+      'limited_edition_total',
+      'tirada',
+      'unidades_comercializadas',
+      'Unidades comercializadas',
+      'tirada_total',
+    ]);
+    let limited_edition_total = limited_edition ? parseCatalogLimitedEditionTotal(ltRaw) : null;
 
     if (!ref || !manufacturerRaw || !model_name) {
       errors.push({ row: rowNum, message: 'Faltan reference, manufacturer o model_name' });
@@ -1512,6 +1697,9 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
           commercial_release_year,
           discontinued,
           upcoming_release,
+          dorsal,
+          limited_edition,
+          limited_edition_total,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
@@ -1534,6 +1722,9 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
           commercial_release_year,
           discontinued,
           upcoming_release,
+          dorsal,
+          limited_edition,
+          limited_edition_total,
           updated_at: new Date().toISOString(),
         },
       ])

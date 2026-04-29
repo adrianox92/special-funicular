@@ -24,6 +24,7 @@ import {
   DialogContent,
 } from './ui/dialog';
 import { Switch } from './ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -34,6 +35,15 @@ const imageFields = [
   { name: 'chassis', label: 'Chasis' },
   { name: 'three_quarters', label: 'Vista 3/4' },
 ];
+
+function ReadOnlyField({ name, label, type, value }) {
+  return (
+    <div className="space-y-2 min-w-0">
+      <Label>{label}</Label>
+      <Input name={name} type={type || 'text'} value={value ?? ''} disabled readOnly className="bg-muted/40" />
+    </div>
+  );
+}
 
 const VehicleDetail = () => {
   const { id } = useParams();
@@ -105,6 +115,9 @@ const VehicleDetail = () => {
   if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;
   if (!vehicle) return null;
 
+  const hasDorsal = vehicle.dorsal != null && String(vehicle.dorsal).trim() !== '';
+  const showCompetitionSection = hasDorsal || !!vehicle.limited_edition;
+
   return (
     <>
       <AlertDialog open={!!deleteImageConfirm} onOpenChange={(open) => !open && setDeleteImageConfirm(null)}>
@@ -137,97 +150,180 @@ const VehicleDetail = () => {
       </Dialog>
 
       <div className="space-y-6 mt-6">
-      <h2 className="text-2xl font-bold">Detalle Vehículo</h2>
+      <h2 className="text-2xl font-bold tracking-tight">Detalle del vehículo</h2>
+      <p className="text-sm text-muted-foreground -mt-4">Información general</p>
       <form className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            {[
-              { name: 'model', label: 'Modelo', value: vehicle.model },
-              { name: 'reference', label: 'Referencia', value: vehicle.reference },
-              { name: 'manufacturer', label: 'Fabricante', value: vehicle.manufacturer },
-              { name: 'traction', label: 'Tracción', value: vehicle.traction },
-              {
-                name: 'motor_position',
-                label: 'Posición del motor',
-                value: labelMotorPosition(vehicle.motor_position),
-              },
-              { name: 'price', label: 'Precio original (€)', type: 'number', value: vehicle.price },
-              { name: 'total_price', label: 'Precio actual (€)', type: 'number', value: vehicle.total_price },
-              { name: 'purchase_date', label: 'Fecha de compra', type: 'date', value: vehicle.purchase_date?.substring(0, 10) },
-              { name: 'purchase_place', label: 'Lugar de compra', value: vehicle.purchase_place },
-            ].map(({ name, label, type, value }) => (
-              <div key={name} className="space-y-2">
-                <Label>{label}</Label>
-                <Input name={name} type={type || 'text'} value={value ?? ''} disabled readOnly />
-              </div>
-            ))}
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Input value={vehicle.type ?? ''} disabled readOnly />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <Switch checked={!!vehicle.modified} disabled />
-                <Label>Modificado</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={!!vehicle.digital} disabled />
-                <Label>Digital</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={!!vehicle.museo} disabled />
-                <Label>Museo</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={!!vehicle.taller} disabled />
-                <Label>Taller</Label>
-              </div>
-            </div>
-            {vehicle.anotaciones != null && vehicle.anotaciones !== '' && String(vehicle.anotaciones) !== 'null' && (
-              <div className="space-y-2">
-                <Label>Anotaciones</Label>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap rounded-md border border-input bg-muted/30 p-3">{vehicle.anotaciones}</p>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
+          <div className="space-y-6 min-w-0 order-2 lg:order-1">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Identificación</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ReadOnlyField name="model" label="Modelo" value={vehicle.model} />
+                <ReadOnlyField name="reference" label="Referencia" value={vehicle.reference} />
+                <ReadOnlyField name="manufacturer" label="Fabricante" value={vehicle.manufacturer} />
+                <ReadOnlyField name="type" label="Tipo" value={vehicle.type} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Datos técnicos</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ReadOnlyField name="traction" label="Tracción" value={vehicle.traction} />
+                <ReadOnlyField
+                  name="motor_position"
+                  label="Posición del motor"
+                  value={labelMotorPosition(vehicle.motor_position)}
+                />
+              </CardContent>
+            </Card>
+
+            {showCompetitionSection && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Competición y edición limitada</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {hasDorsal && <ReadOnlyField name="dorsal" label="Dorsal" value={vehicle.dorsal} />}
+                  {vehicle.limited_edition && (
+                    <div className="space-y-2">
+                      <Label>Edición limitada</Label>
+                      <div className="rounded-md border bg-muted/30 px-3 py-2.5 text-sm space-y-1">
+                        <p className="font-medium text-foreground">Ejemplar en edición limitada</p>
+                        {vehicle.limited_edition_unit_number != null &&
+                          vehicle.limited_edition_unit_number !== '' && (
+                            <p className="text-muted-foreground">
+                              Unidad n.º <span className="text-foreground tabular-nums">{vehicle.limited_edition_unit_number}</span>
+                            </p>
+                          )}
+                        {vehicle.catalog_item?.limited_edition_total != null && (
+                          <p className="text-muted-foreground">
+                            Tirada en catálogo:{' '}
+                            <span className="text-foreground tabular-nums">
+                              {vehicle.catalog_item.limited_edition_total}
+                            </span>{' '}
+                            unidades
+                          </p>
+                        )}
+                        {!(
+                          (vehicle.limited_edition_unit_number != null &&
+                            vehicle.limited_edition_unit_number !== '') ||
+                          vehicle.catalog_item?.limited_edition_total != null
+                        ) && <p className="text-muted-foreground">Sin número de unidad ni tirada en catálogo.</p>}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
-          </div>
-          <div>
-            <h5 className="font-semibold mb-4">Fotografías</h5>
-            <div className="grid grid-cols-2 gap-4">
-              {imageFields.map(({ name, label }) => (
-                <div key={name} className="space-y-2">
-                  <Label>{label} Imagen</Label>
-                  <div className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 relative min-h-[120px] bg-muted/30">
-                    {images[name] ? (
-                      <>
-                        <img
-                          src={images[name]}
-                          alt={label}
-                          className="max-w-full max-h-[90px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={(e) => { e.stopPropagation(); setLightboxImage({ url: images[name], label }); }}
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-8 w-8"
-                          onClick={(e) => { e.preventDefault(); handleDeleteImage(name); }}
-                          disabled={deletingImage === name}
-                        >
-                          {deletingImage === name ? <Spinner className="size-4" /> : '×'}
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Sin imagen</span>
-                    )}
-                  </div>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Compra y precios</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ReadOnlyField name="price" label="Precio original (€)" type="number" value={vehicle.price} />
+                <ReadOnlyField name="total_price" label="Precio actual (€)" type="number" value={vehicle.total_price} />
+                <ReadOnlyField
+                  name="purchase_date"
+                  label="Fecha de compra"
+                  type="date"
+                  value={vehicle.purchase_date?.substring(0, 10)}
+                />
+                <ReadOnlyField name="purchase_place" label="Lugar de compra" value={vehicle.purchase_place} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Estado del ejemplar</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                  {[
+                    ['modified', vehicle.modified, 'Modificado'],
+                    ['digital', vehicle.digital, 'Digital'],
+                    ['museo', vehicle.museo, 'Museo'],
+                    ['taller', vehicle.taller, 'Taller'],
+                  ].map(([key, checked, text]) => (
+                    <div key={key} className="flex items-center gap-2 min-h-9 rounded-md border border-transparent px-0 sm:px-1 py-0.5">
+                      <Switch id={`vf-${key}`} checked={!!checked} disabled />
+                      <Label htmlFor={`vf-${key}`} className="font-normal cursor-default">
+                        {text}
+                      </Label>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </CardContent>
+            </Card>
           </div>
+
+          <Card className="order-1 lg:order-2 lg:sticky lg:top-4 self-start shadow-sm min-w-0">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Fotografías</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {imageFields.map(({ name, label }) => (
+                  <div key={name} className="space-y-2 min-w-0">
+                    <Label className="text-xs sm:text-sm leading-snug">{label}</Label>
+                    <div className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-2 sm:p-4 relative min-h-[100px] sm:min-h-[120px] bg-muted/30">
+                      {images[name] ? (
+                        <>
+                          <img
+                            src={images[name]}
+                            alt={label}
+                            className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLightboxImage({ url: images[name], label });
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-7 w-7 sm:h-8 sm:w-8 shrink-0"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteImage(name);
+                            }}
+                            disabled={deletingImage === name}
+                          >
+                            {deletingImage === name ? <Spinner className="size-3.5 sm:size-4" /> : '×'}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground text-xs sm:text-sm text-center px-1">Sin imagen</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+        {vehicle.anotaciones != null &&
+          vehicle.anotaciones !== '' &&
+          String(vehicle.anotaciones) !== 'null' && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Anotaciones</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap rounded-md border bg-muted/30 p-3 sm:p-4">
+                  {vehicle.anotaciones}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         {modificationComponents.length > 0 && (
-          <div className="space-y-4 border-t pt-6">
-            <h3 className="text-lg font-semibold">Modificaciones</h3>
+          <div className="space-y-4 border-t border-border pt-6">
+            <h3 className="text-lg font-semibold tracking-tight">Modificaciones</h3>
             <ul className="space-y-4">
               {modificationComponents.map((comp) => {
                 const qtyRaw = parseInt(comp.mounted_qty, 10);
@@ -272,7 +368,7 @@ const VehicleDetail = () => {
             Volver al listado
           </Button>
           <Button asChild>
-            <Link to={`/edit/${id}`}>Editar</Link>
+            <Link to={`/vehicles/${id}`}>Editar</Link>
           </Button>
         </div>
       </form>

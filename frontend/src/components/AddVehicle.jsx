@@ -65,6 +65,9 @@ const AddVehicle = () => {
     reference: '',
     scale_factor: 32,
     commercial_release_year: '',
+    dorsal: '',
+    limited_edition: false,
+    limited_edition_unit_number: '',
   });
   const [images, setImages] = useState({});
   const [previews, setPreviews] = useState({});
@@ -110,6 +113,9 @@ const AddVehicle = () => {
         item.commercial_release_year != null && item.commercial_release_year !== ''
           ? String(item.commercial_release_year)
           : '',
+      dorsal: item.dorsal != null && String(item.dorsal).trim() !== '' ? String(item.dorsal).trim() : '',
+      limited_edition: Boolean(item.limited_edition),
+      limited_edition_unit_number: '',
     }));
     if (error) setError(null);
   };
@@ -182,9 +188,19 @@ const AddVehicle = () => {
     try {
       const formData = new FormData();
       Object.entries(vehicle).forEach(([key, value]) => {
+        if (key === 'dorsal' || key === 'limited_edition' || key === 'limited_edition_unit_number') return;
         if (value === undefined || value === null) return;
+        if (typeof value === 'object') return;
         formData.append(key, value);
       });
+      formData.append('dorsal', vehicle.dorsal ?? '');
+      formData.append('limited_edition', vehicle.limited_edition ? 'true' : 'false');
+      formData.append(
+        'limited_edition_unit_number',
+        vehicle.limited_edition && vehicle.limited_edition_unit_number !== '' && vehicle.limited_edition_unit_number != null
+          ? String(vehicle.limited_edition_unit_number)
+          : '',
+      );
       if (catalogItemId) formData.append('catalog_item_id', catalogItemId);
       imageFields.forEach(({ name }) => {
         if (images[name]) formData.append('images', images[name], name);
@@ -302,6 +318,40 @@ const AddVehicle = () => {
               <Label>Lugar de compra</Label>
               <Input name="purchase_place" value={vehicle.purchase_place ?? ''} onChange={handleChange} />
             </div>
+            <div className="space-y-2">
+              <Label>Dorsal</Label>
+              <Input name="dorsal" value={vehicle.dorsal ?? ''} onChange={handleChange} placeholder="Opcional" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={vehicle.limited_edition}
+                onCheckedChange={(v) =>
+                  setVehicle((prev) => ({
+                    ...prev,
+                    limited_edition: v,
+                    limited_edition_unit_number: v ? prev.limited_edition_unit_number : '',
+                  }))
+                }
+              />
+              <Label>Edición limitada</Label>
+            </div>
+            {vehicle.limited_edition && (
+              <div className="space-y-2">
+                <Label>Nº de unidad (tu ejemplar)</Label>
+                <Input
+                  name="limited_edition_unit_number"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  value={vehicle.limited_edition_unit_number ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setVehicle((prev) => ({ ...prev, limited_edition_unit_number: v }));
+                  }}
+                  placeholder="ej. 45"
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
                 <Switch

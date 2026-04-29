@@ -57,6 +57,40 @@ function parseOptionalMotorPosition(raw) {
   return null;
 }
 
+/** Dorsal + edición limitada: body/datos import tiene prioridad; si faltan dorsal y flag LE, se toman del catálogo. */
+function mergeVehicleCatalogDefaults(fields, catalogRow) {
+  const normText = (x) => {
+    if (x == null) return null;
+    const s = String(x).trim();
+    return s === '' || s === 'null' ? null : s;
+  };
+
+  let dorsal = null;
+  if (Object.prototype.hasOwnProperty.call(fields, 'dorsal')) {
+    dorsal = normText(fields.dorsal);
+  } else if (catalogRow?.dorsal != null) {
+    dorsal = normText(catalogRow.dorsal);
+  }
+
+  let limited_edition = false;
+  if (Object.prototype.hasOwnProperty.call(fields, 'limited_edition')) {
+    limited_edition = fields.limited_edition === true || fields.limited_edition === 'true';
+  } else if (catalogRow?.limited_edition) {
+    limited_edition = true;
+  }
+
+  let limited_edition_unit_number = null;
+  if (limited_edition) {
+    const u = fields.limited_edition_unit_number;
+    if (u != null && String(u).trim() !== '') {
+      const n = parseInt(String(u).trim(), 10);
+      if (Number.isFinite(n) && n >= 1) limited_edition_unit_number = n;
+    }
+  }
+
+  return { dorsal, limited_edition, limited_edition_unit_number };
+}
+
 function parseVehicleSort(req) {
   const raw = String(req.query.sort || 'purchase_date').toLowerCase();
   const sortKey = Object.prototype.hasOwnProperty.call(VEHICLE_SORT_COLUMNS, raw) ? raw : 'purchase_date';
@@ -111,6 +145,8 @@ async function insertVehicleFromImportValues(supabaseClient, userId, v) {
       ? parseOptionalMotorPosition(v.motor_position)
       : parseOptionalMotorPosition(catalogRow?.motor_position);
 
+  const { dorsal, limited_edition, limited_edition_unit_number } = mergeVehicleCatalogDefaults(v, catalogRow);
+
   const { data, error } = await supabaseClient
     .from('vehicles')
     .insert([
@@ -130,6 +166,9 @@ async function insertVehicleFromImportValues(supabaseClient, userId, v) {
         taller: Boolean(v.taller),
         anotaciones: v.anotaciones ?? null,
         reference: v.reference ?? null,
+        dorsal,
+        limited_edition,
+        limited_edition_unit_number,
         scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
         commercial_release_year: yearOk ? commercial_release_year_val : null,
         catalog_item_id: catalog_item_id_val,
@@ -195,6 +234,8 @@ async function updateVehicleFromImportValues(supabaseClient, userId, vehicleId, 
       ? parseOptionalMotorPosition(v.motor_position)
       : parseOptionalMotorPosition(catalogRow?.motor_position);
 
+  const { dorsal, limited_edition, limited_edition_unit_number } = mergeVehicleCatalogDefaults(v, catalogRow);
+
   const { data, error } = await supabaseClient
     .from('vehicles')
     .update({
@@ -213,6 +254,9 @@ async function updateVehicleFromImportValues(supabaseClient, userId, vehicleId, 
       taller: Boolean(v.taller),
       anotaciones: v.anotaciones ?? null,
       reference: v.reference ?? null,
+      dorsal,
+      limited_edition,
+      limited_edition_unit_number,
       scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
       commercial_release_year: yearOk ? commercial_release_year_val : null,
       catalog_item_id: catalog_item_id_val,
@@ -269,9 +313,11 @@ const VEHICLE_PUT_BODY_KEYS = [
   'purchase_place',
   'anotaciones',
   'reference',
+  'dorsal',
   'total_price',
   'commercial_release_year',
   'catalog_item_id',
+  'limited_edition_unit_number',
 ];
 
 /** Evita cadenas "null"/"undefined" o vacíos mal interpretados por Postgres (date, numeric, etc.) */
@@ -307,6 +353,14 @@ function vehicleScalarFieldsFromBody(body) {
       }
     } else if (k === 'motor_position') {
       o[k] = parseOptionalMotorPosition(v);
+    } else if (k === 'dorsal') {
+      o[k] = v == null || String(v).trim() === '' ? null : String(v).trim();
+    } else if (k === 'limited_edition_unit_number') {
+      if (v == null || v === '') o[k] = null;
+      else {
+        const n = parseInt(String(v).trim(), 10);
+        o[k] = Number.isFinite(n) && n >= 1 ? n : null;
+      }
     } else {
       o[k] = v;
     }
@@ -1026,14 +1080,16 @@ router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const { data, error } = await supabase
     .from('vehicles')
-    .select('*')
+    .select(
+      '*, catalog_item:slot_catalog_items!catalog_item_id ( limited_edition_total )',
+    )
     .eq('id', id)
     .eq('user_id', req.user.id)
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: 'Vehículo no encontrado' });
-  
+
   res.json(data);
 });
 
@@ -1071,6 +1127,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
       digital: req.body.digital === 'true',
       museo: req.body.museo === 'true',
       taller: req.body.taller === 'true',
+      limited_edition: req.body.limited_edition === 'true',
     };
     if (req.body.scale_factor != null) {
       const sf = parseInt(req.body.scale_factor, 10);
@@ -1081,6 +1138,10 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
     delete updateData.updated_at;
     delete updateData.last_timing_created_at;
     updateData.updated_at = new Date().toISOString();
+
+    if (updateData.limited_edition === false) {
+      updateData.limited_edition_unit_number = null;
+    }
 
     // Si no está modificado, el total_price será igual al price
     if (updateData.modified === false) {
@@ -1171,6 +1232,15 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
         ? parseOptionalMotorPosition(motor_position)
         : parseOptionalMotorPosition(catalogRow?.motor_position);
 
+    const { dorsal, limited_edition, limited_edition_unit_number } = mergeVehicleCatalogDefaults(
+      {
+        dorsal: req.body.dorsal,
+        limited_edition: req.body.limited_edition,
+        limited_edition_unit_number: req.body.limited_edition_unit_number,
+      },
+      catalogRow,
+    );
+
     // Añadir user_id al crear el vehículo
     const { data, error } = await supabase
       .from('vehicles')
@@ -1185,12 +1255,15 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
           total_price,
           purchase_date: purchase_date || null,
           purchase_place: purchase_place || null,
-          modified,
-          digital,
-          museo,
-          taller,
+          modified: modified === 'true',
+          digital: digital === 'true',
+          museo: museo === 'true',
+          taller: taller === 'true',
           anotaciones,
           reference,
+          dorsal,
+          limited_edition,
+          limited_edition_unit_number,
           scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
           commercial_release_year: commercial_release_year_val,
           catalog_item_id: catalog_item_id_val,

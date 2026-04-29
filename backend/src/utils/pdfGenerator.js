@@ -278,6 +278,42 @@ async function generateVehicleSpecsPDF(vehicle, technicalSpecs, modifications) {
       drawBadges(doc, vehicle);
       doc.y = Math.max(doc.y, imgY + imgHeight + 16);
 
+      const dorsalStr =
+        vehicle.dorsal != null &&
+        String(vehicle.dorsal).trim() !== '' &&
+        String(vehicle.dorsal).toLowerCase() !== 'null'
+          ? String(vehicle.dorsal).trim()
+          : null;
+      const leUnitRaw = vehicle.limited_edition_unit_number;
+      const leUnit =
+        vehicle.limited_edition &&
+        leUnitRaw != null &&
+        String(leUnitRaw).trim() !== '' &&
+        Number.isFinite(Number(leUnitRaw))
+          ? Number(leUnitRaw)
+          : null;
+      const leTotal =
+        vehicle.catalog_limited_edition_total != null &&
+        Number.isFinite(Number(vehicle.catalog_limited_edition_total))
+          ? Number(vehicle.catalog_limited_edition_total)
+          : null;
+
+      if (dorsalStr || leUnit != null) {
+        doc.fillColor(COLORS.text).fontSize(10).font('Helvetica');
+        if (dorsalStr) {
+          doc.text(`Dorsal: ${dorsalStr}`, MARGIN, doc.y, { width: dataWidth });
+          doc.moveDown(0.45);
+        }
+        if (leUnit != null) {
+          let leLine = `Edición limitada: unidad n.º ${leUnit}`;
+          if (leTotal != null && leTotal > 0) {
+            leLine += ` (de ${leTotal} comercializadas)`;
+          }
+          doc.text(leLine, MARGIN, doc.y, { width: dataWidth });
+          doc.moveDown(0.5);
+        }
+      }
+
       // Información de compra
       drawSectionTitle(doc, 'Información de compra');
       const basePrice = vehicle.price != null && !isNaN(Number(vehicle.price)) ? Number(vehicle.price) : 0;

@@ -100,6 +100,10 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       motor_position: data.motor_position ?? '',
       commercial_release_year:
         data.commercial_release_year != null ? String(data.commercial_release_year) : '',
+      dorsal: data.dorsal ?? '',
+      limited_edition: Boolean(data.limited_edition),
+      limited_edition_total:
+        data.limited_edition_total != null ? String(data.limited_edition_total) : '',
       discontinued: Boolean(data.discontinued),
       upcoming_release: Boolean(data.upcoming_release),
     });
@@ -202,6 +206,14 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       }
       fd.append('discontinued', suggestForm.discontinued ? 'true' : 'false');
       fd.append('upcoming_release', suggestForm.upcoming_release ? 'true' : 'false');
+      fd.append('dorsal', suggestForm.dorsal ?? '');
+      fd.append('limited_edition', suggestForm.limited_edition ? 'true' : 'false');
+      fd.append(
+        'limited_edition_total',
+        suggestForm.limited_edition && String(suggestForm.limited_edition_total ?? '').trim() !== ''
+          ? String(suggestForm.limited_edition_total).trim()
+          : '',
+      );
       if (suggestImage) fd.append('image', suggestImage);
       await api.post(`/catalog/items/${encodeURIComponent(id)}/change-requests`, fd);
       toast.success('Sugerencia enviada. El equipo la revisará.');
@@ -290,6 +302,14 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             <span className="font-mono">{item.reference}</span>
             <span aria-hidden>·</span>
             <span>{item.manufacturer}</span>
+            {item.dorsal != null && String(item.dorsal).trim() !== '' && (
+              <>
+                <span aria-hidden>·</span>
+                <span>
+                  Dorsal <span className="text-foreground font-medium tabular-nums">{String(item.dorsal).trim()}</span>
+                </span>
+              </>
+            )}
           </p>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {ratingAvgStr != null ? (
@@ -414,6 +434,21 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                   label="Año de comercialización"
                   value={item.commercial_release_year != null ? String(item.commercial_release_year) : '—'}
                 />
+                <DetailRow
+                  label="Dorsal"
+                  value={
+                    item.dorsal != null && String(item.dorsal).trim() !== ''
+                      ? String(item.dorsal).trim()
+                      : '—'
+                  }
+                />
+                <DetailRow label="Edición limitada" value={item.limited_edition ? 'Sí' : 'No'} />
+                {item.limited_edition && item.limited_edition_total != null && (
+                  <DetailRow
+                    label="Tirada (unidades)"
+                    value={String(item.limited_edition_total)}
+                  />
+                )}
                 <DetailRow label="Descatalogado" value={item.discontinued ? 'Sí' : 'No'} />
                 <DetailRow label="Próximo lanzamiento" value={item.upcoming_release ? 'Sí' : 'No'} />
                 <DetailRow label="Última actualización" value={formatDate(item.updated_at)} />
@@ -556,6 +591,42 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                 }
               />
             </div>
+            <div className="space-y-2">
+              <Label>Dorsal</Label>
+              <Input
+                value={suggestForm.dorsal ?? ''}
+                onChange={(e) => setSuggestForm((f) => ({ ...f, dorsal: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="suggest-limited" className="cursor-pointer">
+                Edición limitada
+              </Label>
+              <Switch
+                id="suggest-limited"
+                checked={!!suggestForm.limited_edition}
+                onCheckedChange={(v) =>
+                  setSuggestForm((f) => ({
+                    ...f,
+                    limited_edition: v,
+                    limited_edition_total: v ? f.limited_edition_total : '',
+                  }))
+                }
+              />
+            </div>
+            {suggestForm.limited_edition && (
+              <div className="space-y-2">
+                <Label>Tirada total (unidades)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={suggestForm.limited_edition_total ?? ''}
+                  onChange={(e) =>
+                    setSuggestForm((f) => ({ ...f, limited_edition_total: e.target.value }))
+                  }
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-3 rounded-lg border p-3">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="suggest-discontinued" className="cursor-pointer">

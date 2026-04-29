@@ -66,6 +66,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { toast } from 'sonner';
 import {
   formatDistance,
@@ -842,16 +843,20 @@ const EditVehicle = () => {
     setError(null);
     try {
       const formData = new FormData();
+      const { catalog_item: _catalogItemOmit, ...vehicleFlat } = vehicle;
       const processedVehicle = {
-        ...vehicle,
+        ...vehicleFlat,
         price: vehicle.price === '' || vehicle.price === null ? undefined : Number(vehicle.price),
         total_price: vehicle.total_price === '' || vehicle.total_price === null ? undefined : Number(vehicle.total_price)
       };
 
+      const sendEmptyIfNull = new Set(['dorsal', 'limited_edition_unit_number']);
       Object.entries(processedVehicle).forEach(([key, value]) => {
         // FormData convierte null en la cadena "null" → Postgres rechaza fechas y tipos
-        if (value !== undefined && value !== null) {
+        if (value !== undefined && value !== null && typeof value !== 'object') {
           formData.append(key, value);
+        } else if (sendEmptyIfNull.has(key) && (value === null || value === undefined)) {
+          formData.append(key, '');
         }
       });
 
@@ -2142,177 +2147,335 @@ const EditVehicle = () => {
 
         <TabsContent value="general">
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="model">Modelo</Label>
-                  <Input id="model" name="model" value={vehicle.model || ''} onChange={handleChange} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reference">Referencia</Label>
-                  <Input id="reference" name="reference" value={vehicle.reference ?? ''} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="manufacturer">Fabricante</Label>
-                  <Input id="manufacturer" name="manufacturer" value={vehicle.manufacturer || ''} onChange={handleChange} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="type">Tipo</Label>
-                  <Select value={vehicle.type || 'none'} onValueChange={(v) => handleChange({ target: { name: 'type', value: v === 'none' ? '' : v, type: 'select', checked: false } })} required>
-                    <SelectTrigger id="type">
-                      <SelectValue placeholder="Selecciona tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Selecciona tipo</SelectItem>
-                      {vehicleTypes.map(t => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="traction">Tracción</Label>
-                  <Input id="traction" name="traction" value={vehicle.traction || ''} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="motor_position">Posición del motor</Label>
-                  <Select
-                    value={vehicle.motor_position || '__none__'}
-                    onValueChange={(v) =>
-                      handleChange({
-                        target: {
-                          name: 'motor_position',
-                          value: v === '__none__' ? '' : v,
-                          type: 'select',
-                          checked: false,
-                        },
-                      })
-                    }
-                  >
-                    <SelectTrigger id="motor_position">
-                      <SelectValue placeholder="Opcional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— Sin especificar —</SelectItem>
-                      {MOTOR_POSITION_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="price">Precio original (€)</Label>
-                  <Input id="price" name="price" type="number" step="0.01" value={vehicle.price || ''} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="purchase_date">Fecha de compra</Label>
-                  <Input id="purchase_date" name="purchase_date" type="date" value={vehicle.purchase_date ? vehicle.purchase_date.substring(0, 10) : ''} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="purchase_place">Lugar de compra</Label>
-                  <Input id="purchase_place" name="purchase_place" value={vehicle.purchase_place ?? ''} onChange={handleChange} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch id="modified" checked={!!vehicle.modified} onCheckedChange={(checked) => handleChange({ target: { name: 'modified', type: 'checkbox', checked } })} />
-                    <Label htmlFor="modified">Modificado</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="digital" checked={!!vehicle.digital} onCheckedChange={(checked) => handleChange({ target: { name: 'digital', type: 'checkbox', checked } })} />
-                    <Label htmlFor="digital">Digital</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="museo" checked={!!vehicle.museo} onCheckedChange={(checked) => handleChange({ target: { name: 'museo', type: 'checkbox', checked } })} />
-                    <Label htmlFor="museo">Museo</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="taller" checked={!!vehicle.taller} onCheckedChange={(checked) => handleChange({ target: { name: 'taller', type: 'checkbox', checked } })} />
-                    <Label htmlFor="taller">Taller</Label>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="anotaciones">Anotaciones</Label>
-                  <Textarea id="anotaciones" name="anotaciones" rows={3} value={vehicle.anotaciones ?? ''} onChange={handleChange} placeholder="Añade tus comentarios..." />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="scale_factor">Escala (1:X)</Label>
-                  <Input
-                    id="scale_factor"
-                    name="scale_factor"
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={vehicle.scale_factor ?? 32}
-                    onChange={handleChange}
-                    placeholder="32"
-                  />
-                  <p className="text-xs text-muted-foreground">Escala del coche para calcular velocidad equivalente (ej: 32 = 1:32, 43 = 1:43)</p>
-                </div>
-              </div>
-              <div>
-                <h5 className="text-lg font-semibold mb-4">Fotografías</h5>
-                <div className="grid grid-cols-2 gap-4">
-                  {imageFields.map(({ name, label }) => (
-                    <div key={name} className="space-y-2">
-                      <Label>{label} Imagen</Label>
-                      <div
-                        className={cn(
-                          'border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 relative min-h-[120px] cursor-pointer transition-colors',
-                          draggingOver === name ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 bg-muted/30 hover:bg-muted/50'
-                        )}
-                        onClick={() => document.getElementById(`img-${name}`).click()}
-                        onDragEnter={(e) => handleDragEnter(e, name)}
-                        onDragLeave={(e) => handleDragLeave(e, name)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, name)}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
+              <div className="space-y-6 min-w-0 order-2 lg:order-1">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Identificación</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="model">Modelo</Label>
+                      <Input id="model" name="model" value={vehicle.model || ''} onChange={handleChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reference">Referencia</Label>
+                      <Input id="reference" name="reference" value={vehicle.reference ?? ''} onChange={handleChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manufacturer">Fabricante</Label>
+                      <Input id="manufacturer" name="manufacturer" value={vehicle.manufacturer || ''} onChange={handleChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="type">Tipo</Label>
+                      <Select
+                        value={vehicle.type || 'none'}
+                        onValueChange={(v) =>
+                          handleChange({
+                            target: { name: 'type', value: v === 'none' ? '' : v, type: 'select', checked: false },
+                          })
+                        }
+                        required
                       >
-                        {previews[name] || images[name] ? (
-                          <>
-                            <img
-                              ref={el => imageRefs.current[name] = el}
-                              src={previews[name] || URL.createObjectURL(images[name])}
-                              alt={label}
-                              className="max-w-full max-h-[90px] object-contain pointer-events-none"
-                              loading="lazy"
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              className="absolute top-1 right-1 z-10"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDeleteImage(name);
-                              }}
-                              disabled={deletingImage === name}
-                            >
-                              {deletingImage === name ? (
-                                <Spinner className="size-4" />
-                              ) : (
-                                '×'
-                              )}
-                            </Button>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            {draggingOver === name ? 'Suelta la imagen aquí' : 'Arrastra o haz clic'}
-                          </span>
-                        )}
-                        <input
-                          id={`img-${name}`}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={e => handleImageChange(e, name)}
+                        <SelectTrigger id="type">
+                          <SelectValue placeholder="Selecciona tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Selecciona tipo</SelectItem>
+                          {vehicleTypes.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Datos técnicos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="traction">Tracción</Label>
+                      <Input id="traction" name="traction" value={vehicle.traction || ''} onChange={handleChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="motor_position">Posición del motor</Label>
+                      <Select
+                        value={vehicle.motor_position || '__none__'}
+                        onValueChange={(v) =>
+                          handleChange({
+                            target: {
+                              name: 'motor_position',
+                              value: v === '__none__' ? '' : v,
+                              type: 'select',
+                              checked: false,
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger id="motor_position">
+                          <SelectValue placeholder="Opcional" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                          {MOTOR_POSITION_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Competición y edición limitada</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dorsal">Dorsal</Label>
+                      <Input id="dorsal" name="dorsal" value={vehicle.dorsal ?? ''} onChange={handleChange} placeholder="Opcional" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="limited_edition"
+                        checked={!!vehicle.limited_edition}
+                        onCheckedChange={(checked) =>
+                          setVehicle((prev) => ({
+                            ...prev,
+                            limited_edition: checked,
+                            limited_edition_unit_number: checked ? prev.limited_edition_unit_number : null,
+                          }))
+                        }
+                      />
+                      <Label htmlFor="limited_edition" className="font-normal">
+                        Edición limitada
+                      </Label>
+                    </div>
+                    {vehicle.limited_edition && (
+                      <div className="space-y-2">
+                        <Label htmlFor="limited_edition_unit_number">Nº de unidad (tu ejemplar)</Label>
+                        <Input
+                          id="limited_edition_unit_number"
+                          name="limited_edition_unit_number"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          value={vehicle.limited_edition_unit_number ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setVehicle((prev) => ({
+                              ...prev,
+                              limited_edition_unit_number: v === '' ? null : parseInt(v, 10),
+                            }));
+                          }}
+                          placeholder="ej. 45"
                         />
+                        {vehicle.catalog_item?.limited_edition_total != null && (
+                          <p className="text-xs text-muted-foreground">
+                            Tirada en catálogo: {vehicle.catalog_item.limited_edition_total} unidades
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Compra y precios</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Precio original (€)</Label>
+                      <Input id="price" name="price" type="number" step="0.01" value={vehicle.price || ''} onChange={handleChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="purchase_date">Fecha de compra</Label>
+                      <Input
+                        id="purchase_date"
+                        name="purchase_date"
+                        type="date"
+                        value={vehicle.purchase_date ? vehicle.purchase_date.substring(0, 10) : ''}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="purchase_place">Lugar de compra</Label>
+                      <Input id="purchase_place" name="purchase_place" value={vehicle.purchase_place ?? ''} onChange={handleChange} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Estado del ejemplar</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                      <div className="flex items-center gap-2 min-h-9">
+                        <Switch
+                          id="modified"
+                          checked={!!vehicle.modified}
+                          onCheckedChange={(checked) =>
+                            handleChange({ target: { name: 'modified', type: 'checkbox', checked } })
+                          }
+                        />
+                        <Label htmlFor="modified" className="font-normal">
+                          Modificado
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2 min-h-9">
+                        <Switch
+                          id="digital"
+                          checked={!!vehicle.digital}
+                          onCheckedChange={(checked) =>
+                            handleChange({ target: { name: 'digital', type: 'checkbox', checked } })
+                          }
+                        />
+                        <Label htmlFor="digital" className="font-normal">
+                          Digital
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2 min-h-9">
+                        <Switch
+                          id="museo"
+                          checked={!!vehicle.museo}
+                          onCheckedChange={(checked) =>
+                            handleChange({ target: { name: 'museo', type: 'checkbox', checked } })
+                          }
+                        />
+                        <Label htmlFor="museo" className="font-normal">
+                          Museo
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2 min-h-9">
+                        <Switch
+                          id="taller"
+                          checked={!!vehicle.taller}
+                          onCheckedChange={(checked) =>
+                            handleChange({ target: { name: 'taller', type: 'checkbox', checked } })
+                          }
+                        />
+                        <Label htmlFor="taller" className="font-normal">
+                          Taller
+                        </Label>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Escala y tiempos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Label htmlFor="scale_factor">Escala (1:X)</Label>
+                    <Input
+                      id="scale_factor"
+                      name="scale_factor"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={vehicle.scale_factor ?? 32}
+                      onChange={handleChange}
+                      placeholder="32"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Escala del coche para calcular velocidad equivalente (ej: 32 = 1:32, 43 = 1:43)
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Anotaciones</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      id="anotaciones"
+                      name="anotaciones"
+                      rows={3}
+                      value={vehicle.anotaciones ?? ''}
+                      onChange={handleChange}
+                      placeholder="Añade tus comentarios..."
+                    />
+                  </CardContent>
+                </Card>
               </div>
+
+              <Card className="order-1 lg:order-2 lg:sticky lg:top-4 self-start shadow-sm min-w-0">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Fotografías</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    {imageFields.map(({ name, label }) => (
+                      <div key={name} className="space-y-2 min-w-0">
+                        <Label className="text-xs sm:text-sm leading-snug">{label}</Label>
+                        <div
+                          className={cn(
+                            'border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-2 sm:p-4 relative min-h-[100px] sm:min-h-[120px] cursor-pointer transition-colors',
+                            draggingOver === name
+                              ? 'border-primary bg-primary/10'
+                              : 'border-muted-foreground/25 bg-muted/30 hover:bg-muted/50',
+                          )}
+                          onClick={() => document.getElementById(`img-${name}`).click()}
+                          onDragEnter={(e) => handleDragEnter(e, name)}
+                          onDragLeave={(e) => handleDragLeave(e, name)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, name)}
+                        >
+                          {previews[name] || images[name] ? (
+                            <>
+                              <img
+                                ref={(el) => {
+                                  imageRefs.current[name] = el;
+                                }}
+                                src={previews[name] || URL.createObjectURL(images[name])}
+                                alt={label}
+                                className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain pointer-events-none"
+                                loading="lazy"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="absolute top-1 right-1 z-10 h-7 px-2 sm:h-9"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDeleteImage(name);
+                                }}
+                                disabled={deletingImage === name}
+                              >
+                                {deletingImage === name ? <Spinner className="size-3.5 sm:size-4" /> : '×'}
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground text-xs sm:text-sm text-center px-1">
+                              {draggingOver === name ? 'Suelta la imagen aquí' : 'Arrastra o haz clic'}
+                            </span>
+                          )}
+                          <input
+                            id={`img-${name}`}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageChange(e, name)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
             {error && (
               <Alert variant="destructive" className="mt-4">

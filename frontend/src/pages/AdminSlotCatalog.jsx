@@ -70,6 +70,9 @@ const emptyItem = {
   traction: '',
   motor_position: '',
   commercial_release_year: '',
+  dorsal: '',
+  limited_edition: false,
+  limited_edition_total: '',
   discontinued: false,
   upcoming_release: false,
 };
@@ -81,6 +84,7 @@ const CATALOG_ITEMS_MISSING = {
   withoutTraction: 'traction',
   withoutMotor: 'motor',
   withoutYear: 'year',
+  withoutDorsal: 'dorsal',
 };
 
 const CATALOG_MISSING_FILTER_LABELS = {
@@ -90,6 +94,7 @@ const CATALOG_MISSING_FILTER_LABELS = {
   traction: 'Solo sin tracción',
   motor: 'Solo sin motor',
   year: 'Solo sin año de comercialización',
+  dorsal: 'Solo sin dorsal',
 };
 
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -588,6 +593,12 @@ function AdminSlotCatalog() {
         row.commercial_release_year != null && row.commercial_release_year !== ''
           ? String(row.commercial_release_year)
           : '',
+      dorsal: row.dorsal ?? '',
+      limited_edition: Boolean(row.limited_edition),
+      limited_edition_total:
+        row.limited_edition_total != null && row.limited_edition_total !== ''
+          ? String(row.limited_edition_total)
+          : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
     });
@@ -611,6 +622,12 @@ function AdminSlotCatalog() {
       commercial_release_year:
         row.commercial_release_year != null && row.commercial_release_year !== ''
           ? String(row.commercial_release_year)
+          : '',
+      dorsal: row.dorsal ?? '',
+      limited_edition: Boolean(row.limited_edition),
+      limited_edition_total:
+        row.limited_edition_total != null && row.limited_edition_total !== ''
+          ? String(row.limited_edition_total)
           : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
@@ -636,6 +653,14 @@ function AdminSlotCatalog() {
       fd.append('traction', form.traction ?? '');
       fd.append('motor_position', form.motor_position ?? '');
       if (form.commercial_release_year) fd.append('commercial_release_year', form.commercial_release_year);
+      fd.append('dorsal', form.dorsal ?? '');
+      fd.append('limited_edition', form.limited_edition ? 'true' : 'false');
+      fd.append(
+        'limited_edition_total',
+        form.limited_edition && String(form.limited_edition_total ?? '').trim() !== ''
+          ? String(form.limited_edition_total).trim()
+          : '',
+      );
       fd.append('discontinued', form.discontinued ? 'true' : 'false');
       fd.append('upcoming_release', form.upcoming_release ? 'true' : 'false');
       if (imageFile) fd.append('image', imageFile);
@@ -870,6 +895,11 @@ function AdminSlotCatalog() {
                         label: 'Sin año de comercialización',
                         n: catalogStats.missing?.withoutYear ?? 0,
                       },
+                      {
+                        key: 'withoutDorsal',
+                        label: 'Sin dorsal',
+                        n: catalogStats.missing?.withoutDorsal ?? 0,
+                      },
                     ].map((row) => {
                       const t = catalogStats.totalItems || 1;
                       const pct = Math.round(((row.n / t) * 10000)) / 100;
@@ -908,6 +938,7 @@ function AdminSlotCatalog() {
                           { label: 'Sin tracción', value: catalogStats.missing?.withoutTraction ?? 0 },
                           { label: 'Sin motor', value: catalogStats.missing?.withoutMotor ?? 0 },
                           { label: 'Sin año', value: catalogStats.missing?.withoutYear ?? 0 },
+                          { label: 'Sin dorsal', value: catalogStats.missing?.withoutDorsal ?? 0 },
                         ]}
                         margin={{ top: 8, right: 8, left: 0, bottom: 48 }}
                       >
@@ -975,6 +1006,7 @@ function AdminSlotCatalog() {
                       <SelectItem value="traction">{CATALOG_MISSING_FILTER_LABELS.traction}</SelectItem>
                       <SelectItem value="motor">{CATALOG_MISSING_FILTER_LABELS.motor}</SelectItem>
                       <SelectItem value="year">{CATALOG_MISSING_FILTER_LABELS.year}</SelectItem>
+                      <SelectItem value="dorsal">{CATALOG_MISSING_FILTER_LABELS.dorsal}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1903,6 +1935,39 @@ function AdminSlotCatalog() {
               />
               <p className="text-xs text-muted-foreground">Solo el año (opcional).</p>
             </div>
+            <div className="space-y-2">
+              <Label>Dorsal</Label>
+              <Input
+                value={form.dorsal ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, dorsal: e.target.value }))}
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3 sm:col-span-2">
+              <Label htmlFor="catalog-limited-ed" className="cursor-pointer">
+                Edición limitada
+              </Label>
+              <Switch
+                id="catalog-limited-ed"
+                checked={form.limited_edition}
+                onCheckedChange={(v) =>
+                  setForm((f) => ({ ...f, limited_edition: v, limited_edition_total: v ? f.limited_edition_total : '' }))
+                }
+              />
+            </div>
+            {form.limited_edition && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Unidades comercializadas (tirada total)</Label>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  placeholder="ej. 500"
+                  value={form.limited_edition_total}
+                  onChange={(e) => setForm((f) => ({ ...f, limited_edition_total: e.target.value }))}
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-4 rounded-lg border p-3 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
               <div className="flex items-center justify-between gap-3 sm:min-w-[200px]">
                 <Label htmlFor="catalog-discontinued" className="cursor-pointer">

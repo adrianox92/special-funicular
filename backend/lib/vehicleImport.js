@@ -198,6 +198,7 @@ const VEHICLE_IMPORT_TARGET_FIELDS = [
   { key: 'type', label: 'Tipo', required: false },
   { key: 'traction', label: 'Tracción', required: false },
   { key: 'motor_position', label: 'Posición motor', required: false },
+  { key: 'commercial_release_year', label: 'Año comercialización', required: false },
   { key: 'price', label: 'Precio (€)', required: false },
   { key: 'purchase_date', label: 'Fecha compra', required: false },
   { key: 'purchase_place', label: 'Lugar compra', required: false },
@@ -208,7 +209,9 @@ const VEHICLE_IMPORT_TARGET_FIELDS = [
   { key: 'anotaciones', label: 'Anotaciones', required: false },
   { key: 'reference', label: 'Referencia', required: false },
   { key: 'scale_factor', label: 'Escala (denominador)', required: false },
-  { key: 'commercial_release_year', label: 'Año comercialización', required: false },
+  { key: 'dorsal', label: 'Dorsal', required: false },
+  { key: 'limited_edition', label: 'Edición limitada', required: false },
+  { key: 'limited_edition_unit_number', label: 'Nº unidad (ed. limitada)', required: false },
 ];
 
 const IGNORE_FIELD = '__ignore__';
@@ -318,6 +321,23 @@ const FIELD_KEYWORD_HINTS = {
     'release',
     'comercializacion',
     'comercialización',
+  ],
+  dorsal: ['dorsal', 'numero dorsal', 'número dorsal', 'numero_dorsal', 'race number'],
+  limited_edition: [
+    'edicion limitada',
+    'edición limitada',
+    'limited edition',
+    'limited_edition',
+    'edicion_limitada',
+  ],
+  limited_edition_unit_number: [
+    'numero unidad',
+    'número unidad',
+    'n unidad',
+    'ejemplar',
+    'limited_edition_unit',
+    'unidad edicion limitada',
+    'unidad edición limitada',
   ],
 };
 
@@ -525,6 +545,11 @@ function mapRowToVehicleValues(row, mapping) {
 
   const str = (v) => (v == null ? '' : String(v).trim());
 
+  const colMapped = (key) => {
+    const col = mapping[key];
+    return col != null && String(col).trim() !== '' && col !== IGNORE_FIELD;
+  };
+
   const model = str(get('model'));
   const manufacturer = str(get('manufacturer'));
   const type = str(get('type'));
@@ -619,6 +644,39 @@ function mapRowToVehicleValues(row, mapping) {
     warnings.push('Año comercial no reconocido');
   }
 
+  let dorsal = null;
+  if (colMapped('dorsal')) {
+    const dRaw = get('dorsal');
+    dorsal = dRaw == null || str(dRaw) === '' ? null : str(dRaw);
+  }
+
+  let limited_edition;
+  let limited_edition_unit_number = null;
+  if (colMapped('limited_edition')) {
+    const leRaw = get('limited_edition');
+    if (leRaw != null && str(leRaw) !== '') {
+      const b = parseBoolCell(leRaw);
+      if (b == null) {
+        warnings.push('Edición limitada: valor no reconocido, se asume no');
+        limited_edition = false;
+      } else {
+        limited_edition = b === true;
+      }
+    } else {
+      limited_edition = false;
+    }
+    if (colMapped('limited_edition_unit_number') && limited_edition) {
+      const luRaw = get('limited_edition_unit_number');
+      if (luRaw != null && str(luRaw) !== '') {
+        const n = parseInt(String(luRaw).trim(), 10);
+        if (Number.isFinite(n) && n >= 1) limited_edition_unit_number = n;
+        else warnings.push('Nº de unidad (ed. limitada) no válido; se omitirá');
+      }
+    } else if (limited_edition) {
+      limited_edition_unit_number = null;
+    }
+  }
+
   const priceNum = price;
   const total_price = modified ? null : priceNum != null ? priceNum : null;
 
@@ -642,6 +700,14 @@ function mapRowToVehicleValues(row, mapping) {
     commercial_release_year: commercial_release_year || null,
     catalog_item_id: null,
   };
+
+  if (colMapped('dorsal')) {
+    values.dorsal = dorsal;
+  }
+  if (colMapped('limited_edition')) {
+    values.limited_edition = limited_edition;
+    values.limited_edition_unit_number = limited_edition ? limited_edition_unit_number : null;
+  }
 
   return { values, errors, warnings };
 }

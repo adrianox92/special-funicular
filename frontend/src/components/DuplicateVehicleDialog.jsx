@@ -48,6 +48,12 @@ function buildDuplicateVehicleRecord(source, overrides) {
     scale_factor:
       source.scale_factor != null && source.scale_factor !== '' ? source.scale_factor : 32,
     commercial_release_year: commercialYear,
+    dorsal: source.dorsal != null && String(source.dorsal).trim() !== '' ? String(source.dorsal).trim() : '',
+    limited_edition: Boolean(source.limited_edition),
+    limited_edition_unit_number:
+      source.limited_edition_unit_number != null && source.limited_edition_unit_number !== ''
+        ? String(source.limited_edition_unit_number)
+        : '',
   };
 }
 

@@ -10,7 +10,10 @@ const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
 async function buildVehicleSpecsPdfBuffer(supabase, vehicleId, options = {}) {
   const { userId = null } = options;
 
-  let vQuery = supabase.from('vehicles').select('*').eq('id', vehicleId);
+  let vQuery = supabase
+    .from('vehicles')
+    .select('*, catalog_item:slot_catalog_items!catalog_item_id ( limited_edition_total )')
+    .eq('id', vehicleId);
   if (userId != null) {
     vQuery = vQuery.eq('user_id', userId);
   }
@@ -20,6 +23,16 @@ async function buildVehicleSpecsPdfBuffer(supabase, vehicleId, options = {}) {
     err.statusCode = 404;
     throw err;
   }
+
+  const catalogLimitedTotalRaw =
+    vehicle.catalog_item && typeof vehicle.catalog_item === 'object'
+      ? vehicle.catalog_item.limited_edition_total
+      : null;
+  const catalogLimitedTotal =
+    catalogLimitedTotalRaw != null && Number.isFinite(Number(catalogLimitedTotalRaw))
+      ? Number(catalogLimitedTotalRaw)
+      : null;
+  const { catalog_item: _omitCat, ...vehicleRow } = vehicle;
 
   let imageUrl = null;
   const { data: images, error: imagesError } = await supabase
@@ -49,11 +62,11 @@ async function buildVehicleSpecsPdfBuffer(supabase, vehicleId, options = {}) {
   const technicalSpecs = (specs || []).filter((spec) => !spec.is_modification);
   const modifications = (specs || []).filter((spec) => spec.is_modification);
   const pdfBuffer = await generateVehicleSpecsPDF(
-    { ...vehicle, image: imageUrl },
+    { ...vehicleRow, image: imageUrl, catalog_limited_edition_total: catalogLimitedTotal },
     technicalSpecs,
     modifications,
   );
-  return { pdfBuffer, model: vehicle.model || 'vehiculo' };
+  return { pdfBuffer, model: vehicleRow.model || 'vehiculo' };
 }
 
 /**

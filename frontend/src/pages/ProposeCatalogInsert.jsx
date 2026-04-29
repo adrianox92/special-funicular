@@ -27,6 +27,9 @@ const emptyForm = {
   proposed_traction: '',
   proposed_motor_position: '',
   proposed_commercial_release_year: '',
+  proposed_dorsal: '',
+  proposed_limited_edition: false,
+  proposed_limited_edition_total: '',
   proposed_discontinued: false,
   proposed_upcoming_release: false,
 };
@@ -57,6 +60,14 @@ export default function ProposeCatalogInsert() {
       if (form.proposed_commercial_release_year) {
         fd.append('proposed_commercial_release_year', form.proposed_commercial_release_year);
       }
+      fd.append('proposed_dorsal', form.proposed_dorsal ?? '');
+      fd.append('proposed_limited_edition', form.proposed_limited_edition ? 'true' : 'false');
+      fd.append(
+        'proposed_limited_edition_total',
+        form.proposed_limited_edition && String(form.proposed_limited_edition_total ?? '').trim() !== ''
+          ? String(form.proposed_limited_edition_total).trim()
+          : '',
+      );
       fd.append('proposed_discontinued', form.proposed_discontinued ? 'true' : 'false');
       fd.append('proposed_upcoming_release', form.proposed_upcoming_release ? 'true' : 'false');
       if (imageFile) fd.append('image', imageFile);
@@ -179,6 +190,44 @@ export default function ProposeCatalogInsert() {
                 }
               />
             </div>
+            <div className="space-y-2">
+              <Label>Dorsal</Label>
+              <Input
+                value={form.proposed_dorsal}
+                onChange={(e) => setForm((f) => ({ ...f, proposed_dorsal: e.target.value }))}
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="propose-limited" className="cursor-pointer">
+                Edición limitada
+              </Label>
+              <Switch
+                id="propose-limited"
+                checked={form.proposed_limited_edition}
+                onCheckedChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    proposed_limited_edition: v,
+                    proposed_limited_edition_total: v ? f.proposed_limited_edition_total : '',
+                  }))
+                }
+              />
+            </div>
+            {form.proposed_limited_edition && (
+              <div className="space-y-2">
+                <Label>Tirada total (unidades)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={form.proposed_limited_edition_total}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, proposed_limited_edition_total: e.target.value }))
+                  }
+                  placeholder="ej. 500"
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-3 rounded-lg border p-3">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="propose-discontinued" className="cursor-pointer">

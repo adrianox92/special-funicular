@@ -313,7 +313,7 @@ export default function VehicleImportDialog({ open, onOpenChange, onImported }) 
 
               <div className="space-y-2">
                 <Label>Mapeo de columnas</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-md p-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto border rounded-md p-3">
                   {targetFields.map((f) => (
                     <div key={f.key} className="space-y-1">
                       <span className="text-xs text-muted-foreground">
@@ -375,13 +375,16 @@ export default function VehicleImportDialog({ open, onOpenChange, onImported }) 
                         <TableHead>Modelo</TableHead>
                         <TableHead>Marca</TableHead>
                         <TableHead>Tipo</TableHead>
+                        <TableHead className="whitespace-nowrap" title="Año de comercialización">
+                          Año com.
+                        </TableHead>
                         <TableHead>Notas</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {previewRows.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-muted-foreground text-center">
+                          <TableCell colSpan={7} className="text-muted-foreground text-center">
                             No hay filas para previsualizar
                           </TableCell>
                         </TableRow>
@@ -398,6 +401,11 @@ export default function VehicleImportDialog({ open, onOpenChange, onImported }) 
                             </TableCell>
                             <TableCell className="max-w-[100px] truncate" title={row.values?.type || ''}>
                               {row.values?.type || '—'}
+                            </TableCell>
+                            <TableCell className="text-center tabular-nums">
+                              {row.values?.commercial_release_year != null && row.values?.commercial_release_year !== ''
+                                ? String(row.values.commercial_release_year)
+                                : '—'}
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground max-w-[200px]">
                               {row.errors?.length
