@@ -22,7 +22,7 @@ export function getHelpTableOfContents(isAdmin) {
  */
 export function getHelpGuidePlainText(isAdmin = false) {
   const lines = [];
-  lines.push('# Slot Collection Pro — Guía y onboarding\n');
+  lines.push('# Slot Database — Guía y onboarding\n');
   lines.push('## Primeros pasos\n');
   lines.push(primerosPasos.intro);
   primerosPasos.steps.forEach((st, i) => {

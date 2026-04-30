@@ -1,6 +1,6 @@
 import { LANDING_PAGE_TITLE } from './landingSeo';
 
-export const BRAND = 'Slot Collection Pro';
+export const BRAND = 'Slot Database';
 
 /** Ruta pública `/catalogo/:uuid` o `/catalogo/:uuid/:slug` (ficha de un ítem). */
 const PUBLIC_CATALOG_ITEM_PATH =

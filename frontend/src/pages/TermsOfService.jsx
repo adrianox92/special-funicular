@@ -12,7 +12,7 @@ const TermsOfService = () => {
       <Section>
         <h2 className="text-xl font-semibold text-foreground">Aceptación</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Al acceder o usar Slot Collection Pro (en adelante, «el servicio»), aceptas estos términos. Si no estás
+          Al acceder o usar Slot Database (en adelante, «el servicio»), aceptas estos términos. Si no estás
           de acuerdo, no utilices el servicio. El uso continuado tras la publicación de cambios implica la aceptación
           de las modificaciones que resulten aplicables.
         </p>
@@ -21,7 +21,7 @@ const TermsOfService = () => {
       <Section>
         <h2 className="text-xl font-semibold text-foreground">Descripción del servicio</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Slot Collection Pro es una aplicación web para gestionar colecciones de coches de slot, tiempos,
+          Slot Database es una aplicación web para gestionar colecciones de coches de slot, tiempos,
           circuitos, inventario de piezas, competiciones y funciones relacionadas. El servicio puede evolucionar:
           se pueden añadir, modificar o retirar funcionalidades. La disponibilidad no es garantizada al 100 %;
           pueden producirse interrupciones por mantenimiento, causas técnicas o de fuerza mayor.
@@ -56,7 +56,7 @@ const TermsOfService = () => {
         <h2 className="text-xl font-semibold text-foreground">Propiedad intelectual del servicio</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           El software, el diseño, la estructura, la documentación, las marcas, los nombres comerciales
-          y demás elementos distintivos del servicio (incluido el nombre «Slot Collection Pro» cuando
+          y demás elementos distintivos del servicio (incluido el nombre «Slot Database» cuando
           se use como signo del servicio) son titularidad del responsable del servicio o de sus
           licenciantes y están protegidos por la legislación aplicable. Quedan reservados todos los
           derechos no concedidos expresamente en estos términos.

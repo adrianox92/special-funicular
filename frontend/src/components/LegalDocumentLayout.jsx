@@ -15,7 +15,7 @@ const LegalDocumentLayout = ({ title, children }) => {
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link to="/" className="text-sm font-bold text-foreground">
-            Slot Collection Pro
+            Slot Database
           </Link>
           <div className="flex items-center gap-2">
             {user ? (

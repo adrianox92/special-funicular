@@ -68,11 +68,11 @@ export default function PoliciesPage() {
       'listing-guidelines': 'Guía de publicación de listados',
     };
     if (policy?.title) {
-      document.title = `${policy.title} | Slot Collection Pro`;
+      document.title = `${policy.title} | Slot Database`;
     } else if (slug && FALLBACK_TITLES[slug]) {
-      document.title = `${FALLBACK_TITLES[slug]} | Slot Collection Pro`;
+      document.title = `${FALLBACK_TITLES[slug]} | Slot Database`;
     } else {
-      document.title = `Políticas | Slot Collection Pro`;
+      document.title = `Políticas | Slot Database`;
     }
   }, [policy, slug]);
 

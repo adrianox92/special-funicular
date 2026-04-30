@@ -84,7 +84,7 @@ const Changelog = () => {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Novedades</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cambios y mejoras recientes en Slot Collection Pro.
+          Cambios y mejoras recientes en Slot Database.
         </p>
       </div>
 

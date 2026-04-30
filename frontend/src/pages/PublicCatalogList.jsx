@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import api from '../lib/axios';
 import PublicCatalogShell from '../components/PublicCatalogShell';
 import CatalogThirdPartyNotice from '../components/CatalogThirdPartyNotice';
+import PageRangePagination from '../components/PageRangePagination';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -607,19 +608,13 @@ function PublicCatalogList() {
               })}
             </div>
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-4">
-                <Button variant="outline" size="sm" disabled={pageParam <= 1} onClick={() => setPage(pageParam - 1)}>
-                  Anterior
-                </Button>
-                <span className="text-sm text-muted-foreground px-2">
-                  Página {pageParam} / {totalPages}
-                </span>
-                <Button variant="outline" size="sm" disabled={pageParam >= totalPages} onClick={() => setPage(pageParam + 1)}>
-                  Siguiente
-                </Button>
-              </div>
-            )}
+            <PageRangePagination
+              className="pt-4"
+              page={pageParam}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              disabled={loading}
+            />
           </>
         )}
 

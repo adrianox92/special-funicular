@@ -61,7 +61,7 @@ const HelpPage = () => {
         <h1 className="text-2xl font-bold tracking-tight">Onboarding y ayuda</h1>
       </div>
       <p className="text-muted-foreground text-sm">
-        Guía para empezar con Slot Collection Pro y referencia de cada sección: qué hace, en qué orden conviene
+        Guía para empezar con Slot Database y referencia de cada sección: qué hace, en qué orden conviene
         configurarla y buenas prácticas. También puedes usar el buscador de abajo con preguntas en lenguaje natural.
       </p>
     </div>

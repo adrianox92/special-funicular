@@ -1,10 +1,10 @@
 /** SEO del landing público: palabras clave slot, Scalextric, Ninco, Avant Slot. */
 
 export const LANDING_PAGE_TITLE =
-  'Slot Collection Pro | Lleva la gestión de tu colección a otro nivel';
+  'Slot Database | Lleva la gestión de tu colección a otro nivel';
 
 export const LANDING_PAGE_DESCRIPTION =
-  'Slot Collection Pro (Slot Database): gestiona coches de slot Scalextric, Ninco y Avant Slot. Fichas técnicas, cronometraje al milisegundo, competiciones y sincronización en la nube.';
+  'Slot Database: gestiona coches de slot Scalextric, Ninco y Avant Slot. Fichas técnicas, cronometraje al milisegundo, competiciones y sincronización en la nube.';
 
 const KEYWORDS =
   'slot, scalextric, ninco, avant slot, slot car, base de datos slot, colección scalextric';
@@ -73,8 +73,8 @@ export function applyLandingPageSeo() {
     script.textContent = JSON.stringify({
       '@context': 'https://schema.org',
       '@type': 'WebSite',
-      name: 'Slot Collection Pro',
-      alternateName: ['Slot Database', 'Scalextric Collection'],
+      name: 'Slot Database',
+      alternateName: ['Scalextric Collection'],
       url: canonicalUrl || `${origin}/`,
       description: LANDING_PAGE_DESCRIPTION,
       inLanguage: 'es-ES',

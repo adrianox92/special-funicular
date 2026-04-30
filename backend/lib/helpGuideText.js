@@ -11,7 +11,7 @@ function buildHelpGuidePlainText(data, options = {}) {
   if (!data || !data.sections) return '';
   const lines = [];
   const primeros = data.primerosPasos;
-  lines.push('# Slot Collection Pro — Guía y onboarding\n');
+  lines.push('# Slot Database — Guía y onboarding\n');
   lines.push('## Primeros pasos\n');
   lines.push(primeros.intro);
   primeros.steps.forEach((st, i) => {

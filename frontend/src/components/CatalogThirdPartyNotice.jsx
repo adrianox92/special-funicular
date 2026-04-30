@@ -12,7 +12,7 @@ export default function CatalogThirdPartyNotice() {
       <p>
         Los nombres comerciales, logotipos e imágenes mostrados son propiedad de sus respectivos
         titulares.{' '}
-        <span className="text-foreground/90 font-medium">Slot Collection Pro</span> no está afiliado
+        <span className="text-foreground/90 font-medium">Slot Database</span> no está afiliado
         ni patrocinado por dichos titulares. El contenido se ofrece solo con fines informativos.
       </p>
     </aside>

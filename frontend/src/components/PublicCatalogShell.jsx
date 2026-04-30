@@ -16,7 +16,7 @@ export default function PublicCatalogShell({ children }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-6 min-w-0">
             <Link to="/" className="font-semibold text-foreground truncate hover:opacity-90">
-              Slot Collection Pro
+              Slot Database
             </Link>
             <nav className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
               <Link to="/catalogo" className="hover:text-foreground transition-colors">

@@ -66,7 +66,7 @@ router.post('/', (req, res, next) => {
   }
 
   const { name, email, message } = req.body;
-  const subject = `[Slot Collection Pro] Contacto: ${name}`;
+  const subject = `[Slot Database] Contacto: ${name}`;
   const text = [
     `Nombre: ${name}`,
     `Correo del remitente: ${email}`,

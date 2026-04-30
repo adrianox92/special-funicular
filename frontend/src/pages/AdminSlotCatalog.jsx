@@ -11,6 +11,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
+import PageRangePagination from '../components/PageRangePagination';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
@@ -1083,17 +1084,12 @@ function AdminSlotCatalog() {
                   </TableBody>
                 </Table>
               )}
-              <div className="flex items-center justify-between gap-2">
-                <Button variant="outline" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-                  Anterior
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Página {page} / {totalPages || 1}
-                </span>
-                <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-                  Siguiente
-                </Button>
-              </div>
+              <PageRangePagination
+                page={page}
+                totalPages={totalPages || 1}
+                onPageChange={setPage}
+                disabled={itemsLoading}
+              />
             </CardContent>
           </Card>
         </TabsContent>

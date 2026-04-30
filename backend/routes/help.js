@@ -45,7 +45,7 @@ router.post(
       ? buildHelpGuidePlainText(guideData, { includeAdminSections })
       : 'No hay guía cargada. Di que no tienes contexto suficiente.';
 
-    const systemPrompt = `Eres el asistente de ayuda de la aplicación web Slot Collection Pro (gestión de colección slot/coches, tiempos, circuitos, inventario y competiciones).
+    const systemPrompt = `Eres el asistente de ayuda de la aplicación web Slot Database (gestión de colección slot/coches, tiempos, circuitos, inventario y competiciones).
 Responde SIEMPRE en español, de forma breve y con pasos numerados cuando proceda.
 Usa ÚNICAMENTE la información del siguiente contexto de ayuda. Si la pregunta no puede responderse con ese contexto, dilo claramente y sugiere revisar las secciones relevantes (Inicio, Vehículos, Tiempos, etc.) sin inventar funciones que no aparezcan en la guía.
 No inventes enlaces URL concretos; puedes mencionar nombres de secciones del menú.

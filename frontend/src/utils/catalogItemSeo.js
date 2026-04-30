@@ -202,7 +202,7 @@ export function buildCatalogItemKeywords(item) {
 
 const LIST_TITLE_BASE = `Catálogo de referencias | ${BRAND}`;
 const LIST_DESCRIPTION_BASE =
-  'Catálogo público de modelos slot: referencia, marca, tipo, año de comercialización y valoraciones de la comunidad. Scalextric, Ninco, Avant Slot y más en Slot Collection Pro.';
+  'Catálogo público de modelos slot: referencia, marca, tipo, año de comercialización y valoraciones de la comunidad. Scalextric, Ninco, Avant Slot y más en Slot Database.';
 
 /**
  * Meta del listado /catalogo — acepta filtros activos para componer título y canonical SEO-friendly.

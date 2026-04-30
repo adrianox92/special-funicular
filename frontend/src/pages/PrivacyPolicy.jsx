@@ -12,7 +12,7 @@ const PrivacyPolicy = () => {
       <Section>
         <h2 className="text-xl font-semibold text-foreground">Introducción</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Slot Collection Pro (en adelante, «el servicio») respeta tu privacidad. Esta política describe qué datos
+          Slot Database (en adelante, «el servicio») respeta tu privacidad. Esta política describe qué datos
           recopilamos, cómo los usamos y cuáles son tus derechos. Al usar el servicio, aceptas esta política en la
           medida en que resulte de aplicación junto con la normativa vigente.
         </p>
