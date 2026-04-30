@@ -158,6 +158,12 @@ app.get('/health', (_req, res) => {
   res.json(getHealthPayload());
 });
 
+// Render/y otros pueden usar "/" como health check si no está configurado en el panel.
+// Sin esta ruta, GET / → 404 y el deploy puede fallar con un error genérico.
+app.get('/', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 const sitemapHandler = require('./routes/sitemap');
 app.get('/sitemap.xml', sitemapHandler);
 

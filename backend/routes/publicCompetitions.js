@@ -3,6 +3,11 @@ const router = express.Router();
 const { getAnonClient } = require('../lib/supabaseClients');
 const supabase = getAnonClient();
 const { loadCompetitionExportByPublicSlug } = require('../lib/competitionExportPayload');
+const {
+  calculatePoints,
+  lapTimeStringToSeconds,
+  isUsableBestLapTimeString
+} = require('../lib/pointsCalculator');
 const { generateCompetitionCSV, safeFilenamePart } = require('../lib/competitionCsvGenerator');
 const { generateCompetitionXLSX } = require('../lib/competitionXlsxGenerator');
 const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
