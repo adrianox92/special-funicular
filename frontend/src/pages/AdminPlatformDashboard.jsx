@@ -25,6 +25,10 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
+import VehicleCatalogCoverageChart from '../components/charts/VehicleCatalogCoverageChart';
+import { Switch } from '../components/ui/switch';
+
+const REFS_PAGE_SIZE = 25;
 
 const PRESETS = [
   { value: '7d', label: 'Últimos 7 días', ms: 7 * 24 * 60 * 60 * 1000 },
@@ -79,6 +83,12 @@ const AdminPlatformDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [refsPage, setRefsPage] = useState(1);
+  const [refsOnlyUnlinked, setRefsOnlyUnlinked] = useState(false);
+  const [refsData, setRefsData] = useState(null);
+  const [refsLoading, setRefsLoading] = useState(false);
+  const [refsError, setRefsError] = useState(null);
+
   const fetchMetrics = useCallback(async () => {
     if (!range) return;
     setLoading(true);
@@ -100,13 +110,56 @@ const AdminPlatformDashboard = () => {
     }
   }, [range]);
 
+  const fetchRefsReport = useCallback(async () => {
+    if (!isAdmin) return;
+    setRefsLoading(true);
+    setRefsError(null);
+    const offset = (refsPage - 1) * REFS_PAGE_SIZE;
+    try {
+      const { data: res } = await api.get('/admin/vehicle-refs-not-in-catalog', {
+        params: {
+          limit: REFS_PAGE_SIZE,
+          offset,
+          only_unlinked: refsOnlyUnlinked ? 'true' : 'false',
+        },
+      });
+      setRefsData(res);
+    } catch (err) {
+      const msg =
+        err.response?.data?.error || err.message || 'Error al cargar referencias ausentes del catálogo';
+      setRefsError(msg);
+      setRefsData(null);
+    } finally {
+      setRefsLoading(false);
+    }
+  }, [isAdmin, refsPage, refsOnlyUnlinked]);
+
   useEffect(() => {
     if (isAdmin && range) void fetchMetrics();
   }, [isAdmin, range, fetchMetrics]);
 
+  useEffect(() => {
+    if (isAdmin) void fetchRefsReport();
+  }, [isAdmin, fetchRefsReport]);
+
+  useEffect(() => {
+    setRefsPage(1);
+  }, [refsOnlyUnlinked]);
+
+  useEffect(() => {
+    if (!refsData || refsLoading) return;
+    const pages = Math.max(1, Math.ceil(Number(refsData.total) / REFS_PAGE_SIZE));
+    if (refsPage > pages) setRefsPage(pages);
+  }, [refsData, refsLoading, refsPage]);
+
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const refsTotalPages =
+    refsData?.total != null
+      ? Math.max(1, Math.ceil(Number(refsData.total) / REFS_PAGE_SIZE))
+      : 1;
 
   const kpis = [
     {
@@ -262,6 +315,125 @@ const AdminPlatformDashboard = () => {
           </Card>
         ))}
       </div>
+
+      {data && !loading && (
+        <VehicleCatalogCoverageChart
+          vehiclesTotal={data.vehicles_total ?? 0}
+          withCatalogItemId={data.vehicles_with_catalog_item_id ?? 0}
+        />
+      )}
+
+      <Card>
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-base">Referencias de garaje ausentes del catálogo</CardTitle>
+          <CardDescription>
+            Agrupadas por referencia normalizada (espacios y mayúsculas/minúsculas). Si algún ítem del
+            catálogo público comparte la misma referencia normalizada, no aparece aquí. No depende del
+            periodo de fechas de arriba.
+          </CardDescription>
+          <div className="flex flex-wrap items-center gap-3 pt-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="refs-only-unlinked"
+                checked={refsOnlyUnlinked}
+                onCheckedChange={(v) => setRefsOnlyUnlinked(!!v)}
+              />
+              <Label htmlFor="refs-only-unlinked" className="text-sm font-normal cursor-pointer">
+                Sólo vehículos sin enlace a catálogo (<span className="font-mono">catalog_item_id</span>{' '}
+                vacío)
+              </Label>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void fetchRefsReport()}
+              disabled={refsLoading}
+            >
+              Actualizar listado
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {refsError && (
+            <Alert variant="destructive">
+              <AlertDescription>{refsError}</AlertDescription>
+            </Alert>
+          )}
+          {refsLoading && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Spinner className="size-5" />
+              Cargando referencias…
+            </div>
+          )}
+          {!refsLoading && !refsError && refsData && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {refsData.total === 0
+                  ? 'Ningún grupo cumple los criterios.'
+                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares).`}
+              </p>
+              {refsData.total > 0 && (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-right w-[110px]">Ejemplares</TableHead>
+                        <TableHead>Referencia</TableHead>
+                        <TableHead className="text-right w-[100px]">Usuarios</TableHead>
+                        <TableHead>Fabricante (ej.)</TableHead>
+                        <TableHead>Modelo (ej.)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(refsData.rows || []).map((row, idx) => (
+                        <TableRow key={`${refsData.offset}-${idx}`}>
+                          <TableCell className="text-right tabular-nums font-semibold">
+                            {row.vehicle_count ?? 0}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{row.reference || '—'}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {row.distinct_user_count ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-sm">{row.sample_manufacturer ?? '—'}</TableCell>
+                          <TableCell className="text-sm">{row.sample_model ?? '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {refsData.total > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Página {refsPage} de {refsTotalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={refsPage <= 1 || refsLoading}
+                      onClick={() => setRefsPage((p) => Math.max(1, p - 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={refsLoading || refsPage >= refsTotalPages}
+                      onClick={() => setRefsPage((p) => p + 1)}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

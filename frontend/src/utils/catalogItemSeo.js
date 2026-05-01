@@ -20,6 +20,9 @@ function labelMotorForMeta(value) {
 const KEYWORDS_BASE =
   'slot, scalextric, ninco, avant slot, slot car, coche slot, catálogo referencias slot, base de datos slot, colección scalextric, referencia slot';
 
+/** Pie de meta description compartido entre listados y fichas del catálogo público. */
+const CATALOG_PUBLIC_META_FOOTER = `Referencia, especificaciones, imagen y valoraciones en ${BRAND}.`;
+
 function setMeta(attrName, value, isProperty) {
   if (value == null || value === '') return;
   const attr = isProperty ? 'property' : 'name';
@@ -90,25 +93,34 @@ function toIsoDateModified(iso) {
  * @param {Record<string, unknown>} item
  * @returns {string}
  */
+/**
+ * Cabecera SEO de ficha de catálogo: marca · referencia · modelo (solo valores presentes).
+ * @param {Record<string, unknown>} item
+ * @returns {string}
+ */
+function buildCatalogItemHeadline(item) {
+  const ref = item.reference != null ? String(item.reference).trim() : '';
+  const mfg = item.manufacturer != null ? String(item.manufacturer).trim() : '';
+  const name = item.model_name != null ? String(item.model_name).trim() : '';
+  return [mfg || null, ref || null, name || null].filter(Boolean).join(' · ');
+}
+
 export function buildCatalogItemImageAlt(item) {
   const ref = item.reference != null ? String(item.reference) : '';
   const mfg = item.manufacturer != null ? String(item.manufacturer) : '';
   const name = item.model_name != null ? String(item.model_name) : '';
-  const bits = ['Coche slot', name, ref && `ref. ${ref}`, mfg && `marca ${mfg}`].filter(Boolean);
+  const bits = ['Coche slot', mfg, ref && `ref. ${ref}`, name].filter(Boolean);
   return bits.join(', ');
 }
 
 /**
- * Título del documento: palabras clave al inicio (modelo, referencia, marca) y marca del sitio al cierre.
+ * Título del documento: marca · referencia · modelo | Slot Database.
  * @param {Record<string, unknown>} item
  * @returns {string}
  */
 export function buildCatalogItemPageTitle(item) {
-  const ref = item.reference != null ? String(item.reference) : '';
-  const mfg = item.manufacturer != null ? String(item.manufacturer) : '';
-  const name = item.model_name != null ? String(item.model_name) : '';
-  const core = [name, ref && `ref. ${ref}`, mfg].filter(Boolean).join(' · ');
-  const raw = core ? `${core} | Catálogo slot | ${BRAND}` : `Catálogo slot | ${BRAND}`;
+  const core = buildCatalogItemHeadline(item);
+  const raw = core ? `${core} | ${BRAND}` : `Catálogo de referencias | ${BRAND}`;
   return truncateTitle(raw, 72);
 }
 
@@ -117,12 +129,13 @@ export function buildCatalogItemPageTitle(item) {
  * @returns {string}
  */
 export function buildCatalogItemMetaDescription(item) {
-  const ref = item.reference != null ? String(item.reference) : '';
-  const mfg = item.manufacturer != null ? String(item.manufacturer) : '';
-  const name = item.model_name != null ? String(item.model_name) : '';
-  const parts = [
-    `${name} (${ref}), coche slot ${mfg}: ficha del catálogo público de ${BRAND}.`,
-  ];
+  const headline = buildCatalogItemHeadline(item);
+
+  const lead = headline
+    ? `${headline}: coche slot; catálogo público ${BRAND}.`
+    : `Ficha de coche slot en el catálogo público ${BRAND}.`;
+
+  const parts = [lead];
   const extras = [];
   if (item.vehicle_type) extras.push(`${item.vehicle_type}`);
   if (item.commercial_release_year != null && item.commercial_release_year !== '') {
@@ -143,7 +156,7 @@ export function buildCatalogItemMetaDescription(item) {
   if (extras.length) {
     parts.push(extras.join(' · ') + '.');
   }
-  parts.push('Imagen, especificaciones y opiniones de coleccionistas.');
+  parts.push(CATALOG_PUBLIC_META_FOOTER);
   return truncate(parts.join(' '), 160);
 }
 
@@ -153,11 +166,11 @@ export function buildCatalogItemMetaDescription(item) {
  * @returns {string}
  */
 export function buildCatalogItemLeadParagraph(item) {
-  const ref = item.reference != null ? String(item.reference) : '';
-  const mfg = item.manufacturer != null ? String(item.manufacturer) : '';
-  const name = item.model_name != null ? String(item.model_name) : '';
+  const headline = buildCatalogItemHeadline(item);
   const parts = [
-    `${name} (${ref}) es un modelo slot de ${mfg} en el catálogo público de ${BRAND}.`,
+    headline
+      ? `${headline}: coche slot en el catálogo público de ${BRAND}.`
+      : `Ficha de coche slot en el catálogo público de ${BRAND}.`,
   ];
   const extras = [];
   if (item.vehicle_type) extras.push(String(item.vehicle_type));
@@ -181,7 +194,7 @@ export function buildCatalogItemLeadParagraph(item) {
   if (extras.length) {
     parts.push(`Datos: ${extras.join('; ')}.`);
   }
-  parts.push('Consulta imagen, especificaciones y valoraciones de otros coleccionistas.');
+  parts.push(`Imagen, especificaciones y valoraciones de coleccionistas en ${BRAND}.`);
   return truncate(parts.join(' '), 420);
 }
 
@@ -201,8 +214,10 @@ export function buildCatalogItemKeywords(item) {
 }
 
 const LIST_TITLE_BASE = `Catálogo de referencias | ${BRAND}`;
-const LIST_DESCRIPTION_BASE =
-  'Catálogo público de modelos slot: referencia, marca, tipo, año de comercialización y valoraciones de la comunidad. Scalextric, Ninco, Avant Slot y más en Slot Database.';
+const LIST_DESCRIPTION_BASE = truncate(
+  `Catálogo público de coches slot (Scalextric, Ninco, Avant Slot y más). ${CATALOG_PUBLIC_META_FOOTER}`,
+  158,
+);
 
 /**
  * Meta del listado /catalogo — acepta filtros activos para componer título y canonical SEO-friendly.
@@ -222,15 +237,18 @@ export function applyPublicCatalogListSeo(filters = {}) {
   // Construir título dinámico
   const parts = [manufacturerName, vehicleTypeLabel, tractionLabel, year ? String(year) : null].filter(Boolean);
   const titleSuffix = parts.length ? parts.join(' · ') : null;
+  // Título dinámico: solo filtros del path + marca del sitio (cada combinación es una página distinta para SEO).
   const listTitle = titleSuffix
-    ? `${titleSuffix} | Catálogo slot | ${BRAND}`
+    ? `${titleSuffix} | ${BRAND}`
     : LIST_TITLE_BASE;
+
+  document.title = truncateTitle(listTitle, 72);
 
   // Meta description dinámica
   const countText = total != null ? `${total} modelo${total !== 1 ? 's' : ''}` : 'modelos';
   const filterText = parts.length ? ` de ${parts.join(', ')}` : '';
   const listDescription = parts.length
-    ? truncate(`Catálogo slot${filterText}: ${countText} encontrados. Referencia, precio, tipo y valoraciones en ${BRAND}.`, 158)
+    ? truncate(`Catálogo público${filterText}: ${countText} encontrados. ${CATALOG_PUBLIC_META_FOOTER}`, 158)
     : LIST_DESCRIPTION_BASE;
 
   const canonicalUrl = origin
@@ -306,7 +324,7 @@ export function applyCatalogItemPageSeo(item) {
       setMeta('og:image', logoUrl, true);
       setMeta('og:image:width', '512', true);
       setMeta('og:image:height', '512', true);
-      setMeta('og:image:alt', `${BRAND} · Catálogo slot`, true);
+      setMeta('og:image:alt', `Catálogo público · ${BRAND}`, true);
     }
   }
 
@@ -370,7 +388,7 @@ export function applyCatalogItemPageSeo(item) {
         {
           '@type': 'ListItem',
           position: mfg ? 4 : 3,
-          name: String(item.model_name ?? item.reference ?? 'Ficha'),
+          name: buildCatalogItemHeadline(item) || String(item.model_name ?? item.reference ?? 'Ficha'),
           item: canonicalUrl,
         },
       ],
@@ -378,7 +396,7 @@ export function applyCatalogItemPageSeo(item) {
 
     const product = {
       '@type': 'Product',
-      name: `${item.model_name} (${item.reference})`,
+      name: buildCatalogItemHeadline(item) || String(item.model_name ?? item.reference ?? 'Coche slot'),
       description,
       sku: String(item.reference),
       mpn: String(item.reference),

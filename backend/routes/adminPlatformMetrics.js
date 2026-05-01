@@ -9,6 +9,32 @@ const router = express.Router();
 
 const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000;
 
+const REFS_GAP_MIN_LIMIT = 1;
+const REFS_GAP_MAX_LIMIT = 100;
+
+function parseRefsGapQuery(req) {
+  const limRaw = req.query.limit;
+  const offRaw = req.query.offset;
+  const lim =
+    limRaw === undefined || limRaw === ''
+      ? 25
+      : Number.parseInt(String(limRaw), 10);
+  const off =
+    offRaw === undefined || offRaw === ''
+      ? 0
+      : Number.parseInt(String(offRaw), 10);
+  if (!Number.isFinite(lim) || !Number.isFinite(off)) {
+    return { error: 'limit y offset deben ser enteros.' };
+  }
+  const limit = Math.min(REFS_GAP_MAX_LIMIT, Math.max(REFS_GAP_MIN_LIMIT, lim));
+  const offset = Math.max(0, off);
+  const only =
+    req.query.only_unlinked === true ||
+    req.query.only_unlinked === 'true' ||
+    req.query.only_unlinked === '1';
+  return { limit, offset, only_unlinked: only };
+}
+
 function parseIsoDate(s) {
   if (!s || typeof s !== 'string') return null;
   const t = Date.parse(s.trim());
@@ -65,6 +91,8 @@ router.get('/platform-metrics', async (req, res) => {
     res.json({
       from: p_from,
       to: p_to,
+      vehicles_total: payload.vehicles_total ?? 0,
+      vehicles_with_catalog_item_id: payload.vehicles_with_catalog_item_id ?? 0,
       users_created: payload.users_created ?? 0,
       users_active: payload.users_active ?? 0,
       competitions_created: payload.competitions_created ?? 0,
@@ -75,6 +103,55 @@ router.get('/platform-metrics', async (req, res) => {
     });
   } catch (err) {
     console.error('adminPlatformMetrics:', err);
+    res.status(500).json({ error: err?.message || 'Error interno' });
+  }
+});
+
+/**
+ * GET /vehicle-refs-not-in-catalog?limit=&offset=&only_unlinked=
+ * Referencias de garaje sin equivalencia en catálogo (normalización trim + lower).
+ */
+router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
+  try {
+    if (!assertLicenseAdmin(req, res)) return;
+
+    const supabaseAdmin = getServiceClient();
+    if (!supabaseAdmin) {
+      return res.status(503).json({
+        error: 'Servicio no disponible: falta SUPABASE_SERVICE_ROLE_KEY en el servidor.',
+      });
+    }
+
+    const parsed = parseRefsGapQuery(req);
+    if (parsed.error) {
+      return res.status(400).json({ error: parsed.error });
+    }
+
+    const { data, error } = await supabaseAdmin.rpc('admin_vehicle_refs_missing_catalog', {
+      p_limit: parsed.limit,
+      p_offset: parsed.offset,
+      p_only_unlinked: parsed.only_unlinked,
+    });
+
+    if (error) {
+      console.error('admin_vehicle_refs_missing_catalog:', error);
+      return res.status(500).json({ error: error.message || 'Error al calcular referencias' });
+    }
+
+    const payload =
+      data && typeof data === 'object' && !Array.isArray(data)
+        ? data
+        : {};
+
+    res.json({
+      total: typeof payload.total === 'number' ? payload.total : 0,
+      limit: typeof payload.limit === 'number' ? payload.limit : parsed.limit,
+      offset: typeof payload.offset === 'number' ? payload.offset : parsed.offset,
+      only_unlinked: !!payload.only_unlinked,
+      rows: Array.isArray(payload.rows) ? payload.rows : [],
+    });
+  } catch (err) {
+    console.error('vehicle-refs-not-in-catalog:', err);
     res.status(500).json({ error: err?.message || 'Error interno' });
   }
 });

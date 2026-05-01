@@ -99,6 +99,8 @@ const AppContent = () => {
   React.useEffect(() => {
     // La ficha pública del catálogo fija título y metadescripción en `applyCatalogItemPageSeo`.
     if (isPublicCatalogDetailPath(location.pathname)) return;
+    // Listados SEO /catalogo/marca/... fijan título en `applyPublicCatalogListSeo` (evita <title> idéntico en todas las marcas).
+    if (location.pathname !== '/catalogo' && location.pathname.startsWith('/catalogo/')) return;
     document.title = getDocumentTitle(location.pathname);
   }, [location.pathname]);
 
