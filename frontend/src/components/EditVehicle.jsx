@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ExternalLink,
   Pencil,
@@ -1443,6 +1443,19 @@ const EditVehicle = () => {
                           {item.purchase_price != null &&
                             ` · ${Number(item.purchase_price).toFixed(2)} €/ud (precio unitario)`}
                         </p>
+                        {Array.isArray(item.mounted_vehicles) && item.mounted_vehicles.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
+                            Montado en{' '}
+                            {item.mounted_vehicles.map((v, idx) => (
+                              <span key={v.id}>
+                                {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? ' y ' : ', ') : ''}
+                                <Link to={`/vehicles/${v.id}`} className="text-primary hover:underline font-medium">
+                                  {v.manufacturer} {v.model}
+                                </Link>
+                              </span>
+                            ))}
+                          </p>
+                        )}
                       </div>
                       <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
                         Usar este

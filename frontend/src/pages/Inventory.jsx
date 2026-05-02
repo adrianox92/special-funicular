@@ -121,9 +121,19 @@ const Inventory = () => {
 
   const loadVehicles = useCallback(async () => {
     try {
-      const { data } = await api.get('/vehicles', { params: { page: 1, limit: 500 } });
-      const list = data?.vehicles ?? (Array.isArray(data) ? data : []);
-      setVehicles(list);
+      const limit = 250;
+      let page = 1;
+      /** @type {{ id: string }[]} */
+      const all = [];
+      let totalPages = 1;
+      do {
+        const { data } = await api.get('/vehicles', { params: { page, limit } });
+        const list = data?.vehicles ?? (Array.isArray(data) ? data : []);
+        all.push(...list);
+        totalPages = data?.pagination?.totalPages ?? 1;
+        page += 1;
+      } while (page <= totalPages);
+      setVehicles(all);
     } catch (e) {
       console.error(e);
     }
@@ -1343,18 +1353,25 @@ const Inventory = () => {
                       </a>
                     </div>
                   )}
-                  {item.vehicle && (
-                    <div className="flex items-center gap-1">
-                      <Car className="size-3 shrink-0" aria-hidden />
-                      <span>
-                        Montado en{' '}
-                        <Link
-                          to={`/vehicles/${item.vehicle.id}`}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {item.vehicle.manufacturer} {item.vehicle.model}
-                        </Link>
-                      </span>
+                  {Array.isArray(item.mounted_vehicles) && item.mounted_vehicles.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-start gap-1">
+                        <Car className="size-3 shrink-0 mt-0.5" aria-hidden />
+                        <span className="leading-snug">
+                          Montado en{' '}
+                          {item.mounted_vehicles.map((v, idx) => (
+                            <span key={v.id}>
+                              {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? ' y ' : ', ') : ''}
+                              <Link
+                                to={`/vehicles/${v.id}`}
+                                className="font-medium text-primary hover:underline"
+                              >
+                                {v.manufacturer} {v.model}
+                              </Link>
+                            </span>
+                          ))}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>

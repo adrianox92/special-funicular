@@ -138,6 +138,132 @@ async function attachVehicles(supabase, rows, userId) {
   }));
 }
 
+/** Máximo de ítems de inventario por consulta agrupada a componentes montados */
+const INVENTORY_MOUNT_QUERY_CHUNK = 80;
+
+/**
+ * Coches donde este stock está montado (components.source_inventory_item_id),
+ * combinado con el vehículo opcional declarado en la fila (`vehicle_id`).
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ */
+async function attachMountedVehiclesFromComponents(supabase, rows, userId) {
+  if (!rows || rows.length === 0) return rows;
+
+  /** @type {Map<string, Map<string, { id: string, manufacturer?: string|null, model?: string|null }>>} */
+  const byInventory = new Map();
+
+  const invIds = [...new Set(rows.map((r) => r?.id).filter(Boolean))];
+
+  async function ingestChunk(chunkIds) {
+    if (chunkIds.length === 0) return;
+
+    const { data: comps, error } = await supabase
+      .from('components')
+      .select('source_inventory_item_id, tech_spec_id')
+      .not('source_inventory_item_id', 'is', null)
+      .in('source_inventory_item_id', chunkIds);
+
+    if (error) throw error;
+
+    const specIds = [...new Set((comps || []).map((c) => c.tech_spec_id).filter(Boolean))];
+    if (specIds.length === 0) return;
+
+    const { data: specs, error: specsError } = await supabase
+      .from('technical_specs')
+      .select('id, vehicle_id')
+      .in('id', specIds);
+
+    if (specsError) throw specsError;
+
+    /** @type {Record<string, string>} */
+    const specVehicle = {};
+    const vehicleIds = new Set();
+
+    for (const s of specs || []) {
+      if (s?.id && s.vehicle_id) {
+        specVehicle[s.id] = s.vehicle_id;
+        vehicleIds.add(s.vehicle_id);
+      }
+    }
+
+    const vids = [...vehicleIds];
+    if (vids.length === 0) return;
+
+    const { data: vehRows, error: vehError } = await supabase
+      .from('vehicles')
+      .select('id, manufacturer, model')
+      .eq('user_id', userId)
+      .in('id', vids);
+
+    if (vehError) throw vehError;
+
+    /** @type {Record<string, { id: string, manufacturer?: string|null, model?: string|null }>} */
+    const vehMap = Object.fromEntries((vehRows || []).map((v) => [v.id, v]));
+
+    for (const c of comps || []) {
+      const iid = c.source_inventory_item_id;
+      const specId = c.tech_spec_id;
+      const vId = specId ? specVehicle[specId] : undefined;
+      if (!iid || !vId) continue;
+
+      const vehicle = vehMap[vId];
+      if (!vehicle?.id) continue;
+
+      let bucket = byInventory.get(iid);
+      if (!bucket) {
+        bucket = new Map();
+        byInventory.set(iid, bucket);
+      }
+
+      bucket.set(vehicle.id, {
+        id: vehicle.id,
+        manufacturer: vehicle.manufacturer,
+        model: vehicle.model,
+      });
+    }
+  }
+
+  for (let i = 0; i < invIds.length; i += INVENTORY_MOUNT_QUERY_CHUNK) {
+    await ingestChunk(invIds.slice(i, i + INVENTORY_MOUNT_QUERY_CHUNK));
+  }
+
+  return rows.map((row) => {
+    const merged = new Map();
+    if (row?.vehicle_id && row?.vehicle) {
+      merged.set(row.vehicle.id, {
+        id: row.vehicle.id,
+        manufacturer: row.vehicle.manufacturer,
+        model: row.vehicle.model,
+      });
+    }
+    const fromComp = row?.id ? byInventory.get(row.id) : undefined;
+    if (fromComp) {
+      for (const [vid, v] of fromComp) merged.set(vid, v);
+    }
+
+    const mountedList = [...merged.values()].sort((a, b) =>
+      `${a.manufacturer || ''} ${a.model || ''}`.localeCompare(
+        `${b.manufacturer || ''} ${b.model || ''}`,
+        undefined,
+        { sensitivity: 'base' },
+      ),
+    );
+
+    return {
+      ...row,
+      mounted_vehicles: mountedList,
+    };
+  });
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ */
+async function enrichInventoryRows(supabase, rows, userId) {
+  const withVehicle = await attachVehicles(supabase, rows, userId);
+  return attachMountedVehiclesFromComponents(supabase, withVehicle, userId);
+}
+
 /**
  * GET /api/inventory?category=&low_stock=true&vehicle_id=&q=
  */
@@ -186,7 +312,7 @@ router.get('/', async (req, res) => {
       );
     }
 
-    const enriched = await attachVehicles(req.supabase, rows, req.user.id);
+    const enriched = await enrichInventoryRows(req.supabase, rows, req.user.id);
     res.json(enriched);
   } catch (err) {
     console.error('GET /inventory:', err);
@@ -262,7 +388,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Item no encontrado' });
     }
 
-    const [enriched] = await attachVehicles(req.supabase, [data], req.user.id);
+    const [enriched] = await enrichInventoryRows(req.supabase, [data], req.user.id);
     res.json(enriched);
   } catch (err) {
     console.error('GET /inventory/:id:', err);
@@ -372,7 +498,7 @@ router.post('/:id/restock', async (req, res) => {
       });
     }
 
-    const [enriched] = await attachVehicles(req.supabase, [updatedInv], req.user.id);
+    const [enriched] = await enrichInventoryRows(req.supabase, [updatedInv], req.user.id);
     res.status(201).json({
       inventory_item: enriched,
       purchase_entry: { ...historyRow, id: insertedHist.id },
@@ -507,7 +633,7 @@ router.post('/', inventoryCreateValidators, handleValidationErrors, async (req, 
       return res.status(500).json({ error: error.message });
     }
 
-    const [enriched] = await attachVehicles(req.supabase, [data], req.user.id);
+    const [enriched] = await enrichInventoryRows(req.supabase, [data], req.user.id);
     res.status(201).json(enriched);
   } catch (err) {
     console.error('POST /inventory:', err);
@@ -675,7 +801,7 @@ router.put('/:id', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    const [enriched] = await attachVehicles(req.supabase, [data], req.user.id);
+    const [enriched] = await enrichInventoryRows(req.supabase, [data], req.user.id);
     res.json(enriched);
   } catch (err) {
     console.error('PUT /inventory/:id:', err);
@@ -833,7 +959,7 @@ router.post('/:id/mount', async (req, res) => {
       await updateVehicleTotalPrice(vehicleId);
     }
 
-    const [enriched] = await attachVehicles(req.supabase, [updatedInv], req.user.id);
+    const [enriched] = await enrichInventoryRows(req.supabase, [updatedInv], req.user.id);
     res.status(201).json({
       component: inserted,
       inventory_item: enriched,
