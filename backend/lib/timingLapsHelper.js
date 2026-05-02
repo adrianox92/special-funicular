@@ -2,17 +2,22 @@
  * Helpers for querying timing_laps without hitting PostgREST's default 1000-row limit.
  */
 
+const { getServiceClient } = require('./supabaseClients');
+
 /**
- * Returns a Set of timing_id values that have at least one row in timing_laps.
- * Paginates to avoid truncating bulk selects.
+ * Lectura de timing_laps: si en Supabase RLS solo deja pasar service role (p. ej. sin policy para
+ * authenticated), el cliente con JWT devuelve 0 filas. Los timingIds deben venir siempre de
+ * vehicle_timings ya filtrados por usuario en la ruta que llama.
  *
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {import('@supabase/supabase-js').SupabaseClient} userSupabase — cliente con JWT (fallback)
  * @param {string[]} timingIds
  * @returns {Promise<Set<string>>}
  */
-async function fetchTimingIdsWithLaps(supabase, timingIds) {
+async function fetchTimingIdsWithLaps(userSupabase, timingIds) {
   const result = new Set();
   if (!timingIds || timingIds.length === 0) return result;
+
+  const supabase = getServiceClient() || userSupabase;
 
   const pageSize = 1000;
   let from = 0;

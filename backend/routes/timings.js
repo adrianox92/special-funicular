@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createUserScopedClient } = require('../lib/supabaseClients');
+const { createUserScopedClient, getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { getCircuitRanking } = require('../lib/positionTracker');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
@@ -9,8 +9,6 @@ const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const csvTimingParse = require('../lib/csvTimingParse');
 const smartraceCsv = require('../lib/smartraceCsvImport');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
-
-
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
 router.use((req, res, next) => {
@@ -629,7 +627,8 @@ router.get('/:id/laps', async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    const { data: laps, error: lapsError } = await req.supabase
+    const lapsClient = getServiceClient() || req.supabase;
+    const { data: laps, error: lapsError } = await lapsClient
       .from('timing_laps')
       .select('id, lap_number, lap_time_seconds, lap_time_text')
       .eq('timing_id', id)
