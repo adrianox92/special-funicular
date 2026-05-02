@@ -174,6 +174,8 @@ const pilotProfileRoute = require('./routes/pilotProfile');
 const contactRoute = require('./routes/contact');
 const publicCatalogRoute = require('./routes/publicCatalog');
 const publicVehicleRoute = require('./routes/publicVehicle');
+const debugRoute = require('./routes/debug');
+app.use('/api/debug', debugRoute);
 app.use('/api/public-signup', publicSignupLimiter, publicCompetitionsRoute);
 app.use('/api/public/pilot', publicSignupLimiter, publicPilotRoute);
 app.use('/api/public/catalog', publicCatalogReadLimiter, publicCatalogRoute);

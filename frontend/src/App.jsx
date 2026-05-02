@@ -25,6 +25,7 @@ import CompetitionPresentation from './pages/CompetitionPresentation';
 import Profile from './pages/Profile';
 import PublicPilotProfile from './pages/PublicPilotProfile';
 import SettingsPage from './pages/SettingsPage';
+import DebugDataPathPage from './pages/DebugDataPathPage';
 import HelpPage from './pages/HelpPage';
 import Login from './components/Login';
 import ResetPassword from './components/ResetPassword';
@@ -262,6 +263,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <SettingsPage />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/settings/debug-data"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <DebugDataPathPage />
               </AuthedShell>
             </PrivateRoute>
           }

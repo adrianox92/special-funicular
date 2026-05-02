@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
@@ -460,6 +460,21 @@ const SettingsPage = () => {
                   <AlertDescription>{pwdSuccess}</AlertDescription>
                 </Alert>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Depuración</CardTitle>
+              <CardDescription>
+                Comprueba la URL de la API en este build, el estado del servidor y los conteos en Supabase (anon vs
+                JWT) sin exponer claves secretas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" asChild>
+                <Link to="/settings/debug-data">Abrir diagnóstico de API y datos</Link>
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
