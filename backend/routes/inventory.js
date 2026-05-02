@@ -97,8 +97,13 @@ function normalizeUrl(val) {
   }
 }
 
-async function assertVehicleOwned(vehicleId, userId) {
-  const { data, error } = await req.supabase
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} vehicleId
+ * @param {string} userId
+ */
+async function assertVehicleOwned(supabase, vehicleId, userId) {
+  const { data, error } = await supabase
     .from('vehicles')
     .select('id')
     .eq('id', vehicleId)
@@ -114,10 +119,13 @@ function inventoryCategoryToComponentType(category) {
   return c === 'otro' ? 'other' : c;
 }
 
-async function attachVehicles(rows, userId) {
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ */
+async function attachVehicles(supabase, rows, userId) {
   const ids = [...new Set(rows.map((r) => r.vehicle_id).filter(Boolean))];
   if (ids.length === 0) return rows.map((r) => ({ ...r, vehicle: null }));
-  const { data: vehicles, error } = await req.supabase
+  const { data: vehicles, error } = await supabase
     .from('vehicles')
     .select('id, model, manufacturer')
     .eq('user_id', userId)
@@ -178,7 +186,7 @@ router.get('/', async (req, res) => {
       );
     }
 
-    const enriched = await attachVehicles(rows, req.user.id);
+    const enriched = await attachVehicles(req.supabase, rows, req.user.id);
     res.json(enriched);
   } catch (err) {
     console.error('GET /inventory:', err);
@@ -254,7 +262,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Item no encontrado' });
     }
 
-    const [enriched] = await attachVehicles([data], req.user.id);
+    const [enriched] = await attachVehicles(req.supabase, [data], req.user.id);
     res.json(enriched);
   } catch (err) {
     console.error('GET /inventory/:id:', err);
@@ -364,7 +372,7 @@ router.post('/:id/restock', async (req, res) => {
       });
     }
 
-    const [enriched] = await attachVehicles([updatedInv], req.user.id);
+    const [enriched] = await attachVehicles(req.supabase, [updatedInv], req.user.id);
     res.status(201).json({
       inventory_item: enriched,
       purchase_entry: { ...historyRow, id: insertedHist.id },
@@ -463,7 +471,7 @@ router.post('/', inventoryCreateValidators, handleValidationErrors, async (req, 
 
     let vId = null;
     if (vehicleId != null && String(vehicleId).trim() !== '' && String(vehicleId) !== 'none') {
-      const owned = await assertVehicleOwned(String(vehicleId), req.user.id);
+      const owned = await assertVehicleOwned(req.supabase, String(vehicleId), req.user.id);
       if (!owned) return res.status(404).json({ error: 'Vehículo no encontrado' });
       vId = String(vehicleId);
     }
@@ -499,7 +507,7 @@ router.post('/', inventoryCreateValidators, handleValidationErrors, async (req, 
       return res.status(500).json({ error: error.message });
     }
 
-    const [enriched] = await attachVehicles([data], req.user.id);
+    const [enriched] = await attachVehicles(req.supabase, [data], req.user.id);
     res.status(201).json(enriched);
   } catch (err) {
     console.error('POST /inventory:', err);
@@ -648,7 +656,7 @@ router.put('/:id', async (req, res) => {
       if (vid == null || String(vid).trim() === '' || String(vid) === 'none') {
         updates.vehicle_id = null;
       } else {
-        const owned = await assertVehicleOwned(String(vid), req.user.id);
+        const owned = await assertVehicleOwned(req.supabase, String(vid), req.user.id);
         if (!owned) return res.status(404).json({ error: 'Vehículo no encontrado' });
         updates.vehicle_id = String(vid);
       }
@@ -667,7 +675,7 @@ router.put('/:id', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    const [enriched] = await attachVehicles([data], req.user.id);
+    const [enriched] = await attachVehicles(req.supabase, [data], req.user.id);
     res.json(enriched);
   } catch (err) {
     console.error('PUT /inventory/:id:', err);
@@ -735,7 +743,7 @@ router.post('/:id/mount', async (req, res) => {
       return res.status(400).json({ error: 'vehicle_id es requerido' });
     }
 
-    const owned = await assertVehicleOwned(vehicleId, req.user.id);
+    const owned = await assertVehicleOwned(req.supabase, vehicleId, req.user.id);
     if (!owned) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
@@ -825,7 +833,7 @@ router.post('/:id/mount', async (req, res) => {
       await updateVehicleTotalPrice(vehicleId);
     }
 
-    const [enriched] = await attachVehicles([updatedInv], req.user.id);
+    const [enriched] = await attachVehicles(req.supabase, [updatedInv], req.user.id);
     res.status(201).json({
       component: inserted,
       inventory_item: enriched,
