@@ -194,9 +194,9 @@ async function updateCircuitPositions(circuit, newTimingId = null) {
  * @param {string} circuit - Nombre del circuito
  * @returns {Promise<Array>} Array de rankings ordenados por posición
  */
-async function getCircuitRanking(circuit) {
+async function getCircuitRanking(circuit, client = supabase) {
   try {
-    const { data: allTimings, error } = await supabase
+    const { data: allTimings, error } = await client
       .from('vehicle_timings')
       .select(`
         id,

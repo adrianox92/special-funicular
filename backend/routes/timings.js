@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAnonClient } = require('../lib/supabaseClients');
+const { createUserScopedClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { getCircuitRanking } = require('../lib/positionTracker');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
@@ -10,10 +10,13 @@ const csvTimingParse = require('../lib/csvTimingParse');
 const smartraceCsv = require('../lib/smartraceCsvImport');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 
-const supabase = getAnonClient();
 
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
+router.use((req, res, next) => {
+  req.supabase = createUserScopedClient(req.headers.authorization);
+  next();
+});
 
 function parseNumber(val) {
   if (val == null || val === '') return null;
@@ -354,7 +357,7 @@ router.post('/import', async (req, res) => {
         continue;
       }
 
-      const result = await insertVehicleTimingFromSyncBody(supabase, req.user.id, body);
+      const result = await insertVehicleTimingFromSyncBody(req.supabase, req.user.id, body);
       if (!result.success) {
         errors.push({ row: sourceRowNumber, error: result.error });
         continue;
@@ -397,7 +400,7 @@ router.get('/', async (req, res) => {
   try {
     const { circuit, circuit_id } = req.query;
     // Primero obtenemos todos los vehículos del usuario
-    const { data: vehicles, error: vehiclesError } = await supabase
+    const { data: vehicles, error: vehiclesError } = await req.supabase
       .from('vehicles')
       .select('id, model, manufacturer')
       .eq('user_id', req.user.id);
@@ -420,7 +423,7 @@ router.get('/', async (req, res) => {
     }, {});
 
     // Obtenemos todos los tiempos de los vehículos del usuario
-    let timingsQuery = supabase
+    let timingsQuery = req.supabase
       .from('vehicle_timings')
       .select(`
         *,
@@ -444,7 +447,7 @@ router.get('/', async (req, res) => {
 
     // Qué timings tienen vueltas en timing_laps (paginado: evita límite 1000 filas de PostgREST)
     const allTimingIds = timings.map(t => t.id).filter(Boolean);
-    const timingsWithLapsSet = await fetchTimingIdsWithLaps(supabase, allTimingIds);
+    const timingsWithLapsSet = await fetchTimingIdsWithLaps(req.supabase, allTimingIds);
 
     // Enriquecer los tiempos con la información del vehículo y posiciones
     let enrichedTimings = timings.map(timing => ({
@@ -459,7 +462,7 @@ router.get('/', async (req, res) => {
     const circuitPositions = {};
     await Promise.all(uniqueCircuits.map(async (circuitName) => {
       try {
-        const ranking = await getCircuitRanking(circuitName);
+        const ranking = await getCircuitRanking(circuitName, req.supabase);
         circuitPositions[circuitName] = ranking;
       } catch (error) {
         console.warn(`[WARN] Error al obtener ranking del circuito ${circuitName}:`, error.message);
@@ -558,7 +561,7 @@ router.patch('/:id', async (req, res) => {
       return res.status(400).json({ error: parsed.error });
     }
 
-    const { data: timing, error: timingError } = await supabase
+    const { data: timing, error: timingError } = await req.supabase
       .from('vehicle_timings')
       .select('id, vehicle_id')
       .eq('id', id)
@@ -568,7 +571,7 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    const { data: vehicle } = await supabase
+    const { data: vehicle } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', timing.vehicle_id)
@@ -579,7 +582,7 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    const { data: updated, error: updateErr } = await supabase
+    const { data: updated, error: updateErr } = await req.supabase
       .from('vehicle_timings')
       .update({ supply_voltage_volts: parsed.volts })
       .eq('id', id)
@@ -605,7 +608,7 @@ router.get('/:id/laps', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: timing, error: timingError } = await supabase
+    const { data: timing, error: timingError } = await req.supabase
       .from('vehicle_timings')
       .select('id, vehicle_id')
       .eq('id', id)
@@ -615,7 +618,7 @@ router.get('/:id/laps', async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    const { data: vehicles } = await supabase
+    const { data: vehicles } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', timing.vehicle_id)
@@ -626,7 +629,7 @@ router.get('/:id/laps', async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    const { data: laps, error: lapsError } = await supabase
+    const { data: laps, error: lapsError } = await req.supabase
       .from('timing_laps')
       .select('id, lap_number, lap_time_seconds, lap_time_text')
       .eq('timing_id', id)

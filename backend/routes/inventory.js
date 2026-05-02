@@ -1,12 +1,11 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { createUserScopedClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { getOrCreateBaseSpecs, updateVehicleTotalPrice } = require('../lib/vehicleSpecs');
 
 const router = express.Router();
-const supabase = getAnonClient();
 
 const ALLOWED_CATEGORIES = new Set([
   'pinion',
@@ -37,6 +36,10 @@ const ALLOWED_CATEGORIES = new Set([
 const ALLOWED_UNITS = new Set(['uds', 'pares', 'ml', 'metros', 'juego']);
 
 router.use(authMiddleware);
+router.use((req, res, next) => {
+  req.supabase = createUserScopedClient(req.headers.authorization);
+  next();
+});
 
 function normalizeDate(val) {
   if (val == null || val === '') return null;
@@ -95,7 +98,7 @@ function normalizeUrl(val) {
 }
 
 async function assertVehicleOwned(vehicleId, userId) {
-  const { data, error } = await supabase
+  const { data, error } = await req.supabase
     .from('vehicles')
     .select('id')
     .eq('id', vehicleId)
@@ -114,7 +117,7 @@ function inventoryCategoryToComponentType(category) {
 async function attachVehicles(rows, userId) {
   const ids = [...new Set(rows.map((r) => r.vehicle_id).filter(Boolean))];
   if (ids.length === 0) return rows.map((r) => ({ ...r, vehicle: null }));
-  const { data: vehicles, error } = await supabase
+  const { data: vehicles, error } = await req.supabase
     .from('vehicles')
     .select('id, model, manufacturer')
     .eq('user_id', userId)
@@ -134,7 +137,7 @@ router.get('/', async (req, res) => {
   try {
     const { category, low_stock: lowStock, vehicle_id: vehicleId, q } = req.query;
 
-    let query = supabase
+    let query = req.supabase
       .from('inventory_items')
       .select('*')
       .eq('user_id', req.user.id)
@@ -191,7 +194,7 @@ router.get('/:id/purchase-history', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: item, error: fetchErr } = await supabase
+    const { data: item, error: fetchErr } = await req.supabase
       .from('inventory_items')
       .select('id')
       .eq('id', id)
@@ -206,7 +209,7 @@ router.get('/:id/purchase-history', async (req, res) => {
       return res.status(404).json({ error: 'Item no encontrado' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('inventory_purchase_history')
       .select('*')
       .eq('inventory_item_id', id)
@@ -236,7 +239,7 @@ router.get('/:id', async (req, res) => {
       return res.status(400).json({ error: 'id no válido' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('inventory_items')
       .select('*')
       .eq('id', id)
@@ -294,7 +297,7 @@ router.post('/:id/restock', async (req, res) => {
     const pDate = normalizeDate(purchaseDate);
     const notes = normalizeOptionalText(notesRaw);
 
-    const { data: existing, error: fetchErr } = await supabase
+    const { data: existing, error: fetchErr } = await req.supabase
       .from('inventory_items')
       .select('*')
       .eq('id', id)
@@ -319,7 +322,7 @@ router.post('/:id/restock', async (req, res) => {
       notes,
     };
 
-    const { data: insertedHist, error: histErr } = await supabase
+    const { data: insertedHist, error: histErr } = await req.supabase
       .from('inventory_purchase_history')
       .insert([historyRow])
       .select('id')
@@ -344,7 +347,7 @@ router.post('/:id/restock', async (req, res) => {
       invUpdates.purchase_date = pDate;
     }
 
-    const { data: updatedInv, error: updErr } = await supabase
+    const { data: updatedInv, error: updErr } = await req.supabase
       .from('inventory_items')
       .update(invUpdates)
       .eq('id', id)
@@ -354,7 +357,7 @@ router.post('/:id/restock', async (req, res) => {
       .maybeSingle();
 
     if (updErr || !updatedInv) {
-      await supabase.from('inventory_purchase_history').delete().eq('id', insertedHist.id);
+      await req.supabase.from('inventory_purchase_history').delete().eq('id', insertedHist.id);
       return res.status(409).json({
         error:
           'No se pudo actualizar el stock (posible condición de carrera). Recarga e inténtalo de nuevo.',
@@ -489,7 +492,7 @@ router.post('/', inventoryCreateValidators, handleValidationErrors, async (req, 
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase.from('inventory_items').insert([row]).select('*').single();
+    const { data, error } = await req.supabase.from('inventory_items').insert([row]).select('*').single();
 
     if (error) {
       console.error('Error al crear inventario:', error);
@@ -511,7 +514,7 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: existing, error: fetchErr } = await supabase
+    const { data: existing, error: fetchErr } = await req.supabase
       .from('inventory_items')
       .select('*')
       .eq('id', id)
@@ -651,7 +654,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('inventory_items')
       .update(updates)
       .eq('id', id)
@@ -700,7 +703,7 @@ router.post('/:id/mount', async (req, res) => {
       return res.status(400).json({ error: 'mount_qty debe ser un entero mayor o igual a 1' });
     }
 
-    const { data: item, error: fetchErr } = await supabase
+    const { data: item, error: fetchErr } = await req.supabase
       .from('inventory_items')
       .select('*')
       .eq('id', inventoryId)
@@ -786,7 +789,7 @@ router.post('/:id/mount', async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: inserted, error: insErr } = await supabase
+    const { data: inserted, error: insErr } = await req.supabase
       .from('components')
       .insert([row])
       .select('*')
@@ -798,7 +801,7 @@ router.post('/:id/mount', async (req, res) => {
     }
 
     const prevQty = Number(item.quantity);
-    const { data: updatedInv, error: updErr } = await supabase
+    const { data: updatedInv, error: updErr } = await req.supabase
       .from('inventory_items')
       .update({
         quantity: prevQty - mountQty,
@@ -811,7 +814,7 @@ router.post('/:id/mount', async (req, res) => {
       .maybeSingle();
 
     if (updErr || !updatedInv) {
-      await supabase.from('components').delete().eq('id', inserted.id);
+      await req.supabase.from('components').delete().eq('id', inserted.id);
       return res.status(409).json({
         error:
           'No se pudo actualizar el stock (posible condición de carrera o stock agotado). Reintenta.',
@@ -841,7 +844,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('inventory_items')
       .delete()
       .eq('id', id)

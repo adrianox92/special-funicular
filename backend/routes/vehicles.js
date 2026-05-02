@@ -5,7 +5,7 @@
  */
 const express = require('express');
 const router = express.Router();
-const { getAnonClient } = require('../lib/supabaseClients');
+const { createUserScopedClient } = require('../lib/supabaseClients');
 const multer = require('multer');
 const authMiddleware = require('../middleware/auth');
 const { removeObjectByPublicUrl, removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
@@ -21,7 +21,6 @@ const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const vehicleImport = require('../lib/vehicleImport');
 
-const supabase = getAnonClient();
 
 /** Columnas permitidas para GET /vehicles y /vehicles/export (ordenación). */
 const VEHICLE_SORT_COLUMNS = {
@@ -441,6 +440,10 @@ function runVehicleImageUpload(req, res, next) {
 
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
+router.use((req, res, next) => {
+  req.supabase = createUserScopedClient(req.headers.authorization);
+  next();
+});
 
 const COMPONENT_PAYLOAD_KEYS = [
   'component_type', 'element', 'manufacturer', 'material', 'size', 'teeth',
@@ -630,7 +633,7 @@ router.get('/export', async (req, res) => {
     const { column: sortColumn, ascending } = parseVehicleSort(req);
 
     let query = applyVehicleListSort(
-      supabase.from('vehicles').select('*').eq('user_id', req.user.id),
+      req.supabase.from('vehicles').select('*').eq('user_id', req.user.id),
       sortColumn,
       ascending,
     );
@@ -682,7 +685,7 @@ router.get('/export', async (req, res) => {
 // Denominadores de escala 1:X distintos en la colección del usuario (select de filtro)
 router.get('/scale-factors', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('vehicles')
       .select('scale_factor')
       .eq('user_id', req.user.id);
@@ -875,7 +878,7 @@ router.post('/import', runVehicleImportUpload, async (req, res) => {
         continue;
       }
 
-      const dupId = await findDuplicateVehicleId(supabase, req.user.id, values);
+      const dupId = await findDuplicateVehicleId(req.supabase, req.user.id, values);
       if (dupId) {
         if (duplicateMode === 'skip') {
           results.skipped += 1;
@@ -883,7 +886,7 @@ router.post('/import', runVehicleImportUpload, async (req, res) => {
         }
         if (duplicateMode === 'import') {
           try {
-            await insertVehicleFromImportValues(supabase, req.user.id, values);
+            await insertVehicleFromImportValues(req.supabase, req.user.id, values);
             results.inserted += 1;
           } catch (e) {
             results.failed += 1;
@@ -893,7 +896,7 @@ router.post('/import', runVehicleImportUpload, async (req, res) => {
         }
         if (duplicateMode === 'update') {
           try {
-            await updateVehicleFromImportValues(supabase, req.user.id, dupId, values);
+            await updateVehicleFromImportValues(req.supabase, req.user.id, dupId, values);
             results.updated += 1;
           } catch (e) {
             results.failed += 1;
@@ -903,7 +906,7 @@ router.post('/import', runVehicleImportUpload, async (req, res) => {
         }
       } else {
         try {
-          await insertVehicleFromImportValues(supabase, req.user.id, values);
+          await insertVehicleFromImportValues(req.supabase, req.user.id, values);
           results.inserted += 1;
         } catch (e) {
           results.failed += 1;
@@ -1003,7 +1006,7 @@ router.get('/', async (req, res) => {
     const { column: sortColumn, ascending } = parseVehicleSort(req);
 
     // Obtener el total de vehículos para la paginación
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await req.supabase
       .from('vehicles')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', req.user.id);
@@ -1012,7 +1015,7 @@ router.get('/', async (req, res) => {
     
     // Obtener los vehículos paginados
     const { data: vehicles, error: vehiclesError } = await applyVehicleListSort(
-      supabase.from('vehicles').select('*').eq('user_id', req.user.id),
+      req.supabase.from('vehicles').select('*').eq('user_id', req.user.id),
       sortColumn,
       ascending,
     ).range(from, to);
@@ -1023,7 +1026,7 @@ router.get('/', async (req, res) => {
     const vehicleIds = vehicles.map(v => v.id);
 
     // Traer las imágenes solo para los vehículos de la página actual
-    const { data: images, error: imageError } = await supabase
+    const { data: images, error: imageError } = await req.supabase
       .from('vehicle_images')
       .select('vehicle_id, image_url, view_type')
       .in('vehicle_id', vehicleIds);
@@ -1078,7 +1081,7 @@ router.get('/', async (req, res) => {
 // Obtener un vehículo por ID
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase
+  const { data, error } = await req.supabase
     .from('vehicles')
     .select(
       '*, catalog_item:slot_catalog_items!catalog_item_id ( limited_edition_total )',
@@ -1096,7 +1099,7 @@ router.get('/:id', async (req, res) => {
 // Obtener imágenes de un vehículo
 router.get('/:id/images', async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase
+  const { data, error } = await req.supabase
     .from('vehicle_images')
     .select('image_url, view_type')
     .eq('vehicle_id', id);
@@ -1110,7 +1113,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
     const { id } = req.params;
     
     // Verificar que el vehículo pertenece al usuario
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id, modified')
       .eq('id', id)
@@ -1149,7 +1152,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
     }
 
     // Actualizar datos del vehículo
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('vehicles')
       .update(updateData)
       .eq('id', id)
@@ -1159,7 +1162,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
 
     if (req.files && req.files.length > 0) {
       try {
-        await saveVehicleImagesFromMultipart(supabase, id, req.files, { replacePerView: true });
+        await saveVehicleImagesFromMultipart(req.supabase, id, req.files, { replacePerView: true });
       } catch (e) {
         if (e.code === 'INVALID_IMAGE') {
           return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
@@ -1213,7 +1216,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
 
     let catalogRow = null;
     if (catalog_item_id_val) {
-      const { data: cr } = await supabase
+      const { data: cr } = await req.supabase
         .from('slot_catalog_items_with_ratings')
         .select('*')
         .eq('id', catalog_item_id_val)
@@ -1242,7 +1245,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
     );
 
     // Añadir user_id al crear el vehículo
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('vehicles')
       .insert([
         {
@@ -1276,7 +1279,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
 
     if (req.files && req.files.length > 0) {
       try {
-        await saveVehicleImagesFromMultipart(supabase, data.id, req.files, { replacePerView: false });
+        await saveVehicleImagesFromMultipart(req.supabase, data.id, req.files, { replacePerView: false });
       } catch (e) {
         if (e.code === 'INVALID_IMAGE') {
           return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
@@ -1287,7 +1290,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
     }
 
     try {
-      await tryCopyCatalogImageToVehicleFront(supabase, data.id, catalogRow, req.files);
+      await tryCopyCatalogImageToVehicleFront(req.supabase, data.id, catalogRow, req.files);
     } catch (e) {
       console.warn('[vehicles POST] tryCopyCatalogImageToVehicleFront', e.message);
     }
@@ -1304,7 +1307,7 @@ router.delete('/:id/images/:viewType', async (req, res) => {
     const { id, viewType } = req.params;
     
     // Primero obtener la información de la imagen para poder eliminarla del storage
-    const { data: imageData, error: fetchError } = await supabase
+    const { data: imageData, error: fetchError } = await req.supabase
       .from('vehicle_images')
       .select('image_url')
       .eq('vehicle_id', id)
@@ -1312,14 +1315,14 @@ router.delete('/:id/images/:viewType', async (req, res) => {
       .single();
 
     if (imageData && imageData.image_url) {
-      const { error: storageError } = await removeObjectByPublicUrl(supabase, imageData.image_url);
+      const { error: storageError } = await removeObjectByPublicUrl(req.supabase, imageData.image_url);
       if (storageError) {
         console.error('Error al eliminar del storage:', storageError);
       }
     }
 
     // Intentar eliminar el registro de la base de datos
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await req.supabase
       .from('vehicle_images')
       .delete()
       .eq('vehicle_id', id)
@@ -1343,7 +1346,7 @@ router.delete('/:id/images/:viewType', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
 
-  const { data: existingVehicle, error: checkError } = await supabase
+  const { data: existingVehicle, error: checkError } = await req.supabase
     .from('vehicles')
     .select('id')
     .eq('id', id)
@@ -1355,7 +1358,7 @@ router.delete('/:id', async (req, res) => {
   }
 
   try {
-    await removeAllObjectsInVehicleFolder(supabase, id);
+    await removeAllObjectsInVehicleFolder(req.supabase, id);
   } catch (storageErr) {
     console.error('removeAllObjectsInVehicleFolder', storageErr);
     return res.status(500).json({
@@ -1363,13 +1366,13 @@ router.delete('/:id', async (req, res) => {
     });
   }
 
-  const { error: imagesError } = await supabase.from('vehicle_images').delete().eq('vehicle_id', id);
+  const { error: imagesError } = await req.supabase.from('vehicle_images').delete().eq('vehicle_id', id);
 
   if (imagesError) {
     return res.status(500).json({ error: 'Error al eliminar las imágenes del vehículo' });
   }
 
-  const { error } = await supabase.from('vehicles').delete().eq('id', id).eq('user_id', req.user.id);
+  const { error } = await req.supabase.from('vehicles').delete().eq('id', id).eq('user_id', req.user.id);
 
   if (error) {
     return res.status(500).json({ error: error.message });
@@ -1383,7 +1386,7 @@ router.get('/:id/technical-specs', async (req, res) => {
   try {
     const { id } = req.params;
     // Verificar que el vehículo pertenece al usuario
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', id)
@@ -1393,7 +1396,7 @@ router.get('/:id/technical-specs', async (req, res) => {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
     // Obtener especificaciones técnicas
-    const { data: specs, error: specsError } = await supabase
+    const { data: specs, error: specsError } = await req.supabase
       .from('technical_specs')
       .select('*')
       .eq('vehicle_id', id)
@@ -1405,7 +1408,7 @@ router.get('/:id/technical-specs', async (req, res) => {
     const specIds = specs.map(s => s.id);
     let components = [];
     if (specIds.length > 0) {
-      const { data: comps, error: compsError } = await supabase
+      const { data: comps, error: compsError } = await req.supabase
         .from('components')
         .select('*')
         .in('tech_spec_id', specIds);
@@ -1420,7 +1423,7 @@ router.get('/:id/technical-specs', async (req, res) => {
       .map(c => c.id);
     let historyByComponentId = {};
     if (modComponentIds.length > 0) {
-      const { data: histRows, error: histError } = await supabase
+      const { data: histRows, error: histError } = await req.supabase
         .from('component_modification_history')
         .select('id, component_id, effective_date, previous_snapshot, created_at')
         .eq('vehicle_id', id)
@@ -1467,7 +1470,7 @@ router.post('/:id/technical-specs', async (req, res) => {
     const { is_modification, components } = req.body;
 
     // Verificar que el vehículo pertenece al usuario
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', id)
@@ -1490,7 +1493,7 @@ router.post('/:id/technical-specs', async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }));
-      const { data: comps, error: compsError } = await supabase
+      const { data: comps, error: compsError } = await req.supabase
         .from('components')
         .insert(compsToInsert)
         .select();
@@ -1518,7 +1521,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     const { is_modification, components, change_effective_date } = req.body;
 
     // Verificar que el vehículo pertenece al usuario
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id, user_id, model, manufacturer')
       .eq('id', id)
@@ -1531,7 +1534,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     const returnRemovedToInventory = req.body.return_removed_to_inventory === true;
 
     // Verificar que la especificación pertenece al vehículo y es del tipo correcto
-    const { data: existingSpec, error: specCheckError } = await supabase
+    const { data: existingSpec, error: specCheckError } = await req.supabase
       .from('technical_specs')
       .select('id, is_modification')
       .eq('id', specId)
@@ -1545,7 +1548,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     }
 
     // Verificar que el componente existe y pertenece a la especificación
-    const { data: existingComponent, error: compCheckError } = await supabase
+    const { data: existingComponent, error: compCheckError } = await req.supabase
       .from('components')
       .select('*')
       .eq('id', componentId)
@@ -1574,7 +1577,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
       existingComponent.source_inventory_item_id
     ) {
       const delta = newQ - oldQ;
-      const dres = await deductInventoryQuantity(supabase, {
+      const dres = await deductInventoryQuantity(req.supabase, {
         userId: req.user.id,
         itemId: existingComponent.source_inventory_item_id,
         qty: delta,
@@ -1592,7 +1595,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     let insertedHistoryId = null;
     if (shouldRecordHistory) {
       const effectiveDate = parseChangeEffectiveDate(change_effective_date);
-      const { data: insertedHist, error: histInsertError } = await supabase
+      const { data: insertedHist, error: histInsertError } = await req.supabase
         .from('component_modification_history')
         .insert({
           user_id: req.user.id,
@@ -1606,7 +1609,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
         .single();
       if (histInsertError) {
         if (deductMeta) {
-          await restoreInventoryQuantity(supabase, {
+          await restoreInventoryQuantity(req.supabase, {
             userId: req.user.id,
             itemId: deductMeta.itemId,
             qty: deductMeta.qty,
@@ -1618,7 +1621,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
       insertedHistoryId = insertedHist?.id;
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await req.supabase
       .from('components')
       .update({
         ...pickedUpdate,
@@ -1628,10 +1631,10 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
 
     if (updateError) {
       if (insertedHistoryId) {
-        await supabase.from('component_modification_history').delete().eq('id', insertedHistoryId);
+        await req.supabase.from('component_modification_history').delete().eq('id', insertedHistoryId);
       }
       if (deductMeta) {
-        await restoreInventoryQuantity(supabase, {
+        await restoreInventoryQuantity(req.supabase, {
           userId: req.user.id,
           itemId: deductMeta.itemId,
           qty: deductMeta.qty,
@@ -1647,7 +1650,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     }
 
     // Obtener el componente actualizado
-    const { data: updatedComponent, error: getUpdatedError } = await supabase
+    const { data: updatedComponent, error: getUpdatedError } = await req.supabase
       .from('components')
       .select('*')
       .eq('id', componentId)
@@ -1666,7 +1669,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
       if (onlyMountedQtyChanged && newQ < oldQ) {
         returnSnap = { ...prevSnap, mounted_qty: oldQ - newQ };
       }
-      const invResult = await insertReturnedComponentToInventory(supabase, {
+      const invResult = await insertReturnedComponentToInventory(req.supabase, {
         userId: req.user.id,
         snapshot: returnSnap,
         vehicleLabel,
@@ -1700,7 +1703,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
       req.query.return_to_inventory === '1';
 
     // Verificar que el vehículo pertenece al usuario
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id, model, manufacturer')
       .eq('id', id)
@@ -1711,7 +1714,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
     }
 
     // Verificar que la especificación pertenece al vehículo
-    const { data: existingSpec, error: specCheckError } = await supabase
+    const { data: existingSpec, error: specCheckError } = await req.supabase
       .from('technical_specs')
       .select('id, is_modification')
       .eq('id', specId)
@@ -1722,7 +1725,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
     }
 
     // Verificar que el componente existe y pertenece a la especificación
-    const { data: existingComponent, error: compCheckError } = await supabase
+    const { data: existingComponent, error: compCheckError } = await req.supabase
       .from('components')
       .select('*')
       .eq('id', componentId)
@@ -1736,7 +1739,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
       const prevSnap = modificationSnapshotFromRow(existingComponent);
       const vehicleLabel =
         [existingVehicle.manufacturer, existingVehicle.model].filter(Boolean).join(' ').trim() || null;
-      const invResult = await insertReturnedComponentToInventory(supabase, {
+      const invResult = await insertReturnedComponentToInventory(req.supabase, {
         userId: req.user.id,
         snapshot: prevSnap,
         vehicleLabel,
@@ -1750,7 +1753,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
     }
 
     // Eliminar solo el componente específico
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await req.supabase
       .from('components')
       .delete()
       .eq('id', componentId)
@@ -1778,7 +1781,7 @@ router.get('/:id/timings', async (req, res) => {
     const { id } = req.params;
     
     // Verificar que el vehículo pertenece al usuario
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', id)
@@ -1789,7 +1792,7 @@ router.get('/:id/timings', async (req, res) => {
     }
 
     // Obtener los tiempos ordenados por fecha descendente
-    const { data: timings, error: timingsError } = await supabase
+    const { data: timings, error: timingsError } = await req.supabase
       .from('vehicle_timings')
       .select('*')
       .eq('vehicle_id', id)
@@ -1801,7 +1804,7 @@ router.get('/:id/timings', async (req, res) => {
 
     // Enriquecer con has_laps (paginado: evita límite 1000 filas de PostgREST)
     const timingIds = (timings || []).map(t => t.id).filter(Boolean);
-    const timingsWithLapsSet = await fetchTimingIdsWithLaps(supabase, timingIds);
+    const timingsWithLapsSet = await fetchTimingIdsWithLaps(req.supabase, timingIds);
     const enrichedTimings = (timings || []).map(t => ({
       ...t,
       has_laps: timingsWithLapsSet.has(t.id),
@@ -1834,7 +1837,7 @@ router.post('/:id/timings', async (req, res) => {
     } = req.body;
 
     // Verificar que el vehículo pertenece al usuario y obtener scale_factor
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id, scale_factor')
       .eq('id', id)
@@ -1845,7 +1848,7 @@ router.post('/:id/timings', async (req, res) => {
     }
 
     // Obtener componentes de serie y modificaciones actuales
-    const { data: specs, error: specsError } = await supabase
+    const { data: specs, error: specsError } = await req.supabase
       .from('technical_specs')
       .select('id, is_modification')
       .eq('vehicle_id', id);
@@ -1855,7 +1858,7 @@ router.post('/:id/timings', async (req, res) => {
     const specIds = specs.map(s => s.id);
     let componentsSnapshot = [];
     if (specIds.length > 0) {
-      const { data: comps, error: compsError } = await supabase
+      const { data: comps, error: compsError } = await req.supabase
         .from('components')
         .select('*')
         .in('tech_spec_id', specIds);
@@ -1869,7 +1872,7 @@ router.post('/:id/timings', async (req, res) => {
     let circuitIdToStore = null;
     let circuitLaneLengths = [];
     if (circuit_id) {
-      const { data: circuitRow, error: circuitError } = await supabase
+      const { data: circuitRow, error: circuitError } = await req.supabase
         .from('circuits')
         .select('name, lane_lengths')
         .eq('id', circuit_id)
@@ -1921,7 +1924,7 @@ router.post('/:id/timings', async (req, res) => {
     }
 
     // Crear el nuevo registro de tiempo con el snapshot
-    const { data: timing, error: timingError } = await supabase
+    const { data: timing, error: timingError } = await req.supabase
       .from('vehicle_timings')
       .insert([insertData])
       .select()
@@ -1933,7 +1936,7 @@ router.post('/:id/timings', async (req, res) => {
 
     // Actualizar odómetro del vehículo
     try {
-      await updateVehicleOdometer(supabase, id);
+      await updateVehicleOdometer(req.supabase, id);
     } catch (odometerError) {
       console.warn('Error al actualizar odómetro:', odometerError);
     }
@@ -1991,7 +1994,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     } = req.body;
 
     // Verificar que el vehículo pertenece al usuario y obtener scale_factor
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id, scale_factor')
       .eq('id', id)
@@ -2009,7 +2012,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     }
 
     // Verificar que el tiempo existe y pertenece al vehículo
-    const { data: existingTiming, error: timingCheckError } = await supabase
+    const { data: existingTiming, error: timingCheckError } = await req.supabase
       .from('vehicle_timings')
       .select('*')
       .eq('id', timingId)
@@ -2025,7 +2028,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     let circuitLaneLengths = [];
     if (circuit_id !== undefined) {
       if (circuit_id) {
-        const { data: circuitRow, error: circuitError } = await supabase
+        const { data: circuitRow, error: circuitError } = await req.supabase
           .from('circuits')
           .select('name, lane_lengths')
           .eq('id', circuit_id)
@@ -2047,7 +2050,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       circuitToStore = existingTiming.circuit;
       circuitIdToStore = existingTiming.circuit_id;
       if (circuitIdToStore) {
-        const { data: circuitRow } = await supabase
+        const { data: circuitRow } = await req.supabase
           .from('circuits')
           .select('lane_lengths')
           .eq('id', circuitIdToStore)
@@ -2128,7 +2131,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
       updatePayload.best_lap_speed_kmh = null;
       updatePayload.best_lap_speed_scale_kmh = null;
     }
-    const { data: updatedTiming, error: updateError } = await supabase
+    const { data: updatedTiming, error: updateError } = await req.supabase
       .from('vehicle_timings')
       .update(updatePayload)
       .eq('id', timingId)
@@ -2141,7 +2144,7 @@ router.put('/:id/timings/:timingId', async (req, res) => {
 
     // Actualizar odómetro del vehículo
     try {
-      await updateVehicleOdometer(supabase, id);
+      await updateVehicleOdometer(req.supabase, id);
     } catch (odometerError) {
       console.warn('Error al actualizar odómetro:', odometerError);
     }
@@ -2213,7 +2216,7 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
     const { id, timingId } = req.params;
 
     // Verificar que el vehículo pertenece al usuario
-    const { data: existingVehicle, error: checkError } = await supabase
+    const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', id)
@@ -2224,7 +2227,7 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
     }
 
     // Verificar que el tiempo existe y pertenece al vehículo
-    const { data: existingTiming, error: timingCheckError } = await supabase
+    const { data: existingTiming, error: timingCheckError } = await req.supabase
       .from('vehicle_timings')
       .select('*')
       .eq('id', timingId)
@@ -2238,7 +2241,7 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
     const deletedCircuit = existingTiming.circuit;
 
     // Eliminar el registro
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await req.supabase
       .from('vehicle_timings')
       .delete()
       .eq('id', timingId);
@@ -2249,7 +2252,7 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
 
     // Actualizar odómetro del vehículo
     try {
-      await updateVehicleOdometer(supabase, id);
+      await updateVehicleOdometer(req.supabase, id);
     } catch (odometerError) {
       console.warn('Error al actualizar odómetro:', odometerError);
     }
@@ -2290,7 +2293,7 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
 router.get('/:id/specs-pdf', async (req, res) => {
   try {
     const vehicleId = req.params.id;
-    const { pdfBuffer, model } = await buildVehicleSpecsPdfBuffer(supabase, vehicleId, {
+    const { pdfBuffer, model } = await buildVehicleSpecsPdfBuffer(req.supabase, vehicleId, {
       userId: req.user.id,
     });
     res.setHeader('Content-Type', 'application/pdf');
@@ -2309,7 +2312,7 @@ router.get('/:id/specs-pdf', async (req, res) => {
 router.get('/:id/specs', async (req, res) => {
   try {
     // Primero verificamos que el vehículo pertenece al usuario
-    const { data: vehicle, error: vehicleError } = await supabase
+    const { data: vehicle, error: vehicleError } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', req.params.id)
@@ -2321,7 +2324,7 @@ router.get('/:id/specs', async (req, res) => {
     }
 
     // Obtenemos las especificaciones técnicas
-    const { data: specs, error: specsError } = await supabase
+    const { data: specs, error: specsError } = await req.supabase
       .from('technical_specs')
       .select('id, is_modification')
       .eq('vehicle_id', req.params.id);
@@ -2335,7 +2338,7 @@ router.get('/:id/specs', async (req, res) => {
 
     // Obtenemos los componentes asociados a las especificaciones
     const specIds = specs.map(s => s.id);
-    const { data: components, error: componentsError } = await supabase
+    const { data: components, error: componentsError } = await req.supabase
       .from('components')
       .select('*')
       .in('tech_spec_id', specIds);
@@ -2362,7 +2365,7 @@ router.get('/:id/specs', async (req, res) => {
 router.get('/:id/modifications', async (req, res) => {
   try {
     // Primero verificamos que el vehículo pertenece al usuario
-    const { data: vehicle, error: vehicleError } = await supabase
+    const { data: vehicle, error: vehicleError } = await req.supabase
       .from('vehicles')
       .select('id')
       .eq('id', req.params.id)
@@ -2374,7 +2377,7 @@ router.get('/:id/modifications', async (req, res) => {
     }
 
     // Obtenemos las especificaciones técnicas que son modificaciones
-    const { data: specs, error: specsError } = await supabase
+    const { data: specs, error: specsError } = await req.supabase
       .from('technical_specs')
       .select('id')
       .eq('vehicle_id', req.params.id)
@@ -2389,7 +2392,7 @@ router.get('/:id/modifications', async (req, res) => {
 
     // Obtenemos los componentes asociados a las modificaciones
     const specIds = specs.map(s => s.id);
-    const { data: components, error: componentsError } = await supabase
+    const { data: components, error: componentsError } = await req.supabase
       .from('components')
       .select('*')
       .in('tech_spec_id', specIds);
