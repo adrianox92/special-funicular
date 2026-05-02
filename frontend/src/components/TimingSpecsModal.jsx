@@ -42,6 +42,26 @@ function downloadBlob(filename, blob) {
   URL.revokeObjectURL(a.href);
 }
 
+/** Acepta string JSON (legado) o jsonb ya parseado por PostgREST. */
+function parseSetupSpecs(setupSnapshot) {
+  if (setupSnapshot == null || setupSnapshot === '') return [];
+  if (Array.isArray(setupSnapshot)) return setupSnapshot;
+  if (typeof setupSnapshot === 'object') {
+    return Array.isArray(setupSnapshot) ? setupSnapshot : [];
+  }
+  if (typeof setupSnapshot === 'string') {
+    const t = setupSnapshot.trim();
+    if (!t || t === 'null') return [];
+    try {
+      const p = JSON.parse(setupSnapshot);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   const [laps, setLaps] = useState([]);
 
@@ -57,12 +77,7 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
 
   if (!timing) return null;
 
-  let specs = [];
-  try {
-    if (setupSnapshot) specs = JSON.parse(setupSnapshot);
-  } catch {
-    specs = [];
-  }
+  let specs = parseSetupSpecs(setupSnapshot ?? timing?.setup_snapshot);
 
   const groupByComponentType = (specs) => {
     const groups = {};
@@ -128,12 +143,7 @@ const TimingSpecsModal = ({ show, onHide, setupSnapshot, timing }) => {
   const groupedSpecs = groupByComponentType(specs);
 
   const exportJson = () => {
-    let setup = [];
-    try {
-      if (timing.setup_snapshot) setup = JSON.parse(timing.setup_snapshot);
-    } catch {
-      setup = [];
-    }
+    const setup = parseSetupSpecs(timing.setup_snapshot);
     const payload = {
       session: { ...timing, setup_snapshot: undefined, circuits: undefined },
       laps,

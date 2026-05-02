@@ -42,6 +42,36 @@ import { toast } from 'sonner';
 import './TimingsList.css';
 import { formatDistance } from '../utils/formatUtils';
 
+/** setup_snapshot puede ser string JSON (legado) o objeto/array (jsonb desde PostgREST). */
+function hasMeaningfulSetupSnapshot(raw) {
+  if (raw == null || raw === '') return false;
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (!t || t === 'null' || t === '[]' || t === '{}') return false;
+    return true;
+  }
+  if (Array.isArray(raw)) return raw.length > 0;
+  if (typeof raw === 'object') return Object.keys(raw).length > 0;
+  return false;
+}
+
+/** Botón “detalle de sesión”: resumen, tabla de vueltas y/o setup — no solo si hay snapshot. */
+function showSessionDetailButton(timing) {
+  if (!timing) return false;
+  if (hasMeaningfulSetupSnapshot(timing.setup_snapshot)) return true;
+  if (timing.has_laps) return true;
+  const n = Number(timing.laps);
+  return Number.isFinite(n) && n > 0;
+}
+
+/** Análisis de rendimiento (gráficos): si hay vueltas registradas o datos en timing_laps. */
+function showPerformanceAnalysisButton(timing) {
+  if (!timing) return false;
+  if (timing.has_laps) return true;
+  const n = Number(timing.laps);
+  return Number.isFinite(n) && n > 0;
+}
+
 function formatVoltageVolts(v) {
   if (v == null || v === '') return '—';
   const n = Number(v);
@@ -244,7 +274,7 @@ function TimingMobileGroupCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {group.best_time.setup_snapshot && (
+          {showSessionDetailButton(group.best_time) && (
             <Button
               variant="outline"
               size="sm"
@@ -257,7 +287,7 @@ function TimingMobileGroupCard({
               Config.
             </Button>
           )}
-          {group.best_time?.has_laps && (
+          {showPerformanceAnalysisButton(group.best_time) && (
             <Button
               variant="outline"
               size="sm"
@@ -325,7 +355,7 @@ function TimingMobileGroupCard({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {session.setup_snapshot && (
+                    {showSessionDetailButton(session) && (
                       <Button
                         variant="outline"
                         size="icon"
@@ -339,7 +369,7 @@ function TimingMobileGroupCard({
                         <Wrench className="size-4" />
                       </Button>
                     )}
-                    {session.has_laps && (
+                    {showPerformanceAnalysisButton(session) && (
                       <Button
                         variant="outline"
                         size="icon"
@@ -712,12 +742,12 @@ const TimingsList = () => {
                     <TableCell>{new Date(group.last_session.timing_date).toLocaleDateString()}</TableCell>
                     <TableCell className="text-center min-w-[112px]">
                       <div className="flex items-center justify-center gap-1 flex-wrap">
-                        {group.best_time.setup_snapshot && (
+                        {showSessionDetailButton(group.best_time) && (
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(group.best_time); setShowSpecsModal(true); }} title="Ver especificaciones">
                             <Wrench className="size-4" />
                           </Button>
                         )}
-                        {group.best_time?.has_laps && (
+                        {showPerformanceAnalysisButton(group.best_time) && (
                           <Button
                             variant="outline"
                             size="icon"
@@ -796,12 +826,12 @@ const TimingsList = () => {
                           <TableCell></TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-1">
-                              {session.setup_snapshot && (
+                              {showSessionDetailButton(session) && (
                                 <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(session); setShowSpecsModal(true); }} title="Ver especificaciones">
                                   <Wrench className="size-4" />
                                 </Button>
                               )}
-                              {session.has_laps && (
+                              {showPerformanceAnalysisButton(session) && (
                                 <Button
                                   variant="outline"
                                   size="icon"
