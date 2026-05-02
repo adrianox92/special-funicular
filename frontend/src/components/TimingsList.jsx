@@ -64,12 +64,9 @@ function showSessionDetailButton(timing) {
   return Number.isFinite(n) && n > 0;
 }
 
-/** Análisis de rendimiento (gráficos): si hay vueltas registradas o datos en timing_laps. */
+/** Análisis de rendimiento: solo si hay filas en timing_laps (flag has_laps del listado /api/timings). */
 function showPerformanceAnalysisButton(timing) {
-  if (!timing) return false;
-  if (timing.has_laps) return true;
-  const n = Number(timing.laps);
-  return Number.isFinite(n) && n > 0;
+  return Boolean(timing?.has_laps);
 }
 
 function formatVoltageVolts(v) {
