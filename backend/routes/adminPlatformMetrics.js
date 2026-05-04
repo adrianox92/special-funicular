@@ -42,6 +42,12 @@ function parseIsoDate(s) {
   return new Date(t);
 }
 
+function isUuid(s) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(s || '').trim(),
+  );
+}
+
 /**
  * GET /platform-metrics?from=&to=
  * Intervalo semicerrado [from, to) en ISO 8601.
@@ -152,6 +158,83 @@ router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
     });
   } catch (err) {
     console.error('vehicle-refs-not-in-catalog:', err);
+    res.status(500).json({ error: err?.message || 'Error interno' });
+  }
+});
+
+/**
+ * POST /link-garage-refs-to-catalog
+ * Body JSON: garage_reference, catalog_reference, catalog_manufacturer_id, garage_manufacturer? (opcional)
+ */
+router.post('/link-garage-refs-to-catalog', async (req, res) => {
+  try {
+    if (!assertLicenseAdmin(req, res)) return;
+
+    const supabaseAdmin = getServiceClient();
+    if (!supabaseAdmin) {
+      return res.status(503).json({
+        error: 'Servicio no disponible: falta SUPABASE_SERVICE_ROLE_KEY en el servidor.',
+      });
+    }
+
+    const garageRef = req.body?.garage_reference != null ? String(req.body.garage_reference).trim() : '';
+    const catalogRef = req.body?.catalog_reference != null ? String(req.body.catalog_reference).trim() : '';
+    const catalogManufacturerId = req.body?.catalog_manufacturer_id != null ? String(req.body.catalog_manufacturer_id).trim() : '';
+    const garageManufacturer =
+      req.body?.garage_manufacturer != null ? String(req.body.garage_manufacturer).trim() : '';
+
+    if (!garageRef || !catalogRef || !catalogManufacturerId) {
+      return res.status(400).json({
+        error: 'garage_reference, catalog_reference y catalog_manufacturer_id son obligatorios.',
+      });
+    }
+    if (!isUuid(catalogManufacturerId)) {
+      return res.status(400).json({ error: 'catalog_manufacturer_id no es un UUID válido.' });
+    }
+    const { data: catalogRows, error: catErr } = await supabaseAdmin
+      .from('slot_catalog_items')
+      .select('id, reference')
+      .eq('manufacturer_id', catalogManufacturerId);
+
+    if (catErr) {
+      console.error('link-garage-refs catalog lookup:', catErr);
+      return res.status(500).json({ error: catErr.message || 'Error al buscar el ítem de catálogo' });
+    }
+
+    const catNorm = catalogRef.toLowerCase();
+    const matches = (catalogRows ?? []).filter(
+      (r) => r.reference != null && String(r.reference).trim().toLowerCase() === catNorm,
+    );
+
+    if (matches.length === 0) {
+      return res.status(404).json({
+        error: 'No hay ningún ítem del catálogo con esa referencia para la marca indicada.',
+      });
+    }
+    if (matches.length > 1) {
+      return res.status(409).json({ error: 'Varios ítems coinciden; revisa datos en base de datos.' });
+    }
+
+    const catalogItemId = matches[0].id;
+
+    const { data: rpcData, error: rpcErr } = await supabaseAdmin.rpc(
+      'admin_link_vehicles_by_garage_ref_to_catalog_item',
+      {
+        p_garage_ref: garageRef,
+        p_garage_manufacturer: garageManufacturer !== '' ? garageManufacturer : null,
+        p_catalog_item_id: catalogItemId,
+      },
+    );
+
+    if (rpcErr) {
+      console.error('admin_link_vehicles_by_garage_ref_to_catalog_item:', rpcErr);
+      return res.status(500).json({ error: rpcErr.message || 'Error al enlazar vehículos' });
+    }
+
+    const updatedCount = typeof rpcData === 'number' ? rpcData : Number(rpcData);
+    res.json({ updated_count: Number.isFinite(updatedCount) ? updatedCount : 0 });
+  } catch (err) {
+    console.error('link-garage-refs-to-catalog:', err);
     res.status(500).json({ error: err?.message || 'Error interno' });
   }
 });

@@ -27,6 +27,15 @@ import {
 } from '../components/ui/table';
 import VehicleCatalogCoverageChart from '../components/charts/VehicleCatalogCoverageChart';
 import { Switch } from '../components/ui/switch';
+import CatalogBrandSelect from '../components/CatalogBrandSelect';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 
 const REFS_PAGE_SIZE = 25;
 
@@ -89,6 +98,14 @@ const AdminPlatformDashboard = () => {
   const [refsLoading, setRefsLoading] = useState(false);
   const [refsError, setRefsError] = useState(null);
 
+  const [linkDialogRow, setLinkDialogRow] = useState(null);
+  const [linkCatalogManufacturerId, setLinkCatalogManufacturerId] = useState('');
+  const [linkCatalogReference, setLinkCatalogReference] = useState('');
+  const [linkRestrictMfg, setLinkRestrictMfg] = useState(true);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkFeedback, setLinkFeedback] = useState(null);
+  const [refsLinkBanner, setRefsLinkBanner] = useState(null);
+
   const fetchMetrics = useCallback(async () => {
     if (!range) return;
     setLoading(true);
@@ -133,6 +150,54 @@ const AdminPlatformDashboard = () => {
       setRefsLoading(false);
     }
   }, [isAdmin, refsPage, refsOnlyUnlinked]);
+
+  const openLinkDialog = (row) => {
+    setRefsLinkBanner(null);
+    setLinkFeedback(null);
+    setLinkDialogRow(row);
+    setLinkCatalogManufacturerId('');
+    setLinkCatalogReference('');
+    setLinkRestrictMfg(!!(row.sample_manufacturer && String(row.sample_manufacturer).trim()));
+  };
+
+  const submitLinkGarageToCatalog = async () => {
+    if (!linkDialogRow) return;
+    const catRef = linkCatalogReference.trim();
+    if (!linkCatalogManufacturerId?.trim() || !catRef) {
+      setLinkFeedback({
+        variant: 'destructive',
+        text: 'Marca del catálogo y referencia del catálogo son obligatorias.',
+      });
+      return;
+    }
+    setLinkSaving(true);
+    setLinkFeedback(null);
+    try {
+      const payload = {
+        garage_reference: linkDialogRow.reference ?? '',
+        catalog_reference: catRef,
+        catalog_manufacturer_id: linkCatalogManufacturerId.trim(),
+      };
+      const sm = linkDialogRow.sample_manufacturer;
+      if (linkRestrictMfg && sm != null && String(sm).trim() !== '') {
+        payload.garage_manufacturer = String(sm).trim();
+      }
+      const { data: res } = await api.post('/admin/link-garage-refs-to-catalog', payload);
+      setRefsLinkBanner({
+        text: `Enlazados ${res.updated_count ?? 0} vehículo(s) a la referencia de catálogo.`,
+      });
+      setLinkDialogRow(null);
+      setLinkFeedback(null);
+      void fetchRefsReport();
+    } catch (err) {
+      setLinkFeedback({
+        variant: 'destructive',
+        text: err.response?.data?.error || err.message || 'Error al enlazar',
+      });
+    } finally {
+      setLinkSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (isAdmin && range) void fetchMetrics();
@@ -360,6 +425,11 @@ const AdminPlatformDashboard = () => {
               <AlertDescription>{refsError}</AlertDescription>
             </Alert>
           )}
+          {refsLinkBanner && (
+            <Alert>
+              <AlertDescription>{refsLinkBanner.text}</AlertDescription>
+            </Alert>
+          )}
           {refsLoading && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Spinner className="size-5" />
@@ -383,6 +453,7 @@ const AdminPlatformDashboard = () => {
                         <TableHead className="text-right w-[100px]">Usuarios</TableHead>
                         <TableHead>Fabricante (ej.)</TableHead>
                         <TableHead>Modelo (ej.)</TableHead>
+                        <TableHead className="text-right w-[120px]">Acción</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -397,6 +468,11 @@ const AdminPlatformDashboard = () => {
                           </TableCell>
                           <TableCell className="text-sm">{row.sample_manufacturer ?? '—'}</TableCell>
                           <TableCell className="text-sm">{row.sample_model ?? '—'}</TableCell>
+                          <TableCell className="text-right">
+                            <Button type="button" variant="outline" size="sm" onClick={() => openLinkDialog(row)}>
+                              Enlazar
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -434,6 +510,70 @@ const AdminPlatformDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!linkDialogRow} onOpenChange={(open) => !open && setLinkDialogRow(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enlazar referencia de garaje al catálogo</DialogTitle>
+            <DialogDescription>
+              Se actualizarán todos los vehículos con la misma referencia de garaje (y filtro de fabricante si
+              aplica) que tengan <span className="font-mono">catalog_item_id</span> vacío.
+            </DialogDescription>
+          </DialogHeader>
+          {linkDialogRow && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm space-y-1">
+                <p>
+                  <span className="text-muted-foreground">Referencia en garajes:</span>{' '}
+                  <span className="font-mono font-medium">{linkDialogRow.reference || '—'}</span>
+                </p>
+                <p className="text-muted-foreground tabular-nums">
+                  Vehículos afectados (aprox.): {linkDialogRow.vehicle_count ?? 0} · Usuarios:{' '}
+                  {linkDialogRow.distinct_user_count ?? '—'}
+                </p>
+              </div>
+              {linkDialogRow.sample_manufacturer != null && String(linkDialogRow.sample_manufacturer).trim() !== '' && (
+                <div className="flex items-center gap-2">
+                  <Switch id="link-restrict-mfg" checked={linkRestrictMfg} onCheckedChange={(v) => setLinkRestrictMfg(!!v)} />
+                  <Label htmlFor="link-restrict-mfg" className="text-sm font-normal cursor-pointer leading-tight">
+                    Sólo vehículos con fabricante «{String(linkDialogRow.sample_manufacturer).trim()}» (recomendado)
+                  </Label>
+                </div>
+              )}
+              <CatalogBrandSelect
+                id="admin-gap-link-catalog-brand"
+                label="Marca en el catálogo"
+                value={linkCatalogManufacturerId}
+                onChange={setLinkCatalogManufacturerId}
+                required
+              />
+              <div className="space-y-2">
+                <Label htmlFor="admin-gap-link-catalog-ref">Referencia en el catálogo</Label>
+                <Input
+                  id="admin-gap-link-catalog-ref"
+                  value={linkCatalogReference}
+                  onChange={(e) => setLinkCatalogReference(e.target.value)}
+                  placeholder="ej. AV52802"
+                  className="font-mono"
+                />
+              </div>
+              {linkFeedback?.variant === 'destructive' && (
+                <Alert variant="destructive">
+                  <AlertDescription>{linkFeedback.text}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setLinkDialogRow(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={() => void submitLinkGarageToCatalog()} disabled={linkSaving}>
+              {linkSaving ? 'Enlazando…' : 'Confirmar enlace'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>

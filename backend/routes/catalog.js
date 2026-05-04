@@ -48,6 +48,20 @@ function normalizeManufacturer(m) {
   return String(m ?? '').trim();
 }
 
+/** null = sin prefijo; string MAYÚSCULAS; invalid = error humano */
+function parseReferencePrefixFromBody(raw) {
+  if (raw == null || raw === '') return { prefix: null };
+  const s = String(raw).trim();
+  if (!s) return { prefix: null };
+  if (!/^[A-Za-z][A-Za-z0-9]{0,23}$/.test(s)) {
+    return {
+      invalid: true,
+      message: 'reference_prefix: letra inicial; hasta 24 caracteres alfanuméricos; sin espacios',
+    };
+  }
+  return { prefix: s.toUpperCase() };
+}
+
 function parseOptionalYear(raw) {
   if (raw == null || raw === '') return null;
   const s = String(raw).trim();
@@ -1831,7 +1845,7 @@ router.get('/brands', adminGuard, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('slot_catalog_brands')
-      .select('id,name,logo_url,created_at,updated_at')
+      .select('id,name,logo_url,reference_prefix,created_at,updated_at')
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
     res.json({ brands: data ?? [] });
@@ -1847,6 +1861,8 @@ router.post('/brands', adminGuard, brandUpload, async (req, res) => {
   try {
     const name = normalizeManufacturer(req.body.name);
     if (!name) return res.status(400).json({ error: 'name es obligatorio' });
+    const prefParsed = parseReferencePrefixFromBody(req.body.reference_prefix);
+    if (prefParsed.invalid) return res.status(400).json({ error: prefParsed.message });
     let logo_url = null;
     const logoFile = req.files?.logo?.[0];
     if (logoFile?.buffer) {
@@ -1854,8 +1870,8 @@ router.post('/brands', adminGuard, brandUpload, async (req, res) => {
     }
     const { data, error } = await supabase
       .from('slot_catalog_brands')
-      .insert([{ name, logo_url }])
-      .select('id,name,logo_url,created_at,updated_at')
+      .insert([{ name, logo_url, reference_prefix: prefParsed.prefix }])
+      .select('id,name,logo_url,reference_prefix,created_at,updated_at')
       .single();
     if (error) {
       if (error.code === '23505') return res.status(409).json({ error: 'Ya existe una marca con ese nombre' });
@@ -1881,6 +1897,13 @@ router.put('/brands/:id', adminGuard, brandUpload, async (req, res) => {
     const name = req.body.name !== undefined ? normalizeManufacturer(req.body.name) : existing.name;
     if (!name) return res.status(400).json({ error: 'name no puede estar vacío' });
 
+    let reference_prefix = existing.reference_prefix;
+    if (req.body.reference_prefix !== undefined) {
+      const prefParsed = parseReferencePrefixFromBody(req.body.reference_prefix);
+      if (prefParsed.invalid) return res.status(400).json({ error: prefParsed.message });
+      reference_prefix = prefParsed.prefix;
+    }
+
     let logo_url = existing.logo_url;
     const clearLogo = parseBodyBool(req.body.clear_logo);
     if (clearLogo) {
@@ -1895,9 +1918,9 @@ router.put('/brands/:id', adminGuard, brandUpload, async (req, res) => {
 
     const { data, error } = await supabase
       .from('slot_catalog_brands')
-      .update({ name, logo_url, updated_at: new Date().toISOString() })
+      .update({ name, logo_url, reference_prefix, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('id,name,logo_url,created_at,updated_at')
+      .select('id,name,logo_url,reference_prefix,created_at,updated_at')
       .single();
     if (error) {
       if (error.code === '23505') return res.status(409).json({ error: 'Ya existe una marca con ese nombre' });

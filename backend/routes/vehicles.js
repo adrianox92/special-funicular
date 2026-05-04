@@ -20,6 +20,7 @@ const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/in
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const vehicleImport = require('../lib/vehicleImport');
+const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
 
 
 /** Columnas permitidas para GET /vehicles y /vehicles/export (ordenación). */
@@ -1115,7 +1116,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
     // Verificar que el vehículo pertenece al usuario
     const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
-      .select('id, modified')
+      .select('id, modified, reference, manufacturer, catalog_item_id')
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
@@ -1149,6 +1150,35 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
     // Si no está modificado, el total_price será igual al price
     if (updateData.modified === false) {
       updateData.total_price = Number(updateData.price);
+    }
+
+    const mergedRef =
+      Object.prototype.hasOwnProperty.call(updateData, 'reference') && updateData.reference !== undefined
+        ? updateData.reference
+        : existingVehicle.reference;
+    const mergedMfg =
+      Object.prototype.hasOwnProperty.call(updateData, 'manufacturer') && updateData.manufacturer !== undefined
+        ? updateData.manufacturer
+        : existingVehicle.manufacturer;
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'catalog_item_id')) {
+      const rawCat = normalizeFormScalar(req.body.catalog_item_id);
+      if (rawCat != null && String(rawCat).trim() !== '') {
+        const catalog_item_id_explicit = String(rawCat).trim();
+        const { data: catOk, error: catErr } = await req.supabase
+          .from('slot_catalog_items_with_ratings')
+          .select('id')
+          .eq('id', catalog_item_id_explicit)
+          .maybeSingle();
+        if (catErr) return res.status(500).json({ error: catErr.message });
+        if (!catOk) return res.status(400).json({ error: 'catalog_item_id no existe en el catálogo' });
+        updateData.catalog_item_id = catalog_item_id_explicit;
+      } else {
+        updateData.catalog_item_id = await resolveCatalogItemIdFromGarageRef(req.supabase, mergedMfg, mergedRef);
+      }
+    } else {
+      const resolved = await resolveCatalogItemIdFromGarageRef(req.supabase, mergedMfg, mergedRef);
+      if (resolved) updateData.catalog_item_id = resolved;
     }
 
     // Actualizar datos del vehículo
@@ -1211,8 +1241,18 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
       commercial_release_year,
       commercial_release_date,
     });
-    const catalog_item_id_val =
-      catalog_item_id === '' || catalog_item_id == null ? null : String(catalog_item_id).trim();
+    const explicitCatalog =
+      catalog_item_id != null && catalog_item_id !== '' && String(catalog_item_id).trim() !== '';
+
+    let catalog_item_id_val = explicitCatalog ? String(catalog_item_id).trim() : null;
+
+    if (!catalog_item_id_val && reference && manufacturer) {
+      catalog_item_id_val = await resolveCatalogItemIdFromGarageRef(
+        req.supabase,
+        manufacturer,
+        reference,
+      );
+    }
 
     let catalogRow = null;
     if (catalog_item_id_val) {
@@ -1222,6 +1262,9 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
         .eq('id', catalog_item_id_val)
         .maybeSingle();
       catalogRow = cr;
+    }
+    if (catalog_item_id_val && !catalogRow) {
+      return res.status(400).json({ error: 'catalog_item_id no existe en el catálogo' });
     }
 
     const traction_val =

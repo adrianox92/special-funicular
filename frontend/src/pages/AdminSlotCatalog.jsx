@@ -285,6 +285,7 @@ function AdminSlotCatalog() {
   const [brandDialogOpen, setBrandDialogOpen] = useState(false);
   const [brandEditId, setBrandEditId] = useState(null);
   const [brandName, setBrandName] = useState('');
+  const [brandReferencePrefix, setBrandReferencePrefix] = useState('');
   const [brandLogoFile, setBrandLogoFile] = useState(null);
   const [brandExistingLogo, setBrandExistingLogo] = useState(null);
   const [brandClearLogo, setBrandClearLogo] = useState(false);
@@ -517,6 +518,7 @@ function AdminSlotCatalog() {
   const openCreateBrand = () => {
     setBrandEditId(null);
     setBrandName('');
+    setBrandReferencePrefix('');
     setBrandLogoFile(null);
     setBrandExistingLogo(null);
     setBrandClearLogo(false);
@@ -526,6 +528,7 @@ function AdminSlotCatalog() {
   const openEditBrand = (row) => {
     setBrandEditId(row.id);
     setBrandName(row.name ?? '');
+    setBrandReferencePrefix(row.reference_prefix != null ? String(row.reference_prefix) : '');
     setBrandLogoFile(null);
     const u = row.logo_url != null && String(row.logo_url).trim() ? String(row.logo_url) : null;
     setBrandExistingLogo(u);
@@ -543,6 +546,7 @@ function AdminSlotCatalog() {
     try {
       const fd = new FormData();
       fd.append('name', n);
+      fd.append('reference_prefix', brandReferencePrefix.trim());
       if (brandLogoFile) fd.append('logo', brandLogoFile);
       if (brandEditId && brandClearLogo) fd.append('clear_logo', 'true');
       if (brandEditId) {
@@ -1117,6 +1121,7 @@ function AdminSlotCatalog() {
                     <TableRow>
                       <TableHead className="w-24">Logo</TableHead>
                       <TableHead>Nombre</TableHead>
+                      <TableHead className="hidden md:table-cell w-[100px]">Prefijo ref.</TableHead>
                       <TableHead className="hidden sm:table-cell">Creada</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -1136,6 +1141,11 @@ function AdminSlotCatalog() {
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{b.name}</TableCell>
+                        <TableCell className="hidden md:table-cell font-mono text-sm">
+                          {b.reference_prefix != null && String(b.reference_prefix).trim()
+                            ? String(b.reference_prefix)
+                            : '—'}
+                        </TableCell>
                         <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
                           {b.created_at
                             ? new Date(b.created_at).toLocaleDateString('es-ES')
@@ -2042,6 +2052,19 @@ function AdminSlotCatalog() {
                 onChange={(e) => setBrandName(e.target.value)}
                 placeholder="Ej. Scalextric"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Prefijo de referencia (opcional)</Label>
+              <Input
+                value={brandReferencePrefix}
+                onChange={(e) => setBrandReferencePrefix(e.target.value)}
+                placeholder="Ej. AV — para enlazar referencias solo numéricas al catálogo"
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Letra inicial y hasta 24 caracteres alfanuméricos. Si un usuario introduce «52802» y el catálogo tiene
+                «AV52802», se concatena este prefijo al intentar enlazar automáticamente.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Logo (opcional)</Label>
