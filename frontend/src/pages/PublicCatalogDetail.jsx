@@ -32,7 +32,7 @@ import {
   buildCatalogItemImageAlt,
   clearCatalogItemPageSeo,
 } from '../utils/catalogItemSeo';
-import { ChevronRight, Package, Star, X } from 'lucide-react';
+import { ChevronRight, ExternalLink, Package, Star, X } from 'lucide-react';
 import StoreListingsSection from '../components/StoreListingsSection';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
@@ -106,6 +106,8 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
         data.limited_edition_total != null ? String(data.limited_edition_total) : '',
       discontinued: Boolean(data.discontinued),
       upcoming_release: Boolean(data.upcoming_release),
+      real_race_results_url: data.real_race_results_url != null ? String(data.real_race_results_url) : '',
+      real_race_photos_url: data.real_race_photos_url != null ? String(data.real_race_photos_url) : '',
     });
   }, [id]);
 
@@ -214,6 +216,8 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
           ? String(suggestForm.limited_edition_total).trim()
           : '',
       );
+      fd.append('real_race_results_url', suggestForm.real_race_results_url?.trim() ?? '');
+      fd.append('real_race_photos_url', suggestForm.real_race_photos_url?.trim() ?? '');
       if (suggestImage) fd.append('image', suggestImage);
       await api.post(`/catalog/items/${encodeURIComponent(id)}/change-requests`, fd);
       toast.success('Sugerencia enviada. El equipo la revisará.');
@@ -268,6 +272,15 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       : registeredUserCount === 1
         ? '1 usuario tiene este modelo en su colección.'
         : `${registeredUserCount} usuarios tienen este modelo en su colección.`;
+
+  const publicRaceResultsUrl =
+    item.real_race_results_url != null && String(item.real_race_results_url).trim() !== ''
+      ? String(item.real_race_results_url).trim()
+      : null;
+  const publicRacePhotosUrl =
+    item.real_race_photos_url != null && String(item.real_race_photos_url).trim() !== ''
+      ? String(item.real_race_photos_url).trim()
+      : null;
 
   return (
     <PublicCatalogShell>
@@ -457,6 +470,37 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
           </Card>
         </div>
 
+        {(publicRaceResultsUrl || publicRacePhotosUrl) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <h2 className="text-xl font-semibold leading-none tracking-tight">Competición real</h2>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {publicRaceResultsUrl && (
+                <a
+                  href={publicRaceResultsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                >
+                  <ExternalLink className="size-4 shrink-0" aria-hidden />
+                  Resultados en la prueba real
+                </a>
+              )}
+              {publicRacePhotosUrl && (
+                <a
+                  href={publicRacePhotosUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                >
+                  <ExternalLink className="size-4 shrink-0" aria-hidden />
+                  Fotos del vehículo en la prueba
+                </a>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {user && (
           <Card>
@@ -627,6 +671,30 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                 />
               </div>
             )}
+            <div className="space-y-2">
+              <Label>Enlace a resultados (competición real)</Label>
+              <Input
+                type="url"
+                inputMode="url"
+                placeholder="https://…"
+                value={suggestForm.real_race_results_url ?? ''}
+                onChange={(e) =>
+                  setSuggestForm((f) => ({ ...f, real_race_results_url: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Enlace a fotos del vehículo real</Label>
+              <Input
+                type="url"
+                inputMode="url"
+                placeholder="https://…"
+                value={suggestForm.real_race_photos_url ?? ''}
+                onChange={(e) =>
+                  setSuggestForm((f) => ({ ...f, real_race_photos_url: e.target.value }))
+                }
+              />
+            </div>
             <div className="flex flex-col gap-3 rounded-lg border p-3">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="suggest-discontinued" className="cursor-pointer">

@@ -74,6 +74,8 @@ const emptyItem = {
   dorsal: '',
   limited_edition: false,
   limited_edition_total: '',
+  real_race_results_url: '',
+  real_race_photos_url: '',
   discontinued: false,
   upcoming_release: false,
 };
@@ -604,6 +606,8 @@ function AdminSlotCatalog() {
         row.limited_edition_total != null && row.limited_edition_total !== ''
           ? String(row.limited_edition_total)
           : '',
+      real_race_results_url: row.real_race_results_url != null ? String(row.real_race_results_url) : '',
+      real_race_photos_url: row.real_race_photos_url != null ? String(row.real_race_photos_url) : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
     });
@@ -634,6 +638,8 @@ function AdminSlotCatalog() {
         row.limited_edition_total != null && row.limited_edition_total !== ''
           ? String(row.limited_edition_total)
           : '',
+      real_race_results_url: row.real_race_results_url != null ? String(row.real_race_results_url) : '',
+      real_race_photos_url: row.real_race_photos_url != null ? String(row.real_race_photos_url) : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
     });
@@ -668,6 +674,8 @@ function AdminSlotCatalog() {
       );
       fd.append('discontinued', form.discontinued ? 'true' : 'false');
       fd.append('upcoming_release', form.upcoming_release ? 'true' : 'false');
+      fd.append('real_race_results_url', form.real_race_results_url?.trim() ?? '');
+      fd.append('real_race_photos_url', form.real_race_photos_url?.trim() ?? '');
       if (imageFile) fd.append('image', imageFile);
 
       if (editMode === 'create' || editMode === 'duplicate') {
@@ -1974,6 +1982,28 @@ function AdminSlotCatalog() {
                 />
               </div>
             )}
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Enlace a resultados (competición real)</Label>
+              <Input
+                type="url"
+                inputMode="url"
+                placeholder="https://…"
+                value={form.real_race_results_url ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, real_race_results_url: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">Opcional. Página con el resultado del vehículo real en la prueba.</p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Enlace a fotos (vehículo real en pista)</Label>
+              <Input
+                type="url"
+                inputMode="url"
+                placeholder="https://…"
+                value={form.real_race_photos_url ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, real_race_photos_url: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">Opcional. Galería o álbum del coche real en la competición.</p>
+            </div>
             <div className="flex flex-col gap-4 rounded-lg border p-3 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
               <div className="flex items-center justify-between gap-3 sm:min-w-[200px]">
                 <Label htmlFor="catalog-discontinued" className="cursor-pointer">

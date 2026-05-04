@@ -333,6 +333,22 @@ function normOptionalStr(v) {
   return s === '' ? null : s;
 }
 
+/** URL absoluta http(s) o null. Texto no vacío inválido → { ok: false, error }. */
+function parseOptionalAbsoluteHttpUrl(raw) {
+  if (raw == null) return { ok: true, value: null };
+  const s = String(raw).trim();
+  if (s === '') return { ok: true, value: null };
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      return { ok: false, error: 'La URL debe usar http o https' };
+    }
+    return { ok: true, value: u.toString() };
+  } catch {
+    return { ok: false, error: 'URL no válida' };
+  }
+}
+
 function normYearForDiff(v) {
   if (v == null || v === '') return null;
   const n = typeof v === 'number' ? v : parseInt(String(v), 10);
@@ -468,6 +484,31 @@ function computeCatalogChangeFieldDiffs(item, patch, brandNameById) {
     });
   }
 
+  if (item && patch.real_race_results_url !== undefined) {
+    const curRr = normOptionalStr(item.real_race_results_url);
+    const propRr = normOptionalStr(patch.real_race_results_url);
+    if (curRr !== propRr) {
+      changes.push({
+        field: 'real_race_results_url',
+        label: 'Resultados carrera real',
+        before: curRr ?? '—',
+        after: propRr ?? '—',
+      });
+    }
+  }
+  if (item && patch.real_race_photos_url !== undefined) {
+    const curRp = normOptionalStr(item.real_race_photos_url);
+    const propRp = normOptionalStr(patch.real_race_photos_url);
+    if (curRp !== propRp) {
+      changes.push({
+        field: 'real_race_photos_url',
+        label: 'Fotos carrera real',
+        before: curRp ?? '—',
+        after: propRp ?? '—',
+      });
+    }
+  }
+
   const curImg = item ? normOptionalStr(item.image_url) : null;
   const propImg = normOptionalStr(patch.image_url);
   if (item && curImg !== propImg) {
@@ -569,11 +610,29 @@ function proposedPatchToFallbackDiffs(patch, brandNameById) {
       kind: 'image',
     });
   }
+  if (patch.real_race_results_url !== undefined) {
+    const rr = normOptionalStr(patch.real_race_results_url);
+    changes.push({
+      field: 'real_race_results_url',
+      label: 'Resultados carrera real',
+      before: '—',
+      after: rr ?? '—',
+    });
+  }
+  if (patch.real_race_photos_url !== undefined) {
+    const rp = normOptionalStr(patch.real_race_photos_url);
+    changes.push({
+      field: 'real_race_photos_url',
+      label: 'Fotos carrera real',
+      before: '—',
+      after: rp ?? '—',
+    });
+  }
   return changes;
 }
 
 const CATALOG_ITEM_SUMMARY_SELECT =
-  'id, reference, manufacturer_id, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, image_url';
+  'id, reference, manufacturer_id, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url';
 
 async function fetchChangeRequestCatalogItemsById(rows) {
   const itemIds = [...new Set(rows.map((r) => r.catalog_item_id).filter(Boolean))];
@@ -702,7 +761,7 @@ router.get('/search', async (req, res) => {
     }
     const pattern = `%${escapeIlikePattern(q)}%`;
     const sel =
-      'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, image_url';
+      'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url';
     const [r1, r2, r3, r4] = await Promise.all([
       supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('reference', pattern).limit(20),
       supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('manufacturer', pattern).limit(20),
@@ -959,6 +1018,11 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
     let limited_edition_total = parseCatalogLimitedEditionTotal(req.body.limited_edition_total);
     if (!limited_edition) limited_edition_total = null;
 
+    const raceResultsParsed = parseOptionalAbsoluteHttpUrl(req.body.real_race_results_url);
+    if (!raceResultsParsed.ok) return res.status(400).json({ error: raceResultsParsed.error });
+    const racePhotosParsed = parseOptionalAbsoluteHttpUrl(req.body.real_race_photos_url);
+    if (!racePhotosParsed.ok) return res.status(400).json({ error: racePhotosParsed.error });
+
     if (!reference || !manufacturer_id || !model_name) {
       return res.status(400).json({
         error: 'reference, manufacturer_id (o manufacturer) y model_name son obligatorios',
@@ -991,6 +1055,8 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
           dorsal,
           limited_edition,
           limited_edition_total,
+          real_race_results_url: raceResultsParsed.value,
+          real_race_photos_url: racePhotosParsed.value,
           image_url,
           updated_at: new Date().toISOString(),
         },
@@ -1062,6 +1128,19 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
         : parseCatalogLimitedEditionTotal(existing.limited_edition_total);
     if (!limited_edition) limited_edition_total = null;
 
+    let real_race_results_url = existing.real_race_results_url;
+    if (req.body.real_race_results_url !== undefined) {
+      const p = parseOptionalAbsoluteHttpUrl(req.body.real_race_results_url);
+      if (!p.ok) return res.status(400).json({ error: p.error });
+      real_race_results_url = p.value;
+    }
+    let real_race_photos_url = existing.real_race_photos_url;
+    if (req.body.real_race_photos_url !== undefined) {
+      const p = parseOptionalAbsoluteHttpUrl(req.body.real_race_photos_url);
+      if (!p.ok) return res.status(400).json({ error: p.error });
+      real_race_photos_url = p.value;
+    }
+
     let image_url = existing.image_url;
     const img = req.files?.image?.[0];
     if (img) {
@@ -1094,6 +1173,8 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
         dorsal,
         limited_edition,
         limited_edition_total,
+        real_race_results_url,
+        real_race_photos_url,
         image_url,
         updated_at: new Date().toISOString(),
       })
@@ -1155,6 +1236,19 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
       if (fid) proposed_manufacturer_id = fid;
     }
 
+    let prResults = item.real_race_results_url ?? null;
+    if (req.body.real_race_results_url !== undefined) {
+      const p = parseOptionalAbsoluteHttpUrl(req.body.real_race_results_url);
+      if (!p.ok) return res.status(400).json({ error: p.error });
+      prResults = p.value;
+    }
+    let prPhotos = item.real_race_photos_url ?? null;
+    if (req.body.real_race_photos_url !== undefined) {
+      const p = parseOptionalAbsoluteHttpUrl(req.body.real_race_photos_url);
+      if (!p.ok) return res.status(400).json({ error: p.error });
+      prPhotos = p.value;
+    }
+
     const proposed_patch = {
       manufacturer_id: proposed_manufacturer_id,
       model_name: req.body.model_name != null ? String(req.body.model_name).trim() : item.model_name,
@@ -1195,6 +1289,8 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
         if (!le) lt = null;
         return lt;
       })(),
+      real_race_results_url: prResults,
+      real_race_photos_url: prPhotos,
       image_url: item.image_url,
     };
 
@@ -1314,6 +1410,10 @@ router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) 
               : parseCatalogLimitedEditionTotal(item.limited_edition_total);
           return le ? lt : null;
         })(),
+        real_race_results_url:
+          patch.real_race_results_url !== undefined ? patch.real_race_results_url : item.real_race_results_url,
+        real_race_photos_url:
+          patch.real_race_photos_url !== undefined ? patch.real_race_photos_url : item.real_race_photos_url,
         image_url: patch.image_url ?? null,
         updated_at: new Date().toISOString(),
       })
