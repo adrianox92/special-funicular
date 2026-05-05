@@ -6,7 +6,7 @@ const express = require('express');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
-const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
+const { createUserScopedClient, getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const {
@@ -17,8 +17,6 @@ const {
 const { catalogContributionsLimiter } = require('../middleware/rateLimits');
 const { isExcelImportFile, normalizeBlankColumnHeaders } = require('../lib/vehicleImport');
 const { parseImportCommercialReleaseYear } = require('../lib/importDateParse');
-
-const supabase = getAnonClient();
 
 const router = express.Router();
 
@@ -271,12 +269,12 @@ function computeCatalogDashboardStats(rows) {
   };
 }
 
-async function fetchAllSlotCatalogRowsForStats() {
+async function fetchAllSlotCatalogRowsForStats(sb) {
   const pageSize = 1000;
   let from = 0;
   const all = [];
   for (;;) {
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('slot_catalog_items')
       .select('model_name, vehicle_type, traction, motor_position, image_url, commercial_release_year, dorsal')
       .order('id', { ascending: true })
@@ -297,29 +295,29 @@ function parseRatingBody(raw) {
 }
 
 /** Resuelve UUID de marca por nombre (trim, case-insensitive) vía RPC en BD. */
-async function findBrandIdByName(raw) {
+async function findBrandIdByName(sb, raw) {
   const s = normalizeManufacturer(raw);
   if (!s) return null;
-  const { data, error } = await supabase.rpc('slot_catalog_brand_id_by_name', { p_name: s });
+  const { data, error } = await sb.rpc('slot_catalog_brand_id_by_name', { p_name: s });
   if (error) return null;
   return data || null;
 }
 
-async function resolveManufacturerIdFromBody(reqBody, existingManufacturerId) {
+async function resolveManufacturerIdFromBody(reqBody, existingManufacturerId, sb) {
   if (reqBody.manufacturer_id != null && String(reqBody.manufacturer_id).trim() !== '') {
     return String(reqBody.manufacturer_id).trim();
   }
   if (reqBody.manufacturer != null && String(reqBody.manufacturer).trim() !== '') {
-    return await findBrandIdByName(reqBody.manufacturer);
+    return await findBrandIdByName(sb, reqBody.manufacturer);
   }
   return existingManufacturerId ?? null;
 }
 
-async function enrichInsertRequestsWithBrandNames(rows) {
+async function enrichInsertRequestsWithBrandNames(sb, rows) {
   if (!rows?.length) return rows || [];
   const ids = [...new Set(rows.map((r) => r.proposed_manufacturer_id).filter(Boolean))];
   if (!ids.length) return rows;
-  const { data: brands } = await supabase.from('slot_catalog_brands').select('id,name').in('id', ids);
+  const { data: brands } = await sb.from('slot_catalog_brands').select('id,name').in('id', ids);
   const m = new Map((brands || []).map((b) => [b.id, b.name]));
   return rows.map((r) => ({
     ...r,
@@ -634,11 +632,11 @@ function proposedPatchToFallbackDiffs(patch, brandNameById) {
 const CATALOG_ITEM_SUMMARY_SELECT =
   'id, reference, manufacturer_id, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url';
 
-async function fetchChangeRequestCatalogItemsById(rows) {
+async function fetchChangeRequestCatalogItemsById(sb, rows) {
   const itemIds = [...new Set(rows.map((r) => r.catalog_item_id).filter(Boolean))];
   let itemsById = new Map();
   if (itemIds.length) {
-    const { data: items, error } = await supabase
+    const { data: items, error } = await sb
       .from('slot_catalog_items_with_ratings')
       .select(CATALOG_ITEM_SUMMARY_SELECT)
       .in('id', itemIds);
@@ -664,9 +662,9 @@ function toCatalogItemSummary(item) {
 /**
  * Resumen de ficha para listados (p. ej. GET /my-requests).
  */
-async function attachCatalogItemSummariesToChangeRequests(rows) {
+async function attachCatalogItemSummariesToChangeRequests(sb, rows) {
   if (!rows?.length) return rows || [];
-  const itemsById = await fetchChangeRequestCatalogItemsById(rows);
+  const itemsById = await fetchChangeRequestCatalogItemsById(sb, rows);
   return rows.map((r) => ({
     ...r,
     catalog_item_summary: toCatalogItemSummary(itemsById.get(r.catalog_item_id) ?? null),
@@ -676,9 +674,9 @@ async function attachCatalogItemSummariesToChangeRequests(rows) {
 /**
  * Añade resumen del ítem y lista de cambios respecto al estado actual (admin).
  */
-async function enrichChangeRequestsForAdmin(rows) {
+async function enrichChangeRequestsForAdmin(sb, rows) {
   if (!rows?.length) return rows || [];
-  const itemsById = await fetchChangeRequestCatalogItemsById(rows);
+  const itemsById = await fetchChangeRequestCatalogItemsById(sb, rows);
 
   const brandIds = new Set();
   for (const r of rows) {
@@ -689,7 +687,7 @@ async function enrichChangeRequestsForAdmin(rows) {
   }
   let brandNameById = new Map();
   if (brandIds.size) {
-    const { data: brands } = await supabase.from('slot_catalog_brands').select('id,name').in('id', [...brandIds]);
+    const { data: brands } = await sb.from('slot_catalog_brands').select('id,name').in('id', [...brandIds]);
     brandNameById = new Map((brands || []).map((b) => [String(b.id), b.name]));
   }
 
@@ -737,12 +735,17 @@ async function attachSubmitterEmails(rows) {
 
 router.use(authMiddleware);
 
+router.use((req, res, next) => {
+  req.supabase = createUserScopedClient(req.headers.authorization);
+  next();
+});
+
 /**
  * GET /stats — métricas de completitud y huecos (solo admin)
  */
 router.get('/stats', adminGuard, async (req, res) => {
   try {
-    const rows = await fetchAllSlotCatalogRowsForStats();
+    const rows = await fetchAllSlotCatalogRowsForStats(req.supabase);
     const stats = computeCatalogDashboardStats(rows);
     res.json(stats);
   } catch (e) {
@@ -763,10 +766,10 @@ router.get('/search', async (req, res) => {
     const sel =
       'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url';
     const [r1, r2, r3, r4] = await Promise.all([
-      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('reference', pattern).limit(20),
-      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('manufacturer', pattern).limit(20),
-      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('model_name', pattern).limit(20),
-      supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('vehicle_type', pattern).limit(20),
+      req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('reference', pattern).limit(20),
+      req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('manufacturer', pattern).limit(20),
+      req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('model_name', pattern).limit(20),
+      req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('vehicle_type', pattern).limit(20),
     ]);
     if (r1.error) return res.status(500).json({ error: r1.error.message });
     if (r2.error) return res.status(500).json({ error: r2.error.message });
@@ -790,13 +793,13 @@ router.get('/my-requests', async (req, res) => {
   try {
     const uid = req.user.id;
     const [chg, ins] = await Promise.all([
-      supabase
+      req.supabase
         .from('slot_catalog_change_requests')
         .select('id, catalog_item_id, status, proposed_patch, created_at, reviewed_at, rejection_reason')
         .eq('submitted_by', uid)
         .order('created_at', { ascending: false })
         .limit(50),
-      supabase
+      req.supabase
         .from('slot_catalog_insert_requests')
         .select(
           'id, proposed_reference, proposed_manufacturer_id, proposed_model_name, proposed_vehicle_type, proposed_traction, proposed_motor_position, proposed_commercial_release_year, proposed_discontinued, proposed_upcoming_release, proposed_dorsal, proposed_limited_edition, proposed_limited_edition_total, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
@@ -807,8 +810,8 @@ router.get('/my-requests', async (req, res) => {
     ]);
     if (chg.error) return res.status(500).json({ error: chg.error.message });
     if (ins.error) return res.status(500).json({ error: ins.error.message });
-    const changeRows = await attachCatalogItemSummariesToChangeRequests(chg.data ?? []);
-    const insertRows = await enrichInsertRequestsWithBrandNames(ins.data ?? []);
+    const changeRows = await attachCatalogItemSummariesToChangeRequests(req.supabase, chg.data ?? []);
+    const insertRows = await enrichInsertRequestsWithBrandNames(req.supabase, ins.data ?? []);
     res.json({
       change_requests: changeRows,
       insert_requests: insertRows,
@@ -827,7 +830,7 @@ router.get('/items/:catalogItemId/rating/mine', async (req, res) => {
     if (!isUuid(catalogItemId)) {
       return res.status(404).json({ error: 'Ítem no encontrado' });
     }
-    const { data: row, error } = await supabase
+    const { data: row, error } = await req.supabase
       .from('slot_catalog_ratings')
       .select('rating')
       .eq('catalog_item_id', catalogItemId)
@@ -854,7 +857,7 @@ router.put('/items/:catalogItemId/rating', catalogContributionsLimiter, async (r
       return res.status(400).json({ error: 'rating debe ser un entero entre 1 y 5' });
     }
 
-    const { data: item, error: iErr } = await supabase
+    const { data: item, error: iErr } = await req.supabase
       .from('slot_catalog_items')
       .select('id')
       .eq('id', catalogItemId)
@@ -863,7 +866,7 @@ router.put('/items/:catalogItemId/rating', catalogContributionsLimiter, async (r
     if (!item) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     const now = new Date().toISOString();
-    const { data: existing } = await supabase
+    const { data: existing } = await req.supabase
       .from('slot_catalog_ratings')
       .select('catalog_item_id')
       .eq('catalog_item_id', catalogItemId)
@@ -873,7 +876,7 @@ router.put('/items/:catalogItemId/rating', catalogContributionsLimiter, async (r
     let data;
     let error;
     if (existing) {
-      ({ data, error } = await supabase
+      ({ data, error } = await req.supabase
         .from('slot_catalog_ratings')
         .update({ rating, updated_at: now })
         .eq('catalog_item_id', catalogItemId)
@@ -881,7 +884,7 @@ router.put('/items/:catalogItemId/rating', catalogContributionsLimiter, async (r
         .select()
         .single());
     } else {
-      ({ data, error } = await supabase
+      ({ data, error } = await req.supabase
         .from('slot_catalog_ratings')
         .insert([
           {
@@ -911,7 +914,7 @@ router.delete('/items/:catalogItemId/rating', catalogContributionsLimiter, async
     if (!isUuid(catalogItemId)) {
       return res.status(404).json({ error: 'Ítem no encontrado' });
     }
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('slot_catalog_ratings')
       .delete()
       .eq('catalog_item_id', catalogItemId)
@@ -938,7 +941,7 @@ router.get('/items', adminGuard, async (req, res) => {
     /** Hueco de datos: solo ítems que carecen de ese campo (alineado con métricas del dashboard). */
     const missing = String(req.query.missing ?? '').trim().toLowerCase();
 
-    let q = supabase.from('slot_catalog_items_with_ratings').select('*', { count: 'exact' });
+    let q = req.supabase.from('slot_catalog_items_with_ratings').select('*', { count: 'exact' });
     if (refFilter) {
       const p = `%${escapeIlikePattern(refFilter)}%`;
       q = q.ilike('reference', p);
@@ -986,7 +989,7 @@ router.get('/items', adminGuard, async (req, res) => {
 router.get('/items/:id', adminGuard, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await req.supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Ítem no encontrado' });
     res.json(data);
@@ -1004,7 +1007,7 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
   try {
     const reference = normalizeReference(req.body.reference);
     const model_name = String(req.body.model_name ?? '').trim();
-    const manufacturer_id = await resolveManufacturerIdFromBody(req.body, null);
+    const manufacturer_id = await resolveManufacturerIdFromBody(req.body, null, req.supabase);
     const vehicle_type = parseOptionalVehicleType(req.body.vehicle_type);
     const traction = parseOptionalTraction(req.body.traction);
     const motor_position = parseOptionalMotorPosition(req.body.motor_position);
@@ -1033,13 +1036,13 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
     const img = req.files?.image?.[0];
     if (img) {
       try {
-        image_url = await uploadCatalogImageBuffer(supabase, img.buffer, img.mimetype);
+        image_url = await uploadCatalogImageBuffer(req.supabase, img.buffer, img.mimetype);
       } catch (e) {
         return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
       }
     }
 
-    const { data: insRow, error } = await supabase
+    const { data: insRow, error } = await req.supabase
       .from('slot_catalog_items')
       .insert([
         {
@@ -1070,7 +1073,7 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
       }
       return res.status(500).json({ error: error.message });
     }
-    const { data: full } = await supabase
+    const { data: full } = await req.supabase
       .from('slot_catalog_items_with_ratings')
       .select('*')
       .eq('id', insRow.id)
@@ -1087,12 +1090,12 @@ router.post('/items', adminGuard, itemUpload, async (req, res) => {
 router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data: existing, error: exErr } = await supabase.from('slot_catalog_items').select('*').eq('id', id).maybeSingle();
+    const { data: existing, error: exErr } = await req.supabase.from('slot_catalog_items').select('*').eq('id', id).maybeSingle();
     if (exErr) return res.status(500).json({ error: exErr.message });
     if (!existing) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     const reference = req.body.reference != null ? normalizeReference(req.body.reference) : existing.reference;
-    const manufacturer_id = await resolveManufacturerIdFromBody(req.body, existing.manufacturer_id);
+    const manufacturer_id = await resolveManufacturerIdFromBody(req.body, existing.manufacturer_id, req.supabase);
     const model_name = req.body.model_name != null ? String(req.body.model_name).trim() : existing.model_name;
     const vehicle_type =
       req.body.vehicle_type !== undefined
@@ -1146,9 +1149,9 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
     if (img) {
       try {
         if (existing.image_url) {
-          await removeCatalogObjectByPublicUrl(supabase, existing.image_url);
+          await removeCatalogObjectByPublicUrl(req.supabase, existing.image_url);
         }
-        image_url = await uploadCatalogImageBuffer(supabase, img.buffer, img.mimetype);
+        image_url = await uploadCatalogImageBuffer(req.supabase, img.buffer, img.mimetype);
       } catch (e) {
         return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
       }
@@ -1158,7 +1161,7 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
       return res.status(400).json({ error: 'manufacturer_id inválido o marca no encontrada' });
     }
 
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('slot_catalog_items')
       .update({
         reference,
@@ -1186,7 +1189,7 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
       }
       return res.status(500).json({ error: error.message });
     }
-    const { data: full } = await supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
+    const { data: full } = await req.supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
     res.json(full);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1199,16 +1202,16 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
 router.delete('/items/:id', adminGuard, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data: existing, error: exErr } = await supabase.from('slot_catalog_items').select('image_url').eq('id', id).maybeSingle();
+    const { data: existing, error: exErr } = await req.supabase.from('slot_catalog_items').select('image_url').eq('id', id).maybeSingle();
     if (exErr) return res.status(500).json({ error: exErr.message });
     if (!existing) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     if (existing.image_url) {
-      const { error: rmErr } = await removeCatalogObjectByPublicUrl(supabase, existing.image_url);
+      const { error: rmErr } = await removeCatalogObjectByPublicUrl(req.supabase, existing.image_url);
       if (rmErr) console.warn('[catalog] remove image', rmErr.message);
     }
 
-    const { error } = await supabase.from('slot_catalog_items').delete().eq('id', id);
+    const { error } = await req.supabase.from('slot_catalog_items').delete().eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
   } catch (e) {
@@ -1224,7 +1227,7 @@ const changeUpload = upload.fields([{ name: 'image', maxCount: 1 }]);
 router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter, changeUpload, async (req, res) => {
   try {
     const { catalogItemId } = req.params;
-    const { data: item, error: iErr } = await supabase.from('slot_catalog_items').select('*').eq('id', catalogItemId).maybeSingle();
+    const { data: item, error: iErr } = await req.supabase.from('slot_catalog_items').select('*').eq('id', catalogItemId).maybeSingle();
     if (iErr) return res.status(500).json({ error: iErr.message });
     if (!item) return res.status(404).json({ error: 'Ítem no encontrado' });
 
@@ -1232,7 +1235,7 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
     if (req.body.manufacturer_id != null && String(req.body.manufacturer_id).trim() !== '') {
       proposed_manufacturer_id = String(req.body.manufacturer_id).trim();
     } else if (req.body.manufacturer != null && String(req.body.manufacturer).trim() !== '') {
-      const fid = await findBrandIdByName(req.body.manufacturer);
+      const fid = await findBrandIdByName(req.supabase, req.body.manufacturer);
       if (fid) proposed_manufacturer_id = fid;
     }
 
@@ -1297,13 +1300,13 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
     const img = req.files?.image?.[0];
     if (img) {
       try {
-        proposed_patch.image_url = await uploadCatalogImageBuffer(supabase, img.buffer, img.mimetype);
+        proposed_patch.image_url = await uploadCatalogImageBuffer(req.supabase, img.buffer, img.mimetype);
       } catch (e) {
         return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('slot_catalog_change_requests')
       .insert([
         {
@@ -1338,7 +1341,7 @@ router.get('/change-requests', adminGuard, async (req, res) => {
     const status = String(req.query.status || 'pending').toLowerCase();
     const ok = ['pending', 'approved', 'rejected', 'all'];
     const st = ok.includes(status) ? status : 'pending';
-    let q = supabase
+    let q = req.supabase
       .from('slot_catalog_change_requests')
       .select('*')
       .order('created_at', { ascending: false })
@@ -1346,7 +1349,7 @@ router.get('/change-requests', adminGuard, async (req, res) => {
     if (st !== 'all') q = q.eq('status', st);
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
-    const enriched = await enrichChangeRequestsForAdmin(data ?? []);
+    const enriched = await enrichChangeRequestsForAdmin(req.supabase, data ?? []);
     const withEmail = await attachSubmitterEmails(enriched);
     res.json({ requests: withEmail });
   } catch (e) {
@@ -1360,7 +1363,7 @@ router.get('/change-requests', adminGuard, async (req, res) => {
 router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { data: row, error: rErr } = await supabase
+    const { data: row, error: rErr } = await req.supabase
       .from('slot_catalog_change_requests')
       .select('*')
       .eq('id', requestId)
@@ -1371,16 +1374,16 @@ router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) 
     }
 
     const patch = row.proposed_patch || {};
-    const { data: item, error: iErr } = await supabase.from('slot_catalog_items').select('*').eq('id', row.catalog_item_id).maybeSingle();
+    const { data: item, error: iErr } = await req.supabase.from('slot_catalog_items').select('*').eq('id', row.catalog_item_id).maybeSingle();
     if (iErr) return res.status(500).json({ error: iErr.message });
     if (!item) return res.status(404).json({ error: 'Ítem de catálogo no encontrado' });
 
     if (patch.image_url && item.image_url && patch.image_url !== item.image_url) {
-      const { error: rmErr } = await removeCatalogObjectByPublicUrl(supabase, item.image_url);
+      const { error: rmErr } = await removeCatalogObjectByPublicUrl(req.supabase, item.image_url);
       if (rmErr) console.warn('[catalog] remove old image', rmErr.message);
     }
 
-    const { error: upErr } = await supabase
+    const { error: upErr } = await req.supabase
       .from('slot_catalog_items')
       .update({
         manufacturer_id:
@@ -1421,7 +1424,7 @@ router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) 
 
     if (upErr) return res.status(500).json({ error: upErr.message });
 
-    const { error: finErr } = await supabase
+    const { error: finErr } = await req.supabase
       .from('slot_catalog_change_requests')
       .update({
         status: 'approved',
@@ -1444,7 +1447,7 @@ router.post('/change-requests/:requestId/reject', adminGuard, async (req, res) =
   try {
     const { requestId } = req.params;
     const reason = req.body?.reason != null ? String(req.body.reason).slice(0, 2000) : null;
-    const { data: row, error: rErr } = await supabase
+    const { data: row, error: rErr } = await req.supabase
       .from('slot_catalog_change_requests')
       .select('*')
       .eq('id', requestId)
@@ -1454,7 +1457,7 @@ router.post('/change-requests/:requestId/reject', adminGuard, async (req, res) =
       return res.status(400).json({ error: 'Solicitud no válida o ya procesada' });
     }
 
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('slot_catalog_change_requests')
       .update({
         status: 'rejected',
@@ -1486,6 +1489,7 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
         manufacturer: req.body.proposed_manufacturer ?? req.body.manufacturer,
       },
       null,
+      req.supabase,
     );
     const proposed_vehicle_type = parseOptionalVehicleType(
       req.body.proposed_vehicle_type ?? req.body.vehicle_type,
@@ -1520,7 +1524,7 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
       });
     }
 
-    const { data: existingItem } = await supabase
+    const { data: existingItem } = await req.supabase
       .from('slot_catalog_items')
       .select('id')
       .eq('reference', proposed_reference)
@@ -1536,13 +1540,13 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
     const img = req.files?.image?.[0];
     if (img) {
       try {
-        proposed_image_url = await uploadCatalogImageBuffer(supabase, img.buffer, img.mimetype);
+        proposed_image_url = await uploadCatalogImageBuffer(req.supabase, img.buffer, img.mimetype);
       } catch (e) {
         return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
       }
     }
 
-    const { data: insRow, error } = await supabase
+    const { data: insRow, error } = await req.supabase
       .from('slot_catalog_insert_requests')
       .insert([
         {
@@ -1575,7 +1579,7 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
       }
       return res.status(500).json({ error: error.message });
     }
-    const enriched = await enrichInsertRequestsWithBrandNames([insRow]);
+    const enriched = await enrichInsertRequestsWithBrandNames(req.supabase, [insRow]);
     res.status(201).json(enriched[0] || insRow);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1590,11 +1594,11 @@ router.get('/insert-requests', adminGuard, async (req, res) => {
     const status = String(req.query.status || 'pending').toLowerCase();
     const ok = ['pending', 'approved', 'rejected', 'all'];
     const st = ok.includes(status) ? status : 'pending';
-    let q = supabase.from('slot_catalog_insert_requests').select('*').order('created_at', { ascending: false }).limit(200);
+    let q = req.supabase.from('slot_catalog_insert_requests').select('*').order('created_at', { ascending: false }).limit(200);
     if (st !== 'all') q = q.eq('status', st);
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
-    const rows = await enrichInsertRequestsWithBrandNames(data ?? []);
+    const rows = await enrichInsertRequestsWithBrandNames(req.supabase, data ?? []);
     const withEmail = await attachSubmitterEmails(rows);
     res.json({ requests: withEmail });
   } catch (e) {
@@ -1608,7 +1612,7 @@ router.get('/insert-requests', adminGuard, async (req, res) => {
 router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { data: row, error: rErr } = await supabase
+    const { data: row, error: rErr } = await req.supabase
       .from('slot_catalog_insert_requests')
       .select('*')
       .eq('id', requestId)
@@ -1618,7 +1622,7 @@ router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) 
       return res.status(400).json({ error: 'Solicitud no válida o ya procesada' });
     }
 
-    const { data: created, error: cErr } = await supabase
+    const { data: created, error: cErr } = await req.supabase
       .from('slot_catalog_items')
       .insert([
         {
@@ -1652,7 +1656,7 @@ router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) 
       return res.status(500).json({ error: cErr.message });
     }
 
-    const { error: uErr } = await supabase
+    const { error: uErr } = await req.supabase
       .from('slot_catalog_insert_requests')
       .update({
         status: 'approved',
@@ -1676,7 +1680,7 @@ router.post('/insert-requests/:requestId/reject', adminGuard, async (req, res) =
   try {
     const { requestId } = req.params;
     const reason = req.body?.reason != null ? String(req.body.reason).slice(0, 2000) : null;
-    const { data: row, error: rErr } = await supabase
+    const { data: row, error: rErr } = await req.supabase
       .from('slot_catalog_insert_requests')
       .select('*')
       .eq('id', requestId)
@@ -1686,7 +1690,7 @@ router.post('/insert-requests/:requestId/reject', adminGuard, async (req, res) =
       return res.status(400).json({ error: 'Solicitud no válida o ya procesada' });
     }
 
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('slot_catalog_insert_requests')
       .update({
         status: 'rejected',
@@ -1708,7 +1712,7 @@ router.post('/insert-requests/:requestId/reject', adminGuard, async (req, res) =
  * @param {string} duplicateMode
  * @param {(current: number, total: number) => void} [onProgress] current = filas ya procesadas
  */
-async function runCatalogImportRows(rows, duplicateMode, onProgress) {
+async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
   const inserted = [];
   const updated = [];
   const skipped = [];
@@ -1721,7 +1725,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
     const rowNum = i + 2;
     const ref = normalizeReference(r.reference ?? r.Reference ?? r.REFERENCIA ?? r.ref);
     const manufacturerRaw = normalizeManufacturer(r.manufacturer ?? r.Marca ?? r.fabricante ?? '');
-    const manufacturer_id = await findBrandIdByName(manufacturerRaw);
+    const manufacturer_id = await findBrandIdByName(sb, manufacturerRaw);
     const model_name = String(r.model_name ?? r.model ?? r.nombre ?? r.Nombre ?? '').trim();
     const vehicle_type = parseOptionalVehicleType(
       r.vehicle_type ?? r.tipo ?? r.type ?? r.Tipo ?? '',
@@ -1782,7 +1786,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
       continue;
     }
 
-    const { data: existing } = await supabase
+    const { data: existing } = await sb
       .from('slot_catalog_items')
       .select('id')
       .eq('reference', ref)
@@ -1800,7 +1804,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
         if (onProgress) onProgress(i + 1, total);
         continue;
       }
-      const { error: upErr } = await supabase
+      const { error: upErr } = await sb
         .from('slot_catalog_items')
         .update({
           manufacturer_id,
@@ -1823,7 +1827,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress) {
       continue;
     }
 
-    const { data: ins, error: insErr } = await supabase
+    const { data: ins, error: insErr } = await sb
       .from('slot_catalog_items')
       .insert([
         {
@@ -1919,7 +1923,7 @@ router.post('/import', adminGuard, upload.single('file'), async (req, res) => {
 
     const result = await runCatalogImportRows(rows, duplicateMode, (current, total) => {
       res.write(`${JSON.stringify({ type: 'progress', current, total })}\n`);
-    });
+    }, req.supabase);
     res.write(`${JSON.stringify({ type: 'complete', ...result })}\n`);
     res.end();
   } catch (e) {
@@ -1943,7 +1947,7 @@ const brandUpload = upload.fields([{ name: 'logo', maxCount: 1 }]);
  */
 router.get('/brands', adminGuard, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('slot_catalog_brands')
       .select('id,name,logo_url,reference_prefix,created_at,updated_at')
       .order('name', { ascending: true });
@@ -1966,9 +1970,9 @@ router.post('/brands', adminGuard, brandUpload, async (req, res) => {
     let logo_url = null;
     const logoFile = req.files?.logo?.[0];
     if (logoFile?.buffer) {
-      logo_url = await uploadBrandLogoBuffer(supabase, logoFile.buffer, logoFile.mimetype || 'image/jpeg');
+      logo_url = await uploadBrandLogoBuffer(req.supabase, logoFile.buffer, logoFile.mimetype || 'image/jpeg');
     }
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('slot_catalog_brands')
       .insert([{ name, logo_url, reference_prefix: prefParsed.prefix }])
       .select('id,name,logo_url,reference_prefix,created_at,updated_at')
@@ -1990,7 +1994,7 @@ router.put('/brands/:id', adminGuard, brandUpload, async (req, res) => {
   try {
     const { id } = req.params;
     if (!isUuid(id)) return res.status(404).json({ error: 'Marca no encontrada' });
-    const { data: existing, error: fetchErr } = await supabase.from('slot_catalog_brands').select('*').eq('id', id).maybeSingle();
+    const { data: existing, error: fetchErr } = await req.supabase.from('slot_catalog_brands').select('*').eq('id', id).maybeSingle();
     if (fetchErr) return res.status(500).json({ error: fetchErr.message });
     if (!existing) return res.status(404).json({ error: 'Marca no encontrada' });
 
@@ -2007,16 +2011,16 @@ router.put('/brands/:id', adminGuard, brandUpload, async (req, res) => {
     let logo_url = existing.logo_url;
     const clearLogo = parseBodyBool(req.body.clear_logo);
     if (clearLogo) {
-      if (existing.logo_url) await removeCatalogObjectByPublicUrl(supabase, existing.logo_url);
+      if (existing.logo_url) await removeCatalogObjectByPublicUrl(req.supabase, existing.logo_url);
       logo_url = null;
     }
     const logoFile = req.files?.logo?.[0];
     if (logoFile?.buffer) {
-      if (existing.logo_url) await removeCatalogObjectByPublicUrl(supabase, existing.logo_url);
-      logo_url = await uploadBrandLogoBuffer(supabase, logoFile.buffer, logoFile.mimetype || 'image/jpeg');
+      if (existing.logo_url) await removeCatalogObjectByPublicUrl(req.supabase, existing.logo_url);
+      logo_url = await uploadBrandLogoBuffer(req.supabase, logoFile.buffer, logoFile.mimetype || 'image/jpeg');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('slot_catalog_brands')
       .update({ name, logo_url, reference_prefix, updated_at: new Date().toISOString() })
       .eq('id', id)
@@ -2039,7 +2043,7 @@ router.delete('/brands/:id', adminGuard, async (req, res) => {
   try {
     const { id } = req.params;
     if (!isUuid(id)) return res.status(404).json({ error: 'Marca no encontrada' });
-    const { count: itemCount, error: c1 } = await supabase
+    const { count: itemCount, error: c1 } = await req.supabase
       .from('slot_catalog_items')
       .select('*', { count: 'exact', head: true })
       .eq('manufacturer_id', id);
@@ -2047,7 +2051,7 @@ router.delete('/brands/:id', adminGuard, async (req, res) => {
     if ((itemCount ?? 0) > 0) {
       return res.status(409).json({ error: 'No se puede eliminar: hay ítems del catálogo que usan esta marca' });
     }
-    const { count: reqCount, error: c2 } = await supabase
+    const { count: reqCount, error: c2 } = await req.supabase
       .from('slot_catalog_insert_requests')
       .select('*', { count: 'exact', head: true })
       .eq('proposed_manufacturer_id', id);
@@ -2055,11 +2059,11 @@ router.delete('/brands/:id', adminGuard, async (req, res) => {
     if ((reqCount ?? 0) > 0) {
       return res.status(409).json({ error: 'No se puede eliminar: hay solicitudes de alta que referencian esta marca' });
     }
-    const { data: brand } = await supabase.from('slot_catalog_brands').select('logo_url').eq('id', id).maybeSingle();
+    const { data: brand } = await req.supabase.from('slot_catalog_brands').select('logo_url').eq('id', id).maybeSingle();
     if (!brand) return res.status(404).json({ error: 'Marca no encontrada' });
-    const { error } = await supabase.from('slot_catalog_brands').delete().eq('id', id);
+    const { error } = await req.supabase.from('slot_catalog_brands').delete().eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
-    if (brand.logo_url) await removeCatalogObjectByPublicUrl(supabase, brand.logo_url);
+    if (brand.logo_url) await removeCatalogObjectByPublicUrl(req.supabase, brand.logo_url);
     res.status(204).end();
   } catch (e) {
     res.status(500).json({ error: e.message });

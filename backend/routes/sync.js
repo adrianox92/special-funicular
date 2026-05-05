@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
 const authMiddleware = require('../middleware/auth');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
@@ -8,6 +8,11 @@ const { sendTimingNotification, sendTestNotification } = require('../lib/notifie
 
 const router = express.Router();
 const supabase = getAnonClient();
+
+/** Cliente para escrituras de sync: service role evita RLS que bloquea timing_laps con anon (sesión SÍ, vueltas NO). */
+function supabaseForSyncWrite() {
+  return getServiceClient() || supabase;
+}
 
 /**
  * POST /api/sync/test-notification
@@ -152,14 +157,15 @@ router.post('/circuits', async (req, res) => {
  */
 router.post('/timings', async (req, res) => {
   try {
-    const result = await insertVehicleTimingFromSyncBody(supabase, req.user.id, req.body);
+    const db = supabaseForSyncWrite();
+    const result = await insertVehicleTimingFromSyncBody(db, req.user.id, req.body);
     if (!result.success) {
       return res.status(result.status).json({ error: result.error });
     }
 
     const { finalTiming, previousBestLapSeconds } = result;
 
-    sendTimingNotification(req.user.id, finalTiming, previousBestLapSeconds, supabase).catch(() => {});
+    sendTimingNotification(req.user.id, finalTiming, previousBestLapSeconds, db).catch(() => {});
 
     res.status(201).json(finalTiming);
   } catch (error) {
