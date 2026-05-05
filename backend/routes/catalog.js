@@ -173,6 +173,17 @@ function adminGuard(req, res, next) {
 }
 
 /**
+ * Rutas admin de catálogo: usar service role en PostgREST para leer/escribir tablas base
+ * (slot_catalog_items, slot_catalog_brands) aunque falten GRANT a authenticated o RLS filtre.
+ * Sin service key se mantiene el cliente JWT ya asignado en router.use.
+ */
+function adminCatalogServiceDb(req, res, next) {
+  const svc = getServiceClient();
+  if (svc) req.supabase = svc;
+  next();
+}
+
+/**
  * Completitud ponderada del catálogo (dashboard admin). Marca excluida: `manufacturer_id` es NOT NULL
  * y no discrimina. Pesos sobre 6 campos, suma 1 — imagen 30%; nombre, tipo, tracción, motor y año 14% cada uno.
  */
@@ -743,7 +754,7 @@ router.use((req, res, next) => {
 /**
  * GET /stats — métricas de completitud y huecos (solo admin)
  */
-router.get('/stats', adminGuard, async (req, res) => {
+router.get('/stats', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const rows = await fetchAllSlotCatalogRowsForStats(req.supabase);
     const stats = computeCatalogDashboardStats(rows);
@@ -929,7 +940,7 @@ router.delete('/items/:catalogItemId/rating', catalogContributionsLimiter, async
 /**
  * GET /items — paginación
  */
-router.get('/items', adminGuard, async (req, res) => {
+router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
@@ -986,7 +997,7 @@ router.get('/items', adminGuard, async (req, res) => {
 /**
  * GET /items/:id
  */
-router.get('/items/:id', adminGuard, async (req, res) => {
+router.get('/items/:id', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await req.supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
@@ -1003,7 +1014,7 @@ const itemUpload = upload.fields([{ name: 'image', maxCount: 1 }]);
 /**
  * POST /items
  */
-router.post('/items', adminGuard, itemUpload, async (req, res) => {
+router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req, res) => {
   try {
     const reference = normalizeReference(req.body.reference);
     const model_name = String(req.body.model_name ?? '').trim();
@@ -1199,7 +1210,7 @@ router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
 /**
  * DELETE /items/:id
  */
-router.delete('/items/:id', adminGuard, async (req, res) => {
+router.delete('/items/:id', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { id } = req.params;
     const { data: existing, error: exErr } = await req.supabase.from('slot_catalog_items').select('image_url').eq('id', id).maybeSingle();
@@ -1336,7 +1347,7 @@ router.post('/items/:catalogItemId/change-requests', catalogContributionsLimiter
 /**
  * GET /change-requests?status=pending
  */
-router.get('/change-requests', adminGuard, async (req, res) => {
+router.get('/change-requests', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const status = String(req.query.status || 'pending').toLowerCase();
     const ok = ['pending', 'approved', 'rejected', 'all'];
@@ -1360,7 +1371,7 @@ router.get('/change-requests', adminGuard, async (req, res) => {
 /**
  * POST /change-requests/:requestId/approve
  */
-router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) => {
+router.post('/change-requests/:requestId/approve', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { requestId } = req.params;
     const { data: row, error: rErr } = await req.supabase
@@ -1443,7 +1454,7 @@ router.post('/change-requests/:requestId/approve', adminGuard, async (req, res) 
 /**
  * POST /change-requests/:requestId/reject
  */
-router.post('/change-requests/:requestId/reject', adminGuard, async (req, res) => {
+router.post('/change-requests/:requestId/reject', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { requestId } = req.params;
     const reason = req.body?.reason != null ? String(req.body.reason).slice(0, 2000) : null;
@@ -1589,7 +1600,7 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
 /**
  * GET /insert-requests?status=
  */
-router.get('/insert-requests', adminGuard, async (req, res) => {
+router.get('/insert-requests', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const status = String(req.query.status || 'pending').toLowerCase();
     const ok = ['pending', 'approved', 'rejected', 'all'];
@@ -1609,7 +1620,7 @@ router.get('/insert-requests', adminGuard, async (req, res) => {
 /**
  * POST /insert-requests/:requestId/approve
  */
-router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) => {
+router.post('/insert-requests/:requestId/approve', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { requestId } = req.params;
     const { data: row, error: rErr } = await req.supabase
@@ -1676,7 +1687,7 @@ router.post('/insert-requests/:requestId/approve', adminGuard, async (req, res) 
 /**
  * POST /insert-requests/:requestId/reject
  */
-router.post('/insert-requests/:requestId/reject', adminGuard, async (req, res) => {
+router.post('/insert-requests/:requestId/reject', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { requestId } = req.params;
     const reason = req.body?.reason != null ? String(req.body.reason).slice(0, 2000) : null;
@@ -1872,7 +1883,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
  * POST /import — multipart: file, duplicateMode=skip|update|fail, sheetIndex (excel)
  * Respuesta: NDJSON (application/x-ndjson): líneas { type: 'progress', current, total } y cierre { type: 'complete', ... }.
  */
-router.post('/import', adminGuard, upload.single('file'), async (req, res) => {
+router.post('/import', adminGuard, adminCatalogServiceDb, upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'Archivo requerido (field: file)' });
@@ -1945,7 +1956,7 @@ const brandUpload = upload.fields([{ name: 'logo', maxCount: 1 }]);
 /**
  * GET /brands — admin: listado completo con timestamps (misma fuente que público + metadatos)
  */
-router.get('/brands', adminGuard, async (req, res) => {
+router.get('/brands', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { data, error } = await req.supabase
       .from('slot_catalog_brands')
@@ -1961,7 +1972,7 @@ router.get('/brands', adminGuard, async (req, res) => {
 /**
  * POST /brands — crear marca (multipart: name, logo opcional)
  */
-router.post('/brands', adminGuard, brandUpload, async (req, res) => {
+router.post('/brands', adminGuard, adminCatalogServiceDb, brandUpload, async (req, res) => {
   try {
     const name = normalizeManufacturer(req.body.name);
     if (!name) return res.status(400).json({ error: 'name es obligatorio' });
@@ -1990,7 +2001,7 @@ router.post('/brands', adminGuard, brandUpload, async (req, res) => {
 /**
  * PUT /brands/:id — actualizar nombre y/o logo (clear_logo=true quita logo y borra objeto)
  */
-router.put('/brands/:id', adminGuard, brandUpload, async (req, res) => {
+router.put('/brands/:id', adminGuard, adminCatalogServiceDb, brandUpload, async (req, res) => {
   try {
     const { id } = req.params;
     if (!isUuid(id)) return res.status(404).json({ error: 'Marca no encontrada' });
@@ -2039,7 +2050,7 @@ router.put('/brands/:id', adminGuard, brandUpload, async (req, res) => {
 /**
  * DELETE /brands/:id — solo si no hay ítems ni solicitudes de alta que referencien la marca
  */
-router.delete('/brands/:id', adminGuard, async (req, res) => {
+router.delete('/brands/:id', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const { id } = req.params;
     if (!isUuid(id)) return res.status(404).json({ error: 'Marca no encontrada' });
