@@ -1098,7 +1098,7 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
 /**
  * PUT /items/:id
  */
-router.put('/items/:id', adminGuard, itemUpload, async (req, res) => {
+router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (req, res) => {
   try {
     const { id } = req.params;
     const { data: existing, error: exErr } = await req.supabase.from('slot_catalog_items').select('*').eq('id', id).maybeSingle();
