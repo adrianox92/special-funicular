@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { v4: uuidv4 } = require('uuid');
@@ -19,7 +19,8 @@ const {
 } = require('../lib/competitionPermissions');
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 
-const supabase = getAnonClient();
+/** Cliente que usa service role si existe (omite RLS; el API valida permisos). Igual que clubs/sync. */
+const supabase = getServiceOrAnonClient();
 
 function isUuid(id) {
   return (
