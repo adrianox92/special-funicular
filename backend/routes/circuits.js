@@ -1,10 +1,11 @@
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 
 const router = express.Router();
-const supabase = getAnonClient();
+/** Service role si existe (omite RLS; el API valida user_id). Igual que competitions/clubs. */
+const supabase = getServiceOrAnonClient();
 
 router.use(authMiddleware);
 
