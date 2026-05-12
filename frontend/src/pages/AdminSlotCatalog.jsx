@@ -1130,6 +1130,7 @@ function AdminSlotCatalog() {
                       <TableHead className="w-24">Logo</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead className="hidden md:table-cell w-[100px]">Prefijo ref.</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Ítems</TableHead>
                       <TableHead className="hidden sm:table-cell">Creada</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -1153,6 +1154,9 @@ function AdminSlotCatalog() {
                           {b.reference_prefix != null && String(b.reference_prefix).trim()
                             ? String(b.reference_prefix)
                             : '—'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {Number.isFinite(b.catalog_items_count) ? b.catalog_items_count : 0}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
                           {b.created_at

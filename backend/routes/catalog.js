@@ -1954,16 +1954,34 @@ router.post('/import', adminGuard, adminCatalogServiceDb, upload.single('file'),
 const brandUpload = upload.fields([{ name: 'logo', maxCount: 1 }]);
 
 /**
- * GET /brands — admin: listado completo con timestamps (misma fuente que público + metadatos)
+ * GET /brands — admin: listado completo con timestamps + nº de ítems por marca
  */
 router.get('/brands', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
-    const { data, error } = await req.supabase
+    const { data: brands, error } = await req.supabase
       .from('slot_catalog_brands')
       .select('id,name,logo_url,reference_prefix,created_at,updated_at')
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ brands: data ?? [] });
+
+    const { data: itemRows, error: itemsError } = await req.supabase
+      .from('slot_catalog_items')
+      .select('manufacturer_id');
+    if (itemsError) return res.status(500).json({ error: itemsError.message });
+
+    const countByManufacturer = new Map();
+    for (const row of itemRows ?? []) {
+      const manufacturerId = row?.manufacturer_id != null ? String(row.manufacturer_id) : '';
+      if (!manufacturerId) continue;
+      countByManufacturer.set(manufacturerId, (countByManufacturer.get(manufacturerId) ?? 0) + 1);
+    }
+
+    const brandsWithCounts = (brands ?? []).map((brand) => ({
+      ...brand,
+      catalog_items_count: countByManufacturer.get(String(brand.id)) ?? 0,
+    }));
+
+    res.json({ brands: brandsWithCounts });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
