@@ -112,7 +112,7 @@ export const hasMultipleConfigs = (timings = []) => {
 };
 
 const getBetterConfig = (key, configs) => {
-  const lowerIsBetter = ['best_lap_timestamp', 'average_time_timestamp', 'worst_lap_timestamp', 'consistency_score'];
+  const lowerIsBetter = ['best_lap_timestamp', 'average_time_timestamp', 'worst_lap_timestamp', 'consistency_score', 'reaction_time_ms'];
   const higherIsBetter = ['laps', 'total_distance_meters', 'avg_speed_kmh', 'avg_speed_scale_kmh', 'best_lap_speed_kmh'];
   let bestIdx = 0;
   let bestVal = configs[0]?.stats?.[key];
@@ -152,10 +152,16 @@ const aggregateStats = (sessions) => {
     .map((s) => s.average_time_timestamp ?? timeToSeconds(s.average_time))
     .filter((v) => v != null && !isNaN(v));
   const speeds = sessions.map((s) => s.avg_speed_kmh).filter((v) => v != null && !isNaN(v));
+  const reactions = sessions
+    .map((s) => s.reaction_time_ms)
+    .filter((v) => v != null && v !== "")
+    .map((v) => Number(v))
+    .filter((v) => !isNaN(v));
   return {
     best_lap_timestamp: bestLaps.length ? Math.min(...bestLaps) : null,
     average_time_timestamp: avgTimes.length ? avgTimes.reduce((a, b) => a + b, 0) / avgTimes.length : null,
     avg_speed_kmh: speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null,
+    reaction_time_ms: reactions.length ? reactions.reduce((a, b) => a + b, 0) / reactions.length : null,
   };
 };
 
@@ -165,7 +171,7 @@ const hasLane = (t) => t.lane != null && String(t.lane).trim() !== '';
 
 /** Entre dos valores de una métrica: quién gana ('prev' | 'curr') o empate/null. */
 const getBetterBetween = (key, prevVal, currVal) => {
-  const lowerIsBetter = ['best_lap_timestamp', 'average_time_timestamp'];
+  const lowerIsBetter = ['best_lap_timestamp', 'average_time_timestamp', 'reaction_time_ms'];
   const higherIsBetter = ['avg_speed_kmh'];
   if (prevVal == null && currVal == null) return null;
   if (prevVal == null) return 'curr';
@@ -221,6 +227,12 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
       const bestLap = bestLaps.length ? Math.min(...bestLaps) : null;
       const avgTime = avgTimes.length ? avgTimes.reduce((a, b) => a + b, 0) / avgTimes.length : null;
       const avgSpeed = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null;
+      const reactionVals = sessions
+        .map((s) => s.reaction_time_ms)
+        .filter((v) => v != null && v !== "")
+        .map((v) => Number(v))
+        .filter((v) => !isNaN(v));
+      const avgReactionMs = reactionVals.length ? reactionVals.reduce((a, b) => a + b, 0) / reactionVals.length : null;
       const firstDate = sessions[0]?.timing_date;
       const lastDate = sessions[sessions.length - 1]?.timing_date;
       const prevGroup = idx > 0 ? sortedGroups[idx - 1] : null;
@@ -239,6 +251,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
           consistency_score: sessions.filter((s) => s.consistency_score != null).length
             ? sessions.reduce((sum, s) => sum + (s.consistency_score || 0), 0) / sessions.filter((s) => s.consistency_score != null).length
             : null,
+          reaction_time_ms: avgReactionMs,
         },
         firstDate,
         lastDate,
@@ -324,6 +337,8 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
     );
   }
 
+  const includeReactionCompare = timings.some((t) => t.reaction_time_ms != null);
+
   const comparisonRows = [
     { key: 'best_lap_timestamp', label: 'Mejor vuelta', fmt: (s) => formatTime(s?.best_lap_timestamp) },
     { key: 'average_time_timestamp', label: 'Promedio', fmt: (s) => formatTime(s?.average_time_timestamp) },
@@ -331,6 +346,18 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
     { key: 'laps', label: 'Vueltas totales', fmt: (s) => s?.laps ?? '—' },
     { key: 'total_distance_meters', label: 'Distancia', fmt: (s) => formatDistance(s?.total_distance_meters) },
     { key: 'consistency_score', label: 'Consistencia (%)', fmt: (s) => (s?.consistency_score != null ? `${Number(s.consistency_score).toFixed(2)}%` : '—') },
+    ...(includeReactionCompare
+      ? [
+          {
+            key: 'reaction_time_ms',
+            label: 'Tiempo de reacción',
+            fmt: (s) =>
+              s?.reaction_time_ms != null && Number.isFinite(Number(s.reaction_time_ms))
+                ? `${(Number(s.reaction_time_ms) / 1000).toFixed(3)} s`
+                : '—',
+          },
+        ]
+      : []),
   ];
 
   const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
@@ -375,6 +402,14 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
                   <div>
                     <span className="text-muted-foreground">Vel. media: </span>
                     <span className="font-medium">{Number(cg.stats.avg_speed_kmh).toFixed(1)} km/h</span>
+                  </div>
+                )}
+                {cg.stats.reaction_time_ms != null && Number.isFinite(Number(cg.stats.reaction_time_ms)) && (
+                  <div>
+                    <span className="text-muted-foreground">Reacción (media): </span>
+                    <span className="font-mono font-medium">
+                      {(Number(cg.stats.reaction_time_ms) / 1000).toFixed(3)} s
+                    </span>
                   </div>
                 )}
               </div>

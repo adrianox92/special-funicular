@@ -31,6 +31,9 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     session_type,
     supply_voltage_volts,
     voltage,
+    reaction_time_ms,
+    reactionTime,
+    reactionTimeMs,
   } = body;
 
   if (!vehicle_id || !best_lap_time || !total_time || laps == null || !average_time) {
@@ -153,6 +156,20 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
 
   if (distanceSpeed) {
     Object.assign(timingData, distanceSpeed);
+  }
+
+  const reactionRaw =
+    reaction_time_ms !== undefined && reaction_time_ms !== null && reaction_time_ms !== ''
+      ? reaction_time_ms
+      : reactionTimeMs !== undefined && reactionTimeMs !== null && reactionTimeMs !== ''
+        ? reactionTimeMs
+        : reactionTime;
+  if (reactionRaw !== undefined && reactionRaw !== null && reactionRaw !== '') {
+    const n = typeof reactionRaw === 'number' ? reactionRaw : parseInt(String(reactionRaw), 10);
+    if (!Number.isFinite(n) || n < 0 || n > 600000) {
+      return { success: false, error: 'reaction_time_ms debe ser un entero entre 0 y 600000', status: 400 };
+    }
+    timingData.reaction_time_ms = Math.floor(n);
   }
 
   let previousBestLapSeconds = null;

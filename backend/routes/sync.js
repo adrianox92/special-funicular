@@ -9,7 +9,7 @@ const { sendTimingNotification, sendTestNotification } = require('../lib/notifie
 const router = express.Router();
 const supabase = getAnonClient();
 
-/** Cliente para escrituras de sync: service role evita RLS que bloquea timing_laps con anon (sesión SÍ, vueltas NO). */
+/** Cliente para escrituras de sync: service role evita RLS (p. ej. timing_laps, circuits) cuando la petición usa API key sin JWT en PostgREST. */
 function supabaseForSyncWrite() {
   return getServiceClient() || supabase;
 }
@@ -110,7 +110,8 @@ router.get('/vehicles', async (req, res) => {
  */
 router.get('/circuits', async (req, res) => {
   try {
-    const { data: circuits, error } = await supabase
+    const db = supabaseForSyncWrite();
+    const { data: circuits, error } = await db
       .from('circuits')
       .select('id, name, description, num_lanes, lane_lengths')
       .eq('user_id', req.user.id)
@@ -138,7 +139,8 @@ router.post('/circuits', async (req, res) => {
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
-    const { circuit, created } = await findOrCreateCircuit(supabase, req.user.id, String(name).trim(), {
+    const db = supabaseForSyncWrite();
+    const { circuit, created } = await findOrCreateCircuit(db, req.user.id, String(name).trim(), {
       description,
       num_lanes,
       lane_lengths,
@@ -153,7 +155,7 @@ router.post('/circuits', async (req, res) => {
 /**
  * POST /api/sync/timings
  * Create a new timing record for a vehicle.
- * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date?, session_type?: 'HEAT'|'TRAINING', supply_voltage_volts?: number (0-30), voltage? (alias), lap_times?: [{ lap_number, time_seconds|lap_time_seconds, time_text? }] }
+ * Body: { vehicle_id, best_lap_time, total_time, laps, average_time, lane?, circuit?, circuit_id?, timing_date?, session_type?: 'HEAT'|'TRAINING', supply_voltage_volts?: number (0-30), voltage? (alias), reaction_time_ms?: number (optional, semáforo), reactionTime?, reactionTimeMs?, lap_times?: [{ lap_number, time_seconds|lap_time_seconds, time_text? }] }
  */
 router.post('/timings', async (req, res) => {
   try {

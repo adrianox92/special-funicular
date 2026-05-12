@@ -230,6 +230,21 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                     <p className="font-mono font-semibold">{formatTime(medianTime)}</p>
                   </CardContent>
                 </Card>
+                {timing.reaction_time_ms != null && Number.isFinite(Number(timing.reaction_time_ms)) && (
+                  <Card>
+                    <CardHeader className="py-2 px-3">
+                      <p className="text-xs text-muted-foreground">Tiempo de reacción</p>
+                      <p className="text-[10px] text-muted-foreground font-normal leading-tight mt-0.5">
+                        Semáforo hasta cruce en salida
+                      </p>
+                    </CardHeader>
+                    <CardContent className="py-1 px-3 pb-3">
+                      <p className="font-mono font-semibold">
+                        {(Number(timing.reaction_time_ms) / 1000).toFixed(3)} s
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
                 <Card>
                   <CardHeader className="py-2 px-3">
                     <div className="flex items-center gap-1">
@@ -368,6 +383,14 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
             </TabsContent>
 
             <TabsContent value="statistics" className="space-y-4 mt-4">
+              {timing.reaction_time_ms != null && Number.isFinite(Number(timing.reaction_time_ms)) && (
+                <p className="text-sm text-muted-foreground">
+                  Tiempo de reacción (semáforo → salida):{' '}
+                  <span className="font-mono font-medium text-foreground">
+                    {(Number(timing.reaction_time_ms) / 1000).toFixed(3)} s
+                  </span>
+                </p>
+              )}
               {firstHalf.length > 0 && secondHalf.length > 0 && (
                 <Card>
                   <CardHeader>
