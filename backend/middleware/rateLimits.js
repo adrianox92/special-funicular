@@ -85,9 +85,20 @@ const catalogContributionsLimiter = rateLimit({
   },
 });
 
+/** Feed iCal de clubes (suscripción pública con token). */
+const publicClubIcsFeedLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
+});
+
 module.exports = {
   publicSignupLimiter,
   publicCatalogReadLimiter,
+  publicClubIcsFeedLimiter,
   authSoftLimiter,
   contactLimiter,
   helpAskLimiter,

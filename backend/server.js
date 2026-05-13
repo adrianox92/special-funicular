@@ -40,6 +40,7 @@ const swaggerJSDoc = require('swagger-jsdoc');
 const {
   publicSignupLimiter,
   publicCatalogReadLimiter,
+  publicClubIcsFeedLimiter,
   authSoftLimiter,
   contactLimiter,
 } = require('./middleware/rateLimits');
@@ -181,6 +182,8 @@ app.use('/api/public/pilot', publicSignupLimiter, publicPilotRoute);
 app.use('/api/public/catalog', publicCatalogReadLimiter, publicCatalogRoute);
 app.use('/api/public/vehicles', publicCatalogReadLimiter, publicVehicleRoute);
 app.use('/api/public/contact', contactLimiter, contactRoute);
+const publicClubCalendarRoute = require('./routes/publicClubCalendar');
+app.use('/api/public/clubs', publicClubIcsFeedLimiter, publicClubCalendarRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');

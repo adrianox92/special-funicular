@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Loader2, CalendarDays } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Users, Loader2, CalendarDays, Megaphone, Building2 } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -35,10 +35,15 @@ import {
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import ClubCalendar from '../components/ClubCalendar';
+import ClubBoard from '../components/ClubBoard';
+
+const ADMIN_TABS = new Set(['members', 'board', 'calendar']);
+const MEMBER_TABS = new Set(['board', 'calendar']);
 
 const ClubMembers = () => {
   const { id: clubId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [club, setClub] = useState(null);
@@ -84,6 +89,19 @@ const ClubMembers = () => {
   }, [load]);
 
   const canManage = club && (club.my_role === 'admin' || user?.id === club.owner_user_id);
+
+  const tabParam = searchParams.get('tab');
+  const activeTab = canManage
+    ? ADMIN_TABS.has(tabParam)
+      ? tabParam
+      : 'members'
+    : MEMBER_TABS.has(tabParam)
+      ? tabParam
+      : 'board';
+
+  const onTabChange = (value) => {
+    setSearchParams({ tab: value }, { replace: true });
+  };
 
   const formatDate = (iso) => {
     if (!iso) return '—';
@@ -155,15 +173,11 @@ const ClubMembers = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              {canManage ? (
-                <Users className="size-7" />
-              ) : (
-                <CalendarDays className="size-7" />
-              )}
+              {canManage ? <Users className="size-7" /> : <Building2 className="size-7" />}
               {club.name}
             </h1>
             <p className="text-muted-foreground">
-              {canManage ? 'Miembros y calendario' : 'Calendario de eventos'}
+              {canManage ? 'Miembros, tablón y calendario' : 'Tablón de avisos y calendario de eventos'}
             </p>
           </div>
         </div>
@@ -171,11 +185,15 @@ const ClubMembers = () => {
 
       {canManage ? (
         <>
-          <Tabs defaultValue="members" className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+          <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
+            <TabsList className="grid w-full max-w-2xl grid-cols-3">
               <TabsTrigger value="members" className="gap-2">
                 <Users className="size-4 shrink-0" />
                 Miembros
+              </TabsTrigger>
+              <TabsTrigger value="board" className="gap-2">
+                <Megaphone className="size-4 shrink-0" />
+                Tablón
               </TabsTrigger>
               <TabsTrigger value="calendar" className="gap-2">
                 <CalendarDays className="size-4 shrink-0" />
@@ -263,6 +281,9 @@ const ClubMembers = () => {
                 </CardContent>
               </Card>
             </TabsContent>
+            <TabsContent value="board" className="mt-4">
+              <ClubBoard clubId={clubId} canManage />
+            </TabsContent>
             <TabsContent value="calendar" className="mt-4">
               <ClubCalendar clubId={clubId} canManage={canManage} />
             </TabsContent>
@@ -289,7 +310,24 @@ const ClubMembers = () => {
           </AlertDialog>
         </>
       ) : (
-        <ClubCalendar clubId={clubId} canManage={false} />
+        <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="board" className="gap-2">
+              <Megaphone className="size-4 shrink-0" />
+              Tablón
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-2">
+              <CalendarDays className="size-4 shrink-0" />
+              Calendario
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="board" className="mt-4">
+            <ClubBoard clubId={clubId} canManage={false} />
+          </TabsContent>
+          <TabsContent value="calendar" className="mt-4">
+            <ClubCalendar clubId={clubId} canManage={false} />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

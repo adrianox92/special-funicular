@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Link2, LogOut, Loader2, Users, CalendarDays } from 'lucide-react';
+import { Building2, Plus, Link2, LogOut, Loader2, Users, CalendarDays, Megaphone } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -161,8 +161,9 @@ const Clubs = () => {
             Clubes
           </h1>
           <p className="text-muted-foreground">
-            Crea un club, invita miembros y asocia competiciones. Para licencias multi-PC del Slot Race Manager,
-            pega el UUID del club en la configuración de licencia de la app de escritorio.
+            Crea un club, invita miembros y asocia competiciones. Desde cada tarjeta entras al tablón (avisos y
+            documentos) o al calendario de eventos. Para licencias multi-PC del Slot Race Manager, pega el UUID del
+            club en la configuración de licencia de la app de escritorio.
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -232,25 +233,33 @@ const Clubs = () => {
                     Instalaciones licencia (club): hasta {c.license_installations_max ?? 10} PCs
                   </p>
                 </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1"
-                    onClick={() => navigate(`/clubs/${c.id}/members`)}
-                  >
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
                     {canInvite ? (
-                      <>
+                      <Button
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => navigate(`/clubs/${c.id}/members?tab=members`)}
+                      >
                         <Users className="size-3.5" />
-                        Miembros y calendario
-                      </>
-                    ) : (
-                      <>
-                        <CalendarDays className="size-3.5" />
-                        Calendario
-                      </>
-                    )}
-                  </Button>
+                        Miembros
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant={canInvite ? 'outline' : 'default'}
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => navigate(`/clubs/${c.id}/members?tab=board`)}
+                    >
+                      <Megaphone className="size-3.5" />
+                      Tablón
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/clubs/${c.id}/members?tab=calendar`)}>
+                      <CalendarDays className="size-3.5" />
+                      Calendario
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                   {canInvite && (
                     <Button variant="outline" size="sm" className="gap-1" onClick={() => handleInvite(c.id)}>
                       <Link2 className="size-3.5" />
@@ -268,6 +277,7 @@ const Clubs = () => {
                       Abandonar
                     </Button>
                   )}
+                  </div>
                 </CardContent>
               </Card>
             );

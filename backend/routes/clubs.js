@@ -4,14 +4,56 @@
  */
 const express = require('express');
 const crypto = require('crypto');
+const multer = require('multer');
 const { body, param } = require('express-validator');
 const { getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
+const { uploadClubPdf, removeClubDocument } = require('../lib/clubDocumentUpload');
 
 const router = express.Router();
 
 const supabaseAdmin = getServiceClient();
+
+const CLUB_PDF_MAX = 6 * 1024 * 1024;
+const CLUB_BOARD_SELECT_PUBLIC =
+  'id, club_id, user_id, title, body, link_url, link_label, document_url, document_label, pinned, sort_order, created_at, updated_at';
+
+const clubBoardPdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: CLUB_PDF_MAX },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Solo se permiten archivos PDF'));
+  },
+});
+
+function stripSensitiveClubRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const { calendar_feed_token: _cf, ...rest } = row;
+  return rest;
+}
+
+function getApiPublicBase() {
+  if (process.env.PUBLIC_API_URL) return String(process.env.PUBLIC_API_URL).replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'production') return 'https://api.slotdatabase.es';
+  return 'http://localhost:5001';
+}
+
+function buildCalendarFeedUrl(clubId, token) {
+  return `${getApiPublicBase()}/api/public/clubs/${clubId}/calendar.ics?token=${encodeURIComponent(token)}`;
+}
+
+async function assertCompetitionBelongsToClub(competitionId, clubId) {
+  const { data } = await supabaseAdmin
+    .from('competitions')
+    .select('id, club_id')
+    .eq('id', competitionId)
+    .maybeSingle();
+  if (!data) return { ok: false, error: 'Competición no encontrada' };
+  if (data.club_id !== clubId) return { ok: false, error: 'La competición no pertenece a este club' };
+  return { ok: true };
+}
 
 function slugifyBase(name) {
   return String(name || '')
@@ -129,13 +171,13 @@ router.get('/mine', async (req, res) => {
       .map((m) => {
         const c = m.clubs;
         if (!c) return null;
-        return { ...c, my_role: m.role, joined_at: m.joined_at };
+        return { ...stripSensitiveClubRow(c), my_role: m.role, joined_at: m.joined_at };
       })
       .filter(Boolean);
 
     const byId = new Map();
     for (const c of owned || []) {
-      byId.set(c.id, { ...c, my_role: 'admin' });
+      byId.set(c.id, { ...stripSensitiveClubRow(c), my_role: 'admin' });
     }
     for (const c of fromMembership) {
       if (!byId.has(c.id)) byId.set(c.id, c);
@@ -209,7 +251,9 @@ router.get('/:id/events', param('id').isUUID(), handleValidationErrors, async (r
 
     const { data: events, error } = await supabaseAdmin
       .from('club_events')
-      .select('id, club_id, user_id, title, description, event_date, location, created_at')
+      .select(
+        'id, club_id, user_id, title, description, event_date, location, competition_id, created_at, competitions ( id, name, public_slug )',
+      )
       .eq('club_id', id)
       .gte('event_date', todayStr)
       .order('event_date', { ascending: true })
@@ -230,6 +274,7 @@ router.post(
   body('description').optional({ nullable: true }).trim().isLength({ max: 5000 }),
   body('event_date').matches(/^\d{4}-\d{2}-\d{2}$/),
   body('location').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  body('competition_id').optional({ values: 'falsy' }).isUUID(),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -245,6 +290,13 @@ router.post(
       const location = req.body.location != null && String(req.body.location).trim() !== ''
         ? String(req.body.location).trim()
         : null;
+      let competition_id = req.body.competition_id != null && String(req.body.competition_id).trim() !== ''
+        ? String(req.body.competition_id).trim()
+        : null;
+      if (competition_id) {
+        const v = await assertCompetitionBelongsToClub(competition_id, id);
+        if (!v.ok) return res.status(400).json({ error: v.error });
+      }
 
       const { data: row, error } = await supabaseAdmin
         .from('club_events')
@@ -255,8 +307,11 @@ router.post(
           description,
           event_date,
           location,
+          competition_id,
         })
-        .select()
+        .select(
+          'id, club_id, user_id, title, description, event_date, location, competition_id, created_at, competitions ( id, name, public_slug )',
+        )
         .single();
 
       if (error) {
@@ -279,6 +334,7 @@ router.put(
   body('description').optional({ nullable: true }).trim().isLength({ max: 5000 }),
   body('event_date').optional().matches(/^\d{4}-\d{2}-\d{2}$/),
   body('location').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  body('competition_id').optional({ values: 'falsy' }).isUUID(),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -307,6 +363,17 @@ router.put(
           ? String(req.body.location).trim()
           : null;
       }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'competition_id')) {
+        const raw = req.body.competition_id;
+        if (raw != null && String(raw).trim() !== '') {
+          const compId = String(raw).trim();
+          const v = await assertCompetitionBelongsToClub(compId, id);
+          if (!v.ok) return res.status(400).json({ error: v.error });
+          patch.competition_id = compId;
+        } else {
+          patch.competition_id = null;
+        }
+      }
 
       if (Object.keys(patch).length === 0) {
         return res.status(400).json({ error: 'Nada que actualizar' });
@@ -317,7 +384,9 @@ router.put(
         .update(patch)
         .eq('id', eventId)
         .eq('club_id', id)
-        .select()
+        .select(
+          'id, club_id, user_id, title, description, event_date, location, competition_id, created_at, competitions ( id, name, public_slug )',
+        )
         .single();
 
       if (error) return res.status(500).json({ error: error.message });
@@ -350,6 +419,344 @@ router.delete(
       res.status(204).send();
     } catch (e) {
       console.error('DELETE /clubs/:id/events/:eventId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.get('/:id/competitions', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ok = await userIsClubMember(req.user.id, id);
+    if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
+
+    const { data, error } = await supabaseAdmin
+      .from('competitions')
+      .select('id, name, public_slug, created_at')
+      .eq('club_id', id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch (e) {
+    console.error('GET /clubs/:id/competitions', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/:id/calendar-feed/status', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const admin = await userIsClubAdmin(req.user.id, id);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const { data: club, error } = await supabaseAdmin
+      .from('clubs')
+      .select('id, calendar_feed_token')
+      .eq('id', id)
+      .maybeSingle();
+    if (error || !club) return res.status(404).json({ error: 'Club no encontrado' });
+    const enabled = Boolean(club.calendar_feed_token);
+    res.json({
+      enabled,
+      feed_url: enabled ? buildCalendarFeedUrl(id, club.calendar_feed_token) : null,
+    });
+  } catch (e) {
+    console.error('GET calendar-feed/status', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/:id/calendar-feed/enable', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const admin = await userIsClubAdmin(req.user.id, id);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    let token = crypto.randomBytes(32).toString('hex');
+    const { error } = await supabaseAdmin
+      .from('clubs')
+      .update({ calendar_feed_token: token })
+      .eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(200).json({ enabled: true, feed_url: buildCalendarFeedUrl(id, token) });
+  } catch (e) {
+    console.error('POST calendar-feed/enable', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/:id/calendar-feed/regenerate', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const admin = await userIsClubAdmin(req.user.id, id);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const { error } = await supabaseAdmin
+      .from('clubs')
+      .update({ calendar_feed_token: token })
+      .eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ enabled: true, feed_url: buildCalendarFeedUrl(id, token) });
+  } catch (e) {
+    console.error('POST calendar-feed/regenerate', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/:id/calendar-feed/disable', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const admin = await userIsClubAdmin(req.user.id, id);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const { error } = await supabaseAdmin
+      .from('clubs')
+      .update({ calendar_feed_token: null })
+      .eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ enabled: false, feed_url: null });
+  } catch (e) {
+    console.error('POST calendar-feed/disable', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/:id/board', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ok = await userIsClubMember(req.user.id, id);
+    if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
+
+    const { data, error } = await supabaseAdmin
+      .from('club_board_items')
+      .select(
+        CLUB_BOARD_SELECT_PUBLIC,
+      )
+      .eq('club_id', id)
+      .order('pinned', { ascending: false })
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch (e) {
+    console.error('GET /clubs/:id/board', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post(
+  '/:id/board',
+  param('id').isUUID(),
+  body('title').trim().notEmpty().isLength({ max: 300 }),
+  body('body').optional({ nullable: true }).trim().isLength({ max: 8000 }),
+  body('link_url').optional({ nullable: true }).trim().isLength({ max: 2000 }),
+  body('link_label').optional({ nullable: true }).trim().isLength({ max: 200 }),
+  body('document_url').optional({ nullable: true }).trim().isLength({ max: 2000 }),
+  body('document_label').optional({ nullable: true }).trim().isLength({ max: 200 }),
+  body('document_storage_path').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  body('pinned').optional().isBoolean(),
+  body('sort_order').optional().isInt(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const insert = {
+        club_id: id,
+        user_id: req.user.id,
+        title: req.body.title.trim(),
+        body: req.body.body != null && String(req.body.body).trim() !== '' ? String(req.body.body).trim() : null,
+        link_url:
+          req.body.link_url != null && String(req.body.link_url).trim() !== ''
+            ? String(req.body.link_url).trim()
+            : null,
+        link_label:
+          req.body.link_label != null && String(req.body.link_label).trim() !== ''
+            ? String(req.body.link_label).trim()
+            : null,
+        document_url:
+          req.body.document_url != null && String(req.body.document_url).trim() !== ''
+            ? String(req.body.document_url).trim()
+            : null,
+        document_label:
+          req.body.document_label != null && String(req.body.document_label).trim() !== ''
+            ? String(req.body.document_label).trim()
+            : null,
+        document_storage_path:
+          req.body.document_storage_path != null && String(req.body.document_storage_path).trim() !== ''
+            ? String(req.body.document_storage_path).trim()
+            : null,
+        pinned: Boolean(req.body.pinned),
+        sort_order: req.body.sort_order != null ? parseInt(String(req.body.sort_order), 10) : 0,
+      };
+
+      const { data: row, error } = await supabaseAdmin
+        .from('club_board_items')
+        .insert(insert)
+        .select(CLUB_BOARD_SELECT_PUBLIC)
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(201).json(row);
+    } catch (e) {
+      console.error('POST /clubs/:id/board', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.put(
+  '/:id/board/:itemId',
+  param('id').isUUID(),
+  param('itemId').isUUID(),
+  body('title').optional().trim().notEmpty().isLength({ max: 300 }),
+  body('body').optional({ nullable: true }).trim().isLength({ max: 8000 }),
+  body('link_url').optional({ nullable: true }).trim().isLength({ max: 2000 }),
+  body('link_label').optional({ nullable: true }).trim().isLength({ max: 200 }),
+  body('document_url').optional({ nullable: true }).trim().isLength({ max: 2000 }),
+  body('document_label').optional({ nullable: true }).trim().isLength({ max: 200 }),
+  body('document_storage_path').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  body('pinned').optional().isBoolean(),
+  body('sort_order').optional().isInt(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, itemId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const { data: existing, error: exErr } = await supabaseAdmin
+        .from('club_board_items')
+        .select('*')
+        .eq('id', itemId)
+        .eq('club_id', id)
+        .maybeSingle();
+      if (exErr || !existing) return res.status(404).json({ error: 'Entrada no encontrada' });
+
+      const patch = {};
+      if (req.body.title != null) patch.title = String(req.body.title).trim();
+      if (Object.prototype.hasOwnProperty.call(req.body, 'body')) {
+        patch.body =
+          req.body.body != null && String(req.body.body).trim() !== '' ? String(req.body.body).trim() : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'link_url')) {
+        patch.link_url =
+          req.body.link_url != null && String(req.body.link_url).trim() !== ''
+            ? String(req.body.link_url).trim()
+            : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'link_label')) {
+        patch.link_label =
+          req.body.link_label != null && String(req.body.link_label).trim() !== ''
+            ? String(req.body.link_label).trim()
+            : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'document_url')) {
+        patch.document_url =
+          req.body.document_url != null && String(req.body.document_url).trim() !== ''
+            ? String(req.body.document_url).trim()
+            : null;
+        const prevUrl = existing.document_url != null ? String(existing.document_url) : null;
+        const urlChanged = prevUrl !== patch.document_url;
+        if (
+          urlChanged &&
+          !Object.prototype.hasOwnProperty.call(req.body, 'document_storage_path') &&
+          existing.document_storage_path
+        ) {
+          await removeClubDocument(supabaseAdmin, existing.document_storage_path);
+          patch.document_storage_path = null;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'document_label')) {
+        patch.document_label =
+          req.body.document_label != null && String(req.body.document_label).trim() !== ''
+            ? String(req.body.document_label).trim()
+            : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'document_storage_path')) {
+        patch.document_storage_path =
+          req.body.document_storage_path != null && String(req.body.document_storage_path).trim() !== ''
+            ? String(req.body.document_storage_path).trim()
+            : null;
+        if (existing.document_storage_path && existing.document_storage_path !== patch.document_storage_path) {
+          await removeClubDocument(supabaseAdmin, existing.document_storage_path);
+        }
+      }
+      if (req.body.pinned != null) patch.pinned = Boolean(req.body.pinned);
+      if (req.body.sort_order != null) patch.sort_order = parseInt(String(req.body.sort_order), 10);
+
+      if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'Nada que actualizar' });
+
+      const { data: row, error } = await supabaseAdmin
+        .from('club_board_items')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', itemId)
+        .eq('club_id', id)
+        .select(CLUB_BOARD_SELECT_PUBLIC)
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      res.json(row);
+    } catch (e) {
+      console.error('PUT /clubs/:id/board/:itemId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.delete('/:id/board/:itemId', param('id').isUUID(), param('itemId').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const admin = await userIsClubAdmin(req.user.id, id);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const { data: existing } = await supabaseAdmin
+      .from('club_board_items')
+      .select('document_storage_path')
+      .eq('id', itemId)
+      .eq('club_id', id)
+      .maybeSingle();
+    if (existing?.document_storage_path) {
+      await removeClubDocument(supabaseAdmin, existing.document_storage_path);
+    }
+
+    const { error } = await supabaseAdmin.from('club_board_items').delete().eq('id', itemId).eq('club_id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(204).send();
+  } catch (e) {
+    console.error('DELETE /clubs/:id/board/:itemId', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post(
+  '/:id/board/upload',
+  param('id').isUUID(),
+  handleValidationErrors,
+  clubBoardPdfUpload.single('file'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+      if (!req.file?.buffer) return res.status(400).json({ error: 'Falta el archivo PDF' });
+
+      const { publicUrl, storagePath } = await uploadClubPdf(
+        supabaseAdmin,
+        id,
+        req.file.buffer,
+        req.file.originalname || 'document.pdf',
+      );
+      res.json({ url: publicUrl, storage_path: storagePath });
+    } catch (e) {
+      if (e.message === 'Solo se permiten archivos PDF') {
+        return res.status(400).json({ error: e.message });
+      }
+      console.error('POST board/upload', e);
       res.status(500).json({ error: e.message });
     }
   },
@@ -413,7 +820,7 @@ router.get('/:id', param('id').isUUID(), handleValidationErrors, async (req, res
       .maybeSingle();
 
     res.json({
-      ...club,
+      ...stripSensitiveClubRow(club),
       my_role: (await userOwnsClub(req.user.id, id)) ? 'admin' : (mem?.role || 'member'),
     });
   } catch (e) {
@@ -492,7 +899,7 @@ router.post(
 
       if (existing) {
         const { data: club } = await supabaseAdmin.from('clubs').select('*').eq('id', inv.club_id).single();
-        return res.json({ already_member: true, club });
+        return res.json({ already_member: true, club: stripSensitiveClubRow(club) });
       }
 
       const { error: insErr } = await supabaseAdmin.from('club_members').insert({
@@ -507,7 +914,7 @@ router.post(
       }
 
       const { data: club } = await supabaseAdmin.from('clubs').select('*').eq('id', inv.club_id).single();
-      res.status(201).json({ club });
+      res.status(201).json({ club: stripSensitiveClubRow(club) });
     } catch (e) {
       console.error('POST /clubs/join', e);
       res.status(500).json({ error: e.message });
