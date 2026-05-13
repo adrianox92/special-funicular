@@ -15,6 +15,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import VehicleImportDialog from '../components/VehicleImportDialog';
@@ -162,6 +163,8 @@ const VehicleList = () => {
     try { return localStorage.getItem('vehicleViewMode') || 'grid'; } catch { return 'grid'; }
   });
   const [importOpen, setImportOpen] = useState(false);
+  /** null | 'csv' | 'pdf' — exportación en curso */
+  const [exportingFormat, setExportingFormat] = useState(null);
   const [narrowPagination, setNarrowPagination] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false
   );
@@ -303,20 +306,48 @@ const VehicleList = () => {
     ? filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     : filtered;
 
+  const buildExportQueryParams = () => {
+    const params = new URLSearchParams();
+    if (hasActiveFilters) {
+      if (filters.manufacturer) params.set('manufacturer', filters.manufacturer);
+      if (filters.type) params.set('type', filters.type);
+      if (filters.modified) params.set('modified', filters.modified);
+      if (filters.digital) params.set('digital', filters.digital);
+      if (filters.filterMuseo) params.set('filterMuseo', 'true');
+      if (filters.filterTaller) params.set('filterTaller', 'true');
+      if (filters.scale) params.set('scale', filters.scale);
+    }
+    params.set('sort', listSort.sort);
+    params.set('dir', listSort.dir);
+    return params;
+  };
+
+  const exportToPDF = async () => {
+    try {
+      setExportingFormat('pdf');
+      const params = buildExportQueryParams();
+      const response = await api.get(`/vehicles/export-pdf?${params.toString()}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `coleccion_vehiculos_${new Date().toISOString().split('T')[0]}.pdf`;
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al exportar a PDF:', error);
+      toast.error('Error al exportar el listado a PDF');
+    } finally {
+      setExportingFormat(null);
+    }
+  };
+
   const exportToCSV = async () => {
     try {
-      const params = new URLSearchParams();
-      if (hasActiveFilters) {
-        if (filters.manufacturer) params.set('manufacturer', filters.manufacturer);
-        if (filters.type) params.set('type', filters.type);
-        if (filters.modified) params.set('modified', filters.modified);
-        if (filters.digital) params.set('digital', filters.digital);
-        if (filters.filterMuseo) params.set('filterMuseo', 'true');
-        if (filters.filterTaller) params.set('filterTaller', 'true');
-        if (filters.scale) params.set('scale', filters.scale);
-      }
-      params.set('sort', listSort.sort);
-      params.set('dir', listSort.dir);
+      setExportingFormat('csv');
+      const params = buildExportQueryParams();
       const url = `/vehicles/export?${params.toString()}`;
       const response = await api.get(url);
       const vehiclesData = response.data.vehicles;
@@ -384,6 +415,8 @@ const VehicleList = () => {
     } catch (error) {
       console.error('Error al exportar a CSV:', error);
       toast.error('Error al exportar los datos a CSV');
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -422,10 +455,39 @@ const VehicleList = () => {
               <TableIcon className="size-4" />
             </Button>
           </div>
-          <Button variant="outline" onClick={exportToCSV}>
-            <Download className="size-4 mr-2" />
-            Exportar CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={exportingFormat != null}>
+                <Download className="size-4 mr-2" />
+                {exportingFormat === 'csv'
+                  ? 'Exportando CSV…'
+                  : exportingFormat === 'pdf'
+                    ? 'Exportando PDF…'
+                    : 'Exportar'}
+                <ChevronDown className="size-4 ml-1 opacity-70" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  void exportToCSV();
+                }}
+                disabled={exportingFormat != null}
+              >
+                Hoja de cálculo (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  void exportToPDF();
+                }}
+                disabled={exportingFormat != null}
+              >
+                Documento PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="size-4 mr-2" />
             Importar

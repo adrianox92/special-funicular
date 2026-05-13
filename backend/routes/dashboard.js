@@ -1111,11 +1111,66 @@ router.get('/maintenance-summary', async (req, res) => {
       }
     }
 
+    /** Próximo mantenimiento: el registro más reciente por vehículo (performed_at); si su next_due_at está entre hoy y hoy+7 días. */
+    let upcomingScheduled = [];
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
+      const end = new Date(today);
+      end.setDate(end.getDate() + 7);
+      const endStr = end.toISOString().slice(0, 10);
+
+      const { data: allDueLogs, error: dueErr } = await supabase
+        .from('vehicle_maintenance_log')
+        .select(
+          `
+          id,
+          vehicle_id,
+          performed_at,
+          kind,
+          next_due_at,
+          vehicles ( id, model, manufacturer )
+        `,
+        )
+        .eq('user_id', userId)
+        .order('performed_at', { ascending: false })
+        .limit(2000);
+
+      if (dueErr) throw dueErr;
+
+      const latestByVehicle = new Map();
+      for (const row of allDueLogs || []) {
+        const vid = row.vehicle_id;
+        if (!vid || latestByVehicle.has(vid)) continue;
+        latestByVehicle.set(vid, row);
+      }
+
+      const upcoming = [];
+      for (const row of latestByVehicle.values()) {
+        const due = row.next_due_at != null ? String(row.next_due_at).slice(0, 10) : null;
+        if (!due || due < todayStr || due > endStr) continue;
+        upcoming.push({
+          id: row.id,
+          vehicle_id: row.vehicle_id,
+          next_due_at: due,
+          kind: row.kind,
+          model: row.vehicles?.model,
+          manufacturer: row.vehicles?.manufacturer,
+        });
+      }
+      upcoming.sort((a, b) => String(a.next_due_at).localeCompare(String(b.next_due_at)));
+      upcomingScheduled = upcoming;
+    } catch (dueE) {
+      console.error('maintenance-summary upcomingScheduled:', dueE);
+      upcomingScheduled = [];
+    }
+
     res.json({
       recent,
       vehiclesWithoutRecentMaintenance: staleList.slice(0, 50),
       vehiclesWithoutRecentMaintenanceTotal: staleList.length,
       staleDaysThreshold: staleDays,
+      upcomingScheduled,
     });
   } catch (e) {
     console.error('maintenance-summary:', e);

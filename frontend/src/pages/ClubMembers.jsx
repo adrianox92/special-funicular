@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Loader2 } from 'lucide-react';
+import { ArrowLeft, Users, Loader2, CalendarDays } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -33,6 +33,8 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import ClubCalendar from '../components/ClubCalendar';
 
 const ClubMembers = () => {
   const { id: clubId } = useParams();
@@ -148,94 +150,111 @@ const ClubMembers = () => {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Users className="size-7" />
-              Miembros
+              {club.name}
             </h1>
-            <p className="text-muted-foreground">{club.name}</p>
+            <p className="text-muted-foreground">Miembros y calendario</p>
           </div>
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Lista de miembros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Alta</TableHead>
-                {canManage && <TableHead className="text-right">Acciones</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={canManage ? 4 : 3} className="text-center text-muted-foreground">
-                    No hay miembros
-                  </TableCell>
-                </TableRow>
-              ) : (
-                members.map((m) => {
-                  const isOwner = m.is_owner || m.user_id === ownerUserId;
-                  const showActions = canManage && !isOwner;
-                  return (
-                    <TableRow key={m.id || m.user_id}>
-                      <TableCell className="font-medium">
-                        {m.email || m.user_id}
-                        {isOwner && (
-                          <Badge variant="secondary" className="ml-2">
-                            Propietario
-                          </Badge>
-                        )}
+      <Tabs defaultValue="members" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="members" className="gap-2">
+            <Users className="size-4 shrink-0" />
+            Miembros
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2">
+            <CalendarDays className="size-4 shrink-0" />
+            Calendario
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="members" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Lista de miembros</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead>Alta</TableHead>
+                    {canManage && <TableHead className="text-right">Acciones</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {members.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={canManage ? 4 : 3} className="text-center text-muted-foreground">
+                        No hay miembros
                       </TableCell>
-                      <TableCell>
-                        {showActions ? (
-                          <Select
-                            value={m.role}
-                            onValueChange={(v) => handleRoleChange(m.user_id, v)}
-                            disabled={roleUpdating[m.user_id]}
-                          >
-                            <SelectTrigger className="w-[140px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="member">Miembro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge variant={m.role === 'admin' ? 'default' : 'outline'}>
-                            {m.role === 'admin' ? 'Admin' : 'Miembro'}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(m.joined_at)}</TableCell>
-                      {canManage && (
-                        <TableCell className="text-right">
-                          {showActions ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              onClick={() => setKickTarget(m)}
-                            >
-                              Expulsar
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
-                          )}
-                        </TableCell>
-                      )}
                     </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  ) : (
+                    members.map((m) => {
+                      const isOwner = m.is_owner || m.user_id === ownerUserId;
+                      const showActions = canManage && !isOwner;
+                      return (
+                        <TableRow key={m.id || m.user_id}>
+                          <TableCell className="font-medium">
+                            {m.email || m.user_id}
+                            {isOwner && (
+                              <Badge variant="secondary" className="ml-2">
+                                Propietario
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {showActions ? (
+                              <Select
+                                value={m.role}
+                                onValueChange={(v) => handleRoleChange(m.user_id, v)}
+                                disabled={roleUpdating[m.user_id]}
+                              >
+                                <SelectTrigger className="w-[140px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="member">Miembro</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge variant={m.role === 'admin' ? 'default' : 'outline'}>
+                                {m.role === 'admin' ? 'Admin' : 'Miembro'}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{formatDate(m.joined_at)}</TableCell>
+                          {canManage && (
+                            <TableCell className="text-right">
+                              {showActions ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() => setKickTarget(m)}
+                                >
+                                  Expulsar
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">—</span>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="calendar" className="mt-4">
+          <ClubCalendar clubId={clubId} canManage={canManage} />
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={Boolean(kickTarget)} onOpenChange={(open) => !open && setKickTarget(null)}>
         <AlertDialogContent>

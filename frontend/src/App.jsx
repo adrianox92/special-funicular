@@ -19,6 +19,7 @@ import Inventory from './pages/Inventory';
 import CompetitionParticipants from './pages/CompetitionParticipants';
 import FavoritePilots from './pages/FavoritePilots';
 import CompetitionTimings from './pages/CompetitionTimings';
+import CompetitionRefereeView from './pages/CompetitionRefereeView';
 import CompetitionSignup from './pages/CompetitionSignup';
 import CompetitionStatus from './pages/CompetitionStatus';
 import CompetitionPresentation from './pages/CompetitionPresentation';
@@ -417,6 +418,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <FavoritePilots />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/competitions/:id/referee"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <CompetitionRefereeView />
               </AuthedShell>
             </PrivateRoute>
           }

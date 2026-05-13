@@ -1,4 +1,5 @@
 const { generateVehicleSpecsPDF } = require('../src/utils/pdfGenerator');
+const { pickPreferredVehicleImageUrl } = require('./vehicleImagePick');
 
 /**
  * Carga el vehículo, imágenes y specs; genera el buffer PDF.
@@ -41,13 +42,7 @@ async function buildVehicleSpecsPdfBuffer(supabase, vehicleId, options = {}) {
     .eq('vehicle_id', vehicleId)
     .order('created_at', { ascending: true });
   if (!imagesError && images && images.length > 0) {
-    const threeQuarters = images.find((img) => img.view_type === 'three_quarters');
-    if (threeQuarters) {
-      imageUrl = threeQuarters.image_url;
-    } else {
-      const lateral = images.find((img) => img.view_type === 'left' || img.view_type === 'right');
-      imageUrl = lateral ? lateral.image_url : images[0].image_url;
-    }
+    imageUrl = pickPreferredVehicleImageUrl(images);
   }
 
   const { data: specs, error: specsError } = await supabase

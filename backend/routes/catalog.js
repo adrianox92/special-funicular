@@ -1964,16 +1964,26 @@ router.get('/brands', adminGuard, adminCatalogServiceDb, async (req, res) => {
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
 
-    const { data: itemRows, error: itemsError } = await req.supabase
-      .from('slot_catalog_items')
-      .select('manufacturer_id');
-    if (itemsError) return res.status(500).json({ error: itemsError.message });
-
     const countByManufacturer = new Map();
-    for (const row of itemRows ?? []) {
-      const manufacturerId = row?.manufacturer_id != null ? String(row.manufacturer_id) : '';
-      if (!manufacturerId) continue;
-      countByManufacturer.set(manufacturerId, (countByManufacturer.get(manufacturerId) ?? 0) + 1);
+    const pageSize = 1000;
+    let from = 0;
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data: itemRows, error: itemsError } = await req.supabase
+        .from('slot_catalog_items')
+        .select('manufacturer_id')
+        .not('manufacturer_id', 'is', null)
+        .range(from, to);
+      if (itemsError) return res.status(500).json({ error: itemsError.message });
+
+      for (const row of itemRows ?? []) {
+        const manufacturerId = row?.manufacturer_id != null ? String(row.manufacturer_id) : '';
+        if (!manufacturerId) continue;
+        countByManufacturer.set(manufacturerId, (countByManufacturer.get(manufacturerId) ?? 0) + 1);
+      }
+
+      if (!itemRows || itemRows.length < pageSize) break;
+      from += pageSize;
     }
 
     const brandsWithCounts = (brands ?? []).map((brand) => ({

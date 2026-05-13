@@ -199,6 +199,162 @@ router.get('/:id/members', param('id').isUUID(), handleValidationErrors, async (
   }
 });
 
+router.get('/:id/events', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ok = await userIsClubMember(req.user.id, id);
+    if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const { data: events, error } = await supabaseAdmin
+      .from('club_events')
+      .select('id, club_id, user_id, title, description, event_date, location, created_at')
+      .eq('club_id', id)
+      .gte('event_date', todayStr)
+      .order('event_date', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(events || []);
+  } catch (e) {
+    console.error('GET /clubs/:id/events', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post(
+  '/:id/events',
+  param('id').isUUID(),
+  body('title').trim().notEmpty().isLength({ max: 300 }),
+  body('description').optional({ nullable: true }).trim().isLength({ max: 5000 }),
+  body('event_date').matches(/^\d{4}-\d{2}-\d{2}$/),
+  body('location').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const title = req.body.title.trim();
+      const description = req.body.description != null && String(req.body.description).trim() !== ''
+        ? String(req.body.description).trim()
+        : null;
+      const event_date = req.body.event_date;
+      const location = req.body.location != null && String(req.body.location).trim() !== ''
+        ? String(req.body.location).trim()
+        : null;
+
+      const { data: row, error } = await supabaseAdmin
+        .from('club_events')
+        .insert({
+          club_id: id,
+          user_id: req.user.id,
+          title,
+          description,
+          event_date,
+          location,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('POST /clubs/:id/events', error);
+        return res.status(500).json({ error: error.message });
+      }
+      res.status(201).json(row);
+    } catch (e) {
+      console.error('POST /clubs/:id/events', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.put(
+  '/:id/events/:eventId',
+  param('id').isUUID(),
+  param('eventId').isUUID(),
+  body('title').optional().trim().notEmpty().isLength({ max: 300 }),
+  body('description').optional({ nullable: true }).trim().isLength({ max: 5000 }),
+  body('event_date').optional().matches(/^\d{4}-\d{2}-\d{2}$/),
+  body('location').optional({ nullable: true }).trim().isLength({ max: 500 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, eventId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const { data: existing, error: exErr } = await supabaseAdmin
+        .from('club_events')
+        .select('id')
+        .eq('id', eventId)
+        .eq('club_id', id)
+        .maybeSingle();
+      if (exErr || !existing) return res.status(404).json({ error: 'Evento no encontrado' });
+
+      const patch = {};
+      if (req.body.title != null) patch.title = String(req.body.title).trim();
+      if (Object.prototype.hasOwnProperty.call(req.body, 'description')) {
+        patch.description = req.body.description != null && String(req.body.description).trim() !== ''
+          ? String(req.body.description).trim()
+          : null;
+      }
+      if (req.body.event_date != null) patch.event_date = req.body.event_date;
+      if (Object.prototype.hasOwnProperty.call(req.body, 'location')) {
+        patch.location = req.body.location != null && String(req.body.location).trim() !== ''
+          ? String(req.body.location).trim()
+          : null;
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'Nada que actualizar' });
+      }
+
+      const { data: row, error } = await supabaseAdmin
+        .from('club_events')
+        .update(patch)
+        .eq('id', eventId)
+        .eq('club_id', id)
+        .select()
+        .single();
+
+      if (error) return res.status(500).json({ error: error.message });
+      res.json(row);
+    } catch (e) {
+      console.error('PUT /clubs/:id/events/:eventId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.delete(
+  '/:id/events/:eventId',
+  param('id').isUUID(),
+  param('eventId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, eventId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const { error } = await supabaseAdmin
+        .from('club_events')
+        .delete()
+        .eq('id', eventId)
+        .eq('club_id', id);
+
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(204).send();
+    } catch (e) {
+      console.error('DELETE /clubs/:id/events/:eventId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
 router.patch(
   '/:id/members/:userId',
   param('id').isUUID(),

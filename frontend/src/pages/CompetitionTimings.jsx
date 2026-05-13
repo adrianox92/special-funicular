@@ -16,6 +16,7 @@ import {
   Trash2,
   Ban,
   Clock,
+  Smartphone,
 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -831,23 +832,35 @@ const CompetitionTimings = () => {
                 </>
               )}
               {canUseOrganizerTools && (
-                <Button
-                  onClick={() => handleShowModal()}
-                  className="flex items-center gap-2"
-                  disabled={
-                    participants.length === 0 || isCompetitionComplete()
-                  }
-                >
-                  <Plus className="size-4" />
-                  {isCompetitionComplete()
-                    ? 'Competición Completada'
-                    : 'Registrar Tiempo'}
-                  {participants.length > 0 && !isCompetitionComplete() && (
-                    <Badge variant="secondary" className="ml-2">
-                      {participants.length} participantes
-                    </Badge>
-                  )}
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    onClick={() => navigate(`/competitions/${id}/referee`)}
+                    disabled={participants.length === 0}
+                  >
+                    <Smartphone className="size-4" />
+                    Modo árbitro
+                  </Button>
+                  <Button
+                    onClick={() => handleShowModal()}
+                    className="flex items-center gap-2"
+                    disabled={
+                      participants.length === 0 || isCompetitionComplete()
+                    }
+                  >
+                    <Plus className="size-4" />
+                    {isCompetitionComplete()
+                      ? 'Competición Completada'
+                      : 'Registrar Tiempo'}
+                    {participants.length > 0 && !isCompetitionComplete() && (
+                      <Badge variant="secondary" className="ml-2">
+                        {participants.length} participantes
+                      </Badge>
+                    )}
+                  </Button>
+                </>
               )}
             </div>
           </div>

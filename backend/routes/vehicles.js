@@ -12,6 +12,8 @@ const { removeObjectByPublicUrl, removeAllObjectsInVehicleFolder } = require('..
 const { saveVehicleImagesFromMultipart } = require('../lib/vehicleImageUpload');
 const { tryCopyCatalogImageToVehicleFront } = require('../lib/copyCatalogToVehicleImage');
 const { buildVehicleSpecsPdfBuffer, safeFilenamePart } = require('../lib/vehicleSpecsPdfBuilder');
+const { pickPreferredVehicleImageUrl } = require('../lib/vehicleImagePick');
+const { generateCollectionVehiclesPDF } = require('../src/utils/collectionPdfGenerator');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
@@ -386,6 +388,54 @@ function applyVehicleListSort(query, sortColumn, ascending) {
   return q;
 }
 
+/** Filtros opcionales compartidos entre GET /vehicles/export y GET /vehicles/export-pdf */
+function applyVehicleExportFilters(query, req) {
+  const { manufacturer, type, modified, digital, filterMuseo, filterTaller, scale, scale_factor } = req.query;
+
+  if (manufacturer && String(manufacturer).trim()) {
+    query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
+  }
+  if (type && String(type).trim()) {
+    query = query.eq('type', String(type).trim());
+  }
+  if (modified === 'Sí' || modified === 'true') {
+    query = query.eq('modified', true);
+  } else if (modified === 'No' || modified === 'false') {
+    query = query.eq('modified', false);
+  }
+  if (digital === 'Digital' || digital === 'true') {
+    query = query.eq('digital', true);
+  } else if (digital === 'Analógico' || digital === 'false') {
+    query = query.eq('digital', false);
+  }
+  const museoFilter = filterMuseo === 'true' || filterMuseo === true;
+  const tallerFilter = filterTaller === 'true' || filterTaller === true;
+  if (museoFilter && tallerFilter) {
+    query = query.or('museo.eq.true,taller.eq.true');
+  } else if (museoFilter) {
+    query = query.eq('museo', true);
+  } else if (tallerFilter) {
+    query = query.eq('taller', true);
+  }
+  const scaleParam = scale != null && String(scale).trim() !== '' ? scale : scale_factor;
+  if (scaleParam != null && String(scaleParam).trim() !== '') {
+    const n = parseInt(String(scaleParam).trim(), 10);
+    if (Number.isFinite(n) && n > 0) {
+      query = query.eq('scale_factor', n);
+    }
+  }
+  return query;
+}
+
+async function fetchUserVehiclesForExport(supabase, userId, req) {
+  const { column: sortColumn, ascending } = parseVehicleSort(req);
+  let query = applyVehicleListSort(supabase.from('vehicles').select('*').eq('user_id', userId), sortColumn, ascending);
+  query = applyVehicleExportFilters(query, req);
+  const { data: vehicles, error: vehiclesError } = await query;
+  if (vehiclesError) throw vehiclesError;
+  return vehicles || [];
+}
+
 const VEHICLE_IMAGE_MAX_UPLOAD_BYTES =
   Number(process.env.VEHICLE_IMAGE_MAX_UPLOAD_BYTES) > 0
     ? Number(process.env.VEHICLE_IMAGE_MAX_UPLOAD_BYTES)
@@ -630,55 +680,57 @@ function parseChangeEffectiveDate(raw) {
 // Endpoint para exportar vehículos (opcionalmente filtrados)
 router.get('/export', async (req, res) => {
   try {
-    const { manufacturer, type, modified, digital, filterMuseo, filterTaller, scale, scale_factor } = req.query;
-    const { column: sortColumn, ascending } = parseVehicleSort(req);
-
-    let query = applyVehicleListSort(
-      req.supabase.from('vehicles').select('*').eq('user_id', req.user.id),
-      sortColumn,
-      ascending,
-    );
-
-    if (manufacturer && String(manufacturer).trim()) {
-      query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
-    }
-    if (type && String(type).trim()) {
-      query = query.eq('type', String(type).trim());
-    }
-    if (modified === 'Sí' || modified === 'true') {
-      query = query.eq('modified', true);
-    } else if (modified === 'No' || modified === 'false') {
-      query = query.eq('modified', false);
-    }
-    if (digital === 'Digital' || digital === 'true') {
-      query = query.eq('digital', true);
-    } else if (digital === 'Analógico' || digital === 'false') {
-      query = query.eq('digital', false);
-    }
-    const museoFilter = filterMuseo === 'true' || filterMuseo === true;
-    const tallerFilter = filterTaller === 'true' || filterTaller === true;
-    if (museoFilter && tallerFilter) {
-      query = query.or('museo.eq.true,taller.eq.true');
-    } else if (museoFilter) {
-      query = query.eq('museo', true);
-    } else if (tallerFilter) {
-      query = query.eq('taller', true);
-    }
-    const scaleParam = scale != null && String(scale).trim() !== '' ? scale : scale_factor;
-    if (scaleParam != null && String(scaleParam).trim() !== '') {
-      const n = parseInt(String(scaleParam).trim(), 10);
-      if (Number.isFinite(n) && n > 0) {
-        query = query.eq('scale_factor', n);
-      }
-    }
-
-    const { data: vehicles, error: vehiclesError } = await query;
-
-    if (vehiclesError) throw vehiclesError;
-
+    const vehicles = await fetchUserVehiclesForExport(req.supabase, req.user.id, req);
     res.json({ vehicles });
   } catch (error) {
     console.error('Error en /vehicles/export:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PDF del listado de la colección (mismos filtros y orden que /export)
+router.get('/export-pdf', async (req, res) => {
+  try {
+    const vehicles = await fetchUserVehiclesForExport(req.supabase, req.user.id, req);
+    const ids = vehicles.map((v) => v.id).filter(Boolean);
+
+    const urlByVehicleId = new Map();
+    if (ids.length > 0) {
+      const { data: images, error: imagesError } = await req.supabase
+        .from('vehicle_images')
+        .select('vehicle_id, image_url, view_type')
+        .in('vehicle_id', ids)
+        .order('created_at', { ascending: true });
+
+      if (imagesError) throw imagesError;
+
+      const grouped = new Map();
+      for (const img of images || []) {
+        if (!grouped.has(img.vehicle_id)) grouped.set(img.vehicle_id, []);
+        grouped.get(img.vehicle_id).push(img);
+      }
+      for (const [vehicleId, imgs] of grouped) {
+        const url = pickPreferredVehicleImageUrl(imgs);
+        if (url) urlByVehicleId.set(vehicleId, url);
+      }
+    }
+
+    const rows = vehicles.map((v) => ({
+      imageUrl: urlByVehicleId.get(v.id) || null,
+      manufacturer: v.manufacturer,
+      model: v.model,
+      purchase_date: v.purchase_date,
+      price: v.price,
+      total_price: v.total_price,
+    }));
+
+    const pdfBuffer = await generateCollectionVehiclesPDF(rows);
+    const datePart = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="coleccion_vehiculos_${datePart}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error en /vehicles/export-pdf:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1024,18 +1076,20 @@ router.get('/', async (req, res) => {
     if (vehiclesError) throw vehiclesError;
 
     // Obtener los IDs de los vehículos para buscar sus imágenes
-    const vehicleIds = vehicles.map(v => v.id);
+    const vehicleIds = vehicles.map((v) => v.id);
 
-    // Traer las imágenes solo para los vehículos de la página actual
-    const { data: images, error: imageError } = await req.supabase
-      .from('vehicle_images')
-      .select('vehicle_id, image_url, view_type')
-      .in('vehicle_id', vehicleIds);
+    let images = [];
+    if (vehicleIds.length > 0) {
+      const { data: imgRows, error: imageError } = await req.supabase
+        .from('vehicle_images')
+        .select('vehicle_id, image_url, view_type')
+        .in('vehicle_id', vehicleIds)
+        .order('created_at', { ascending: true });
 
-    if (imageError) throw imageError;
+      if (imageError) throw imageError;
+      images = imgRows || [];
+    }
 
-    // Agrupar imágenes por vehicle_id y seleccionar con prioridad:
-    // three_quarters > left/right > primera disponible
     const imagesByVehicle = new Map();
     for (const img of images) {
       if (!imagesByVehicle.has(img.vehicle_id)) {
@@ -1046,22 +1100,13 @@ router.get('/', async (req, res) => {
 
     const imagesMap = new Map();
     for (const [vehicleId, imgs] of imagesByVehicle) {
-      const threeQuarters = imgs.find(i => i.view_type === 'three_quarters');
-      if (threeQuarters) {
-        imagesMap.set(vehicleId, threeQuarters.image_url);
-        continue;
-      }
-      const lateral = imgs.find(i => i.view_type === 'left' || i.view_type === 'right');
-      if (lateral) {
-        imagesMap.set(vehicleId, lateral.image_url);
-        continue;
-      }
-      imagesMap.set(vehicleId, imgs[0].image_url);
+      const url = pickPreferredVehicleImageUrl(imgs);
+      if (url) imagesMap.set(vehicleId, url);
     }
 
-    const result = vehicles.map(v => ({
+    const result = vehicles.map((v) => ({
       ...v,
-      image: imagesMap.get(v.id) || null
+      image: imagesMap.get(v.id) || null,
     }));
 
     res.json({

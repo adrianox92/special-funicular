@@ -248,7 +248,7 @@ const Dashboard = () => {
         <DashboardActionBlocks data={actionItems} loadError={actionItemsError} />
 
         {maintenanceSummary ? (
-          <section aria-labelledby="dash-maintenance">
+          <section aria-labelledby="dash-maintenance" className="space-y-4">
             <Card className="border-border/80 shadow-sm">
               <CardHeader className="flex flex-col gap-3 border-b border-border/60 bg-muted/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1">
@@ -313,6 +313,40 @@ const Dashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {maintenanceSummary.upcomingScheduled?.length ? (
+              <Card className="border-amber-500/40 shadow-sm" aria-labelledby="dash-maintenance-upcoming">
+                <CardHeader className="border-b border-border/60 bg-amber-500/5 pb-4">
+                  <CardTitle id="dash-maintenance-upcoming" className="text-base">
+                    Próximos mantenimientos programados
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Próxima fecha prevista en los próximos 7 días (según el último registro de cada vehículo).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-5">
+                  <ul className="space-y-0 divide-y divide-border/40 text-sm">
+                    {maintenanceSummary.upcomingScheduled.map((row) => (
+                      <li key={`${row.vehicle_id}-${row.next_due_at}`} className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
+                        <Link
+                          to={`/vehicles/${row.vehicle_id}?tab=maintenance`}
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {[row.manufacturer, row.model].filter(Boolean).join(' ') ||
+                            `Vehículo ${row.vehicle_id}`}
+                        </Link>
+                        <span className="text-xs text-muted-foreground sm:text-end sm:shrink-0">
+                          {formatMaintenanceKind(row.kind)}
+                          {row.next_due_at
+                            ? ` · ${new Date(String(row.next_due_at).slice(0, 10)).toLocaleDateString('es-ES')}`
+                            : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
           </section>
         ) : null}
       </div>

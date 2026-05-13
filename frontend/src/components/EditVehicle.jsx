@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ExternalLink,
   Pencil,
@@ -174,6 +174,7 @@ function getModificationSaveDialogInfo(baseline, editing) {
 const EditVehicle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [vehicle, setVehicle] = useState(null);
   const [images, setImages] = useState({});
   const [previews, setPreviews] = useState({});
@@ -189,6 +190,12 @@ const EditVehicle = () => {
   const [draggingOver, setDraggingOver] = useState(null);
   const imageRefs = useRef({});
   const [activeTab, setActiveTab] = useState('general');
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (q.get('tab') === 'maintenance' || location.hash === '#maintenance') {
+      setActiveTab('maintenance');
+    }
+  }, [location.search, location.hash]);
   const [technicalSpecs, setTechnicalSpecs] = useState({
     modification: null,
     technical: null
