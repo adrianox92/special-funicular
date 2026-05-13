@@ -54,15 +54,21 @@ const ClubMembers = () => {
     try {
       setLoading(true);
       setError(null);
-      const [clubRes, membersRes] = await Promise.all([
-        axios.get(`/clubs/${clubId}`),
-        axios.get(`/clubs/${clubId}/members`),
-      ]);
+      const clubRes = await axios.get(`/clubs/${clubId}`);
       setClub(clubRes.data);
-      const payload = membersRes.data;
-      const list = Array.isArray(payload?.members) ? payload.members : Array.isArray(payload) ? payload : [];
-      setMembers(list);
-      setOwnerUserId(payload?.owner_user_id ?? clubRes.data?.owner_user_id ?? null);
+      const isManager =
+        clubRes.data?.my_role === 'admin' || user?.id === clubRes.data?.owner_user_id;
+
+      if (isManager) {
+        const membersRes = await axios.get(`/clubs/${clubId}/members`);
+        const payload = membersRes.data;
+        const list = Array.isArray(payload?.members) ? payload.members : Array.isArray(payload) ? payload : [];
+        setMembers(list);
+        setOwnerUserId(payload?.owner_user_id ?? clubRes.data?.owner_user_id ?? null);
+      } else {
+        setMembers([]);
+        setOwnerUserId(clubRes.data?.owner_user_id ?? null);
+      }
     } catch (e) {
       console.error(e);
       setError(e.response?.data?.error || 'No se pudo cargar el club');
@@ -71,7 +77,7 @@ const ClubMembers = () => {
     } finally {
       setLoading(false);
     }
-  }, [clubId]);
+  }, [clubId, user?.id]);
 
   useEffect(() => {
     load();
@@ -149,129 +155,142 @@ const ClubMembers = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Users className="size-7" />
+              {canManage ? (
+                <Users className="size-7" />
+              ) : (
+                <CalendarDays className="size-7" />
+              )}
               {club.name}
             </h1>
-            <p className="text-muted-foreground">Miembros y calendario</p>
+            <p className="text-muted-foreground">
+              {canManage ? 'Miembros y calendario' : 'Calendario de eventos'}
+            </p>
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="members" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="members" className="gap-2">
-            <Users className="size-4 shrink-0" />
-            Miembros
-          </TabsTrigger>
-          <TabsTrigger value="calendar" className="gap-2">
-            <CalendarDays className="size-4 shrink-0" />
-            Calendario
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="members" className="mt-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Lista de miembros</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Alta</TableHead>
-                    {canManage && <TableHead className="text-right">Acciones</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {members.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={canManage ? 4 : 3} className="text-center text-muted-foreground">
-                        No hay miembros
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    members.map((m) => {
-                      const isOwner = m.is_owner || m.user_id === ownerUserId;
-                      const showActions = canManage && !isOwner;
-                      return (
-                        <TableRow key={m.id || m.user_id}>
-                          <TableCell className="font-medium">
-                            {m.email || m.user_id}
-                            {isOwner && (
-                              <Badge variant="secondary" className="ml-2">
-                                Propietario
-                              </Badge>
-                            )}
+      {canManage ? (
+        <>
+          <Tabs defaultValue="members" className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="members" className="gap-2">
+                <Users className="size-4 shrink-0" />
+                Miembros
+              </TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-2">
+                <CalendarDays className="size-4 shrink-0" />
+                Calendario
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="members" className="mt-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Lista de miembros</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Rol</TableHead>
+                        <TableHead>Alta</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {members.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground">
+                            No hay miembros
                           </TableCell>
-                          <TableCell>
-                            {showActions ? (
-                              <Select
-                                value={m.role}
-                                onValueChange={(v) => handleRoleChange(m.user_id, v)}
-                                disabled={roleUpdating[m.user_id]}
-                              >
-                                <SelectTrigger className="w-[140px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="admin">Admin</SelectItem>
-                                  <SelectItem value="member">Miembro</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge variant={m.role === 'admin' ? 'default' : 'outline'}>
-                                {m.role === 'admin' ? 'Admin' : 'Miembro'}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>{formatDate(m.joined_at)}</TableCell>
-                          {canManage && (
-                            <TableCell className="text-right">
-                              {showActions ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  onClick={() => setKickTarget(m)}
-                                >
-                                  Expulsar
-                                </Button>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">—</span>
-                              )}
-                            </TableCell>
-                          )}
                         </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="calendar" className="mt-4">
-          <ClubCalendar clubId={clubId} canManage={canManage} />
-        </TabsContent>
-      </Tabs>
+                      ) : (
+                        members.map((m) => {
+                          const isOwner = m.is_owner || m.user_id === ownerUserId;
+                          const showActions = canManage && !isOwner;
+                          return (
+                            <TableRow key={m.id || m.user_id}>
+                              <TableCell className="font-medium">
+                                {m.email || m.user_id}
+                                {isOwner && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    Propietario
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {showActions ? (
+                                  <Select
+                                    value={m.role}
+                                    onValueChange={(v) => handleRoleChange(m.user_id, v)}
+                                    disabled={roleUpdating[m.user_id]}
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="admin">Admin</SelectItem>
+                                      <SelectItem value="member">Miembro</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Badge variant={m.role === 'admin' ? 'default' : 'outline'}>
+                                    {m.role === 'admin' ? 'Admin' : 'Miembro'}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>{formatDate(m.joined_at)}</TableCell>
+                              <TableCell className="text-right">
+                                  {showActions ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive"
+                                      onClick={() => setKickTarget(m)}
+                                    >
+                                      Expulsar
+                                    </Button>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">—</span>
+                                  )}
+                                </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="calendar" className="mt-4">
+              <ClubCalendar clubId={clubId} canManage={canManage} />
+            </TabsContent>
+          </Tabs>
 
-      <AlertDialog open={Boolean(kickTarget)} onOpenChange={(open) => !open && setKickTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Expulsar a este miembro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {kickTarget?.email || kickTarget?.user_id} dejará de pertenecer al club.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={confirmKick}>
-              Expulsar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialog open={Boolean(kickTarget)} onOpenChange={(open) => !open && setKickTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Expulsar a este miembro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {kickTarget?.email || kickTarget?.user_id} dejará de pertenecer al club.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={confirmKick}
+                >
+                  Expulsar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      ) : (
+        <ClubCalendar clubId={clubId} canManage={false} />
+      )}
     </div>
   );
 };

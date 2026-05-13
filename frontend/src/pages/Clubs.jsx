@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Link2, LogOut, Loader2, Users } from 'lucide-react';
+import { Building2, Plus, Link2, LogOut, Loader2, Users, CalendarDays } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -233,22 +233,29 @@ const Clubs = () => {
                   </p>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
-                  {canInvite && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1"
-                        onClick={() => navigate(`/clubs/${c.id}/members`)}
-                      >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={() => navigate(`/clubs/${c.id}/members`)}
+                  >
+                    {canInvite ? (
+                      <>
                         <Users className="size-3.5" />
-                        Miembros
-                      </Button>
-                      <Button variant="outline" size="sm" className="gap-1" onClick={() => handleInvite(c.id)}>
-                        <Link2 className="size-3.5" />
-                        Invitar (copiar enlace)
-                      </Button>
-                    </>
+                        Miembros y calendario
+                      </>
+                    ) : (
+                      <>
+                        <CalendarDays className="size-3.5" />
+                        Calendario
+                      </>
+                    )}
+                  </Button>
+                  {canInvite && (
+                    <Button variant="outline" size="sm" className="gap-1" onClick={() => handleInvite(c.id)}>
+                      <Link2 className="size-3.5" />
+                      Invitar (copiar enlace)
+                    </Button>
                   )}
                   {!isOwner && (
                     <Button
