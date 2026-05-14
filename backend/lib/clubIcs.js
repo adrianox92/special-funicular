@@ -30,13 +30,46 @@ function formatIcsDate(dStr) {
   return s.replace(/-/g, '');
 }
 
-function addDaysYmd(ymd, delta) {
-  const [y, m, d] = ymd.split('-').map(Number);
+function addDaysYmd(ymdHyphen, delta) {
+  const [y, m, d] = ymdHyphen.split('-').map(Number);
   const dt = new Date(y, m - 1, d + delta);
   const yy = dt.getFullYear();
   const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const dd = String(dt.getDate()).padStart(2, '0');
-  return `${yy}${mm}${dd}`;
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Normaliza time desde Postgres/JSON (p. ej. "18:30:00") a HH:mm:ss */
+function timeToHms(t) {
+  if (t == null || t === '') return null;
+  const s = String(t);
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const hh = String(Math.min(23, parseInt(m[1], 10))).padStart(2, '0');
+  const mm = String(Math.min(59, parseInt(m[2], 10))).padStart(2, '0');
+  const ss = m[3] != null ? String(Math.min(59, parseInt(m[3], 10))).padStart(2, '0') : '00';
+  return `${hh}:${mm}:${ss}`;
+}
+
+/** Suma segundos a fecha+hora local flotante; devuelve YYYYMMDDTHHmmss para ICS */
+function addSecondsToWallFloating(ymdHyphen, hhmmss, deltaSec) {
+  const [hh, mi, ss] = hhmmss.split(':').map(Number);
+  let sec = hh * 3600 + mi * 60 + ss + deltaSec;
+  let days = Math.floor(sec / 86400);
+  sec = ((sec % 86400) + 86400) % 86400;
+  const nh = Math.floor(sec / 3600);
+  const rem = sec % 3600;
+  const nmi = Math.floor(rem / 60);
+  const nss = rem % 60;
+  const newYmdHyphen = addDaysYmd(ymdHyphen, days);
+  const dtf = formatIcsDate(newYmdHyphen);
+  return `${dtf}T${String(nh).padStart(2, '0')}${String(nmi).padStart(2, '0')}${String(nss).padStart(2, '0')}`;
+}
+
+function wallYmdTimeToIcsFloating(ymdHyphen, hhmmss) {
+  const d = formatIcsDate(ymdHyphen);
+  const [h, m, s] = hhmmss.split(':');
+  return `${d}T${h.padStart(2, '0')}${m.padStart(2, '0')}${(s || '00').padStart(2, '0')}`;
 }
 
 function dtstampNow() {
@@ -62,25 +95,40 @@ function buildClubEventsIcs(events, options = {}) {
   ];
 
   for (const ev of events || []) {
-    const dt = formatIcsDate(ev.event_date);
+    const dateYmd = String(ev.event_date || '').slice(0, 10);
+    const dt = formatIcsDate(dateYmd);
     if (!dt) continue;
-    const dtEnd = addDaysYmd(String(ev.event_date).slice(0, 10), 1);
+
     const slug = ev.competitions?.public_slug;
     let desc = ev.description || '';
     if (slug && signupBase) {
       const signupLine = `Inscripción: ${signupBase}/competitions/signup/${slug}`;
       desc = desc ? `${desc}\n\n${signupLine}` : signupLine;
     }
-    const descFolded = foldLine(`DESCRIPTION:${icsEscape(desc)}`);
-    const locFolded = ev.location ? foldLine(`LOCATION:${icsEscape(ev.location)}`) : null;
+    const startHms = timeToHms(ev.start_time);
+
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:club-event-${ev.id}@${uidDomain}`);
     lines.push(`DTSTAMP:${dtstampNow()}`);
-    lines.push(`DTSTART;VALUE=DATE:${dt}`);
-    lines.push(`DTEND;VALUE=DATE:${dtEnd}`);
+
+    if (startHms) {
+      const startIcs = wallYmdTimeToIcsFloating(dateYmd, startHms);
+      const endHms = timeToHms(ev.end_time);
+      const endIcs = endHms
+        ? wallYmdTimeToIcsFloating(dateYmd, endHms)
+        : addSecondsToWallFloating(dateYmd, startHms, 3600);
+      lines.push(`DTSTART:${startIcs}`);
+      lines.push(`DTEND:${endIcs}`);
+    } else {
+      const dtEnd = addDaysYmd(dateYmd, 1);
+      const dtEndCompact = formatIcsDate(dtEnd);
+      lines.push(`DTSTART;VALUE=DATE:${dt}`);
+      lines.push(`DTEND;VALUE=DATE:${dtEndCompact}`);
+    }
+
     lines.push(foldLine(`SUMMARY:${icsEscape(ev.title || 'Evento')}`));
-    if (locFolded) lines.push(locFolded);
-    lines.push(descFolded);
+    if (ev.location) lines.push(foldLine(`LOCATION:${icsEscape(ev.location)}`));
+    if (desc) lines.push(foldLine(`DESCRIPTION:${icsEscape(desc)}`));
     lines.push('END:VEVENT');
   }
 

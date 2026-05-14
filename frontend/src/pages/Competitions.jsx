@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -38,6 +38,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import { competitionPublicSignupUrl } from '../utils/clubEventCalendarExport';
 
 const COMPETITIONS_DEBUG_ORG_KEY = 'scalextric_competitions_for_organizer';
 
@@ -260,6 +261,20 @@ const Competitions = () => {
 
   const handleDeleteCompetition = (competitionId) => {
     setDeleteConfirm({ open: true, competitionId });
+  };
+
+  const copyPublicSignupLink = async (slug) => {
+    const url = competitionPublicSignupUrl(slug);
+    if (!url || !navigator.clipboard?.writeText) {
+      toast.error('No se pudo copiar el enlace');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Enlace público copiado');
+    } catch {
+      toast.error('No se pudo copiar');
+    }
   };
 
   const confirmDeleteCompetition = async () => {
@@ -687,9 +702,34 @@ const Competitions = () => {
               <CardContent className="p-4">
                 <div className="flex justify-between items-start gap-2 mb-4 min-w-0">
                   <h5 className="font-semibold text-lg min-w-0 flex-1 truncate">{competition.name}</h5>
-                  <Badge variant={competition.participants_count >= competition.num_slots ? 'default' : 'secondary'} className="shrink-0">
-                    {competition.participants_count}/{competition.num_slots}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {competition.public_slug ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        title="Copiar enlace público (inscripción)"
+                        aria-label="Copiar enlace público"
+                        onClick={() => copyPublicSignupLink(competition.public_slug)}
+                      >
+                        <Link2 className="size-4" />
+                      </Button>
+                    ) : (
+                      <span
+                        className="hidden text-[10px] text-muted-foreground sm:inline whitespace-nowrap"
+                        title="Esta competición no tiene slug de inscripción pública"
+                      >
+                        Sin enlace público
+                      </span>
+                    )}
+                    <Badge
+                      variant={competition.participants_count >= competition.num_slots ? 'default' : 'secondary'}
+                      className="shrink-0"
+                    >
+                      {competition.participants_count}/{competition.num_slots}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="space-y-2 mb-4 text-sm text-muted-foreground">

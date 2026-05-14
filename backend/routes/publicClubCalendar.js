@@ -37,10 +37,13 @@ router.get(
       const todayStr = new Date().toISOString().slice(0, 10);
       const { data: events, error: eErr } = await supabaseAdmin
         .from('club_events')
-        .select('id, title, description, event_date, location, competition_id, competitions ( public_slug )')
+        .select(
+          'id, title, description, event_date, start_time, end_time, location, competition_id, competitions ( public_slug )',
+        )
         .eq('club_id', clubId)
         .gte('event_date', todayStr)
         .order('event_date', { ascending: true })
+        .order('start_time', { ascending: true, nullsFirst: true })
         .order('created_at', { ascending: true });
 
       if (eErr) {

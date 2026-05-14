@@ -13,6 +13,31 @@ const { uploadClubPdf, removeClubDocument } = require('../lib/clubDocumentUpload
 
 const router = express.Router();
 
+/** Normaliza campo time opcional desde JSON (HH:mm o HH:mm:ss → HH:mm:ss). */
+function parseBodyTime(val) {
+  if (val === undefined) return { omit: true };
+  if (val == null || val === '') return { value: null };
+  const s = String(val).trim();
+  const m = s.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+  if (!m) return { error: 'Formato de hora inválido (HH:mm)' };
+  const hh = m[1].padStart(2, '0');
+  const mm = m[2].padStart(2, '0');
+  const ss = (m[3] || '00').padStart(2, '0');
+  return { value: `${hh}:${mm}:${ss}` };
+}
+
+function validateEventTimes(startVal, endVal) {
+  if (endVal && !startVal) return 'La hora de fin requiere hora de inicio';
+  if (startVal && endVal) {
+    const toSec = (t) => {
+      const [h, mi, se] = t.split(':').map(Number);
+      return h * 3600 + mi * 60 + se;
+    };
+    if (toSec(endVal) <= toSec(startVal)) return 'La hora de fin debe ser posterior a la de inicio';
+  }
+  return null;
+}
+
 const supabaseAdmin = getServiceClient();
 
 const CLUB_PDF_MAX = 6 * 1024 * 1024;
@@ -249,14 +274,16 @@ router.get('/:id/events', param('id').isUUID(), handleValidationErrors, async (r
 
     const todayStr = new Date().toISOString().slice(0, 10);
 
+    const selectFields =
+      'id, club_id, user_id, title, description, event_date, start_time, end_time, location, competition_id, created_at, competitions ( id, name, public_slug )';
+
     const { data: events, error } = await supabaseAdmin
       .from('club_events')
-      .select(
-        'id, club_id, user_id, title, description, event_date, location, competition_id, created_at, competitions ( id, name, public_slug )',
-      )
+      .select(selectFields)
       .eq('club_id', id)
       .gte('event_date', todayStr)
       .order('event_date', { ascending: true })
+      .order('start_time', { ascending: true, nullsFirst: true })
       .order('created_at', { ascending: true });
 
     if (error) return res.status(500).json({ error: error.message });
@@ -275,6 +302,8 @@ router.post(
   body('event_date').matches(/^\d{4}-\d{2}-\d{2}$/),
   body('location').optional({ nullable: true }).trim().isLength({ max: 500 }),
   body('competition_id').optional({ values: 'falsy' }).isUUID(),
+  body('start_time').optional({ nullable: true }),
+  body('end_time').optional({ nullable: true }),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -298,6 +327,18 @@ router.post(
         if (!v.ok) return res.status(400).json({ error: v.error });
       }
 
+      const st = parseBodyTime(req.body.start_time);
+      const et = parseBodyTime(req.body.end_time);
+      if (st.error) return res.status(400).json({ error: st.error });
+      if (et.error) return res.status(400).json({ error: et.error });
+      const start_time = st.omit ? null : st.value;
+      const end_time = et.omit ? null : et.value;
+      const timeErr = validateEventTimes(start_time, end_time);
+      if (timeErr) return res.status(400).json({ error: timeErr });
+
+      const selectFields =
+        'id, club_id, user_id, title, description, event_date, start_time, end_time, location, competition_id, created_at, competitions ( id, name, public_slug )';
+
       const { data: row, error } = await supabaseAdmin
         .from('club_events')
         .insert({
@@ -306,12 +347,12 @@ router.post(
           title,
           description,
           event_date,
+          start_time,
+          end_time,
           location,
           competition_id,
         })
-        .select(
-          'id, club_id, user_id, title, description, event_date, location, competition_id, created_at, competitions ( id, name, public_slug )',
-        )
+        .select(selectFields)
         .single();
 
       if (error) {
@@ -335,6 +376,8 @@ router.put(
   body('event_date').optional().matches(/^\d{4}-\d{2}-\d{2}$/),
   body('location').optional({ nullable: true }).trim().isLength({ max: 500 }),
   body('competition_id').optional({ values: 'falsy' }).isUUID(),
+  body('start_time').optional({ nullable: true }),
+  body('end_time').optional({ nullable: true }),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -344,7 +387,7 @@ router.put(
 
       const { data: existing, error: exErr } = await supabaseAdmin
         .from('club_events')
-        .select('id')
+        .select('id, start_time, end_time')
         .eq('id', eventId)
         .eq('club_id', id)
         .maybeSingle();
@@ -375,18 +418,44 @@ router.put(
         }
       }
 
+      let nextStart = existing.start_time;
+      let nextEnd = existing.end_time;
+      if (Object.prototype.hasOwnProperty.call(req.body, 'start_time')) {
+        const st = parseBodyTime(req.body.start_time);
+        if (st.error) return res.status(400).json({ error: st.error });
+        if (!st.omit) {
+          patch.start_time = st.value;
+          nextStart = st.value;
+          if (!nextStart) {
+            patch.end_time = null;
+            nextEnd = null;
+          }
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'end_time')) {
+        const et = parseBodyTime(req.body.end_time);
+        if (et.error) return res.status(400).json({ error: et.error });
+        if (!et.omit) {
+          patch.end_time = et.value;
+          nextEnd = et.value;
+        }
+      }
+      const timeErr = validateEventTimes(nextStart, nextEnd);
+      if (timeErr) return res.status(400).json({ error: timeErr });
+
       if (Object.keys(patch).length === 0) {
         return res.status(400).json({ error: 'Nada que actualizar' });
       }
+
+      const selectFields =
+        'id, club_id, user_id, title, description, event_date, start_time, end_time, location, competition_id, created_at, competitions ( id, name, public_slug )';
 
       const { data: row, error } = await supabaseAdmin
         .from('club_events')
         .update(patch)
         .eq('id', eventId)
         .eq('club_id', id)
-        .select(
-          'id, club_id, user_id, title, description, event_date, location, competition_id, created_at, competitions ( id, name, public_slug )',
-        )
+        .select(selectFields)
         .single();
 
       if (error) return res.status(500).json({ error: error.message });

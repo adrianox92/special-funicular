@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import QRCode from 'qrcode';
 import {
   CalendarPlus,
   Loader2,
@@ -11,6 +12,8 @@ import {
   UserPlus,
   Calendar as CalendarIcon,
   Download,
+  Link2,
+  QrCode,
 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from './ui/button';
@@ -45,7 +48,13 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog';
 import { toast } from 'sonner';
-import { googleCalendarUrlForClubEvent, downloadClubEventIcs } from '../utils/clubEventCalendarExport';
+import {
+  googleCalendarUrlForClubEvent,
+  downloadClubEventIcs,
+  competitionPublicSignupUrl,
+  clubEventTimeForInput,
+  defaultClubEventTz,
+} from '../utils/clubEventCalendarExport';
 
 function parseLocalDate(isoDate) {
   if (!isoDate) return null;
@@ -73,6 +82,8 @@ const emptyForm = () => ({
   title: '',
   description: '',
   event_date: new Date().toISOString().slice(0, 10),
+  start_time: '',
+  end_time: '',
   location: '',
   competition_id: '',
 });
@@ -88,6 +99,11 @@ const ClubCalendar = ({ clubId, canManage }) => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [feedStatus, setFeedStatus] = useState(null);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [qrPathShort, setQrPathShort] = useState('');
+  const [qrFullUrl, setQrFullUrl] = useState('');
+  const [qrLoading, setQrLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!clubId) return;
@@ -153,6 +169,8 @@ const ClubCalendar = ({ clubId, canManage }) => {
       title: ev.title || '',
       description: ev.description || '',
       event_date: String(ev.event_date).slice(0, 10),
+      start_time: clubEventTimeForInput(ev.start_time),
+      end_time: clubEventTimeForInput(ev.end_time),
       location: ev.location || '',
       competition_id: ev.competition_id ? String(ev.competition_id) : '',
     });
@@ -171,6 +189,8 @@ const ClubCalendar = ({ clubId, canManage }) => {
         title: form.title.trim(),
         description: form.description.trim() || null,
         event_date: form.event_date,
+        start_time: form.start_time.trim() || null,
+        end_time: form.end_time.trim() || null,
         location: form.location.trim() || null,
         competition_id: form.competition_id ? form.competition_id : null,
       };
@@ -243,6 +263,34 @@ const ClubCalendar = ({ clubId, canManage }) => {
     }
   };
 
+  const copyCompetitionPublicUrl = async (slug) => {
+    const url = competitionPublicSignupUrl(slug);
+    if (!url || !navigator.clipboard?.writeText) {
+      toast.error('No se pudo copiar');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Enlace público copiado');
+    } catch {
+      toast.error('No se pudo copiar');
+    }
+  };
+
+  const openSignupQr = (slug) => {
+    const full = competitionPublicSignupUrl(slug);
+    const path = `/competitions/signup/${encodeURIComponent(slug)}`;
+    setQrFullUrl(full);
+    setQrPathShort(path);
+    setQrDataUrl('');
+    setQrOpen(true);
+    setQrLoading(true);
+    QRCode.toDataURL(full, { width: 220, margin: 2 })
+      .then((u) => setQrDataUrl(u))
+      .catch(() => toast.error('No se pudo generar el QR'))
+      .finally(() => setQrLoading(false));
+  };
+
   const disableFeed = async () => {
     try {
       setFeedLoading(true);
@@ -270,7 +318,7 @@ const ClubCalendar = ({ clubId, canManage }) => {
         <div>
           <h2 className="text-lg font-semibold">Próximos eventos</h2>
           <p className="text-sm text-muted-foreground">
-            Carreras, reuniones y fechas del club. Puedes añadir cada evento a Google Calendar o descargar un .ics (iPhone, Outlook…).
+            Carreras, reuniones y fechas del club. Horas opcionales (zona {defaultClubEventTz()}) para Google e .ics. Puedes exportar cada evento a Google Calendar o descargar un .ics.
           </p>
         </div>
         {canManage ? (
@@ -359,6 +407,14 @@ const ClubCalendar = ({ clubId, canManage }) => {
                         {ev.competitions?.name && (
                           <p className="text-xs text-muted-foreground">Competición: {ev.competitions.name}</p>
                         )}
+                        {ev.start_time ? (
+                          <p className="text-xs text-muted-foreground">
+                            {clubEventTimeForInput(ev.start_time)}
+                            {ev.end_time
+                              ? ` – ${clubEventTimeForInput(ev.end_time)}`
+                              : ' (fin por defecto +1 h en calendarios externos)'}
+                          </p>
+                        ) : null}
                       </div>
                       {canManage ? (
                         <div className="flex shrink-0 gap-1">
@@ -388,12 +444,36 @@ const ClubCalendar = ({ clubId, canManage }) => {
                   <CardContent className="space-y-3 pt-0 text-sm">
                     <div className="flex flex-wrap gap-2">
                       {slug ? (
-                        <Button type="button" size="sm" variant="secondary" className="gap-2" asChild>
-                          <Link to={`/competitions/signup/${encodeURIComponent(slug)}`}>
-                            <UserPlus className="size-4" />
-                            Inscribirme en la competición
-                          </Link>
-                        </Button>
+                        <>
+                          <Button type="button" size="sm" variant="secondary" className="gap-2" asChild>
+                            <Link to={`/competitions/signup/${encodeURIComponent(slug)}`}>
+                              <UserPlus className="size-4" />
+                              Inscribirme
+                            </Link>
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => copyCompetitionPublicUrl(slug)}
+                            title="Copiar URL de inscripción"
+                          >
+                            <Link2 className="size-4" />
+                            Copiar enlace
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => openSignupQr(slug)}
+                            title="Mostrar código QR"
+                          >
+                            <QrCode className="size-4" />
+                            QR
+                          </Button>
+                        </>
                       ) : null}
                       {googleCalUrl ? (
                         <Button variant="outline" size="sm" className="gap-1" asChild>
@@ -465,6 +545,36 @@ const ClubCalendar = ({ clubId, canManage }) => {
                 onChange={(e) => setForm((f) => ({ ...f, event_date: e.target.value }))}
               />
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ce-start">Hora inicio (opcional)</Label>
+                <Input
+                  id="ce-start"
+                  type="time"
+                  value={form.start_time}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      start_time: e.target.value,
+                      end_time: e.target.value ? f.end_time : '',
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ce-end">Hora fin (opcional)</Label>
+                <Input
+                  id="ce-end"
+                  type="time"
+                  value={form.end_time}
+                  onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
+                  disabled={!form.start_time}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sin horas = evento de día entero. Si solo indicas inicio, el fin será +1 h en enlaces a Google o .ics (zona {defaultClubEventTz()}).
+            </p>
             <div className="space-y-2">
               <Label htmlFor="ce-loc">Lugar (opcional)</Label>
               <Input
@@ -538,6 +648,52 @@ const ClubCalendar = ({ clubId, canManage }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={qrOpen}
+        onOpenChange={(o) => {
+          setQrOpen(o);
+          if (!o) {
+            setQrDataUrl('');
+            setQrPathShort('');
+            setQrFullUrl('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Inscripción pública</DialogTitle>
+            <DialogDescription>Enlace corto y código QR para compartir la competición.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-3 py-2">
+            {qrLoading || !qrDataUrl ? (
+              <Loader2 className="size-10 animate-spin text-muted-foreground" />
+            ) : (
+              <img src={qrDataUrl} alt="Código QR inscripción" className="max-w-[220px] rounded-md border border-border" />
+            )}
+            <code className="text-center text-xs break-all text-muted-foreground">{qrPathShort}</code>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={!qrFullUrl}
+              onClick={async () => {
+                if (!qrFullUrl || !navigator.clipboard?.writeText) return;
+                try {
+                  await navigator.clipboard.writeText(qrFullUrl);
+                  toast.success('Enlace copiado');
+                } catch {
+                  toast.error('No se pudo copiar');
+                }
+              }}
+            >
+              <ClipboardCopy className="size-4" />
+              Copiar URL completa
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
