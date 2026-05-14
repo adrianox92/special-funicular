@@ -448,6 +448,7 @@ router.post(
           setup_snapshot: setupSnapshot,
           circuit,
           circuit_id: circuitId,
+          penalty_seconds: penaltySeconds,
         } = t;
 
         if (roundNumber > competition.rounds) {
@@ -496,6 +497,9 @@ router.post(
         if (bestLapTimestamp != null) timingData.best_lap_timestamp = bestLapTimestamp;
         if (totalTimeTimestamp != null) timingData.total_time_timestamp = totalTimeTimestamp;
         if (setupSnapshot) timingData.setup_snapshot = setupSnapshot;
+        if (penaltySeconds != null && Number.isFinite(Number(penaltySeconds)) && Number(penaltySeconds) >= 0) {
+          timingData.penalty_seconds = Number(penaltySeconds);
+        }
 
         let circuitLaneLengths = [];
         if (circuitId) {

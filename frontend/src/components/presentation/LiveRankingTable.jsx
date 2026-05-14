@@ -68,6 +68,10 @@ const LiveRankingTable = ({ participants }) => {
     (p) => p.points !== undefined && p.points !== null
   );
 
+  const formatPenaltySeconds = (sec) => `+${Number(sec).toFixed(3)} s`;
+
+  const showPenaltyColumn = orderedParticipants.some((p) => Number(p.penalties) > 0);
+
   const participantsWithGaps = orderedParticipants.map((participant, index) => {
     const cur = participant.total_time_timestamp || 0;
     const leader = orderedParticipants[0]?.total_time_timestamp || 0;
@@ -105,7 +109,7 @@ const LiveRankingTable = ({ participants }) => {
               <th className="driver-col">Piloto</th>
               <th className="vehicle-col">Vehículo</th>
               <th className="time-col">Tiempo Total</th>
-              <th className="penalty-col">Penalización</th>
+              {showPenaltyColumn && <th className="penalty-col">Penalización</th>}
               <th className="best-lap-col">Mejor Vuelta</th>
               <th className="gap-leader-col">Dif. Líder</th>
               <th className="gap-previous-col">Dif. Anterior</th>
@@ -141,13 +145,15 @@ const LiveRankingTable = ({ participants }) => {
                       {formatTime(participant.total_time_timestamp)}
                     </span>
                   </td>
-                  <td className="penalty-cell">
-                    {participant.penalties > 0 ? (
-                      <span className="penalty-time">+{formatTime(participant.penalties)}</span>
-                    ) : (
-                      <span className="no-penalty">-</span>
-                    )}
-                  </td>
+                  {showPenaltyColumn && (
+                    <td className="penalty-cell">
+                      {Number(participant.penalties) > 0 ? (
+                        <span className="penalty-time">{formatPenaltySeconds(participant.penalties)}</span>
+                      ) : (
+                        <span className="no-penalty">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="best-lap-cell">
                     <span className="best-lap-time">
                       {formatBestLap(participant.best_lap)}
