@@ -5,8 +5,16 @@
 import { addHours } from 'date-fns';
 import { toDate, formatInTimeZone } from 'date-fns-tz';
 
+/**
+ * Zona IANA para interpretar horas del club al generar enlaces Google Calendar (UTC).
+ * CRA solo inyecta variables REACT_APP_* desde frontend/.env al hacer build.
+ */
 export function defaultClubEventTz() {
-  return process.env.REACT_APP_CLUB_EVENTS_TZ || 'Europe/Madrid';
+  const v =
+    typeof process !== 'undefined' && process.env && process.env.REACT_APP_CLUB_EVENTS_TZ
+      ? String(process.env.REACT_APP_CLUB_EVENTS_TZ).trim()
+      : '';
+  return v || 'Europe/Madrid';
 }
 
 export function competitionPublicSignupUrl(slug, origin = typeof window !== 'undefined' ? window.location.origin : '') {
