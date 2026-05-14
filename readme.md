@@ -53,6 +53,12 @@ The application includes [Vercel Web Analytics](https://vercel.com/docs/analytic
 
 The application includes [Vercel Speed Insights](https://vercel.com/docs/speed-insights) for real-time performance metrics (Core Web Vitals: LCP, FID, CLS, INP, TTFB). Data is collected automatically when deployed to Vercel. Enable Speed Insights in your Vercel project dashboard under **Speed Insights** to start collecting performance data. If no data appears after 30 seconds, check for content blockers and try navigating between pages.
 
+### Depuración del dashboard (API)
+
+En el **backend**, define `DASHBOARD_PERF_LOG=1` en el entorno para registrar por cada respuesta JSON de `/api/dashboard/*` la duración en ms y el tamaño aproximado en bytes. Útil para comparar antes/después de optimizaciones.
+
+En **desarrollo**, el hook del dashboard escribe en consola del navegador (nivel `debug`) el tiempo del bloque paralelo de peticiones a `/dashboard/*`.
+
 ### Requisitos Técnicos PWA
 
 - **HTTPS obligatorio**: La PWA requiere conexión segura en producción

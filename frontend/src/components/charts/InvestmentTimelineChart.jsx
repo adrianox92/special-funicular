@@ -83,6 +83,7 @@ const InvestmentTimelineChart = ({ data }) => {
                 dataKey="value"
                 stroke="#0d6efd"
                 strokeWidth={2}
+                isAnimationActive={false}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
               />

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { invalidateApiAccessTokenCache } from '../lib/axios';
 
 const AuthContext = createContext(null);
 
@@ -48,6 +49,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    invalidateApiAccessTokenCache();
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };

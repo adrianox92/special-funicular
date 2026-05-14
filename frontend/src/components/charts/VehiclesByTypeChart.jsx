@@ -100,6 +100,7 @@ const VehiclesByTypeChart = ({ data }) => {
                 stackId="a" 
                 fill={COLORS.modified}
                 name="modified"
+                isAnimationActive={false}
                 radius={[4, 4, 0, 0]}
               />
               <Bar 
@@ -107,6 +108,7 @@ const VehiclesByTypeChart = ({ data }) => {
                 stackId="a" 
                 fill={COLORS.stock}
                 name="stock"
+                isAnimationActive={false}
                 radius={[4, 4, 0, 0]}
               />
               <Bar 
@@ -114,6 +116,7 @@ const VehiclesByTypeChart = ({ data }) => {
                 fill={COLORS.total}
                 name="total"
                 opacity={0.3}
+                isAnimationActive={false}
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>

@@ -44,31 +44,29 @@ const IncrementBar = ({ value, maxValue, basePrice, totalPrice }) => {
   const color = getColor(value, maxValue / 2); // Usamos la mitad del máximo como promedio aproximado
   
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center gap-2 cursor-help">
-            <div className="w-[60px] h-2 bg-muted rounded overflow-hidden">
-              <div
-                className="h-full rounded transition-all"
-                style={{ width: `${width}%`, backgroundColor: color }}
-              />
-            </div>
-            <span className="text-sm" style={{ color, fontWeight: value > 0 ? 'bold' : 'normal' }}>
-              {formatPercentage(value)}
-            </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-2 cursor-help">
+          <div className="w-[60px] h-2 bg-muted rounded overflow-hidden">
+            <div
+              className="h-full rounded transition-all"
+              style={{ width: `${width}%`, backgroundColor: color }}
+            />
           </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-left">
-          <div>Coste original: {formatCurrency(basePrice)}</div>
-          <div className="flex items-center gap-1">
-            <ArrowRight className="size-3.5 shrink-0" aria-hidden />
-            Total: {formatCurrency(totalPrice)}
-          </div>
-          <div className="font-semibold">Incremento: {formatPercentage(value)}</div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <span className="text-sm" style={{ color, fontWeight: value > 0 ? 'bold' : 'normal' }}>
+            {formatPercentage(value)}
+          </span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-left">
+        <div>Coste original: {formatCurrency(basePrice)}</div>
+        <div className="flex items-center gap-1">
+          <ArrowRight className="size-3.5 shrink-0" aria-hidden />
+          Total: {formatCurrency(totalPrice)}
+        </div>
+        <div className="font-semibold">Incremento: {formatPercentage(value)}</div>
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -119,6 +117,7 @@ const TopCostTable = ({ data }) => {
     <Card className="h-full">
       <CardHeader><h5 className="font-semibold">Top 5 Vehículos por Coste</h5></CardHeader>
       <CardContent>
+        <TooltipProvider delayDuration={300}>
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
@@ -167,6 +166,7 @@ const TopCostTable = ({ data }) => {
             </TableBody>
           </Table>
         </div>
+        </TooltipProvider>
       </CardContent>
     </Card>
   );

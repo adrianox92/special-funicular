@@ -111,6 +111,7 @@ const ModificationPieChart = ({ data }) => {
                 dataKey="value"
                 nameKey="name"
                 paddingAngle={2} // Añadir espacio entre segmentos
+                isAnimationActive={false}
               >
                 {chartDataWithPercentage.map((entry, index) => (
                   <Cell 

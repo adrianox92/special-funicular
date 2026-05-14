@@ -100,6 +100,7 @@ const PerformanceByTypeChart = ({ data = {} }) => {
               <Bar 
                 dataKey="averageTime" 
                 fill="#8884d8"
+                isAnimationActive={false}
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>

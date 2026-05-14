@@ -7,6 +7,75 @@ const { resolveStaleDaysThreshold } = require('../lib/userPreferences');
 
 const supabase = getAnonClient();
 
+/** TTL en memoria para deduplicar resúmenes de competición entre /metrics y /action-items. */
+const COMPETITION_SUMMARY_TTL_MS = 30_000;
+const competitionSummaryCache = new Map();
+
+/**
+ * @param {string} organizerId
+ * @returns {Promise<Array>}
+ */
+async function getCompetitionProgressSummariesCached(organizerId) {
+  const now = Date.now();
+  const hit = competitionSummaryCache.get(organizerId);
+  if (hit && now - hit.fetchedAt < COMPETITION_SUMMARY_TTL_MS) {
+    return hit.data;
+  }
+  const data = await getCompetitionProgressSummaries(organizerId);
+  competitionSummaryCache.set(organizerId, { fetchedAt: now, data });
+  return data;
+}
+
+/**
+ * Agrega rendimiento por tipo a partir de vehículos ya cargados (evita segunda query masiva).
+ * @param {Array<object>} vehicles
+ */
+function computePerformanceByTypeFromVehicles(vehicles) {
+  const typePerformance = {};
+  (vehicles || []).forEach((vehicle) => {
+    if (!vehicle.type) {
+      return;
+    }
+
+    if (!typePerformance[vehicle.type]) {
+      typePerformance[vehicle.type] = {
+        total_time: 0,
+        count: 0,
+        vehicles: [],
+      };
+    }
+
+    const validTimings =
+      vehicle.vehicle_timings?.filter((t) => {
+        const timeInSeconds = timeToSeconds(t.best_lap_time);
+        return timeInSeconds !== null && timeInSeconds > 0;
+      }) || [];
+
+    if (validTimings.length > 0) {
+      const bestTime = Math.min(...validTimings.map((t) => timeToSeconds(t.best_lap_time)));
+
+      typePerformance[vehicle.type].total_time += bestTime;
+      typePerformance[vehicle.type].count++;
+      typePerformance[vehicle.type].vehicles.push({
+        model: vehicle.model || 'Sin modelo',
+        manufacturer: vehicle.manufacturer || 'Sin marca',
+        best_time: Number(bestTime.toFixed(2)),
+      });
+    }
+  });
+
+  Object.keys(typePerformance).forEach((type) => {
+    if (typePerformance[type].count > 0) {
+      typePerformance[type].average_time = Number(
+        (typePerformance[type].total_time / typePerformance[type].count).toFixed(2),
+      );
+      typePerformance[type].vehicles.sort((a, b) => a.best_time - b.best_time);
+    }
+  });
+
+  return typePerformance;
+}
+
 /** Categorías de inventario consideradas críticas para alertas en dashboard. */
 const CRITICAL_INVENTORY_CATEGORIES = new Set([
   'motor',
@@ -116,6 +185,27 @@ function circuitLabelFromKey(key, rowsSample) {
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
 
+// Métricas opcionales por request (activar con DASHBOARD_PERF_LOG=1)
+router.use((req, res, next) => {
+  if (process.env.DASHBOARD_PERF_LOG !== '1') {
+    return next();
+  }
+  const started = Date.now();
+  const origJson = res.json.bind(res);
+  res.json = function dashboardJsonMeter(payload) {
+    const ms = Date.now() - started;
+    let approxBytes = 0;
+    try {
+      approxBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+    } catch (_) {
+      /* ignore */
+    }
+    console.log(`[dashboard-perf] ${req.method} ${req.path} ${ms}ms ~${approxBytes}B`);
+    return origJson(payload);
+  };
+  next();
+});
+
 // Función para formatear tiempo de segundos a mm:ss.ms
 const formatTime = (seconds) => {
   if (!seconds) return null;
@@ -141,16 +231,21 @@ const calculateTrends = async (userId, options = {}) => {
   const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
 
   try {
-    // Obtener vehículos con fechas de compra
-    const { data: vehicles, error: vehiclesError } = await supabase
-      .from('vehicles')
-      .select(
-        'id, model, manufacturer, price, total_price, modified, digital, museo, taller, purchase_date, created_at',
-      )
-      .eq('user_id', userId)
-      .limit(500);
+    let vehicles;
+    if (Array.isArray(options.vehiclesForTrends)) {
+      vehicles = options.vehiclesForTrends;
+    } else {
+      const { data: vdata, error: vehiclesError } = await supabase
+        .from('vehicles')
+        .select(
+          'id, model, manufacturer, price, total_price, modified, digital, museo, taller, purchase_date, created_at',
+        )
+        .eq('user_id', userId)
+        .limit(500);
 
-    if (vehiclesError) throw vehiclesError;
+      if (vehiclesError) throw vehiclesError;
+      vehicles = vdata || [];
+    }
 
     // Calcular tendencias de vehículos
     const currentTotal = vehicles.length;
@@ -286,7 +381,7 @@ const calculateTrends = async (userId, options = {}) => {
     try {
       let summaries = options.competitionSummaries;
       if (!Array.isArray(summaries)) {
-        summaries = await getCompetitionProgressSummaries(userId);
+        summaries = await getCompetitionProgressSummariesCached(userId);
       }
       const incomplete = summaries.filter(
         (s) => s.participants_count > 0 && !s.is_completed,
@@ -337,6 +432,7 @@ router.get('/metrics', async (req, res) => {
       .from('vehicles')
       .select(`
         id,
+        type,
         model,
         manufacturer,
         price,
@@ -447,70 +543,8 @@ router.get('/metrics', async (req, res) => {
       throw bestTimeError;
     }
 
-    // Calcular rendimiento promedio por tipo usando una consulta SQL más eficiente
-    const { data: performanceByType, error: performanceError } = await supabase
-      .from('vehicles')
-      .select(`
-        type,
-        model,
-        manufacturer,
-        vehicle_timings (
-          best_lap_time,
-          timing_date
-        )
-      `)
-      .eq('user_id', req.user.id);
-
-    if (performanceError) throw performanceError;
-
-
-    // Procesar datos de rendimiento por tipo
-    const typePerformance = {};
-    performanceByType.forEach(vehicle => {
-      
-      if (!vehicle.type) {
-        return;
-      }
-
-      if (!typePerformance[vehicle.type]) {
-        typePerformance[vehicle.type] = {
-          total_time: 0,
-          count: 0,
-          vehicles: []
-        };
-      }
-
-      // Solo procesar vehículos que tienen tiempos válidos
-      const validTimings = vehicle.vehicle_timings?.filter(t => {
-        const timeInSeconds = timeToSeconds(t.best_lap_time);
-        return timeInSeconds !== null && timeInSeconds > 0;
-      }) || [];
-
-
-      if (validTimings.length > 0) {
-        const bestTime = Math.min(...validTimings.map(t => timeToSeconds(t.best_lap_time)));
-        
-        typePerformance[vehicle.type].total_time += bestTime;
-        typePerformance[vehicle.type].count++;
-        typePerformance[vehicle.type].vehicles.push({
-          model: vehicle.model || 'Sin modelo',
-          manufacturer: vehicle.manufacturer || 'Sin marca',
-          best_time: Number(bestTime.toFixed(2))
-        });
-      }
-    });
-
-
-    // Calcular promedios y ordenar vehículos por tipo
-    Object.keys(typePerformance).forEach(type => {
-      if (typePerformance[type].count > 0) {
-        typePerformance[type].average_time = Number(
-          (typePerformance[type].total_time / typePerformance[type].count).toFixed(2)
-        );
-        typePerformance[type].vehicles.sort((a, b) => a.best_time - b.best_time);
-      }
-    });
-
+    // Rendimiento por tipo: reutilizar vehículos ya cargados (evita segunda lectura sin límite)
+    const typePerformance = computePerformanceByTypeFromVehicles(vehicles);
 
     // Calcular evolución del valor total de la colección por trimestres
     const getQuarterStartDate = (date) => {
@@ -597,12 +631,26 @@ router.get('/metrics', async (req, res) => {
 
     let competitionSummaries = [];
     try {
-      competitionSummaries = await getCompetitionProgressSummaries(req.user.id);
+      competitionSummaries = await getCompetitionProgressSummariesCached(req.user.id);
     } catch (e) {
       console.error('Métricas: resumen de competiciones:', e);
     }
 
-    const trends = await calculateTrends(req.user.id, { competitionSummaries });
+    const vehiclesForTrends = vehicles.map((v) => ({
+      id: v.id,
+      model: v.model,
+      manufacturer: v.manufacturer,
+      price: v.price,
+      total_price: v.total_price,
+      modified: v.modified,
+      digital: v.digital,
+      museo: v.museo,
+      taller: v.taller,
+      purchase_date: v.purchase_date,
+      created_at: v.created_at,
+    }));
+
+    const trends = await calculateTrends(req.user.id, { competitionSummaries, vehiclesForTrends });
 
     const activeCompetitionsCount = competitionSummaries.filter(
       (s) => s.participants_count > 0 && !s.is_completed,
@@ -638,35 +686,36 @@ router.get('/metrics', async (req, res) => {
 // Nuevo endpoint para obtener datos de gráficos y tablas
 router.get('/charts', async (req, res) => {
   try {
-    // 1. Gráfico de barras por tipo de coche
-    const { data: vehiclesByType, error: vehiclesByTypeError } = await supabase
+    // Una sola lectura de vehículos del usuario para gráficos/tablas de agregación
+    const { data: vehiclesRows, error: vehiclesAggregateError } = await supabase
       .from('vehicles')
-      .select('type, modified')
+      .select('id, type, modified, manufacturer, purchase_place, model, price, total_price')
       .eq('user_id', req.user.id);
 
-    if (vehiclesByTypeError) throw vehiclesByTypeError;
+    if (vehiclesAggregateError) throw vehiclesAggregateError;
 
-    // Procesar datos para el gráfico de barras
+    const vehiclesByType = vehiclesRows || [];
+
     const typeStats = vehiclesByType.reduce((acc, vehicle) => {
-      if (!acc[vehicle.type]) {
-        acc[vehicle.type] = {
+      const t = vehicle.type || 'Sin tipo';
+      if (!acc[t]) {
+        acc[t] = {
           total: 0,
           modified: 0,
-          stock: 0
+          stock: 0,
         };
       }
-      acc[vehicle.type].total++;
+      acc[t].total++;
       if (vehicle.modified) {
-        acc[vehicle.type].modified++;
+        acc[t].modified++;
       } else {
-        acc[vehicle.type].stock++;
+        acc[t].stock++;
       }
       return acc;
     }, {});
 
-    // 2. Gráfico circular (proporción modificados vs serie)
     const totalVehicles = vehiclesByType.length;
-    const totalModified = vehiclesByType.filter(v => v.modified).length;
+    const totalModified = vehiclesByType.filter((v) => v.modified).length;
     const totalStock = totalVehicles - totalModified;
 
     // 3. Top 5 vehículos por mejor vuelta
@@ -688,26 +737,19 @@ router.get('/charts', async (req, res) => {
 
     if (bestLapsError) throw bestLapsError;
 
-    // 4. Top 5 vehículos con mayor coste
-    const { data: topCostVehicles, error: topCostError } = await supabase
-      .from('vehicles')
-      .select('id, model, manufacturer, price, total_price')
-      .eq('user_id', req.user.id)
-      .gt('price', 0)
-      .order('total_price', { ascending: false })
-      .limit(5);
-
-    if (topCostError) throw topCostError;
-
-    // Procesar datos de costes
-    const topCostVehiclesProcessed = topCostVehicles.map(vehicle => ({
-      id: vehicle.id,
-      model: vehicle.model,
-      manufacturer: vehicle.manufacturer,
-      basePrice: vehicle.price,
-      totalPrice: vehicle.total_price,
-      incrementPercentage: ((vehicle.total_price - vehicle.price) / vehicle.price) * 100
-    }));
+    // Top 5 vehículos con mayor coste (misma lista `vehiclesByType`, sin query adicional)
+    const topCostVehiclesProcessed = [...vehiclesByType]
+      .filter((v) => Number(v.price) > 0)
+      .sort((a, b) => Number(b.total_price || 0) - Number(a.total_price || 0))
+      .slice(0, 5)
+      .map((vehicle) => ({
+        id: vehicle.id,
+        model: vehicle.model,
+        manufacturer: vehicle.manufacturer,
+        basePrice: vehicle.price,
+        totalPrice: vehicle.total_price,
+        incrementPercentage: ((vehicle.total_price - vehicle.price) / vehicle.price) * 100,
+      }));
 
     // 5. Componentes más utilizados en modificaciones
     const { data: componentsData, error: componentsError } = await supabase
@@ -799,31 +841,13 @@ router.get('/charts', async (req, res) => {
       .sort((a, b) => b.totalInvestment - a.totalInvestment)
       .slice(0, 10); // Top 10 componentes
 
-    // 6. Distribución de marcas
-    const { data: vehiclesByBrand, error: brandsError } = await supabase
-      .from('vehicles')
-      .select('manufacturer')
-      .eq('user_id', req.user.id);
-
-    if (brandsError) throw brandsError;
-
-    // Procesar datos de marcas
-    const brandDistribution = vehiclesByBrand.reduce((acc, vehicle) => {
-      const brand = vehicle.manufacturer;
+    const brandDistribution = vehiclesByType.reduce((acc, vehicle) => {
+      const brand = vehicle.manufacturer || 'Sin marca';
       acc[brand] = (acc[brand] || 0) + 1;
       return acc;
     }, {});
 
-    // 7. Distribución de tiendas
-    const { data: vehiclesByStore, error: storesError } = await supabase
-      .from('vehicles')
-      .select('purchase_place')
-      .eq('user_id', req.user.id);
-
-    if (storesError) throw storesError;
-
-    // Procesar datos de tiendas
-    const storeDistribution = vehiclesByStore.reduce((acc, vehicle) => {
+    const storeDistribution = vehiclesByType.reduce((acc, vehicle) => {
       const store = vehicle.purchase_place || 'No especificada';
       acc[store] = (acc[store] || 0) + 1;
       return acc;
@@ -840,7 +864,7 @@ router.get('/charts', async (req, res) => {
         total: totalVehicles,
         modified: totalModified,
         stock: totalStock,
-        modifiedPercentage: (totalModified / totalVehicles) * 100
+        modifiedPercentage: totalVehicles > 0 ? (totalModified / totalVehicles) * 100 : 0,
       },
       bestLaps: bestLaps
         .filter(lap => lap.vehicles !== null) // Filtrar registros sin vehículo
@@ -875,7 +899,7 @@ router.get('/action-items', async (req, res) => {
     const staleDaysThreshold = resolveStaleDaysThreshold(req.user);
     const generatedAt = new Date().toISOString();
 
-    const competitionSummaries = await getCompetitionProgressSummaries(userId);
+    const competitionSummaries = await getCompetitionProgressSummariesCached(userId);
 
     const withParticipantsIncomplete = competitionSummaries.filter(
       (s) => s.participants_count > 0 && !s.is_completed,
@@ -933,7 +957,9 @@ router.get('/action-items', async (req, res) => {
       const { data: vtRows, error: vtErr } = await supabase
         .from('vehicle_timings')
         .select('vehicle_id, timing_date, circuit_id, circuit, circuits(id, name)')
-        .in('vehicle_id', vehicleIds);
+        .in('vehicle_id', vehicleIds)
+        .order('timing_date', { ascending: false })
+        .limit(8000);
 
       if (vtErr) {
         console.error('action-items vehicle_timings:', vtErr);
@@ -1086,7 +1112,7 @@ router.get('/maintenance-summary', async (req, res) => {
       .select('vehicle_id, performed_at')
       .eq('user_id', userId)
       .order('performed_at', { ascending: false })
-      .limit(1000);
+      .limit(800);
 
     if (lErr) throw lErr;
 
@@ -1134,7 +1160,7 @@ router.get('/maintenance-summary', async (req, res) => {
         )
         .eq('user_id', userId)
         .order('performed_at', { ascending: false })
-        .limit(2000);
+        .limit(1200);
 
       if (dueErr) throw dueErr;
 

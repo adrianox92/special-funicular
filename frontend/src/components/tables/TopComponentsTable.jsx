@@ -107,6 +107,7 @@ const TopComponentsTable = ({ data }) => {
     <Card className="h-full">
       <CardHeader><h5 className="font-semibold">Top 10 Componentes más Utilizados</h5></CardHeader>
       <CardContent>
+        <TooltipProvider delayDuration={300}>
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
@@ -133,8 +134,7 @@ const TopComponentsTable = ({ data }) => {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {renderComponentLinks(component)}
-                      <TooltipProvider>
-                        <Tooltip>
+                      <Tooltip>
                           <TooltipTrigger asChild>
                             <Badge variant="secondary" className="cursor-help">{component.usageCount}</Badge>
                           </TooltipTrigger>
@@ -145,7 +145,6 @@ const TopComponentsTable = ({ data }) => {
                             ))}
                           </TooltipContent>
                         </Tooltip>
-                      </TooltipProvider>
                     </div>
                   </TableCell>
                   <TableCell>{component.sku}</TableCell>
@@ -156,6 +155,7 @@ const TopComponentsTable = ({ data }) => {
             </TableBody>
           </Table>
         </div>
+        </TooltipProvider>
       </CardContent>
     </Card>
   );

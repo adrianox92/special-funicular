@@ -85,6 +85,7 @@ const Dashboard = () => {
     maintenanceSummary,
     maintenanceError,
     loading,
+    isRefreshing,
     error,
     refetch,
   } = useDashboardData();
@@ -213,8 +214,14 @@ const Dashboard = () => {
           role="group"
           aria-label="Acciones rápidas del dashboard"
         >
-          <Button type="button" variant="outline" size="default" onClick={() => refetch()}>
-            <RefreshCw className="size-4 mr-2" aria-hidden />
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            disabled={isRefreshing}
+            onClick={() => refetch()}
+          >
+            <RefreshCw className={`size-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden />
             Actualizar
           </Button>
           <Button size="default" asChild>

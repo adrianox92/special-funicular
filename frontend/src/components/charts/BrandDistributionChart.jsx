@@ -93,6 +93,7 @@ const BrandDistributionChart = ({ data }) => {
               <Bar 
                 dataKey="value" 
                 fill={COLORS.bar}
+                isAnimationActive={false}
                 radius={[0, 4, 4, 0]}
                 label={{ 
                   position: 'right',
