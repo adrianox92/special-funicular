@@ -6,7 +6,7 @@ import { addHours } from 'date-fns';
 import { toDate, formatInTimeZone } from 'date-fns-tz';
 
 export function defaultClubEventTz() {
-  return import.meta.env.VITE_CLUB_EVENTS_TZ || 'Europe/Madrid';
+  return process.env.REACT_APP_CLUB_EVENTS_TZ || 'Europe/Madrid';
 }
 
 export function competitionPublicSignupUrl(slug, origin = typeof window !== 'undefined' ? window.location.origin : '') {
