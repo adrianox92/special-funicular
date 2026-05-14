@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Trophy, Users, Calendar, Flag, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import axios from '../lib/axios';
+import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -24,9 +25,58 @@ import {
 } from '../components/ui/dialog';
 import { Spinner } from '../components/ui/spinner';
 
+const headerImgClass =
+  'h-9 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:max-w-[16rem]';
+const footerImgClass =
+  'h-8 w-auto max-w-[min(100%,12rem)] object-contain sm:max-w-[14rem]';
+
+const SignupLayout = ({ headerLogoSrc, headerRight, title, children }) => (
+  <div className="flex min-h-screen flex-col bg-background">
+    <header
+      className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      role="banner"
+    >
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link to="/" className="flex shrink-0 items-center">
+          <img
+            key={headerLogoSrc}
+            src={headerLogoSrc}
+            alt="Slot Database"
+            className={headerImgClass}
+            decoding="async"
+          />
+        </Link>
+        {headerRight ? <div className="flex shrink-0 items-center gap-2">{headerRight}</div> : null}
+      </div>
+    </header>
+    {title ? (
+      <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6">{title}</div>
+    ) : null}
+    <main className="flex-1 w-full">{children}</main>
+    <footer className="border-t bg-muted/50 mt-auto">
+      <div className="mx-auto flex max-w-6xl justify-center px-4 py-6 sm:px-6">
+        <Link to="/" className="flex shrink-0 items-center">
+          <img
+            key={`${headerLogoSrc}-footer`}
+            src={headerLogoSrc}
+            alt="Slot Database"
+            className={footerImgClass}
+            decoding="async"
+          />
+        </Link>
+      </div>
+    </footer>
+  </div>
+);
+
 const CompetitionSignup = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+
+  const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
+    theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
+  }`;
 
   const [competition, setCompetition] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -109,28 +159,32 @@ const CompetitionSignup = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-[50vh]">
-        <Spinner className="size-8 mb-4" />
-        <p className="text-muted-foreground">Cargando información de la competición...</p>
-      </div>
+      <SignupLayout headerLogoSrc={headerLogoSrc}>
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-center px-4 py-16 sm:px-6">
+          <Spinner className="size-8 mb-4" />
+          <p className="text-muted-foreground">Cargando información de la competición...</p>
+        </div>
+      </SignupLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <Card className="text-center py-12">
-          <CardContent>
-            <AlertTriangle className="size-12 mx-auto text-destructive mb-4" />
-            <h4 className="mb-4">Error</h4>
-            <p className="text-muted-foreground mb-6">{error}</p>
-            <Button variant="outline" onClick={() => navigate('/')} className="flex items-center gap-2 mx-auto">
-              <ArrowLeft className="size-4" />
-              Volver al inicio
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <SignupLayout headerLogoSrc={headerLogoSrc}>
+        <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+          <Card className="text-center py-12">
+            <CardContent>
+              <AlertTriangle className="size-12 mx-auto text-destructive mb-4" />
+              <h4 className="mb-4">Error</h4>
+              <p className="text-muted-foreground mb-6">{error}</p>
+              <Button variant="outline" onClick={() => navigate('/')} className="flex items-center gap-2 mx-auto">
+                <ArrowLeft className="size-4" />
+                Volver al inicio
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </SignupLayout>
     );
   }
 
@@ -139,215 +193,218 @@ const CompetitionSignup = () => {
   const canSignup = !isFull && (!status || status.times_registered === 0);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+    <SignupLayout
+      headerLogoSrc={headerLogoSrc}
+      headerRight={
         <Button variant="outline" size="sm" onClick={() => navigate('/')} className="flex items-center gap-2">
           <ArrowLeft className="size-4" />
           Volver
         </Button>
-        <h1 className="text-2xl font-bold">Inscripción a Competición</h1>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Info card */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
-            <h5 className="font-semibold flex items-center gap-2">
-              <Trophy className="size-4" />
-              {competition.name}
-            </h5>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="mb-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <Users className="size-4" />
-                <small>Plazas: {competition.signups_count}/{competition.num_slots}</small>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
-                <div
-                  className={`h-full rounded-full transition-all ${isFull ? 'bg-destructive' : 'bg-primary'}`}
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              {isFull && (
-                <span className="text-sm font-medium text-destructive">¡Completo!</span>
-              )}
-            </div>
-            <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Calendar className="size-4" />
-                Creada: {formatDate(competition.created_at)}
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+      }
+      title={<h1 className="text-2xl font-bold">Inscripción a Competición</h1>}
+    >
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Info card */}
+          <Card className="lg:col-span-1">
+            <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
+              <h5 className="font-semibold flex items-center gap-2">
                 <Trophy className="size-4" />
-                Rondas: {competition.rounds}
+                {competition.name}
+              </h5>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <Users className="size-4" />
+                  <small>Plazas: {competition.signups_count}/{competition.num_slots}</small>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
+                  <div
+                    className={`h-full rounded-full transition-all ${isFull ? 'bg-destructive' : 'bg-primary'}`}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                {isFull && (
+                  <span className="text-sm font-medium text-destructive">¡Completo!</span>
+                )}
               </div>
-              {competition.circuit_name && (
+              <div className="space-y-2 mb-4">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Flag className="size-4" />
-                  Circuito: {competition.circuit_name}
+                  <Calendar className="size-4" />
+                  Creada: {formatDate(competition.created_at)}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Trophy className="size-4" />
+                  Rondas: {competition.rounds}
+                </div>
+                {competition.circuit_name && (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Flag className="size-4" />
+                    Circuito: {competition.circuit_name}
+                  </div>
+                )}
+              </div>
+              {competition.categories?.length > 0 && (
+                <div>
+                  <h6 className="font-medium mb-2">Categorías disponibles:</h6>
+                  <div className="flex flex-wrap gap-2">
+                    {competition.categories.map((cat) => (
+                      <span
+                        key={cat.id}
+                        className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium"
+                      >
+                        {cat.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
-            {competition.categories?.length > 0 && (
-              <div>
-                <h6 className="font-medium mb-2">Categorías disponibles:</h6>
-                <div className="flex flex-wrap gap-2">
-                  {competition.categories.map((cat) => (
-                    <span
-                      key={cat.id}
-                      className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium"
-                    >
-                      {cat.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Form */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <h5 className="font-semibold">Formulario de Inscripción</h5>
-          </CardHeader>
-          <CardContent>
-            {isFull ? (
-              <Alert variant="destructive">
-                <AlertTriangle className="size-4" />
-                <AlertDescription>
-                  <strong>¡Competición completa!</strong> No hay plazas disponibles en este momento.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {submitError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{submitError}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nombre completo *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Tu nombre completo"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="tu@email.com"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {competition.categories?.length > 0 ? (
-                  <div className="space-y-2">
-                    <Label>Categoría *</Label>
-                    <Select
-                      value={formData.category_id}
-                      onValueChange={(v) => setFormData({ ...formData, category_id: v })}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {competition.categories.map((cat) => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">Selecciona la categoría en la que quieres competir</p>
-                  </div>
-                ) : (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="size-4" />
-                    <AlertDescription>
-                      <strong>No hay categorías disponibles</strong> para esta competición. Contacta al organizador.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="vehicle">Vehículo con el que competirás *</Label>
-                  <Input
-                    id="vehicle"
-                    value={formData.vehicle}
-                    onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
-                    placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">Especifica el modelo y marca de tu vehículo</p>
-                </div>
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full flex items-center justify-center gap-2"
-                  disabled={submitting || !canSignup}
-                >
-                  {submitting ? (
-                    <>
-                      <Spinner className="size-4" />
-                      Enviando inscripción...
-                    </>
-                  ) : !canSignup && status?.times_registered > 0 ? (
-                    <>
-                      <AlertTriangle className="size-4" />
-                      Ya no es posible inscribirse porque la competición ha comenzado.
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="size-4" />
-                      Enviar Inscripción
-                    </>
+          {/* Form */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <h5 className="font-semibold">Formulario de Inscripción</h5>
+            </CardHeader>
+            <CardContent>
+              {isFull ? (
+                <Alert variant="destructive">
+                  <AlertTriangle className="size-4" />
+                  <AlertDescription>
+                    <strong>¡Competición completa!</strong> No hay plazas disponibles en este momento.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {submitError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{submitError}</AlertDescription>
+                    </Alert>
                   )}
-                </Button>
 
-                {status?.times_registered > 0 && (
-                  <Alert variant="destructive">
-                    <AlertDescription>Ya no es posible inscribirse porque la competición ha comenzado.</AlertDescription>
-                  </Alert>
-                )}
-              </form>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nombre completo *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Tu nombre completo"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="tu@email.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {competition.categories?.length > 0 ? (
+                    <div className="space-y-2">
+                      <Label>Categoría *</Label>
+                      <Select
+                        value={formData.category_id}
+                        onValueChange={(v) => setFormData({ ...formData, category_id: v })}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una categoría" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {competition.categories.map((cat) => (
+                            <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">Selecciona la categoría en la que quieres competir</p>
+                    </div>
+                  ) : (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="size-4" />
+                      <AlertDescription>
+                        <strong>No hay categorías disponibles</strong> para esta competición. Contacta al organizador.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicle">Vehículo con el que competirás *</Label>
+                    <Input
+                      id="vehicle"
+                      value={formData.vehicle}
+                      onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
+                      placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground">Especifica el modelo y marca de tu vehículo</p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full flex items-center justify-center gap-2"
+                    disabled={submitting || !canSignup}
+                  >
+                    {submitting ? (
+                      <>
+                        <Spinner className="size-4" />
+                        Enviando inscripción...
+                      </>
+                    ) : !canSignup && status?.times_registered > 0 ? (
+                      <>
+                        <AlertTriangle className="size-4" />
+                        Ya no es posible inscribirse porque la competición ha comenzado.
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="size-4" />
+                        Enviar Inscripción
+                      </>
+                    )}
+                  </Button>
+
+                  {status?.times_registered > 0 && (
+                    <Alert variant="destructive">
+                      <AlertDescription>Ya no es posible inscribirse porque la competición ha comenzado.</AlertDescription>
+                    </Alert>
+                  )}
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <CheckCircle className="size-5" />
+                ¡Inscripción enviada!
+              </DialogTitle>
+              <DialogDescription>
+                Tu inscripción ha sido enviada correctamente. El organizador de la competición revisará tu solicitud y te contactará si es necesario.
+              </DialogDescription>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              <strong>Competición:</strong> {competition?.name}
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowSuccessModal(false)}>Cerrar</Button>
+              <Button onClick={() => navigate('/')}>Volver al inicio</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
-              <CheckCircle className="size-5" />
-              ¡Inscripción enviada!
-            </DialogTitle>
-            <DialogDescription>
-              Tu inscripción ha sido enviada correctamente. El organizador de la competición revisará tu solicitud y te contactará si es necesario.
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            <strong>Competición:</strong> {competition?.name}
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSuccessModal(false)}>Cerrar</Button>
-            <Button onClick={() => navigate('/')}>Volver al inicio</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </SignupLayout>
   );
 };
 
