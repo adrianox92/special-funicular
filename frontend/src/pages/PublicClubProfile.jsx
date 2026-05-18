@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Building2, CalendarDays, FileText, Link as LinkIcon, MapPin, Globe, Megaphone, Users } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import {
   Dialog,
@@ -14,6 +15,8 @@ import {
 } from '../components/ui/dialog';
 import { Spinner } from '../components/ui/spinner';
 import Footer from '../components/Footer';
+import { cn } from '../lib/utils';
+import { clubEventCategoryMeta } from '../constants/clubEventCategories';
 
 function formatClubDate(iso) {
   if (!iso) return null;
@@ -201,17 +204,25 @@ export default function PublicClubProfile() {
               <p className="text-muted-foreground text-sm">No hay eventos públicos próximos.</p>
             ) : (
               <ul className="space-y-4">
-                {upcomingEvents.map((ev) => (
-                  <li key={ev.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
-                    <p className="font-medium">{ev.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {ev.event_date}
-                      {ev.start_time ? ` · ${ev.start_time}` : ''}
-                      {ev.location ? ` · ${ev.location}` : ''}
-                    </p>
-                    {ev.description ? <p className="text-sm mt-1 text-muted-foreground">{ev.description}</p> : null}
-                  </li>
-                ))}
+                {upcomingEvents.map((ev) => {
+                  const cat = clubEventCategoryMeta(ev.event_category);
+                  return (
+                    <li key={ev.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{ev.title}</p>
+                        <Badge variant="outline" className={cn('shrink-0 text-xs font-normal', cat.badgeClass)}>
+                          {cat.label}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {ev.event_date}
+                        {ev.start_time ? ` · ${ev.start_time}` : ''}
+                        {ev.location ? ` · ${ev.location}` : ''}
+                      </p>
+                      {ev.description ? <p className="text-sm mt-1 text-muted-foreground">{ev.description}</p> : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </CardContent>

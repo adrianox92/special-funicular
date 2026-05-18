@@ -1,9 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import {
   CalendarPlus,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
+  LayoutList,
   MapPin,
   Pencil,
   Trash2,
@@ -15,6 +19,15 @@ import {
   Link2,
   QrCode,
 } from 'lucide-react';
+import {
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameMonth,
+  startOfWeek,
+} from 'date-fns';
+import { es } from 'date-fns/locale';
 import axios from '../lib/axios';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -55,6 +68,8 @@ import {
   clubEventTimeForInput,
   defaultClubEventTz,
 } from '../utils/clubEventCalendarExport';
+import { cn } from '../lib/utils';
+import { CLUB_EVENT_CATEGORY_OPTIONS, clubEventCategoryMeta } from '../constants/clubEventCategories';
 
 function parseLocalDate(isoDate) {
   if (!isoDate) return null;
@@ -86,7 +101,154 @@ const emptyForm = () => ({
   end_time: '',
   location: '',
   competition_id: '',
+  event_category: 'other',
 });
+
+function ClubEventCard({
+  ev,
+  canManage,
+  onEdit,
+  onDelete,
+  copyCompetitionPublicUrl,
+  openSignupQr,
+}) {
+  const cat = clubEventCategoryMeta(ev.event_category);
+  const badge = badgeForEvent(ev.event_date);
+  const when = parseLocalDate(ev.event_date);
+  const slug = ev.competitions?.public_slug;
+  const googleCalUrl = googleCalendarUrlForClubEvent(ev);
+  return (
+    <Card className={cn('overflow-hidden', cat.cardBorderClass)}>
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="text-base leading-snug">{ev.title}</CardTitle>
+            <CardDescription className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className={cn('shrink-0 border font-normal', cat.badgeClass)}>
+                {cat.label}
+              </Badge>
+              <span className="font-medium text-foreground">
+                {when
+                  ? when.toLocaleDateString('es-ES', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                  : ev.event_date}
+              </span>
+              {badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+            </CardDescription>
+            {ev.competitions?.name && (
+              <p className="text-xs text-muted-foreground">Competición: {ev.competitions.name}</p>
+            )}
+            {ev.start_time ? (
+              <p className="text-xs text-muted-foreground">
+                {clubEventTimeForInput(ev.start_time)}
+                {ev.end_time
+                  ? ` – ${clubEventTimeForInput(ev.end_time)}`
+                  : ' (fin por defecto +1 h en calendarios externos)'}
+              </p>
+            ) : null}
+          </div>
+          {canManage ? (
+            <div className="flex shrink-0 gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Editar evento"
+                onClick={() => onEdit(ev)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-destructive"
+                aria-label="Eliminar evento"
+                onClick={() => onDelete(ev)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 pt-0 text-sm">
+        <div className="flex flex-wrap gap-2">
+          {slug ? (
+            <>
+              <Button type="button" size="sm" variant="secondary" className="gap-2" asChild>
+                <Link to={`/competitions/signup/${encodeURIComponent(slug)}`}>
+                  <UserPlus className="size-4" />
+                  Inscribirme
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => copyCompetitionPublicUrl(slug)}
+                title="Copiar URL de inscripción"
+              >
+                <Link2 className="size-4" />
+                Copiar enlace
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => openSignupQr(slug)}
+                title="Mostrar código QR"
+              >
+                <QrCode className="size-4" />
+                QR
+              </Button>
+            </>
+          ) : null}
+          {googleCalUrl ? (
+            <Button variant="outline" size="sm" className="gap-1" asChild>
+              <a href={googleCalUrl} target="_blank" rel="noopener noreferrer" title="Abre Google Calendar">
+                <CalendarIcon className="size-4" />
+                Google Calendar
+              </a>
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={() => {
+              if (!downloadClubEventIcs(ev)) {
+                toast.error('No se pudo generar el calendario (.ics)');
+              }
+            }}
+            title="Apple Calendar, Outlook y otras apps"
+          >
+            <Download className="size-4" />
+            iCal (.ics)
+          </Button>
+        </div>
+        {ev.location || ev.description ? (
+          <div className="space-y-2">
+            {ev.location ? (
+              <p className="flex items-start gap-2 text-muted-foreground">
+                <MapPin className="mt-0.5 size-4 shrink-0" />
+                {ev.location}
+              </p>
+            ) : null}
+            {ev.description ? <p className="whitespace-pre-wrap">{ev.description}</p> : null}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
 
 const ClubCalendar = ({ clubId, canManage }) => {
   const [events, setEvents] = useState([]);
@@ -104,12 +266,19 @@ const ClubCalendar = ({ clubId, canManage }) => {
   const [qrPathShort, setQrPathShort] = useState('');
   const [qrFullUrl, setQrFullUrl] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
+  const [calMonth, setCalMonth] = useState(() => {
+    const n = new Date();
+    return { year: n.getFullYear(), month: n.getMonth() };
+  });
+  const [selectedDay, setSelectedDay] = useState(null);
 
   const load = useCallback(async () => {
     if (!clubId) return;
     try {
       setLoading(true);
-      const { data } = await axios.get(`/clubs/${clubId}/events`);
+      const qs = viewMode === 'calendar' ? '?all=true' : '';
+      const { data } = await axios.get(`/clubs/${clubId}/events${qs}`);
       setEvents(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
@@ -118,7 +287,41 @@ const ClubCalendar = ({ clubId, canManage }) => {
     } finally {
       setLoading(false);
     }
-  }, [clubId]);
+  }, [clubId, viewMode]);
+
+  const eventsByDate = useMemo(() => {
+    const m = new Map();
+    for (const ev of events) {
+      const k = String(ev.event_date).slice(0, 10);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(ev);
+    }
+    for (const arr of m.values()) {
+      arr.sort((a, b) => {
+        const as = a.start_time || '';
+        const bs = b.start_time || '';
+        if (as !== bs) return as.localeCompare(bs);
+        return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+      });
+    }
+    return m;
+  }, [events]);
+
+  const gridMonthStart = useMemo(
+    () => new Date(calMonth.year, calMonth.month, 1),
+    [calMonth.year, calMonth.month],
+  );
+
+  const calendarGridDays = useMemo(() => {
+    const monthEnd = endOfMonth(gridMonthStart);
+    const gridStart = startOfWeek(gridMonthStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [gridMonthStart]);
+
+  const dayEventsForSelected = selectedDay
+    ? eventsByDate.get(format(selectedDay, 'yyyy-MM-dd')) || []
+    : [];
 
   const loadCompetitions = useCallback(async () => {
     if (!clubId || !canManage) return;
@@ -157,6 +360,7 @@ const ClubCalendar = ({ clubId, canManage }) => {
   }, [canManage, loadCompetitions, loadFeedStatus]);
 
   const openCreate = () => {
+    setSelectedDay(null);
     setEditingEvent(null);
     setForm(emptyForm());
     loadCompetitions();
@@ -164,6 +368,7 @@ const ClubCalendar = ({ clubId, canManage }) => {
   };
 
   const openEdit = (ev) => {
+    setSelectedDay(null);
     setEditingEvent(ev);
     setForm({
       title: ev.title || '',
@@ -173,6 +378,7 @@ const ClubCalendar = ({ clubId, canManage }) => {
       end_time: clubEventTimeForInput(ev.end_time),
       location: ev.location || '',
       competition_id: ev.competition_id ? String(ev.competition_id) : '',
+      event_category: ev.event_category || 'other',
     });
     loadCompetitions();
     setDialogOpen(true);
@@ -193,6 +399,7 @@ const ClubCalendar = ({ clubId, canManage }) => {
         end_time: form.end_time.trim() || null,
         location: form.location.trim() || null,
         competition_id: form.competition_id ? form.competition_id : null,
+        event_category: form.event_category || 'other',
       };
       if (editingEvent) {
         await axios.put(`/clubs/${clubId}/events/${editingEvent.id}`, payload);
@@ -314,20 +521,61 @@ const ClubCalendar = ({ clubId, canManage }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Próximos eventos</h2>
-          <p className="text-sm text-muted-foreground">
-            Carreras, reuniones y fechas del club. Horas opcionales (zona {defaultClubEventTz()}) para Google e .ics. Puedes exportar cada evento a Google Calendar o descargar un .ics.
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <h2 className="text-lg font-semibold leading-tight">Próximos eventos</h2>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Carreras, reuniones y fechas del club. Horas opcionales (zona {defaultClubEventTz()}) para Google e .ics.
+            Puedes exportar cada evento a Google Calendar o descargar un .ics.
           </p>
         </div>
-        {canManage ? (
-          <Button type="button" className="gap-2" onClick={openCreate}>
-            <CalendarPlus className="size-4" />
-            Nuevo evento
-          </Button>
-        ) : null}
-      </div>
+        <div
+          className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-start lg:justify-end"
+          aria-label="Acciones del calendario"
+        >
+          <div
+            className="inline-flex h-9 w-full max-w-full rounded-lg border border-border bg-muted/30 p-0.5 shadow-sm sm:w-auto sm:max-w-none"
+            role="group"
+            aria-label="Cambiar vista de eventos"
+          >
+            <Button
+              type="button"
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              className={cn(
+                'h-8 flex-1 gap-1.5 rounded-md px-3 sm:flex-initial',
+                viewMode === 'list' && 'shadow-sm',
+              )}
+              onClick={() => setViewMode('list')}
+              aria-pressed={viewMode === 'list'}
+            >
+              <LayoutList className="size-4 shrink-0" aria-hidden />
+              Lista
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
+              size="sm"
+              className={cn(
+                'h-8 flex-1 gap-1.5 rounded-md px-3 sm:flex-initial',
+                viewMode === 'calendar' && 'shadow-sm',
+              )}
+              onClick={() => setViewMode('calendar')}
+              aria-pressed={viewMode === 'calendar'}
+              title="Vista de rejilla mensual"
+            >
+              <CalendarDays className="size-4 shrink-0" aria-hidden />
+              Mes
+            </Button>
+          </div>
+          {canManage ? (
+            <Button type="button" size="sm" className="h-9 w-full gap-2 shadow-sm sm:w-auto sm:shrink-0" onClick={openCreate}>
+              <CalendarPlus className="size-4 shrink-0" aria-hidden />
+              Nuevo evento
+            </Button>
+          ) : null}
+        </div>
+      </header>
 
       {canManage ? (
         <Card className="border-border/60 bg-muted/20">
@@ -370,153 +618,144 @@ const ClubCalendar = ({ clubId, canManage }) => {
         </Card>
       ) : null}
 
-      {events.length === 0 ? (
-        <Card className="border-dashed bg-muted/20">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No hay eventos programados.
-            {canManage ? ' Crea el primero con el botón de arriba.' : ''}
-          </CardContent>
-        </Card>
-      ) : (
-        <ul className="space-y-3">
-          {events.map((ev) => {
-            const badge = badgeForEvent(ev.event_date);
-            const when = parseLocalDate(ev.event_date);
-            const slug = ev.competitions?.public_slug;
-            const googleCalUrl = googleCalendarUrlForClubEvent(ev);
-            return (
+      {viewMode === 'list' ? (
+        events.length === 0 ? (
+          <Card className="border-dashed bg-muted/20">
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              No hay eventos programados.
+              {canManage ? ' Crea el primero con el botón de arriba.' : ''}
+            </CardContent>
+          </Card>
+        ) : (
+          <ul className="space-y-3">
+            {events.map((ev) => (
               <li key={ev.id}>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0 space-y-1">
-                        <CardTitle className="text-base leading-snug">{ev.title}</CardTitle>
-                        <CardDescription className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-foreground">
-                            {when
-                              ? when.toLocaleDateString('es-ES', {
-                                  weekday: 'long',
-                                  day: 'numeric',
-                                  month: 'long',
-                                  year: 'numeric',
-                                })
-                              : ev.event_date}
-                          </span>
-                          {badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
-                        </CardDescription>
-                        {ev.competitions?.name && (
-                          <p className="text-xs text-muted-foreground">Competición: {ev.competitions.name}</p>
-                        )}
-                        {ev.start_time ? (
-                          <p className="text-xs text-muted-foreground">
-                            {clubEventTimeForInput(ev.start_time)}
-                            {ev.end_time
-                              ? ` – ${clubEventTimeForInput(ev.end_time)}`
-                              : ' (fin por defecto +1 h en calendarios externos)'}
-                          </p>
-                        ) : null}
-                      </div>
-                      {canManage ? (
-                        <div className="flex shrink-0 gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Editar evento"
-                            onClick={() => openEdit(ev)}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            aria-label="Eliminar evento"
-                            onClick={() => setDeleteTarget(ev)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 pt-0 text-sm">
-                    <div className="flex flex-wrap gap-2">
-                      {slug ? (
-                        <>
-                          <Button type="button" size="sm" variant="secondary" className="gap-2" asChild>
-                            <Link to={`/competitions/signup/${encodeURIComponent(slug)}`}>
-                              <UserPlus className="size-4" />
-                              Inscribirme
-                            </Link>
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="gap-1"
-                            onClick={() => copyCompetitionPublicUrl(slug)}
-                            title="Copiar URL de inscripción"
-                          >
-                            <Link2 className="size-4" />
-                            Copiar enlace
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="gap-1"
-                            onClick={() => openSignupQr(slug)}
-                            title="Mostrar código QR"
-                          >
-                            <QrCode className="size-4" />
-                            QR
-                          </Button>
-                        </>
-                      ) : null}
-                      {googleCalUrl ? (
-                        <Button variant="outline" size="sm" className="gap-1" asChild>
-                          <a href={googleCalUrl} target="_blank" rel="noopener noreferrer" title="Abre Google Calendar">
-                            <CalendarIcon className="size-4" />
-                            Google Calendar
-                          </a>
-                        </Button>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-1"
-                        onClick={() => {
-                          if (!downloadClubEventIcs(ev)) {
-                            toast.error('No se pudo generar el calendario (.ics)');
-                          }
-                        }}
-                        title="Apple Calendar, Outlook y otras apps"
-                      >
-                        <Download className="size-4" />
-                        iCal (.ics)
-                      </Button>
-                    </div>
-                    {ev.location || ev.description ? (
-                      <div className="space-y-2">
-                        {ev.location ? (
-                          <p className="flex items-start gap-2 text-muted-foreground">
-                            <MapPin className="mt-0.5 size-4 shrink-0" />
-                            {ev.location}
-                          </p>
-                        ) : null}
-                        {ev.description ? <p className="whitespace-pre-wrap">{ev.description}</p> : null}
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
+                <ClubEventCard
+                  ev={ev}
+                  canManage={canManage}
+                  onEdit={openEdit}
+                  onDelete={setDeleteTarget}
+                  copyCompetitionPublicUrl={copyCompetitionPublicUrl}
+                  openSignupQr={openSignupQr}
+                />
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        )
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Mes anterior"
+              onClick={() =>
+                setCalMonth((m) => {
+                  const d = new Date(m.year, m.month - 1, 1);
+                  return { year: d.getFullYear(), month: d.getMonth() };
+                })
+              }
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <h3 className="min-w-0 flex-1 text-center text-base font-semibold capitalize">
+              {format(gridMonthStart, 'MMMM yyyy', { locale: es })}
+            </h3>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Mes siguiente"
+              onClick={() =>
+                setCalMonth((m) => {
+                  const d = new Date(m.year, m.month + 1, 1);
+                  return { year: d.getFullYear(), month: d.getMonth() };
+                })
+              }
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+          {events.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">No hay eventos registrados.</p>
+          ) : null}
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <div className="min-w-[280px]">
+              <div className="grid grid-cols-7 border-b border-border bg-muted/40 text-center text-xs font-medium text-muted-foreground">
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d) => (
+                  <div key={d} className="px-1 py-2">
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-px bg-border">
+                {calendarGridDays.map((day) => {
+                  const key = format(day, 'yyyy-MM-dd');
+                  const dayEvs = eventsByDate.get(key) || [];
+                  const inMonth = isSameMonth(day, gridMonthStart);
+                  const todayKey = format(new Date(), 'yyyy-MM-dd');
+                  const isToday = key === todayKey;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedDay(day)}
+                      className={`flex min-h-[5.5rem] flex-col bg-background p-1.5 text-left text-xs transition-colors hover:bg-muted/30 ${
+                        !inMonth ? 'text-muted-foreground/70' : ''
+                      } ${isToday ? 'ring-2 ring-inset ring-primary/50' : ''}`}
+                    >
+                      <span className={`mb-1 font-medium ${inMonth ? 'text-foreground' : ''}`}>{format(day, 'd')}</span>
+                      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                        {dayEvs.slice(0, 3).map((ev) => (
+                          <span
+                            key={ev.id}
+                            title={ev.title}
+                            className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${clubEventCategoryMeta(ev.event_category).pillClass}`}
+                          >
+                            {ev.title}
+                          </span>
+                        ))}
+                        {dayEvs.length > 3 ? (
+                          <span className="text-[10px] text-muted-foreground">+{dayEvs.length - 3} más</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
+
+      <Dialog open={Boolean(selectedDay)} onOpenChange={(open) => !open && setSelectedDay(null)}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="capitalize">
+              {selectedDay ? format(selectedDay, "EEEE d 'de' MMMM yyyy", { locale: es }) : ''}
+            </DialogTitle>
+            <DialogDescription>
+              {dayEventsForSelected.length === 0
+                ? 'No hay eventos este día.'
+                : `${dayEventsForSelected.length} evento${dayEventsForSelected.length === 1 ? '' : 's'}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {dayEventsForSelected.map((ev) => (
+              <ClubEventCard
+                key={ev.id}
+                ev={ev}
+                canManage={canManage}
+                onEdit={openEdit}
+                onDelete={setDeleteTarget}
+                copyCompetitionPublicUrl={copyCompetitionPublicUrl}
+                openSignupQr={openSignupQr}
+              />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={(o) => !saving && setDialogOpen(o)}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
@@ -535,6 +774,24 @@ const ClubCalendar = ({ clubId, canManage }) => {
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 maxLength={300}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ce-cat">Categoría</Label>
+              <Select
+                value={form.event_category || 'other'}
+                onValueChange={(v) => setForm((f) => ({ ...f, event_category: v }))}
+              >
+                <SelectTrigger id="ce-cat">
+                  <SelectValue placeholder="Categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLUB_EVENT_CATEGORY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="ce-date">Fecha</Label>

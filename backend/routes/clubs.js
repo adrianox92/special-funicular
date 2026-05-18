@@ -10,8 +10,13 @@ const { getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { uploadClubPdf, removeClubDocument } = require('../lib/clubDocumentUpload');
+const { ALLOWED_CLUB_EVENT_CATEGORIES, normalizeClubEventCategory } = require('../lib/clubEventCategories');
 
 const router = express.Router();
+
+/** SELECT de filas club_events devueltas al cliente (debe incluir event_category). */
+const CLUB_EVENT_LIST_SELECT =
+  'id, club_id, user_id, title, description, event_date, start_time, end_time, location, competition_id, event_category, created_at, competitions ( id, name, public_slug )';
 
 /** Normaliza campo time opcional desde JSON (HH:mm o HH:mm:ss → HH:mm:ss). */
 function parseBodyTime(val) {
@@ -272,16 +277,17 @@ router.get('/:id/events', param('id').isUUID(), handleValidationErrors, async (r
     const ok = await userIsClubMember(req.user.id, id);
     if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
 
+    const showAll = req.query.all === 'true';
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const selectFields =
-      'id, club_id, user_id, title, description, event_date, start_time, end_time, location, competition_id, created_at, competitions ( id, name, public_slug )';
-
-    const { data: events, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('club_events')
-      .select(selectFields)
-      .eq('club_id', id)
-      .gte('event_date', todayStr)
+      .select(CLUB_EVENT_LIST_SELECT)
+      .eq('club_id', id);
+    if (!showAll) {
+      query = query.gte('event_date', todayStr);
+    }
+    const { data: events, error } = await query
       .order('event_date', { ascending: true })
       .order('start_time', { ascending: true, nullsFirst: true })
       .order('created_at', { ascending: true });
@@ -304,12 +310,15 @@ router.post(
   body('competition_id').optional({ values: 'falsy' }).isUUID(),
   body('start_time').optional({ nullable: true }),
   body('end_time').optional({ nullable: true }),
+  body('event_category').optional({ values: 'falsy' }).isIn(ALLOWED_CLUB_EVENT_CATEGORIES),
   handleValidationErrors,
   async (req, res) => {
     try {
       const { id } = req.params;
       const admin = await userIsClubAdmin(req.user.id, id);
       if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const event_category = normalizeClubEventCategory(req.body.event_category);
 
       const title = req.body.title.trim();
       const description = req.body.description != null && String(req.body.description).trim() !== ''
@@ -336,9 +345,6 @@ router.post(
       const timeErr = validateEventTimes(start_time, end_time);
       if (timeErr) return res.status(400).json({ error: timeErr });
 
-      const selectFields =
-        'id, club_id, user_id, title, description, event_date, start_time, end_time, location, competition_id, created_at, competitions ( id, name, public_slug )';
-
       const { data: row, error } = await supabaseAdmin
         .from('club_events')
         .insert({
@@ -351,8 +357,9 @@ router.post(
           end_time,
           location,
           competition_id,
+          event_category,
         })
-        .select(selectFields)
+        .select(CLUB_EVENT_LIST_SELECT)
         .single();
 
       if (error) {
@@ -378,6 +385,7 @@ router.put(
   body('competition_id').optional({ values: 'falsy' }).isUUID(),
   body('start_time').optional({ nullable: true }),
   body('end_time').optional({ nullable: true }),
+  body('event_category').optional({ values: 'falsy', nullable: true }).isIn(ALLOWED_CLUB_EVENT_CATEGORIES),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -417,6 +425,11 @@ router.put(
           patch.competition_id = null;
         }
       }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'event_category')) {
+        const raw = req.body.event_category;
+        patch.event_category =
+          raw == null || String(raw).trim() === '' ? 'other' : normalizeClubEventCategory(raw);
+      }
 
       let nextStart = existing.start_time;
       let nextEnd = existing.end_time;
@@ -447,15 +460,12 @@ router.put(
         return res.status(400).json({ error: 'Nada que actualizar' });
       }
 
-      const selectFields =
-        'id, club_id, user_id, title, description, event_date, start_time, end_time, location, competition_id, created_at, competitions ( id, name, public_slug )';
-
       const { data: row, error } = await supabaseAdmin
         .from('club_events')
         .update(patch)
         .eq('id', eventId)
         .eq('club_id', id)
-        .select(selectFields)
+        .select(CLUB_EVENT_LIST_SELECT)
         .single();
 
       if (error) return res.status(500).json({ error: error.message });

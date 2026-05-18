@@ -41,7 +41,7 @@ router.get(
       const { data: events, error: eErr } = await supabaseAdmin
         .from('club_events')
         .select(
-          'id, title, description, event_date, start_time, end_time, location, competition_id, competitions ( public_slug )',
+          'id, title, description, event_date, start_time, end_time, location, competition_id, event_category, competitions ( public_slug )',
         )
         .eq('club_id', club.id)
         .gte('event_date', todayStr)
@@ -110,7 +110,7 @@ router.get(
       const { data: events, error: eErr } = await supabaseAdmin
         .from('club_events')
         .select(
-          'id, title, description, event_date, start_time, end_time, location, competition_id, competitions ( public_slug )',
+          'id, title, description, event_date, start_time, end_time, location, competition_id, event_category, competitions ( public_slug )',
         )
         .eq('club_id', clubId)
         .gte('event_date', todayStr)
