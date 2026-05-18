@@ -8,6 +8,7 @@ import {
   Plus,
   Trash2,
   Link as LinkIcon,
+  Globe,
 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from './ui/button';
@@ -49,6 +50,7 @@ const emptyForm = () => ({
   documentMode: 'url',
   pinned: false,
   sort_order: 0,
+  is_public: false,
 });
 
 const ClubBoard = ({ clubId, canManage }) => {
@@ -99,6 +101,7 @@ const ClubBoard = ({ clubId, canManage }) => {
       documentMode: row.document_url ? 'url' : 'url',
       pinned: Boolean(row.pinned),
       sort_order: row.sort_order ?? 0,
+      is_public: Boolean(row.is_public),
     });
     setPendingFile(null);
     setDialogOpen(true);
@@ -139,6 +142,7 @@ const ClubBoard = ({ clubId, canManage }) => {
         link_label: form.link_label.trim() || null,
         pinned: form.pinned,
         sort_order,
+        is_public: form.is_public,
       };
 
       if (editing) {
@@ -248,6 +252,12 @@ const ClubBoard = ({ clubId, canManage }) => {
                             Fijado
                           </Badge>
                         ) : null}
+                        {row.is_public ? (
+                          <Badge variant="outline" className="gap-1 text-muted-foreground">
+                            <Globe className="size-3" />
+                            Ficha pública
+                          </Badge>
+                        ) : null}
                       </CardTitle>
                       {row.body ? <CardDescription className="whitespace-pre-wrap text-foreground">{row.body}</CardDescription> : null}
                     </div>
@@ -312,7 +322,10 @@ const ClubBoard = ({ clubId, canManage }) => {
         <DialogContent className="max-h-[min(90dvh,calc(100dvh-2rem))] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar entrada' : 'Nueva entrada'}</DialogTitle>
-            <DialogDescription>Solo visible para miembros del club.</DialogDescription>
+            <DialogDescription>
+              Las entradas son visibles para los miembros del club. Marca &quot;Visible en ficha pública&quot; para
+              mostrarlas también en la página pública del club.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
@@ -437,6 +450,16 @@ const ClubBoard = ({ clubId, canManage }) => {
                 />
                 <Label htmlFor="cb-pin" className="font-normal">
                   Fijar arriba
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="cb-public"
+                  checked={form.is_public}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, is_public: v }))}
+                />
+                <Label htmlFor="cb-public" className="font-normal">
+                  Visible en ficha pública
                 </Label>
               </div>
               <div className="flex items-center gap-2">

@@ -6,15 +6,22 @@
 
 const { isLicenseAdminUser } = require('./licenseAdminAuth');
 
+function ensureSelectIncludesStatus(select) {
+  const s = select && String(select).trim() ? String(select).trim() : 'id, organizer, club_id';
+  if (/\bstatus\b/.test(s)) return s;
+  return `${s},status`;
+}
+
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} competitionId
  * @param {string} [select]
  */
 async function fetchCompetitionAccess(supabase, competitionId, select = 'id, organizer, club_id') {
+  const selectResolved = ensureSelectIncludesStatus(select);
   const { data, error } = await supabase
     .from('competitions')
-    .select(select)
+    .select(selectResolved)
     .eq('id', competitionId)
     .maybeSingle();
   return { competition: data, error };

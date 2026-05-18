@@ -2,7 +2,8 @@
 
 const { calculatePoints } = require('./pointsCalculator');
 
-const COMPETITION_EXPORT_SELECT = 'id,name,circuit_name,rounds,num_slots,created_at,public_slug';
+const COMPETITION_EXPORT_SELECT =
+  'id,name,circuit_name,rounds,num_slots,created_at,public_slug,club_id,status';
 
 /**
  * Carga participantes, tiempos y reglas para una competición.

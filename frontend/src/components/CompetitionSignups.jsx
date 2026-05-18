@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Users, Check, X, User, Mail, Car, Tag, Calendar } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from './ui/button';
@@ -85,6 +85,9 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
     loadVehicles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitionId]);
+
+  const pendingSignups = useMemo(() => signups.filter((s) => !s.is_waitlist), [signups]);
+  const waitlistedSignups = useMemo(() => signups.filter((s) => s.is_waitlist), [signups]);
 
   const openApproveModal = (signup) => {
     setSelectedSignup(signup);
@@ -187,7 +190,7 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
         <CardHeader>
           <h6 className="font-semibold flex items-center gap-2">
             <Users className="size-4" />
-            Inscripciones pendientes de validar ({signups.length})
+            Inscripciones pendientes de validar ({pendingSignups.length})
           </h6>
         </CardHeader>
         <CardContent>
@@ -197,14 +200,14 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
             </Alert>
           )}
 
-          {signups.length === 0 ? (
+          {pendingSignups.length === 0 ? (
             <div className="text-center py-8">
               <Users className="size-8 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground">No hay inscripciones pendientes</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {signups.map((signup) => (
+              {pendingSignups.map((signup) => (
                 <div
                   key={signup.id}
                   className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg border bg-card"
@@ -249,6 +252,60 @@ const CompetitionSignups = ({ competitionId, onSignupApproved }) => {
                     >
                       <X className="size-4" />
                       Rechazar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <h6 className="font-semibold flex items-center gap-2">
+            <Users className="size-4" />
+            Lista de espera ({waitlistedSignups.length})
+          </h6>
+        </CardHeader>
+        <CardContent>
+          {waitlistedSignups.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-6">Nadie en lista de espera.</p>
+          ) : (
+            <div className="space-y-4">
+              {waitlistedSignups.map((signup) => (
+                <div
+                  key={signup.id}
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg border bg-muted/40"
+                >
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <User className="size-4 text-primary" />
+                      <strong>{signup.name}</strong>
+                      <Badge variant="outline">Espera #{signup.waitlist_position ?? '—'}</Badge>
+                      <Badge variant="secondary" className="ml-auto">
+                        <Calendar className="size-3 mr-1" />
+                        {formatDate(signup.created_at)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <Mail className="size-4" />
+                      {signup.email}
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <Car className="size-4" />
+                      {formatMemberVehicle(signup) || signup.vehicle}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleRejectSignup(signup.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <X className="size-4" />
+                      Quitar de la lista
                     </Button>
                   </div>
                 </div>

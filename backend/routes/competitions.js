@@ -12,15 +12,65 @@ const { loadCompetitionExportById } = require('../lib/competitionExportPayload')
 const { generateCompetitionCSV, safeFilenamePart } = require('../lib/competitionCsvGenerator');
 const { generateCompetitionXLSX } = require('../lib/competitionXlsxGenerator');
 const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
+const { generateCompetitionSocialPDF } = require('../src/utils/competitionSocialPdfGenerator');
 const {
   canViewCompetition,
   requireViewCompetition,
   requireManageCompetition,
 } = require('../lib/competitionPermissions');
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
+const {
+  normalizeStatus,
+  timingForbiddenReason,
+  participantMutationForbiddenReason,
+  metadataEditForbiddenReason,
+  signupForbiddenReason,
+  validateManualStatusTransition,
+} = require('../lib/competitionLifecycle');
+const { sendWaitlistPromotionEmail } = require('../lib/waitlistMailer');
 
 /** Cliente que usa service role si existe (omite RLS; el API valida permisos). Igual que clubs/sync. */
 const supabase = getServiceOrAnonClient();
+
+/** Promociona el primer signup en lista de espera y envía email (tras liberar plaza de participante). */
+async function promoteWaitlistAfterParticipantRemoval(competitionId) {
+  const { data: comp, error: cErr } = await supabase
+    .from('competitions')
+    .select('id, name, public_slug')
+    .eq('id', competitionId)
+    .maybeSingle();
+  if (cErr || !comp?.public_slug) return;
+
+  const { data: next, error: wErr } = await supabase
+    .from('competition_signups')
+    .select('id, email, name')
+    .eq('competition_id', competitionId)
+    .eq('is_waitlist', true)
+    .order('waitlist_position', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (wErr || !next) return;
+
+  const { error: uErr } = await supabase
+    .from('competition_signups')
+    .update({ is_waitlist: false })
+    .eq('id', next.id);
+  if (uErr) {
+    console.error('[waitlist] Error al promocionar signup:', uErr);
+    return;
+  }
+
+  const base = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '');
+  const signupUrl = `${base}/competitions/signup/${encodeURIComponent(comp.public_slug)}`;
+  await sendWaitlistPromotionEmail({
+    to: next.email,
+    name: next.name,
+    competitionName: comp.name,
+    signupUrl,
+  });
+}
 
 function isUuid(id) {
   return (
@@ -225,6 +275,7 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       circuit_name: circuitNameToStore,
       circuit_id: circuit_id || null,
       club_id: club_id || null,
+      status: 'draft',
     };
 
     const { data, error } = await supabase
@@ -411,21 +462,32 @@ router.get('/:id', async (req, res) => {
       console.error('Error al obtener categorías:', catError);
     }
 
-    // Obtener el número de inscripciones
-    const { count: signupsCount, error: signupsError } = await supabase
+    // Obtener el número de inscripciones pendientes (sin lista de espera)
+    const { count: signupsPending, error: signupsPendingErr } = await supabase
       .from('competition_signups')
       .select('*', { count: 'exact', head: true })
-      .eq('competition_id', id);
+      .eq('competition_id', id)
+      .eq('is_waitlist', false);
 
-    if (signupsError) {
-      console.error('Error al contar inscripciones:', signupsError);
+    const { count: waitlistCount, error: waitlistErr } = await supabase
+      .from('competition_signups')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', id)
+      .eq('is_waitlist', true);
+
+    if (signupsPendingErr) {
+      console.error('Error al contar inscripciones:', signupsPendingErr);
+    }
+    if (waitlistErr) {
+      console.error('Error al contar lista de espera:', waitlistErr);
     }
 
     res.json({
       ...competition,
       participants: participants || [],
       categories: categories || [],
-      signups_count: signupsCount || 0
+      signups_count: signupsPending || 0,
+      waitlist_count: waitlistCount || 0,
     });
   } catch (error) {
     console.error('Error en GET /competitions/:id:', error);
@@ -442,6 +504,11 @@ router.put('/:id', async (req, res) => {
     const access = await requireManageCompetition(supabase, req.user, id, 'id, num_slots, rounds, organizer, club_id');
     if (!access.ok) return access.respond(res);
     const existingComp = access.competition;
+
+    const metaBlock = metadataEditForbiddenReason(existingComp.status);
+    if (metaBlock) {
+      return res.status(400).json({ error: metaBlock });
+    }
 
     // Validaciones
     if (name && !name.trim()) {
@@ -532,6 +599,58 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.patch(
+  '/:id/status',
+  body('status')
+    .trim()
+    .isIn(['draft', 'published', 'running', 'closed'])
+    .withMessage('Estado inválido'),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const nextStatus = req.body.status.trim();
+
+      const access = await requireManageCompetition(supabase, req.user, id);
+      if (!access.ok) return access.respond(res);
+      const existingComp = access.competition;
+
+      const { count: participantsCount, error: pcErr } = await supabase
+        .from('competition_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('competition_id', id);
+      if (pcErr) {
+        console.error('PATCH status count participants:', pcErr);
+        return res.status(500).json({ error: pcErr.message });
+      }
+
+      const transitionErr = validateManualStatusTransition(existingComp.status, nextStatus, {
+        participantsCount: participantsCount || 0,
+      });
+      if (transitionErr) {
+        return res.status(400).json({ error: transitionErr });
+      }
+
+      const { data, error } = await supabase
+        .from('competitions')
+        .update({ status: nextStatus })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error al actualizar estado:', error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json(data);
+    } catch (error) {
+      console.error('Error en PATCH /competitions/:id/status:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Eliminar una competición
 router.delete('/:id', async (req, res) => {
   try {
@@ -569,6 +688,11 @@ router.post('/:id/participants', async (req, res) => {
     const access = await requireManageCompetition(supabase, req.user, competitionId, 'id, num_slots, organizer, club_id');
     if (!access.ok) return access.respond(res);
     const competition = access.competition;
+
+    const partBlock = participantMutationForbiddenReason(competition.status);
+    if (partBlock) {
+      return res.status(400).json({ error: partBlock });
+    }
 
     // Validaciones
     if (!driver_name || !driver_name.trim()) {
@@ -686,6 +810,11 @@ router.post('/:id/participants/bulk-from-favorites', async (req, res) => {
     );
     if (!access.ok) return access.respond(res);
     const competition = access.competition;
+
+    const partBlockBulk = participantMutationForbiddenReason(competition.status);
+    if (partBlockBulk) {
+      return res.status(400).json({ error: partBlockBulk });
+    }
 
     for (const [idx, item] of items.entries()) {
       if (!item || typeof item !== 'object') {
@@ -915,6 +1044,11 @@ router.put('/:id/participants/:participantId', async (req, res) => {
     if (!access.ok) return access.respond(res);
     const competition = access.competition;
 
+    const partBlockPut = participantMutationForbiddenReason(competition.status);
+    if (partBlockPut) {
+      return res.status(400).json({ error: partBlockPut });
+    }
+
     // Verificar que el participante existe
     const { data: existingParticipant, error: partError } = await supabase
       .from('competition_participants')
@@ -1014,6 +1148,12 @@ router.delete('/:id/participants/:participantId', async (req, res) => {
 
     const access = await requireManageCompetition(supabase, req.user, competitionId);
     if (!access.ok) return access.respond(res);
+    const competitionRow = access.competition;
+
+    const partBlock = participantMutationForbiddenReason(competitionRow.status);
+    if (partBlock) {
+      return res.status(400).json({ error: partBlock });
+    }
 
     // Verificar que el participante existe
     const { data: existingParticipant, error: partError } = await supabase
@@ -1037,6 +1177,8 @@ router.delete('/:id/participants/:participantId', async (req, res) => {
       console.error('Error al eliminar participante:', error);
       return res.status(500).json({ error: error.message });
     }
+
+    await promoteWaitlistAfterParticipantRemoval(competitionId);
 
     res.json({ message: 'Participante eliminado correctamente' });
   } catch (error) {
@@ -1191,6 +1333,11 @@ router.post('/:id/timings', async (req, res) => {
     if (!access.ok) return access.respond(res);
     const competition = access.competition;
 
+    const timingBlock = timingForbiddenReason(competition.status);
+    if (timingBlock) {
+      return res.status(400).json({ error: timingBlock });
+    }
+
     // Verificar que el participante existe y pertenece a esta competición
     const { data: participant, error: partError } = await supabase
       .from('competition_participants')
@@ -1247,6 +1394,20 @@ router.post('/:id/timings', async (req, res) => {
       return res.status(400).json({ 
         error: `Ya existe un tiempo registrado para este participante en la ronda ${round_number}` 
       });
+    }
+
+    let timingsBefore = 0;
+    const { data: partRowsForCount } = await supabase
+      .from('competition_participants')
+      .select('id')
+      .eq('competition_id', competitionId);
+    const pidList = (partRowsForCount || []).map((p) => p.id);
+    if (pidList.length > 0) {
+      const { count: tb } = await supabase
+        .from('competition_timings')
+        .select('*', { count: 'exact', head: true })
+        .in('participant_id', pidList);
+      timingsBefore = tb || 0;
     }
 
     // Crear el tiempo
@@ -1322,6 +1483,16 @@ router.post('/:id/timings', async (req, res) => {
     if (error) {
       console.error('Error al registrar tiempo:', error);
       return res.status(500).json({ error: error.message });
+    }
+
+    if (normalizeStatus(competition) === 'published' && timingsBefore === 0) {
+      const { error: stErr } = await supabase
+        .from('competitions')
+        .update({ status: 'running' })
+        .eq('id', competitionId);
+      if (stErr) {
+        console.warn('No se pudo pasar la competición a en_curso:', stErr.message);
+      }
     }
 
     // Actualizar odómetro del vehículo si el participante tiene uno (no aplica a NP)
@@ -1429,6 +1600,11 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     const access = await requireManageCompetition(supabase, req.user, competitionId);
     if (!access.ok) return access.respond(res);
     const competition = access.competition;
+
+    const timingBlockPut = timingForbiddenReason(competition.status);
+    if (timingBlockPut) {
+      return res.status(400).json({ error: timingBlockPut });
+    }
 
     // Verificar que el tiempo existe y pertenece a esta competición
     const { data: existingTiming, error: timingError } = await supabase
@@ -1612,6 +1788,11 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
     const access = await requireManageCompetition(supabase, req.user, competitionId);
     if (!access.ok) return access.respond(res);
 
+    const timingBlockDel = timingForbiddenReason(access.competition.status);
+    if (timingBlockDel) {
+      return res.status(400).json({ error: timingBlockDel });
+    }
+
     // Verificar que el tiempo existe y pertenece a esta competición
     const { data: existingTiming, error: timingError } = await supabase
       .from('competition_timings')
@@ -1663,6 +1844,55 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
 });
 
 // ==================== EXPORTACIÓN DE DATOS ====================
+
+// Exportar datos de competición — PDF compacto para redes (podio + barras)
+router.get('/:id/export/social', async (req, res) => {
+  try {
+    const { id: competitionId } = req.params;
+
+    const access = await requireViewCompetition(supabase, req.user, competitionId, 'id');
+    if (!access.ok) return access.respond(res);
+
+    const loaded = await loadCompetitionExportById(supabase, competitionId);
+    if (loaded.error) {
+      console.error('export social load:', loaded.error);
+      return res.status(500).json({ error: loaded.error.message || 'Error al cargar datos' });
+    }
+    const { competition, payload } = loaded;
+
+    const need = payload.participants.length * payload.competition.rounds;
+    const completed = need > 0 && payload.timings.length >= need;
+    if (!completed) {
+      return res.status(400).json({
+        error: 'La competición no está finalizada; no hay resultados completos para exportar.',
+      });
+    }
+
+    let clubName = null;
+    if (competition.club_id) {
+      const { data: clubRow } = await supabase.from('clubs').select('name').eq('id', competition.club_id).maybeSingle();
+      clubName = clubRow?.name || null;
+    }
+
+    const pdfBuffer = await generateCompetitionSocialPDF(competition, {
+      sortedParticipants: payload.sortedParticipants,
+      rules: payload.rules,
+      clubName,
+    });
+
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=competicion_${base}_social_${day}.pdf`
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error en GET /competitions/:id/export/social:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Exportar datos de competición en CSV
 router.get('/:id/export/csv', async (req, res) => {
@@ -2003,6 +2233,11 @@ router.post(
       if (!access.ok) return access.respond(res);
       const competition = access.competition;
 
+      const signupBlock = signupForbiddenReason(competition.status);
+      if (signupBlock) {
+        return res.status(400).json({ error: signupBlock });
+      }
+
       const email = (req.user.email || '').trim().toLowerCase();
       if (!email) {
         return res.status(400).json({ error: 'Tu cuenta no tiene email; no puedes inscribirte por esta vía.' });
@@ -2040,17 +2275,15 @@ router.post(
         }
       }
 
-      const { count: signupsCount, error: countError } = await supabase
-        .from('competition_signups')
+      const { count: participantsCount, error: pcErr } = await supabase
+        .from('competition_participants')
         .select('*', { count: 'exact', head: true })
         .eq('competition_id', id);
-      if (countError) {
-        console.error('signups count', countError);
-        return res.status(500).json({ error: countError.message });
+      if (pcErr) {
+        console.error('participants count signup', pcErr);
+        return res.status(500).json({ error: pcErr.message });
       }
-      if ((signupsCount ?? 0) >= competition.num_slots) {
-        return res.status(400).json({ error: 'No hay plazas disponibles en esta competición' });
-      }
+      const filled = (participantsCount ?? 0) >= competition.num_slots;
 
       const { data: existingSignup } = await supabase
         .from('competition_signups')
@@ -2068,18 +2301,39 @@ router.post(
         email.split('@')[0] ||
         'Piloto';
 
+      let insertPayload = {
+        competition_id: id,
+        name: displayName,
+        email,
+        vehicle: vehicleText,
+        vehicle_id: vehicleIdValue,
+        category_id: categoryId,
+        is_waitlist: false,
+        waitlist_position: null,
+      };
+
+      if (filled) {
+        const { data: maxRows } = await supabase
+          .from('competition_signups')
+          .select('waitlist_position')
+          .eq('competition_id', id)
+          .eq('is_waitlist', true)
+          .order('waitlist_position', { ascending: false, nullsFirst: false })
+          .limit(1);
+        const maxPos =
+          Array.isArray(maxRows) && maxRows.length > 0 && maxRows[0]?.waitlist_position != null
+            ? Number(maxRows[0].waitlist_position)
+            : 0;
+        insertPayload = {
+          ...insertPayload,
+          is_waitlist: true,
+          waitlist_position: maxPos + 1,
+        };
+      }
+
       const { data: signup, error: signupError } = await supabase
         .from('competition_signups')
-        .insert([
-          {
-            competition_id: id,
-            name: displayName,
-            email,
-            vehicle: vehicleText,
-            vehicle_id: vehicleIdValue,
-            category_id: categoryId,
-          },
-        ])
+        .insert([insertPayload])
         .select(`*, competition_categories(name), vehicles(id, model, manufacturer, type)`)
         .single();
 
@@ -2089,7 +2343,11 @@ router.post(
       }
 
       res.status(201).json({
-        message: 'Inscripción enviada correctamente',
+        message: filled
+          ? 'Te has añadido a la lista de espera'
+          : 'Inscripción enviada correctamente',
+        waitlisted: Boolean(signup.is_waitlist),
+        waitlist_position: signup.waitlist_position ?? null,
         signup: {
           id: signup.id,
           name: signup.name,
@@ -2123,6 +2381,8 @@ router.get('/:id/signups', async (req, res) => {
         vehicles(id, model, manufacturer, type)
       `)
       .eq('competition_id', id)
+      .order('is_waitlist', { ascending: true })
+      .order('waitlist_position', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -2147,6 +2407,11 @@ router.post('/:id/signups/:signupId/approve', async (req, res) => {
     if (!access.ok) return access.respond(res);
     const competition = access.competition;
 
+    const approveBlock = participantMutationForbiddenReason(competition.status);
+    if (approveBlock) {
+      return res.status(400).json({ error: approveBlock });
+    }
+
     const { data: signup, error: signupError } = await supabase
       .from('competition_signups')
       .select('*')
@@ -2156,6 +2421,12 @@ router.post('/:id/signups/:signupId/approve', async (req, res) => {
 
     if (signupError || !signup) {
       return res.status(404).json({ error: 'Inscripción no encontrada' });
+    }
+
+    if (signup.is_waitlist) {
+      return res.status(400).json({
+        error: 'Este piloto está en lista de espera; promóvelo cuando haya una plaza libre.',
+      });
     }
 
     const { count: participantsCount, error: countError } = await supabase

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const supabase = getAnonClient();
 const { loadCompetitionExportByPublicSlug } = require('../lib/competitionExportPayload');
 const {
@@ -11,6 +11,12 @@ const {
 const { generateCompetitionCSV, safeFilenamePart } = require('../lib/competitionCsvGenerator');
 const { generateCompetitionXLSX } = require('../lib/competitionXlsxGenerator');
 const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
+const { generateCompetitionSocialPDF } = require('../src/utils/competitionSocialPdfGenerator');
+const { normalizeStatus, signupForbiddenReason } = require('../lib/competitionLifecycle');
+
+function isDraftCompetitionPublic(competition) {
+  return normalizeStatus(competition) === 'draft';
+}
 
 /**
  * @swagger
@@ -188,6 +194,14 @@ async function sendPublicExportError(res, err) {
   return res.status(st).json({ error: msg });
 }
 
+function rejectDraftPublic(competition, res) {
+  if (isDraftCompetitionPublic(competition)) {
+    res.status(404).json({ error: 'Competición no encontrada' });
+    return true;
+  }
+  return false;
+}
+
 router.get('/:slug/export/csv', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -196,6 +210,7 @@ router.get('/:slug/export/csv', async (req, res) => {
       return sendPublicExportError(res, loaded.error);
     }
     const { competition, payload } = loaded;
+    if (rejectDraftPublic(competition, res)) return;
     if (!competitionExportCompleted(payload)) {
       return res.status(400).json({
         error: 'La competición no está finalizada; no hay resultados completos para exportar.',
@@ -221,6 +236,7 @@ router.get('/:slug/export/pdf', async (req, res) => {
       return sendPublicExportError(res, loaded.error);
     }
     const { competition, payload } = loaded;
+    if (rejectDraftPublic(competition, res)) return;
     if (!competitionExportCompleted(payload)) {
       return res.status(400).json({
         error: 'La competición no está finalizada; no hay resultados completos para exportar.',
@@ -249,6 +265,7 @@ router.get('/:slug/export/xlsx', async (req, res) => {
       return sendPublicExportError(res, loaded.error);
     }
     const { competition, payload } = loaded;
+    if (rejectDraftPublic(competition, res)) return;
     if (!competitionExportCompleted(payload)) {
       return res.status(400).json({
         error: 'La competición no está finalizada; no hay resultados completos para exportar.',
@@ -269,6 +286,47 @@ router.get('/:slug/export/xlsx', async (req, res) => {
   }
 });
 
+router.get('/:slug/export/social', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const loaded = await loadCompetitionExportByPublicSlug(supabase, slug);
+    if (loaded.error) {
+      return sendPublicExportError(res, loaded.error);
+    }
+    const { competition, payload } = loaded;
+    if (rejectDraftPublic(competition, res)) return;
+    if (!competitionExportCompleted(payload)) {
+      return res.status(400).json({
+        error: 'La competición no está finalizada; no hay resultados completos para exportar.',
+      });
+    }
+
+    let clubName = null;
+    const svc = getServiceClient();
+    if (competition.club_id && svc) {
+      const { data: clubRow } = await svc.from('clubs').select('name').eq('id', competition.club_id).maybeSingle();
+      clubName = clubRow?.name || null;
+    }
+
+    const pdfBuffer = await generateCompetitionSocialPDF(competition, {
+      sortedParticipants: payload.sortedParticipants,
+      rules: payload.rules,
+      clubName,
+    });
+    const base = safeFilenamePart(competition.name);
+    const day = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=competicion_${base}_social_${day}.pdf`
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('GET /public-signup/:slug/export/social:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Endpoint público para obtener información de competición para inscripción
 router.get('/:slug', async (req, res) => {
   try {
@@ -283,12 +341,17 @@ router.get('/:slug', async (req, res) => {
         num_slots,
         rounds,
         circuit_name,
-        created_at
+        created_at,
+        status
       `)
       .eq('public_slug', slug)
       .single();
 
     if (compError || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    if (isDraftCompetitionPublic(competition)) {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 
@@ -310,21 +373,34 @@ router.get('/:slug', async (req, res) => {
       });
     }
 
-    // Obtener número de inscripciones actuales
-    const { count: signupsCount, error: countError } = await supabase
-      .from('competition_signups')
+    const { count: participantsCount, error: pcErr } = await supabase
+      .from('competition_participants')
       .select('*', { count: 'exact', head: true })
       .eq('competition_id', competition.id);
 
-    if (countError) {
-      console.error('Error al contar inscripciones:', countError);
-    }
+    const { count: signupsPending, error: spErr } = await supabase
+      .from('competition_signups')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', competition.id)
+      .eq('is_waitlist', false);
+
+    const { count: waitlistCount, error: wlErr } = await supabase
+      .from('competition_signups')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', competition.id)
+      .eq('is_waitlist', true);
+
+    if (pcErr) console.error('Error al contar participantes:', pcErr);
+    if (spErr) console.error('Error al contar inscripciones:', spErr);
+    if (wlErr) console.error('Error al contar lista de espera:', wlErr);
 
     // Preparar respuesta
     const response = {
       ...competition,
       categories: categories || [],
-      signups_count: signupsCount || 0
+      participants_count: participantsCount || 0,
+      signups_count: signupsPending || 0,
+      waitlist_count: waitlistCount || 0,
     };
 
     res.json(response);
@@ -360,12 +436,17 @@ router.post('/:slug/signup', async (req, res) => {
     // Obtener la competición por public_slug
     const { data: competition, error: compError } = await supabase
       .from('competitions')
-      .select('id, num_slots')
+      .select('id, num_slots, status')
       .eq('public_slug', slug)
       .single();
 
     if (compError || !competition) {
       return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    const signupBlock = signupForbiddenReason(competition.status);
+    if (signupBlock) {
+      return res.status(400).json({ error: signupBlock });
     }
 
     // Verificar que la categoría existe y pertenece a esta competición
@@ -380,20 +461,16 @@ router.post('/:slug/signup', async (req, res) => {
       return res.status(400).json({ error: 'Categoría no válida para esta competición' });
     }
 
-    // Verificar si hay plazas disponibles
-    const { count: signupsCount, error: countError } = await supabase
-      .from('competition_signups')
+    const { count: participantsCount, error: pcErr } = await supabase
+      .from('competition_participants')
       .select('*', { count: 'exact', head: true })
       .eq('competition_id', competition.id);
-
-    if (countError) {
-      console.error('Error al contar inscripciones:', countError);
+    if (pcErr) {
+      console.error('Error al contar participantes:', pcErr);
       return res.status(500).json({ error: 'Error interno del servidor' });
     }
 
-    if (signupsCount >= competition.num_slots) {
-      return res.status(400).json({ error: 'No hay plazas disponibles en esta competición' });
-    }
+    const filled = (participantsCount ?? 0) >= competition.num_slots;
 
     // Verificar si el email ya está inscrito
     const { data: existingSignup, error: existingError } = await supabase
@@ -401,7 +478,7 @@ router.post('/:slug/signup', async (req, res) => {
       .select('id')
       .eq('competition_id', competition.id)
       .eq('email', email.trim())
-      .single();
+      .maybeSingle();
 
     if (existingError && existingError.code !== 'PGRST116') {
       console.error('Error al verificar inscripción existente:', existingError);
@@ -412,16 +489,39 @@ router.post('/:slug/signup', async (req, res) => {
       return res.status(400).json({ error: 'Ya estás inscrito en esta competición' });
     }
 
+    let insertPayload = {
+      competition_id: competition.id,
+      name: name.trim(),
+      email: email.trim(),
+      vehicle: vehicle.trim(),
+      category_id: category_id,
+      is_waitlist: false,
+      waitlist_position: null,
+    };
+
+    if (filled) {
+      const { data: maxRows } = await supabase
+        .from('competition_signups')
+        .select('waitlist_position')
+        .eq('competition_id', competition.id)
+        .eq('is_waitlist', true)
+        .order('waitlist_position', { ascending: false, nullsFirst: false })
+        .limit(1);
+      const maxPos =
+        Array.isArray(maxRows) && maxRows.length > 0 && maxRows[0]?.waitlist_position != null
+          ? Number(maxRows[0].waitlist_position)
+          : 0;
+      insertPayload = {
+        ...insertPayload,
+        is_waitlist: true,
+        waitlist_position: maxPos + 1,
+      };
+    }
+
     // Crear la inscripción
     const { data: signup, error: signupError } = await supabase
       .from('competition_signups')
-      .insert([{
-        competition_id: competition.id,
-        name: name.trim(),
-        email: email.trim(),
-        vehicle: vehicle.trim(),
-        category_id: category_id
-      }])
+      .insert([insertPayload])
       .select(`
         *,
         competition_categories(name)
@@ -434,7 +534,11 @@ router.post('/:slug/signup', async (req, res) => {
     }
 
     res.status(201).json({
-      message: 'Inscripción enviada correctamente',
+      message: filled
+        ? 'Te has añadido a la lista de espera'
+        : 'Inscripción enviada correctamente',
+      waitlisted: Boolean(signup.is_waitlist),
+      waitlist_position: signup.waitlist_position ?? null,
       signup: {
         id: signup.id,
         name: signup.name,
@@ -462,12 +566,17 @@ router.get('/:slug/status', async (req, res) => {
         num_slots,
         rounds,
         circuit_name,
-        created_at
+        created_at,
+        status
       `)
       .eq('public_slug', slug)
       .single();
 
     if (compError || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    if (isDraftCompetitionPublic(competition)) {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 
@@ -595,11 +704,15 @@ router.get('/:slug/rules', async (req, res) => {
     // Buscar la competición por public_slug
     const { data: competition, error: compError } = await supabase
       .from('competitions')
-      .select('id')
+      .select('id, status')
       .eq('public_slug', slug)
       .single();
 
     if (compError || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    if (isDraftCompetitionPublic(competition)) {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 
@@ -635,12 +748,17 @@ router.get('/:slug/presentation', async (req, res) => {
         circuit_name,
         circuit_id,
         circuits ( name ),
-        created_at
+        created_at,
+        status
       `)
       .eq('public_slug', slug)
       .single();
 
     if (compError || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    if (isDraftCompetitionPublic(competition)) {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 

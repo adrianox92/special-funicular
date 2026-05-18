@@ -21,6 +21,7 @@ import FavoritePilots from './pages/FavoritePilots';
 import CompetitionTimings from './pages/CompetitionTimings';
 import CompetitionRefereeView from './pages/CompetitionRefereeView';
 import CompetitionSignup from './pages/CompetitionSignup';
+import PublicClubProfile from './pages/PublicClubProfile';
 import CompetitionStatus from './pages/CompetitionStatus';
 import CompetitionPresentation from './pages/CompetitionPresentation';
 import Profile from './pages/Profile';
@@ -84,6 +85,7 @@ const AppContent = () => {
     '/competitions/signup',
     '/competitions/status',
     '/competitions/presentation',
+    '/club',
     '/piloto',
     '/privacidad',
     '/terminos',
@@ -144,6 +146,7 @@ const AppContent = () => {
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
+        <Route path="/club/:slug" element={<PublicClubProfile />} />
         <Route path="/piloto/:slug" element={<PublicPilotProfile />} />
         {/* Catálogo: índice + splat; PublicCatalogEntry distingue UUID (ficha) vs slugs SEO (listado). */}
         <Route path="/catalogo" element={<PublicCatalogList />} />

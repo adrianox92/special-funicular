@@ -17,6 +17,7 @@ import {
   Ban,
   Clock,
   Smartphone,
+  Share2,
 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -68,6 +69,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
 
 /** Promedio por vuelta = tiempo total / vueltas (formato mm:ss.mmm). */
 function averageTimeFromTotalAndLaps(totalTimeStr, lapsStr) {
@@ -654,6 +656,29 @@ const CompetitionTimings = () => {
     }
   };
 
+  const handleExportSocial = async () => {
+    try {
+      const response = await axios.get(`/competitions/${id}/export/social`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `competicion_${competition.name.replace(/[^a-zA-Z0-9]/g, '_')}_social_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('PDF para redes descargado');
+    } catch (error) {
+      console.error('Error al exportar PDF social:', error);
+      toast.error(error.response?.data?.error || 'Error al generar PDF para redes');
+    }
+  };
+
   const handleOpenPenaltyModal = (timing) => {
     setPenaltyTiming(timing);
     setPenaltyValue(timing.penalty_seconds || 0);
@@ -786,6 +811,13 @@ const CompetitionTimings = () => {
             </AlertDescription>
           </Alert>
         )}
+        {competition?.status === 'closed' && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              Esta competición está cerrada: no se pueden registrar ni modificar tiempos.
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Header */}
         <div className="flex flex-col gap-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -798,7 +830,10 @@ const CompetitionTimings = () => {
                 Volver
               </Button>
               <div>
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold">Tiempos de Competición</h1>
+                <CompetitionStatusBadge status={competition?.status} />
+              </div>
                 <p className="text-muted-foreground">{competition?.name}</p>
               </div>
             </div>
@@ -828,6 +863,14 @@ const CompetitionTimings = () => {
                   >
                     <Table2 className="size-4" />
                     Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleExportSocial}
+                    className="flex items-center gap-2"
+                  >
+                    <Share2 className="size-4" />
+                    Para redes
                   </Button>
                 </>
               )}

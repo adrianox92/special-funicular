@@ -84,6 +84,7 @@ const CompetitionSignup = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [signupResult, setSignupResult] = useState(null);
   const [status, setStatus] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -138,7 +139,11 @@ const CompetitionSignup = () => {
     try {
       setSubmitting(true);
       setSubmitError(null);
-      await axios.post(`/public-signup/${slug}/signup`, formData);
+      const res = await axios.post(`/public-signup/${slug}/signup`, formData);
+      setSignupResult({
+        waitlisted: Boolean(res.data?.waitlisted),
+        position: res.data?.waitlist_position ?? null,
+      });
       setShowSuccessModal(true);
       setFormData({ name: '', email: '', category_id: '', vehicle: '' });
     } catch (err) {
@@ -188,9 +193,13 @@ const CompetitionSignup = () => {
     );
   }
 
-  const isFull = competition.signups_count >= competition.num_slots;
-  const progressPercent = (competition.signups_count / competition.num_slots) * 100;
-  const canSignup = !isFull && (!status || status.times_registered === 0);
+  const participantsCount = competition.participants_count ?? 0;
+  const waitlistCount = competition.waitlist_count ?? 0;
+  const slotsFull = participantsCount >= competition.num_slots;
+  const effectiveStatus = competition.status || 'published';
+  const progressPercent = Math.min(100, (participantsCount / competition.num_slots) * 100);
+  const canSignup =
+    effectiveStatus === 'published' && (!status || status.times_registered === 0);
 
   return (
     <SignupLayout
@@ -217,16 +226,21 @@ const CompetitionSignup = () => {
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-2">
                   <Users className="size-4" />
-                  <small>Plazas: {competition.signups_count}/{competition.num_slots}</small>
+                  <small>
+                    Pilotos confirmados: {participantsCount}/{competition.num_slots}
+                    {waitlistCount > 0 ? ` · Lista espera: ${waitlistCount}` : ''}
+                  </small>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
                   <div
-                    className={`h-full rounded-full transition-all ${isFull ? 'bg-destructive' : 'bg-primary'}`}
+                    className={`h-full rounded-full transition-all ${slotsFull ? 'bg-amber-600' : 'bg-primary'}`}
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
-                {isFull && (
-                  <span className="text-sm font-medium text-destructive">¡Completo!</span>
+                {slotsFull && effectiveStatus === 'published' && (
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    Plazas completas — inscripción con lista de espera
+                  </span>
                 )}
               </div>
               <div className="space-y-2 mb-4">
@@ -269,15 +283,34 @@ const CompetitionSignup = () => {
               <h5 className="font-semibold">Formulario de Inscripción</h5>
             </CardHeader>
             <CardContent>
-              {isFull ? (
+              {!canSignup ? (
                 <Alert variant="destructive">
                   <AlertTriangle className="size-4" />
                   <AlertDescription>
-                    <strong>¡Competición completa!</strong> No hay plazas disponibles en este momento.
+                    {effectiveStatus !== 'published' ? (
+                      <>
+                        <strong>Inscripción no disponible.</strong> Esta competición no está abierta a nuevas
+                        inscripciones en este momento.
+                      </>
+                    ) : (
+                      <>
+                        <strong>La competición ya ha comenzado.</strong> Ya no es posible inscribirse.
+                      </>
+                    )}
                   </AlertDescription>
                 </Alert>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <>
+                  {slotsFull && (
+                    <Alert className="mb-4 border-amber-600/50 bg-amber-50 dark:bg-amber-950/30">
+                      <AlertTriangle className="size-4 text-amber-700" />
+                      <AlertDescription>
+                        Las plazas de piloto están completas. Si envías el formulario, pasarás a la{' '}
+                        <strong>lista de espera</strong>. Te avisaremos por correo si se libera una plaza.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <form onSubmit={handleSubmit} className="space-y-4">
                   {submitError && (
                     <Alert variant="destructive">
                       <AlertDescription>{submitError}</AlertDescription>
@@ -352,46 +385,53 @@ const CompetitionSignup = () => {
                     type="submit"
                     size="lg"
                     className="w-full flex items-center justify-center gap-2"
-                    disabled={submitting || !canSignup}
+                    disabled={submitting}
                   >
                     {submitting ? (
                       <>
                         <Spinner className="size-4" />
                         Enviando inscripción...
                       </>
-                    ) : !canSignup && status?.times_registered > 0 ? (
-                      <>
-                        <AlertTriangle className="size-4" />
-                        Ya no es posible inscribirse porque la competición ha comenzado.
-                      </>
                     ) : (
                       <>
                         <CheckCircle className="size-4" />
-                        Enviar Inscripción
+                        {slotsFull ? 'Unirme a la lista de espera' : 'Enviar inscripción'}
                       </>
                     )}
                   </Button>
-
-                  {status?.times_registered > 0 && (
-                    <Alert variant="destructive">
-                      <AlertDescription>Ya no es posible inscribirse porque la competición ha comenzado.</AlertDescription>
-                    </Alert>
-                  )}
                 </form>
+                </>
               )}
             </CardContent>
           </Card>
         </div>
 
-        <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <Dialog
+          open={showSuccessModal}
+          onOpenChange={(open) => {
+            setShowSuccessModal(open);
+            if (!open) setSignupResult(null);
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <CheckCircle className="size-5" />
-                ¡Inscripción enviada!
+                {signupResult?.waitlisted ? 'Estás en lista de espera' : '¡Inscripción enviada!'}
               </DialogTitle>
               <DialogDescription>
-                Tu inscripción ha sido enviada correctamente. El organizador de la competición revisará tu solicitud y te contactará si es necesario.
+                {signupResult?.waitlisted ? (
+                  <>
+                    Plazas completas. Tu posición en la lista de espera:{' '}
+                    <strong>{signupResult.position ?? '—'}</strong>. Te enviaremos un correo si pasas a pendiente de
+                    aprobación.
+                  </>
+                ) : (
+                  <>
+                    Tu inscripción ha sido enviada correctamente. El organizador revisará tu solicitud y te contactará
+                    si es necesario.
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">

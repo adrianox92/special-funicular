@@ -42,7 +42,7 @@ const supabaseAdmin = getServiceClient();
 
 const CLUB_PDF_MAX = 6 * 1024 * 1024;
 const CLUB_BOARD_SELECT_PUBLIC =
-  'id, club_id, user_id, title, body, link_url, link_label, document_url, document_label, pinned, sort_order, created_at, updated_at';
+  'id, club_id, user_id, title, body, link_url, link_label, document_url, document_label, pinned, sort_order, is_public, created_at, updated_at';
 
 const clubBoardPdfUpload = multer({
   storage: multer.memoryStorage(),
@@ -629,6 +629,7 @@ router.post(
   body('document_storage_path').optional({ nullable: true }).trim().isLength({ max: 500 }),
   body('pinned').optional().isBoolean(),
   body('sort_order').optional().isInt(),
+  body('is_public').optional().isBoolean(),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -663,6 +664,7 @@ router.post(
             : null,
         pinned: Boolean(req.body.pinned),
         sort_order: req.body.sort_order != null ? parseInt(String(req.body.sort_order), 10) : 0,
+        is_public: req.body.is_public != null ? Boolean(req.body.is_public) : false,
       };
 
       const { data: row, error } = await supabaseAdmin
@@ -692,6 +694,7 @@ router.put(
   body('document_storage_path').optional({ nullable: true }).trim().isLength({ max: 500 }),
   body('pinned').optional().isBoolean(),
   body('sort_order').optional().isInt(),
+  body('is_public').optional().isBoolean(),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -758,6 +761,9 @@ router.put(
       }
       if (req.body.pinned != null) patch.pinned = Boolean(req.body.pinned);
       if (req.body.sort_order != null) patch.sort_order = parseInt(String(req.body.sort_order), 10);
+      if (Object.prototype.hasOwnProperty.call(req.body, 'is_public')) {
+        patch.is_public = Boolean(req.body.is_public);
+      }
 
       if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'Nada que actualizar' });
 
@@ -867,6 +873,68 @@ router.patch(
       res.json({ ok: true, role });
     } catch (e) {
       console.error('PATCH /clubs/:id/members/:userId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.patch(
+  '/:id',
+  param('id').isUUID(),
+  body('description').optional({ nullable: true }).isLength({ max: 10000 }),
+  body('city').optional({ nullable: true }).isLength({ max: 200 }),
+  body('website_url').optional({ nullable: true }).isLength({ max: 500 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const patch = {};
+      if (Object.prototype.hasOwnProperty.call(req.body, 'description')) {
+        patch.description =
+          req.body.description != null && String(req.body.description).trim() !== ''
+            ? String(req.body.description).trim()
+            : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'city')) {
+        patch.city =
+          req.body.city != null && String(req.body.city).trim() !== ''
+            ? String(req.body.city).trim()
+            : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'website_url')) {
+        const u = req.body.website_url;
+        if (u != null && String(u).trim() !== '') {
+          const s = String(u).trim();
+          try {
+            // eslint-disable-next-line no-new
+            new URL(s);
+          } catch {
+            return res.status(400).json({ error: 'website_url no es una URL válida' });
+          }
+          patch.website_url = s;
+        } else {
+          patch.website_url = null;
+        }
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'Nada que actualizar' });
+      }
+
+      const { data: club, error } = await supabaseAdmin
+        .from('clubs')
+        .update(patch)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) return res.status(500).json({ error: error.message });
+      res.json(stripSensitiveClubRow(club));
+    } catch (e) {
+      console.error('PATCH /clubs/:id', e);
       res.status(500).json({ error: e.message });
     }
   },

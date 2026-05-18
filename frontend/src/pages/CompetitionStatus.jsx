@@ -15,6 +15,7 @@ import {
   Table2,
   ChevronDown,
   ChevronRight,
+  Share2,
 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -193,6 +194,24 @@ const CompetitionStatus = () => {
     } catch (err) {
       console.error(err);
       await toastBlobError(err, 'Error al exportar Excel');
+    }
+  };
+
+  const handleExportSocial = async () => {
+    try {
+      const response = await axios.get(`/public-signup/${slug}/export/social`, { responseType: 'blob' });
+      const name =
+        competitionData?.competition?.name?.replace(/[^a-zA-Z0-9]/g, '_') ||
+        slug ||
+        'competicion';
+      triggerBlobDownload(
+        response.data,
+        `competicion_${name}_social_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      toast.success('PDF para redes descargado');
+    } catch (err) {
+      console.error(err);
+      await toastBlobError(err, 'Error al generar PDF para redes');
     }
   };
 
@@ -525,6 +544,10 @@ const CompetitionStatus = () => {
                     <Button variant="outline" size="sm" onClick={handleExportXlsx}>
                       <Table2 className="size-4 mr-1" />
                       Excel
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportSocial}>
+                      <Share2 className="size-4 mr-1" />
+                      Para redes
                     </Button>
                   </>
                 )}

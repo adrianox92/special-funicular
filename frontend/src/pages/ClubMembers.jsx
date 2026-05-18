@@ -32,6 +32,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import ClubCalendar from '../components/ClubCalendar';
@@ -53,6 +64,14 @@ const ClubMembers = () => {
   const [error, setError] = useState(null);
   const [kickTarget, setKickTarget] = useState(null);
   const [roleUpdating, setRoleUpdating] = useState({});
+
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    description: '',
+    city: '',
+    website_url: '',
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!clubId) return;
@@ -141,6 +160,25 @@ const ClubMembers = () => {
     }
   };
 
+  const saveClubProfile = async () => {
+    if (!clubId) return;
+    try {
+      setProfileSaving(true);
+      await axios.patch(`/clubs/${clubId}`, {
+        description: profileForm.description.trim() || null,
+        city: profileForm.city.trim() || null,
+        website_url: profileForm.website_url.trim() || null,
+      });
+      toast.success('Ficha del club actualizada');
+      setProfileOpen(false);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'No se pudo guardar');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[40vh]">
@@ -165,7 +203,7 @@ const ClubMembers = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex items-start gap-3">
           <Button variant="outline" size="icon" className="shrink-0" onClick={() => navigate('/clubs')}>
             <ArrowLeft className="size-4" />
@@ -181,6 +219,37 @@ const ClubMembers = () => {
             </p>
           </div>
         </div>
+        {canManage && club.slug ? (
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() =>
+                window.open(`${window.location.origin}/club/${encodeURIComponent(club.slug)}`, '_blank', 'noopener,noreferrer')
+              }
+            >
+              Ver ficha pública
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="gap-2"
+              onClick={() => {
+                setProfileForm({
+                  description: club.description || '',
+                  city: club.city || '',
+                  website_url: club.website_url || '',
+                });
+                setProfileOpen(true);
+              }}
+            >
+              Editar ficha pública
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {canManage ? (
@@ -288,6 +357,56 @@ const ClubMembers = () => {
               <ClubCalendar clubId={clubId} canManage={canManage} />
             </TabsContent>
           </Tabs>
+
+          <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Ficha pública del club</DialogTitle>
+                <DialogDescription>
+                  Visible en la página pública del club (nombre y próximos eventos siempre; estos campos son opcionales).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="club-desc">Descripción</Label>
+                  <Textarea
+                    id="club-desc"
+                    rows={4}
+                    value={profileForm.description}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="Presentación del club para nuevos visitantes..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="club-city">Ciudad</Label>
+                  <Input
+                    id="club-city"
+                    value={profileForm.city}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="Ej: Madrid"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="club-web">Sitio web</Label>
+                  <Input
+                    id="club-web"
+                    type="url"
+                    value={profileForm.website_url}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, website_url: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setProfileOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="button" disabled={profileSaving} onClick={saveClubProfile}>
+                  {profileSaving ? 'Guardando…' : 'Guardar'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <AlertDialog open={Boolean(kickTarget)} onOpenChange={(open) => !open && setKickTarget(null)}>
             <AlertDialogContent>

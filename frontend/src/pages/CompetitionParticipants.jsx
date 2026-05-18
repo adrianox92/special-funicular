@@ -5,6 +5,7 @@ import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
 import CompetitionCategories from '../components/CompetitionCategories';
 import CompetitionRulesPanel from '../components/CompetitionRulesPanel';
+import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -105,9 +106,8 @@ const CompetitionParticipants = () => {
   const canUseOrganizerTools = Boolean(
     (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
   );
-  const signupsFull = competition
-    ? (competition.signups_count || 0) >= competition.num_slots
-    : false;
+  const effectiveCompetitionStatus = competition?.status || 'published';
+  const memberSignupBlocked = effectiveCompetitionStatus !== 'published';
   const participantsFull = competition
     ? participants.length >= (competition.num_slots ?? 0)
     : false;
@@ -347,8 +347,14 @@ const CompetitionParticipants = () => {
         } else {
           payload.vehicle = memberSignupForm.vehicle.trim();
         }
-        await axios.post(`/competitions/${competitionId}/signups`, payload);
-        toast.success('Inscripción enviada. El organizador la validará.');
+        const res = await axios.post(`/competitions/${competitionId}/signups`, payload);
+        if (res.data?.waitlisted) {
+          toast.success(
+            `Lista de espera (posición ${res.data.waitlist_position ?? '—'}). Te avisaremos por email si hay plaza.`,
+          );
+        } else {
+          toast.success('Inscripción enviada. El organizador la validará.');
+        }
         setMemberSignupForm({ category_id: '', vehicle: '', vehicle_id: '', name: '' });
         setMemberVehicleSource('own');
         loadCompetition();
@@ -522,13 +528,24 @@ const CompetitionParticipants = () => {
 
   return (
     <div className="space-y-6">
-      {isLicenseAdminUser(user) && competition.organizer && user?.id !== competition.organizer && (
+      {canUseOrganizerTools && effectiveCompetitionStatus === 'draft' && (
         <Alert>
           <AlertDescription>
-            Modo depuración (admin): ves esta competición con permisos de organizador; el organizador es otra cuenta.
+            Esta competición está en <strong>borrador</strong>: el formulario público de inscripción no es visible.
+            Publícala desde la lista de competiciones cuando esté lista.
           </AlertDescription>
         </Alert>
       )}
+      {canUseOrganizerTools &&
+        (effectiveCompetitionStatus === 'running' || effectiveCompetitionStatus === 'closed') && (
+          <Alert variant={effectiveCompetitionStatus === 'closed' ? 'destructive' : 'default'}>
+            <AlertDescription>
+              {effectiveCompetitionStatus === 'running'
+                ? 'Competición en curso: no se pueden añadir ni eliminar participantes ni aprobar inscripciones nuevas.'
+                : 'Competición cerrada: no se pueden modificar participantes ni tiempos desde la web.'}
+            </AlertDescription>
+          </Alert>
+        )}
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, participantId: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -555,7 +572,10 @@ const CompetitionParticipants = () => {
               Volver
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{competition.name}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold">{competition.name}</h1>
+                <CompetitionStatusBadge status={competition.status} />
+              </div>
               <p className="text-muted-foreground text-sm">
                 {canUseOrganizerTools ? 'Gestionar competición' : 'Miembro del club — la gestión la lleva el organizador'}
               </p>
@@ -728,7 +748,8 @@ const CompetitionParticipants = () => {
           {canUseOrganizerTools && (
             <TabsTrigger value="signups" className="flex items-center gap-2">
               <Users className="size-4" />
-              Inscripciones ({competition?.signups_count || 0})
+              Inscripciones ({competition?.signups_count || 0}
+              {competition?.waitlist_count > 0 ? ` · espera ${competition.waitlist_count}` : ''})
             </TabsTrigger>
           )}
           <TabsTrigger value="categories" className="flex items-center gap-2">
@@ -755,7 +776,7 @@ const CompetitionParticipants = () => {
                     <Select
                       value={memberSignupForm.category_id}
                       onValueChange={(v) => setMemberSignupForm((f) => ({ ...f, category_id: v }))}
-                      disabled={signupsFull || !competition.categories?.length}
+                      disabled={memberSignupBlocked || !competition.categories?.length}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona categoría" />
@@ -776,7 +797,7 @@ const CompetitionParticipants = () => {
                           name="memberVehicleSource"
                           checked={memberVehicleSource === 'own'}
                           onChange={() => setMemberVehicleSource('own')}
-                          disabled={signupsFull}
+                          disabled={memberSignupBlocked}
                           className="rounded-full"
                         />
                         De mi colección
@@ -787,7 +808,7 @@ const CompetitionParticipants = () => {
                           name="memberVehicleSource"
                           checked={memberVehicleSource === 'text'}
                           onChange={() => setMemberVehicleSource('text')}
-                          disabled={signupsFull}
+                          disabled={memberSignupBlocked}
                           className="rounded-full"
                         />
                         Otro (texto)
@@ -798,7 +819,7 @@ const CompetitionParticipants = () => {
                         <Select
                           value={memberSignupForm.vehicle_id}
                           onValueChange={(v) => setMemberSignupForm((f) => ({ ...f, vehicle_id: v }))}
-                          disabled={signupsFull}
+                          disabled={memberSignupBlocked}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona un vehículo de tu colección" />
@@ -821,7 +842,7 @@ const CompetitionParticipants = () => {
                         value={memberSignupForm.vehicle}
                         onChange={(e) => setMemberSignupForm((f) => ({ ...f, vehicle: e.target.value }))}
                         placeholder="Ej: McLaren F1 nº 1"
-                        disabled={signupsFull}
+                        disabled={memberSignupBlocked}
                       />
                     )}
                   </div>
@@ -831,11 +852,15 @@ const CompetitionParticipants = () => {
                       value={memberSignupForm.name}
                       onChange={(e) => setMemberSignupForm((f) => ({ ...f, name: e.target.value }))}
                       placeholder="Si vacío, usamos tu nombre de perfil o email"
-                      disabled={signupsFull}
+                      disabled={memberSignupBlocked}
                     />
                   </div>
-                  <Button type="submit" disabled={memberSignupLoading || signupsFull}>
-                    {memberSignupLoading ? 'Enviando…' : signupsFull ? 'Sin plazas de inscripción' : 'Enviar inscripción'}
+                  <Button type="submit" disabled={memberSignupLoading || memberSignupBlocked}>
+                    {memberSignupLoading
+                      ? 'Enviando…'
+                      : memberSignupBlocked
+                        ? 'Inscripción no disponible'
+                        : 'Enviar inscripción'}
                   </Button>
                 </form>
               </CardContent>

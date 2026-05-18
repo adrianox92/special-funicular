@@ -38,6 +38,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
 import { competitionPublicSignupUrl } from '../utils/clubEventCalendarExport';
 
 const COMPETITIONS_DEBUG_ORG_KEY = 'scalextric_competitions_for_organizer';
@@ -134,6 +135,16 @@ const Competitions = () => {
       setFavorites(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Error al cargar favoritos:', err);
+    }
+  };
+
+  const patchCompetitionStatus = async (competitionId, status) => {
+    try {
+      await axios.patch(`/competitions/${competitionId}/status`, { status });
+      toast.success('Estado actualizado');
+      await loadCompetitions();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'No se pudo cambiar el estado');
     }
   };
 
@@ -697,7 +708,12 @@ const Competitions = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {competitions.map((competition) => (
+          {competitions.map((competition) => {
+            const participantCount = competition.participants_count ?? 0;
+            const slotCap = competition.num_slots ?? 0;
+            const occupancyPct =
+              slotCap > 0 ? Math.min(100, (participantCount / slotCap) * 100) : 0;
+            return (
             <Card key={competition.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start gap-2 mb-4 min-w-0">
@@ -723,19 +739,66 @@ const Competitions = () => {
                         Sin enlace público
                       </span>
                     )}
-                    <Badge
-                      variant={competition.participants_count >= competition.num_slots ? 'default' : 'secondary'}
-                      className="shrink-0"
-                    >
-                      {competition.participants_count}/{competition.num_slots}
-                    </Badge>
                   </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <CompetitionStatusBadge status={competition.status} />
+                  {(isLicenseAdmin || user?.id === competition.organizer) && (
+                    <>
+                      {(competition.status || 'published') === 'draft' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => patchCompetitionStatus(competition.id, 'published')}
+                        >
+                          Publicar
+                        </Button>
+                      )}
+                      {(competition.status || 'published') === 'published' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => patchCompetitionStatus(competition.id, 'draft')}
+                        >
+                          Despublicar
+                        </Button>
+                      )}
+                      {(competition.status || 'published') === 'running' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => patchCompetitionStatus(competition.id, 'closed')}
+                        >
+                          Cerrar
+                        </Button>
+                      )}
+                      {(competition.status || 'published') === 'closed' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => patchCompetitionStatus(competition.id, 'published')}
+                        >
+                          Reabrir
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-2 mb-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <Users className="size-4" />
-                    Participantes
+                    <Users className="size-4 shrink-0" />
+                    <span>
+                      Participantes:{' '}
+                      <span className="font-medium tabular-nums text-foreground">
+                        {participantCount}/{slotCap}
+                      </span>
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="size-4" />
@@ -756,7 +819,7 @@ const Competitions = () => {
                 <div className="h-2 rounded-full bg-muted overflow-hidden mb-4">
                   <div
                     className="h-full bg-primary transition-all rounded-full"
-                    style={{ width: `${(competition.participants_count / competition.num_slots) * 100}%` }}
+                    style={{ width: `${occupancyPct}%` }}
                   />
                 </div>
 
@@ -769,7 +832,7 @@ const Competitions = () => {
                   >
                     Gestionar Participantes
                   </Button>
-                  {competition.participants_count > 0 && (
+                  {participantCount > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -778,9 +841,9 @@ const Competitions = () => {
                     >
                       <Clock className="size-4 mr-1" />
                       Tiempos
-                      {competition.participants_count < competition.num_slots && (
-                        <Badge variant="secondary" className="ml-1 text-xs">
-                          {competition.participants_count}
+                      {participantCount < slotCap && (
+                        <Badge variant="secondary" className="ml-1 text-xs tabular-nums">
+                          {participantCount}
                         </Badge>
                       )}
                     </Button>
@@ -796,7 +859,8 @@ const Competitions = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
