@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3, Trash2 } from 'lucide-react';
 import api from '../lib/axios';
@@ -41,6 +41,10 @@ import {
 import { toast } from 'sonner';
 import './TimingsList.css';
 import { formatDistance } from '../utils/formatUtils';
+import { cn } from '../lib/utils';
+
+/** Igual que VehicleList: GET /vehicles está paginado (25 por defecto). */
+const TIMINGS_VEHICLES_PAGE_LIMIT = 10000;
 
 /** setup_snapshot puede ser string JSON (legado) o objeto/array (jsonb desde PostgREST). */
 function hasMeaningfulSetupSnapshot(raw) {
@@ -427,13 +431,17 @@ const TimingsList = () => {
     circuit_id: '',
     lane: ''
   });
+  const [vehiclePickerOpen, setVehiclePickerOpen] = useState(false);
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const vehiclePickerRef = useRef(null);
+  const vehicleSearchInputRef = useRef(null);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
       const [vehiclesResponse, timingsResponse, circuitsResponse] = await Promise.allSettled([
-        api.get('/vehicles'),
+        api.get('/vehicles', { params: { page: 1, limit: TIMINGS_VEHICLES_PAGE_LIMIT } }),
         api.get('/timings'),
         api.get('/circuits')
       ]);
@@ -458,6 +466,60 @@ const TimingsList = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const sortedVehicleOptions = useMemo(() => {
+    return Object.values(vehicles).sort((a, b) => {
+      const ma = `${a.manufacturer ?? ''} ${a.model ?? ''}`.trim().toLocaleLowerCase();
+      const mb = `${b.manufacturer ?? ''} ${b.model ?? ''}`.trim().toLocaleLowerCase();
+      return ma.localeCompare(mb, 'es');
+    });
+  }, [vehicles]);
+
+  const vehicleFilterLabel = useMemo(() => {
+    if (!filter.vehicle) return 'Todos los vehículos';
+    const v = vehicles[filter.vehicle];
+    if (!v) return 'Vehículo';
+    const label = `${v.manufacturer ?? ''} ${v.model ?? ''}`.trim();
+    return label || v.id;
+  }, [filter.vehicle, vehicles]);
+
+  const filteredVehicleOptions = useMemo(() => {
+    const q = vehicleSearch.trim().toLocaleLowerCase();
+    if (!q) return sortedVehicleOptions;
+    return sortedVehicleOptions.filter((v) => {
+      const label = `${v.manufacturer ?? ''} ${v.model ?? ''}`.trim().toLocaleLowerCase();
+      return label.includes(q) || String(v.id).toLocaleLowerCase().includes(q);
+    });
+  }, [sortedVehicleOptions, vehicleSearch]);
+
+  useEffect(() => {
+    if (!vehiclePickerOpen) setVehicleSearch('');
+  }, [vehiclePickerOpen]);
+
+  useEffect(() => {
+    if (!vehiclePickerOpen) return;
+    const id = requestAnimationFrame(() => vehicleSearchInputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [vehiclePickerOpen]);
+
+  useEffect(() => {
+    if (!vehiclePickerOpen) return;
+    const esc = (e) => {
+      if (e.key === 'Escape') setVehiclePickerOpen(false);
+    };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [vehiclePickerOpen]);
+
+  useEffect(() => {
+    if (!vehiclePickerOpen) return;
+    const onDocMouseDown = (e) => {
+      if (!vehiclePickerRef.current || vehiclePickerRef.current.contains(e.target)) return;
+      setVehiclePickerOpen(false);
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [vehiclePickerOpen]);
 
   const reloadTimings = async () => {
     try {
@@ -584,21 +646,95 @@ const TimingsList = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="space-y-2">
+        <div ref={vehiclePickerRef} className="relative space-y-2">
           <Label>Filtrar por Vehículo</Label>
-          <Select value={filter.vehicle || '__all__'} onValueChange={(v) => setFilter(prev => ({ ...prev, vehicle: v === '__all__' ? '' : v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="Todos los vehículos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos los vehículos</SelectItem>
-              {Object.values(vehicles).map(vehicle => (
-                <SelectItem key={vehicle.id} value={String(vehicle.id)}>
-                  {vehicle.manufacturer} {vehicle.model}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={vehiclePickerOpen}
+            aria-haspopup="listbox"
+            className="h-9 w-full justify-between font-normal"
+            type="button"
+            onClick={() => setVehiclePickerOpen((o) => !o)}
+          >
+            <span className="truncate text-left">{vehicleFilterLabel}</span>
+            <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" aria-hidden />
+          </Button>
+          {vehiclePickerOpen ? (
+            <div
+              className="pointer-events-auto absolute left-0 right-0 top-full z-[200] mt-1 flex flex-col rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+              role="listbox"
+              aria-label="Lista de vehículos"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="border-b px-3 py-2">
+                <Input
+                  ref={vehicleSearchInputRef}
+                  placeholder="Buscar por marca o modelo…"
+                  value={vehicleSearch}
+                  onChange={(e) => setVehicleSearch(e.target.value)}
+                  className="h-9"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="pointer-events-auto max-h-[280px] overflow-y-auto overscroll-contain p-1">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={!filter.vehicle}
+                  className={cn(
+                    'flex w-full cursor-pointer rounded-sm px-2 py-2.5 text-left text-sm outline-none transition-colors',
+                    'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground',
+                    !filter.vehicle ? 'bg-accent/80 text-accent-foreground' : null,
+                  )}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setFilter((prev) => ({ ...prev, vehicle: '' }));
+                    setVehiclePickerOpen(false);
+                  }}
+                >
+                  Todos los vehículos
+                </button>
+                {filteredVehicleOptions.length === 0 ? (
+                  <p className="px-2 py-4 text-center text-sm text-muted-foreground">Sin coincidencias</p>
+                ) : (
+                  filteredVehicleOptions.map((vehicle) => {
+                    const label = `${vehicle.manufacturer ?? ''} ${vehicle.model ?? ''}`.trim() || String(vehicle.id);
+                    const idStr = String(vehicle.id);
+                    const selected = filter.vehicle === idStr;
+                    return (
+                      <button
+                        key={vehicle.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={cn(
+                          'flex w-full cursor-pointer rounded-sm px-2 py-2.5 text-left text-sm outline-none transition-colors',
+                          'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground',
+                          selected ? 'bg-accent/80 text-accent-foreground' : null,
+                        )}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setFilter((prev) => ({ ...prev, vehicle: idStr }));
+                          setVehiclePickerOpen(false);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="space-y-2">
           <Label>Fecha Desde</Label>
