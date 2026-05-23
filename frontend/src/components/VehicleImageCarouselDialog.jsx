@@ -39,9 +39,22 @@ export default function VehicleImageCarouselDialog({
 
   useEffect(() => {
     if (!open || !api || slides.length === 0) return;
-    const index = Math.min(Math.max(0, initialIndex), slides.length - 1);
-    api.scrollTo(index, true);
-    setCurrentIndex(index);
+
+    const syncCarousel = () => {
+      api.reInit();
+      const index = Math.min(Math.max(0, initialIndex), slides.length - 1);
+      api.scrollTo(index, true);
+      setCurrentIndex(index);
+    };
+
+    // El diálogo anima su tamaño al abrir; Embla necesita recalcular el viewport en móvil.
+    const frameId = requestAnimationFrame(syncCarousel);
+    const timeoutId = window.setTimeout(syncCarousel, 150);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
   }, [open, api, initialIndex, slides.length]);
 
   if (slides.length === 0) return null;
@@ -50,20 +63,24 @@ export default function VehicleImageCarouselDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full sm:max-w-4xl border-0 bg-black/95 p-4 sm:p-6 text-white shadow-2xl">
+      <DialogContent className="left-1/2 top-1/2 w-[calc(100vw-1rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 border-0 bg-black/95 p-3 sm:p-6 text-white shadow-2xl [&>button]:text-white [&>button]:opacity-80 [&>button]:hover:opacity-100">
         <DialogTitle className="sr-only">Fotografías del vehículo</DialogTitle>
-        <Carousel setApi={setApi} className="w-full" opts={{ loop: false }}>
-          <div className="relative px-10 sm:px-12">
+        <Carousel
+          setApi={setApi}
+          className="mx-auto w-full"
+          opts={{ loop: false, align: 'center' }}
+        >
+          <div className="relative mx-auto w-full">
             <CarouselContent className="-ml-0">
               {slides.map((slide) => (
-                <CarouselItem key={slide.name} className="pl-0 basis-full">
-                  <div className="flex flex-col items-center gap-3">
+                <CarouselItem key={slide.name} className="min-w-0 shrink-0 grow-0 basis-full pl-0">
+                  <div className="flex w-full flex-col items-center justify-center gap-3 px-1">
                     <img
                       src={slide.url}
                       alt={slide.label}
-                      className="max-h-[75dvh] w-full object-contain"
+                      className="mx-auto block max-h-[75dvh] max-w-full object-contain"
                     />
-                    <p className="text-sm text-white/90 text-center">{slide.label}</p>
+                    <p className="w-full text-center text-sm text-white/90">{slide.label}</p>
                   </div>
                 </CarouselItem>
               ))}
@@ -71,17 +88,17 @@ export default function VehicleImageCarouselDialog({
             {showNav && (
               <>
                 <CarouselPrevious
-                  className="left-0 top-[calc(50%-1.25rem)] h-11 w-11 border-white/30 bg-black/60 text-white hover:bg-black/80 hover:text-white disabled:opacity-30"
+                  className="left-1 top-1/2 z-10 h-11 w-11 -translate-y-1/2 border-white/30 bg-black/60 text-white hover:bg-black/80 hover:text-white disabled:opacity-30 sm:left-2"
                 />
                 <CarouselNext
-                  className="right-0 top-[calc(50%-1.25rem)] h-11 w-11 border-white/30 bg-black/60 text-white hover:bg-black/80 hover:text-white disabled:opacity-30"
+                  className="right-1 top-1/2 z-10 h-11 w-11 -translate-y-1/2 border-white/30 bg-black/60 text-white hover:bg-black/80 hover:text-white disabled:opacity-30 sm:right-2"
                 />
               </>
             )}
           </div>
         </Carousel>
         {showNav && (
-          <p className="text-center text-sm text-white/70 tabular-nums mt-1">
+          <p className="mt-1 text-center text-sm text-white/70 tabular-nums">
             {currentIndex + 1} / {slides.length}
           </p>
         )}
