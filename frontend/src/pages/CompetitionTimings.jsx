@@ -109,6 +109,23 @@ function isUsableBestLapTimeString(str) {
   return s != null && s > 0;
 }
 
+function mapParticipantStatToAggregatedRow(stat, totalRounds) {
+  return {
+    id: stat.participant_id,
+    participant_id: stat.participant_id,
+    total_time_seconds: stat.total_time_seconds || 0,
+    penalty_seconds: stat.penalty_seconds || 0,
+    best_lap_time: stat.best_lap_time,
+    rounds_completed: stat.rounds_completed || 0,
+    rounds_dnp: stat.rounds_dnp || 0,
+    total_laps: stat.total_laps || 0,
+    position: stat.position,
+    total_time_formatted: stat.total_time,
+    has_completed_all_rounds:
+      (stat.rounds_completed || 0) - (stat.rounds_dnp || 0) >= (totalRounds || 0),
+  };
+}
+
 const CompetitionTimings = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -141,6 +158,9 @@ const CompetitionTimings = () => {
 
   const [, setRules] = useState([]);
   const [pointsByParticipant, setPointsByParticipant] = useState({});
+  const [categoryRankings, setCategoryRankings] = useState([]);
+  const [hasCategoryRules, setHasCategoryRules] = useState(false);
+  const [activeClassificationTab, setActiveClassificationTab] = useState('general');
 
   // Estados para el modal de penalización
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
@@ -229,9 +249,11 @@ const CompetitionTimings = () => {
     });
     return Object.values(aggregatedData)
       .sort((a, b) => {
-        const ptsA = pointsByParticipant[a.participant_id] ?? 0;
-        const ptsB = pointsByParticipant[b.participant_id] ?? 0;
-        if (ptsA !== ptsB) return ptsB - ptsA;
+        if (!hasCategoryRules) {
+          const ptsA = pointsByParticipant[a.participant_id] ?? 0;
+          const ptsB = pointsByParticipant[b.participant_id] ?? 0;
+          if (ptsA !== ptsB) return ptsB - ptsA;
+        }
         if (a.total_time_seconds && b.total_time_seconds) {
           return a.total_time_seconds - b.total_time_seconds;
         }
@@ -257,7 +279,29 @@ const CompetitionTimings = () => {
             (competition?.rounds || 0),
         };
       });
-  }, [timings, competition, pointsByParticipant]);
+  }, [timings, competition, pointsByParticipant, hasCategoryRules]);
+
+  const categoryClassificationRows = useMemo(() => {
+    const map = {};
+    categoryRankings.forEach((ranking) => {
+      map[ranking.category_id] = (ranking.sortedParticipants || []).map((stat) =>
+        mapParticipantStatToAggregatedRow(stat, competition?.rounds || 0)
+      );
+    });
+    return map;
+  }, [categoryRankings, competition?.rounds]);
+
+  const activeClassificationRows = useMemo(() => {
+    if (activeClassificationTab === 'general' || !hasCategoryRules) {
+      return aggregatedTimes;
+    }
+    return categoryClassificationRows[activeClassificationTab] || [];
+  }, [
+    activeClassificationTab,
+    aggregatedTimes,
+    categoryClassificationRows,
+    hasCategoryRules,
+  ]);
 
   /** Mismo criterio que la clasificación agregada: puntos → tiempo. */
   const participantsDisplayOrder = useMemo(() => {
@@ -395,6 +439,8 @@ const CompetitionTimings = () => {
         });
       }
       setPointsByParticipant(pointsByParticipant);
+      setCategoryRankings(progressResponse.data.category_rankings || []);
+      setHasCategoryRules(Boolean(progressResponse.data.has_category_rules));
     } catch (error) {
       console.error('Error al cargar datos:', error);
       setError(error.response?.data?.error || 'Error al cargar los datos');
@@ -1774,11 +1820,35 @@ const CompetitionTimings = () => {
           <TabsContent value="aggregated" className="mt-4">
             <Card>
               <CardContent className="pt-6">
+                {hasCategoryRules && categoryRankings.length > 0 && (
+                  <Tabs
+                    value={activeClassificationTab}
+                    onValueChange={setActiveClassificationTab}
+                    className="mb-4"
+                  >
+                    <TabsList className="flex h-auto min-h-9 w-full flex-wrap gap-1">
+                      <TabsTrigger value="general" className="text-xs sm:text-sm">
+                        General
+                      </TabsTrigger>
+                      {categoryRankings.map((ranking) => (
+                        <TabsTrigger
+                          key={ranking.category_id}
+                          value={ranking.category_id}
+                          className="text-xs sm:text-sm"
+                        >
+                          {ranking.category_name}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                )}
                 <h6 className="font-semibold mb-3 flex items-center gap-2">
                   <Trophy className="size-4" />
-                  Clasificación General
+                  {activeClassificationTab === 'general' || !hasCategoryRules
+                    ? 'Clasificación General'
+                    : `Clasificación — ${categoryRankings.find((r) => r.category_id === activeClassificationTab)?.category_name || 'Categoría'}`}
                 </h6>
-                {aggregatedTimes.length > 0 ? (
+                {activeClassificationRows.length > 0 ? (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -1796,13 +1866,13 @@ const CompetitionTimings = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {aggregatedTimes.map((data, index) => {
+                        {activeClassificationRows.map((data, index) => {
                           const leaderDiff =
                             index === 0
                               ? '-'
                               : formatTimeDiff(
                                   data.total_time_seconds -
-                                    aggregatedTimes[0].total_time_seconds
+                                    activeClassificationRows[0].total_time_seconds
                                 );
 
                           const previousDiff =
@@ -1810,7 +1880,7 @@ const CompetitionTimings = () => {
                               ? '-'
                               : formatTimeDiff(
                                   data.total_time_seconds -
-                                    aggregatedTimes[index - 1].total_time_seconds
+                                    activeClassificationRows[index - 1].total_time_seconds
                                 );
 
                           const base =

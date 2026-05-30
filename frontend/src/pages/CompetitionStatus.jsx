@@ -75,6 +75,7 @@ const CompetitionStatus = () => {
   const [selectedRound, setSelectedRound] = useState(1);
   const [showGeneralExtraColumns, setShowGeneralExtraColumns] = useState(false);
   const [participantDetailsOpen, setParticipantDetailsOpen] = useState(false);
+  const [activeClassificationTab, setActiveClassificationTab] = useState('general');
 
   useEffect(() => {
     loadCompetitionStatus();
@@ -291,8 +292,99 @@ const CompetitionStatus = () => {
     );
   }
 
-  const { competition, status, participants, global_best_lap } = competitionData;
+  const { competition, status, participants, global_best_lap, category_rankings: categoryRankings = [], has_category_rules: hasCategoryRules = false } = competitionData;
   const isCompleted = status.is_completed;
+
+  const displayedGeneralParticipants = (() => {
+    if (!competitionData) return [];
+    const {
+      participants: allParticipants,
+      category_rankings: categoryRankings = [],
+      has_category_rules: hasCategoryRules = false,
+    } = competitionData;
+    if (activeClassificationTab === 'general' || !hasCategoryRules) {
+      return allParticipants;
+    }
+    const ranking = categoryRankings.find((r) => r.category_id === activeClassificationTab);
+    return ranking?.sortedParticipants || [];
+  })();
+
+  const generalClassificationTitle =
+    activeClassificationTab === 'general' || !hasCategoryRules
+      ? 'Clasificación general'
+      : `Clasificación — ${categoryRankings.find((r) => r.category_id === activeClassificationTab)?.category_name || 'Categoría'}`;
+
+  const renderGeneralClassificationTable = (rows) => (
+    <div className="overflow-x-auto rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Pos.</TableHead>
+            <TableHead>Piloto</TableHead>
+            <TableHead>Vehículo</TableHead>
+            <TableHead className="tabular-nums">Rondas</TableHead>
+            <TableHead className="tabular-nums">Tiempo total</TableHead>
+            {rules.length > 0 && <TableHead className="tabular-nums">Puntos</TableHead>}
+            {showGeneralExtraColumns && (
+              <>
+                <TableHead className="tabular-nums">Mejor vuelta</TableHead>
+                <TableHead className="tabular-nums">Dif. líder</TableHead>
+                <TableHead className="tabular-nums">Dif. anterior</TableHead>
+              </>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((participant, idx) => {
+            const totalTimeSeconds = timeStringToSeconds(participant.total_time);
+            let leaderDiff = '-';
+            let previousDiff = '-';
+            if (idx > 0 && rows[0].total_time) {
+              leaderDiff = formatTimeDiff(totalTimeSeconds - timeStringToSeconds(rows[0].total_time));
+            }
+            if (idx > 0 && rows[idx - 1].total_time) {
+              previousDiff = formatTimeDiff(
+                totalTimeSeconds - timeStringToSeconds(rows[idx - 1].total_time)
+              );
+            }
+            const top3Style =
+              participant.position <= 3 ? 'bg-muted/30 border-l-2 border-l-primary/60' : '';
+
+            return (
+              <TableRow key={participant.participant_id} className={top3Style}>
+                <TableCell>
+                  <Badge variant={getPositionVariant(participant.position)}>{participant.position}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <div className="font-medium">{participant.driver_name}</div>
+                    {participant.team_name ? (
+                      <div className="text-muted-foreground text-sm">{participant.team_name}</div>
+                    ) : null}
+                  </div>
+                </TableCell>
+                <TableCell className="max-w-[220px]">{participant.vehicle_info}</TableCell>
+                <TableCell className="tabular-nums text-muted-foreground">
+                  {participant.rounds_completed}/{competition.rounds}
+                </TableCell>
+                <TableCell>{renderGeneralTotalCell(participant)}</TableCell>
+                {rules.length > 0 && (
+                  <TableCell className="tabular-nums font-medium">{participant.points || 0}</TableCell>
+                )}
+                {showGeneralExtraColumns && (
+                  <>
+                    <TableCell className="tabular-nums">{formatTime(participant.best_lap_time)}</TableCell>
+                    <TableCell className="tabular-nums">{leaderDiff}</TableCell>
+                    <TableCell className="tabular-nums">{previousDiff}</TableCell>
+                  </>
+                )}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   return (
     <div className="space-y-6 py-6">
@@ -524,7 +616,7 @@ const CompetitionStatus = () => {
             <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h5 className="font-semibold flex items-center gap-2">
                 <Trophy className="size-5" />
-                Clasificación general
+                {generalClassificationTitle}
               </h5>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={handlePresentationMode}>
@@ -554,6 +646,24 @@ const CompetitionStatus = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {hasCategoryRules && categoryRankings.length > 0 && (
+                <Tabs value={activeClassificationTab} onValueChange={setActiveClassificationTab}>
+                  <TabsList className="flex h-auto min-h-9 w-full flex-wrap gap-1">
+                    <TabsTrigger value="general" className="text-xs sm:text-sm">
+                      General
+                    </TabsTrigger>
+                    {categoryRankings.map((ranking) => (
+                      <TabsTrigger
+                        key={ranking.category_id}
+                        value={ranking.category_id}
+                        className="text-xs sm:text-sm"
+                      >
+                        {ranking.category_name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -564,80 +674,8 @@ const CompetitionStatus = () => {
                   {showGeneralExtraColumns ? 'Ocultar columnas extra' : 'Ver más columnas'}
                 </Button>
               </div>
-              {participants.length > 0 ? (
-                <div className="overflow-x-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Pos.</TableHead>
-                        <TableHead>Piloto</TableHead>
-                        <TableHead>Vehículo</TableHead>
-                        <TableHead className="tabular-nums">Rondas</TableHead>
-                        <TableHead className="tabular-nums">Tiempo total</TableHead>
-                        {rules.length > 0 && <TableHead className="tabular-nums">Puntos</TableHead>}
-                        {showGeneralExtraColumns && (
-                          <>
-                            <TableHead className="tabular-nums">Mejor vuelta</TableHead>
-                            <TableHead className="tabular-nums">Dif. líder</TableHead>
-                            <TableHead className="tabular-nums">Dif. anterior</TableHead>
-                          </>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {participants.map((participant, idx) => {
-                        const totalTimeSeconds = timeStringToSeconds(participant.total_time);
-                        let leaderDiff = '-';
-                        let previousDiff = '-';
-                        if (idx > 0 && participants[0].total_time) {
-                          leaderDiff = formatTimeDiff(
-                            totalTimeSeconds - timeStringToSeconds(participants[0].total_time)
-                          );
-                        }
-                        if (idx > 0 && participants[idx - 1].total_time) {
-                          previousDiff = formatTimeDiff(
-                            totalTimeSeconds - timeStringToSeconds(participants[idx - 1].total_time)
-                          );
-                        }
-                        const top3Style =
-                          participant.position <= 3
-                            ? 'bg-muted/30 border-l-2 border-l-primary/60'
-                            : '';
-
-                        return (
-                          <TableRow key={participant.participant_id} className={top3Style}>
-                            <TableCell>
-                              <Badge variant={getPositionVariant(participant.position)}>{participant.position}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{participant.driver_name}</div>
-                                {participant.team_name ? (
-                                  <div className="text-muted-foreground text-sm">{participant.team_name}</div>
-                                ) : null}
-                              </div>
-                            </TableCell>
-                            <TableCell className="max-w-[220px]">{participant.vehicle_info}</TableCell>
-                            <TableCell className="tabular-nums text-muted-foreground">
-                              {participant.rounds_completed}/{competition.rounds}
-                            </TableCell>
-                            <TableCell>{renderGeneralTotalCell(participant)}</TableCell>
-                            {rules.length > 0 && (
-                              <TableCell className="tabular-nums font-medium">{participant.points || 0}</TableCell>
-                            )}
-                            {showGeneralExtraColumns && (
-                              <>
-                                <TableCell className="tabular-nums">{formatTime(participant.best_lap_time)}</TableCell>
-                                <TableCell className="tabular-nums">{leaderDiff}</TableCell>
-                                <TableCell className="tabular-nums">{previousDiff}</TableCell>
-                              </>
-                            )}
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+              {displayedGeneralParticipants.length > 0 ? (
+                renderGeneralClassificationTable(displayedGeneralParticipants)
               ) : (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">No hay participantes registrados</p>

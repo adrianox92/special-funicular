@@ -38,6 +38,46 @@ function competitionTitleLeftLine(competitionName) {
   return `Resultados - ${n}`;
 }
 
+function buildRankingRows(sortedParticipants, hasPoints) {
+  const leaderSec = sortedParticipants[0]?.total_time_seconds ?? null;
+  return sortedParticipants.map((p, index) => {
+    const prev = index > 0 ? sortedParticipants[index - 1] : null;
+    const pen = p.penalty_seconds != null ? Number(p.penalty_seconds).toFixed(1) : '0';
+    const base = [
+      String(p.position),
+      p.driver_name || '-',
+      (p.vehicle_info || '-').slice(0, 42),
+      String(p.rounds_completed),
+      formatTime(p.best_lap_time),
+      p.total_time || '-',
+      pen,
+      formatDiffShort(leaderSec, p.total_time_seconds),
+      prev && prev.total_time_seconds != null && p.total_time_seconds != null
+        ? formatDiffShort(prev.total_time_seconds, p.total_time_seconds)
+        : '-',
+    ];
+    if (hasPoints) base.push(String(p.points != null ? p.points : 0));
+    return base;
+  });
+}
+
+function drawRankingSection(doc, title, sortedParticipants, hasPoints) {
+  drawSectionTitle(doc, title);
+  const rankHeaders = hasPoints
+    ? ['Pos.', 'Piloto', 'Vehic.', 'Rond.', 'Mejor', 'Total', 'Pen.', 'Dif.lider', 'Dif.ant.', 'Pts']
+    : ['Pos.', 'Piloto', 'Vehic.', 'Rond.', 'Mejor', 'Total', 'Pen.', 'Dif.lider', 'Dif.ant.'];
+  const colWidthsRank = hasPoints
+    ? [34, 86, 86, 32, 48, 48, 38, 52, 52, 32]
+    : [38, 90, 90, 34, 50, 50, 40, 56, 56];
+  const rowsRank = buildRankingRows(sortedParticipants, hasPoints);
+  drawAccentDataTable(doc, colWidthsRank, rankHeaders, rowsRank, {
+    fontSize: 8,
+    minYForNewPage: 100,
+    headerRowHeight: 28,
+  });
+  doc.moveDown(0.5);
+}
+
 /**
  * @param {object} competition
  * @param {Array} participants — filas competition_participants (no usado salvo compat; el ranking va en sorted)
@@ -48,10 +88,10 @@ function competitionTitleLeftLine(competitionName) {
  */
 async function generateCompetitionPDF(competition, _participants, timings, opts = {}) {
   const sortedParticipants = opts.sortedParticipants || [];
+  const categoryRankings = opts.categoryRankings || [];
   const rules = opts.rules || [];
   const hasPoints =
     rules.length > 0 || sortedParticipants.some((p) => (p.points || 0) > 0);
-  const leaderSec = sortedParticipants[0]?.total_time_seconds ?? null;
 
   return new Promise((resolve, reject) => {
     try {
@@ -86,41 +126,19 @@ async function generateCompetitionPDF(competition, _participants, timings, opts 
 
       doc.moveDown(0.5);
 
-      drawSectionTitle(doc, 'Clasificación general');
+      drawRankingSection(doc, 'Clasificación general', sortedParticipants, hasPoints);
 
-      const rankHeaders = hasPoints
-        ? ['Pos.', 'Piloto', 'Vehic.', 'Rond.', 'Mejor', 'Total', 'Pen.', 'Dif.lider', 'Dif.ant.', 'Pts']
-        : ['Pos.', 'Piloto', 'Vehic.', 'Rond.', 'Mejor', 'Total', 'Pen.', 'Dif.lider', 'Dif.ant.'];
-
-      const colWidthsRank = hasPoints
-        ? [34, 86, 86, 32, 48, 48, 38, 52, 52, 32]
-        : [38, 90, 90, 34, 50, 50, 40, 56, 56];
-
-      const rowsRank = sortedParticipants.map((p, index) => {
-        const prev = index > 0 ? sortedParticipants[index - 1] : null;
-        const pen = p.penalty_seconds != null ? Number(p.penalty_seconds).toFixed(1) : '0';
-        const base = [
-          String(p.position),
-          p.driver_name || '-',
-          (p.vehicle_info || '-').slice(0, 42),
-          String(p.rounds_completed),
-          formatTime(p.best_lap_time),
-          p.total_time || '-',
-          pen,
-          formatDiffShort(leaderSec, p.total_time_seconds),
-          prev && prev.total_time_seconds != null && p.total_time_seconds != null
-            ? formatDiffShort(prev.total_time_seconds, p.total_time_seconds)
-            : '-',
-        ];
-        if (hasPoints) base.push(String(p.points != null ? p.points : 0));
-        return base;
-      });
-
-      drawAccentDataTable(doc, colWidthsRank, rankHeaders, rowsRank, {
-        fontSize: 8,
-        minYForNewPage: 100,
-        headerRowHeight: 28,
-      });
+      if (categoryRankings.length > 0) {
+        categoryRankings.forEach((ranking) => {
+          if (!ranking.sortedParticipants?.length) return;
+          drawRankingSection(
+            doc,
+            `Clasificación — ${ranking.category_name || 'Categoría'}`,
+            ranking.sortedParticipants,
+            hasPoints
+          );
+        });
+      }
 
       doc.addPage();
 

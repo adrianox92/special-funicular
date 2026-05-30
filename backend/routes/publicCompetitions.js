@@ -18,6 +18,48 @@ function isDraftCompetitionPublic(competition) {
   return normalizeStatus(competition) === 'draft';
 }
 
+function mapParticipantToPresentation(participant, competitionRounds) {
+  const rounds = [];
+  for (let i = 1; i <= competitionRounds; i++) {
+    const roundTiming = (participant.timings || []).find((t) => t.round_number === i);
+    const isDnp = Boolean(roundTiming?.did_not_participate);
+    rounds.push({
+      round_number: i,
+      did_not_participate: isDnp,
+      time_timestamp:
+        roundTiming && !isDnp && roundTiming.total_time
+          ? parseFloat(roundTiming.total_time.split(':')[0]) * 60 +
+            parseFloat(roundTiming.total_time.split(':')[1])
+          : null,
+      penalty_seconds: roundTiming ? Number(roundTiming.penalty_seconds) || 0 : 0,
+    });
+  }
+
+  const hasParticipated = (participant.timings || []).some((t) => t && !t.did_not_participate);
+  let bestLapSeconds = null;
+  if (hasParticipated && isUsableBestLapTimeString(participant.best_lap_time)) {
+    bestLapSeconds = lapTimeStringToSeconds(participant.best_lap_time);
+  }
+
+  const vehicleInfo = participant.vehicle_info || '';
+  const vehicleParts = vehicleInfo.split(' ');
+
+  return {
+    id: participant.participant_id,
+    driver_name: participant.driver_name,
+    team_name: participant.team_name,
+    vehicle_name: vehicleParts.slice(1).join(' '),
+    vehicle_brand: vehicleParts[0] || '',
+    total_time_timestamp: participant.total_time_seconds,
+    penalties: participant.penalty_seconds,
+    best_lap: bestLapSeconds,
+    position: participant.position,
+    points: participant.points ?? 0,
+    category_id: participant.category_id || null,
+    rounds,
+  };
+}
+
 /**
  * @swagger
  * /api/public-signup/{slug}:
@@ -245,6 +287,7 @@ router.get('/:slug/export/pdf', async (req, res) => {
     const pdfBuffer = await generateCompetitionPDF(competition, payload.participants, payload.timings, {
       sortedParticipants: payload.sortedParticipants,
       rules: payload.rules,
+      categoryRankings: payload.categoryRankings,
     });
     const base = safeFilenamePart(competition.name);
     const day = new Date().toISOString().split('T')[0];
@@ -588,6 +631,7 @@ router.get('/:slug/status', async (req, res) => {
         driver_name,
         team_name,
         vehicle_model,
+        category_id,
         vehicles(model, manufacturer)
       `)
       .eq('competition_id', competition.id)
@@ -641,12 +685,23 @@ router.get('/:slug/status', async (req, res) => {
       return res.status(500).json({ error: 'Error interno del servidor' });
     }
 
+    const { data: categories, error: catError } = await supabase
+      .from('competition_categories')
+      .select('id, name')
+      .eq('competition_id', competition.id)
+      .order('name', { ascending: true });
+    if (catError) {
+      console.error('Error al obtener categorías:', catError);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
     // Calcular puntos y stats usando la función centralizada
-    const { sortedParticipants } = calculatePoints({
+    const { sortedParticipants, categoryRankings } = calculatePoints({
       competition,
       participants,
       timings,
-      rules
+      rules,
+      categories: categories || [],
     });
 
     // Mejor vuelta global: solo rondas con participación real (no NP, no 00:00.000)
@@ -684,6 +739,8 @@ router.get('/:slug/status', async (req, res) => {
         times_remaining: Math.max(0, totalRequiredTimes - timesCount)
       },
       participants: sortedParticipants,
+      category_rankings: categoryRankings || [],
+      has_category_rules: (rules || []).some((r) => r.category_id != null),
       global_best_lap: globalBestLap ? {
         time: globalBestLap,
         driver: globalBestLapParticipant?.driver_name
@@ -781,6 +838,7 @@ router.get('/:slug/presentation', async (req, res) => {
         driver_name,
         team_name,
         vehicle_model,
+        category_id,
         vehicles(model, manufacturer)
       `)
       .eq('competition_id', competition.id)
@@ -829,51 +887,36 @@ router.get('/:slug/presentation', async (req, res) => {
       return res.status(500).json({ error: 'Error interno del servidor' });
     }
 
+    const { data: categories, error: catError } = await supabase
+      .from('competition_categories')
+      .select('id, name')
+      .eq('competition_id', competition.id)
+      .order('name', { ascending: true });
+    if (catError) {
+      console.error('Error al obtener categorías:', catError);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
     // Calcular puntos y stats usando la función centralizada
-    const { sortedParticipants } = calculatePoints({
+    const { sortedParticipants, categoryRankings } = calculatePoints({
       competition,
       participants,
       timings,
-      rules
+      rules,
+      categories: categories || [],
     });
 
-    // Transformar datos para el modo presentación
-    const presentationParticipants = sortedParticipants.map(participant => {
-      // Agrupar tiempos por ronda
-      const rounds = [];
-      for (let i = 1; i <= competition.rounds; i++) {
-        const roundTiming = participant.timings.find(t => t.round_number === i);
-        const isDnp = Boolean(roundTiming?.did_not_participate);
-        rounds.push({
-          round_number: i,
-          did_not_participate: isDnp,
-          time_timestamp: roundTiming && !isDnp
-            ? (parseFloat(roundTiming.total_time.split(':')[0]) * 60 + parseFloat(roundTiming.total_time.split(':')[1]))
-            : null,
-          penalty_seconds: roundTiming ? Number(roundTiming.penalty_seconds) || 0 : 0
-        });
-      }
+    const presentationParticipants = sortedParticipants.map((participant) =>
+      mapParticipantToPresentation(participant, competition.rounds)
+    );
 
-      const hasParticipated = (participant.timings || []).some(t => t && !t.did_not_participate);
-      let bestLapSeconds = null;
-      if (hasParticipated && isUsableBestLapTimeString(participant.best_lap_time)) {
-        bestLapSeconds = lapTimeStringToSeconds(participant.best_lap_time);
-      }
-
-      return {
-        id: participant.participant_id,
-        driver_name: participant.driver_name,
-        team_name: participant.team_name,
-        vehicle_name: participant.vehicle_info.split(' ').slice(1).join(' '), // Modelo
-        vehicle_brand: participant.vehicle_info.split(' ')[0], // Fabricante
-        total_time_timestamp: participant.total_time_seconds,
-        penalties: participant.penalty_seconds,
-        best_lap: bestLapSeconds,
-        position: participant.position,
-        points: participant.points ?? 0,
-        rounds: rounds
-      };
-    });
+    const categoryParticipants = (categoryRankings || []).map((ranking) => ({
+      category_id: ranking.category_id,
+      category_name: ranking.category_name,
+      participants: (ranking.sortedParticipants || []).map((participant) =>
+        mapParticipantToPresentation(participant, competition.rounds)
+      ),
+    }));
 
     const totalRequiredTimes = participants.length * competition.rounds;
     const isCompleted =
@@ -889,7 +932,9 @@ router.get('/:slug/presentation', async (req, res) => {
         created_at: competition.created_at,
         status: isCompleted ? 'finished' : 'active',
       },
-      participants: presentationParticipants
+      participants: presentationParticipants,
+      category_participants: categoryParticipants,
+      has_category_rules: (rules || []).some((r) => r.category_id != null),
     };
 
     res.json(response);

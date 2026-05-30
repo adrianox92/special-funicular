@@ -51,10 +51,21 @@ async function fetchParticipantsTimingsAndRules(supabase, competitionId) {
     return { error: rulesError };
   }
 
+  const { data: categories, error: catError } = await supabase
+    .from('competition_categories')
+    .select('id, name')
+    .eq('competition_id', competitionId)
+    .order('name', { ascending: true });
+
+  if (catError) {
+    return { error: catError };
+  }
+
   return {
     participants: list,
     timings,
     rules: rules || [],
+    categories: categories || [],
   };
 }
 
@@ -64,7 +75,7 @@ async function fetchParticipantsTimingsAndRules(supabase, competitionId) {
  * @returns {Promise<{ error?: import('@supabase/postgrest-js').PostgrestError|Error, payload?: object }>}
  */
 async function buildExportPayload(supabase, competition) {
-  const { participants, timings, rules, error } = await fetchParticipantsTimingsAndRules(
+  const { participants, timings, rules, categories, error } = await fetchParticipantsTimingsAndRules(
     supabase,
     competition.id
   );
@@ -77,6 +88,7 @@ async function buildExportPayload(supabase, competition) {
     participants,
     timings,
     rules,
+    categories,
   });
 
   return {
@@ -85,9 +97,11 @@ async function buildExportPayload(supabase, competition) {
       participants,
       timings,
       rules,
+      categories,
       pointsByParticipant: pointsResult.pointsByParticipant,
       participantStats: pointsResult.participantStats,
       sortedParticipants: pointsResult.sortedParticipants,
+      categoryRankings: pointsResult.categoryRankings || [],
     },
   };
 }

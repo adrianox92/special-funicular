@@ -23,12 +23,13 @@ import {
 } from './ui/select';
 import { Spinner } from './ui/spinner';
 
-const RuleFormModal = ({ show, onHide, rule, competitionId, onSave, disabled = false }) => {
+const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onSave, disabled = false }) => {
   const [formData, setFormData] = useState({
     rule_type: 'per_round',
     description: '',
     points_structure: { "1": 10, "2": 8, "3": 6, "4": 4, "5": 2 },
-    use_bonus_best_lap: false
+    use_bonus_best_lap: false,
+    category_id: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -40,14 +41,16 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, onSave, disabled = f
           rule_type: rule.rule_type,
           description: rule.description || '',
           points_structure: rule.points_structure,
-          use_bonus_best_lap: rule.use_bonus_best_lap || false
+          use_bonus_best_lap: rule.use_bonus_best_lap || false,
+          category_id: rule.category_id || '',
         });
       } else {
         setFormData({
           rule_type: 'per_round',
           description: '',
           points_structure: { "1": 10, "2": 8, "3": 6, "4": 4, "5": 2 },
-          use_bonus_best_lap: false
+          use_bonus_best_lap: false,
+          category_id: '',
         });
       }
       setError(null);
@@ -90,20 +93,21 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, onSave, disabled = f
         return;
       }
       if (!formData.description?.trim()) {
-        setError('Debes especificar una descripción');
+        setError('Debes especificar una descripci?n');
         setSaving(false);
         return;
       }
       if ((formData.rule_type === 'per_round' || formData.rule_type === 'final') &&
           (!formData.points_structure || Object.keys(formData.points_structure).length === 0)) {
-        setError('Debes especificar al menos una posición con puntos');
+        setError('Debes especificar al menos una posici?n con puntos');
         setSaving(false);
         return;
       }
       const ruleData = {
         ...formData,
         competition_id: rule ? undefined : competitionId,
-        is_template: false
+        is_template: false,
+        category_id: formData.category_id || null,
       };
       if (rule) {
         await axios.put(`/competition-rules/${rule.id}`, ruleData);
@@ -126,9 +130,9 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, onSave, disabled = f
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="size-5" />
-            {rule ? 'Editar Regla' : 'Nueva Regla de Puntuación'}
+            {rule ? 'Editar Regla' : 'Nueva Regla de Puntuaci?n'}
           </DialogTitle>
-          <DialogDescription>Configura los puntos para cada posición</DialogDescription>
+          <DialogDescription>Configura los puntos para cada posici?n</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSave}>
           <div className="space-y-4 py-4">
@@ -157,29 +161,56 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, onSave, disabled = f
                 <p className="text-sm text-muted-foreground">
                   {formData.rule_type === 'per_round'
                     ? 'Los puntos se asignan en cada ronda individual'
-                    : 'Los puntos se asignan al final de la competición'}
+                    : 'Los puntos se asignan al final de la competici?n'}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rule-desc">Descripción (opcional)</Label>
+                <Label htmlFor="rule-desc">Descripci?n (opcional)</Label>
                 <Input
                   id="rule-desc"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Ej: Puntuación estándar F1"
+                  placeholder="Ej: Puntuaci?n est?ndar F1"
                   disabled={disabled}
                 />
               </div>
             </div>
 
+            {!disabled && categories.length > 0 && (
+              <div className="space-y-2">
+                <Label>Categor?a (opcional)</Label>
+                <Select
+                  value={formData.category_id || 'all'}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, category_id: v === 'all' ? '' : v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas las categor?as" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las categor?as (global)</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Si eliges una categor?a, esta regla solo aplicar? a los participantes de esa categor?a.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Estructura de puntos *</Label>
               <div className="rounded-lg border p-4 space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Define los puntos para cada posición</span>
+                  <span className="text-sm text-muted-foreground">Define los puntos para cada posici?n</span>
                   <Button type="button" variant="outline" size="sm" onClick={addPosition} disabled={disabled} className="flex items-center gap-1">
                     <Plus className="size-4" />
-                    Añadir posición
+                    A?adir posici?n
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -187,7 +218,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, onSave, disabled = f
                     .sort(([a], [b]) => parseInt(a) - parseInt(b))
                     .map(([position, points]) => (
                       <div key={position} className="flex gap-2 items-center">
-                        <span className="text-sm font-medium w-8">{position}º</span>
+                        <span className="text-sm font-medium w-8">{position}?</span>
                         <Input
                           type="number"
                           min="0"
@@ -218,7 +249,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, onSave, disabled = f
                 <div className="space-y-0.5">
                   <Label htmlFor="bonus-lap">Bonus por mejor vuelta</Label>
                   <p className="text-sm text-muted-foreground">
-                    El participante con la mejor vuelta de cada ronda recibirá 1 punto adicional.
+                    El participante con la mejor vuelta de cada ronda recibir? 1 punto adicional.
                   </p>
                 </div>
                 <Switch

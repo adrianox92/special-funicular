@@ -1283,15 +1283,45 @@ router.get('/:id/progress', async (req, res) => {
       console.error('Error al obtener reglas:', rulesError);
       return res.status(500).json({ error: rulesError.message });
     }
-    const perRoundRule = rules.find(r => r.rule_type === 'per_round');
-    const finalRule = rules.find(r => r.rule_type === 'final');
 
-    // Calcular puntos y stats usando la función centralizada
-    const { pointsByParticipant, participantStats } = calculatePoints({
+    const { data: categories, error: catError } = await supabase
+      .from('competition_categories')
+      .select('id, name')
+      .eq('competition_id', id)
+      .order('name', { ascending: true });
+    if (catError) {
+      console.error('Error al obtener categorías:', catError);
+      return res.status(500).json({ error: catError.message });
+    }
+
+    const { data: fullParticipants, error: fullPartError } = await supabase
+      .from('competition_participants')
+      .select(`
+        id,
+        driver_name,
+        team_name,
+        vehicle_model,
+        category_id,
+        vehicles(model, manufacturer)
+      `)
+      .eq('competition_id', id);
+
+    if (fullPartError) {
+      console.error('Error al obtener participantes:', fullPartError);
+      return res.status(500).json({ error: fullPartError.message });
+    }
+
+    const participantsForPoints = (fullParticipants || []).filter(
+      (p) => timesByParticipant[p.id]
+    );
+    const allTimings = Object.values(timesByParticipant).flat();
+
+    const { pointsByParticipant, participantStats, categoryRankings } = calculatePoints({
       competition,
-      participants: Object.keys(timesByParticipant).map(pid => ({ id: pid })),
-      timings: Object.values(timesByParticipant).flat(),
-      rules
+      participants: participantsForPoints,
+      timings: allTimings,
+      rules: rules || [],
+      categories: categories || [],
     });
 
     res.json({
@@ -1304,7 +1334,9 @@ router.get('/:id/progress', async (req, res) => {
       is_completed: isCompleted,
       progress_percentage: Math.round(progressPercentage),
       times_by_round: timesByRound,
-      participant_stats: participantStats
+      participant_stats: participantStats,
+      category_rankings: categoryRankings || [],
+      has_category_rules: (rules || []).some((r) => r.category_id != null),
     });
   } catch (error) {
     console.error('Error en GET /competitions/:id/progress:', error);
@@ -1638,6 +1670,7 @@ router.get('/:id/export/pdf', async (req, res) => {
     const pdfBuffer = await generateCompetitionPDF(competition, payload.participants, payload.timings, {
       sortedParticipants: payload.sortedParticipants,
       rules: payload.rules,
+      categoryRankings: payload.categoryRankings,
     });
 
     const base = safeFilenamePart(competition.name);
@@ -1776,7 +1809,7 @@ router.delete('/:id/categories/:categoryId', async (req, res) => {
 router.post('/:id/rules', async (req, res) => {
   try {
     const { id } = req.params;
-    const { rule_type, description, points_structure } = req.body;
+    const { rule_type, description, points_structure, category_id } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, id);
     if (!access.ok) return access.respond(res);
@@ -1789,13 +1822,26 @@ router.post('/:id/rules', async (req, res) => {
       return res.status(400).json({ error: 'La estructura de puntos es requerida' });
     }
 
+    if (category_id) {
+      const { data: category, error: catError } = await supabase
+        .from('competition_categories')
+        .select('id')
+        .eq('id', category_id)
+        .eq('competition_id', id)
+        .maybeSingle();
+      if (catError || !category) {
+        return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+      }
+    }
+
     const { data, error } = await supabase
       .from('competition_rules')
       .insert([{
         competition_id: id,
         rule_type,
         description: description ? description.trim() : null,
-        points_structure
+        points_structure,
+        category_id: category_id || null,
       }])
       .select()
       .single();
@@ -1842,15 +1888,28 @@ router.get('/:id/rules', async (req, res) => {
 router.put('/:id/rules/:ruleId', async (req, res) => {
   try {
     const { id, ruleId } = req.params;
-    const { rule_type, description, points_structure } = req.body;
+    const { rule_type, description, points_structure, category_id } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, id);
     if (!access.ok) return access.respond(res);
+
+    if (category_id) {
+      const { data: category, error: catError } = await supabase
+        .from('competition_categories')
+        .select('id')
+        .eq('id', category_id)
+        .eq('competition_id', id)
+        .maybeSingle();
+      if (catError || !category) {
+        return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+      }
+    }
 
     const updateData = {};
     if (rule_type) updateData.rule_type = rule_type;
     if (description !== undefined) updateData.description = description ? description.trim() : null;
     if (points_structure) updateData.points_structure = points_structure;
+    if (category_id !== undefined) updateData.category_id = category_id || null;
 
     const { data, error } = await supabase
       .from('competition_rules')

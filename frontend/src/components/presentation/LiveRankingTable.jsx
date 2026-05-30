@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { formatTimeDiff } from '../../utils/formatTimeDiff';
 
-const LiveRankingTable = ({ participants }) => {
+const LiveRankingTable = ({ participants, title = 'Clasificación general', subtitle = 'Orden por puntos y tiempo · Se actualiza automáticamente' }) => {
   /** Mismo criterio que la clasificación pública: puntos → tiempo (orden del API / calculatePoints). */
   const orderedParticipants = useMemo(() => {
     return [...participants].sort((a, b) => {
@@ -98,8 +98,8 @@ const LiveRankingTable = ({ participants }) => {
   return (
     <div className="live-ranking-table">
       <div className="table-title-block">
-        <h2 className="table-title">Clasificación general</h2>
-        <p className="table-subtitle">Orden por puntos y tiempo · Se actualiza automáticamente</p>
+        <h2 className="table-title">{title}</h2>
+        <p className="table-subtitle">{subtitle}</p>
       </div>
       <div className="table-container">
         <table className="ranking-table">

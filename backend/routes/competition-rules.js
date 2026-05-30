@@ -179,7 +179,8 @@ router.post('/', async (req, res) => {
       points_structure, 
       is_template = false, 
       competition_id, 
-      use_bonus_best_lap = false 
+      use_bonus_best_lap = false,
+      category_id,
     } = req.body;
 
     // Validaciones básicas
@@ -210,6 +211,18 @@ router.post('/', async (req, res) => {
       if (compError || !competition || !canManageCompetition(req.user, competition)) {
         return res.status(404).json({ error: 'Competición no encontrada' });
       }
+
+      if (category_id) {
+        const { data: category, error: catError } = await supabase
+          .from('competition_categories')
+          .select('id')
+          .eq('id', category_id)
+          .eq('competition_id', competition_id)
+          .maybeSingle();
+        if (catError || !category) {
+          return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+        }
+      }
     }
 
     const ruleData = {
@@ -226,6 +239,7 @@ router.post('/', async (req, res) => {
       ruleData.name = name.trim();
     } else {
       ruleData.competition_id = competition_id;
+      ruleData.category_id = category_id || null;
     }
 
     const { data, error } = await supabase
@@ -294,7 +308,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, rule_type, points_structure, use_bonus_best_lap } = req.body;
+    const { name, description, rule_type, points_structure, use_bonus_best_lap, category_id } = req.body;
 
     // Verificar que la regla existe y pertenece al usuario
     const { data: existingRule, error: ruleError } = await supabase
@@ -334,12 +348,27 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'La estructura de puntos debe ser un objeto' });
     }
 
+    if (!existingRule.is_template && category_id) {
+      const { data: category, error: catError } = await supabase
+        .from('competition_categories')
+        .select('id')
+        .eq('id', category_id)
+        .eq('competition_id', existingRule.competition_id)
+        .maybeSingle();
+      if (catError || !category) {
+        return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+      }
+    }
+
     const updateData = {};
     if (name !== undefined) updateData.name = name ? name.trim() : null;
     if (description !== undefined) updateData.description = description ? description.trim() : null;
     if (rule_type) updateData.rule_type = rule_type;
     if (points_structure) updateData.points_structure = points_structure;
     if (use_bonus_best_lap !== undefined) updateData.use_bonus_best_lap = use_bonus_best_lap;
+    if (category_id !== undefined && !existingRule.is_template) {
+      updateData.category_id = category_id || null;
+    }
 
     const { data, error } = await supabase
       .from('competition_rules')

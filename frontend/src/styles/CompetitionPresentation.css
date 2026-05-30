@@ -381,6 +381,37 @@ html.presentation-mode .presentation-container {
   border: 1px dashed var(--border);
 }
 
+.presentation-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.presentation-category-tab {
+  appearance: none;
+  border: 1px solid color-mix(in oklch, var(--border) 85%, transparent);
+  background: color-mix(in oklch, var(--card) 80%, var(--background));
+  color: var(--foreground);
+  border-radius: calc(var(--radius) + 2px);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.presentation-category-tab:hover {
+  border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}
+
+.presentation-category-tab.is-active {
+  background: color-mix(in oklch, var(--primary) 18%, var(--card));
+  border-color: color-mix(in oklch, var(--primary) 45%, var(--border));
+  color: var(--foreground);
+}
+
 /* Layout Principal */
 .presentation-main {
   display: flex;

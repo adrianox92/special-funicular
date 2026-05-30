@@ -22,6 +22,7 @@ import TemplatesDrawer from './TemplatesDrawer';
 
 const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }) => {
   const [rules, setRules] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showRuleModal, setShowRuleModal] = useState(false);
@@ -33,7 +34,10 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
 
   useEffect(() => {
     if (competitionId) {
-      axios.get(`/competitions/${competitionId}`).then(res => setCompetition(res.data)).catch(() => {});
+      axios.get(`/competitions/${competitionId}`).then((res) => {
+        setCompetition(res.data);
+        setCategories(Array.isArray(res.data?.categories) ? res.data.categories : []);
+      }).catch(() => {});
       axios.get(`/competitions/${competitionId}/progress`).then(res => setTimesRegistered(res.data.times_registered || 0)).catch(() => setTimesRegistered(0));
     }
   }, [competitionId]);
@@ -94,6 +98,12 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
       case 'best_time_per_round': return 'outline';
       default: return 'secondary';
     }
+  };
+
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return null;
+    const cat = categories.find((c) => c.id === categoryId);
+    return cat ? cat.name : null;
   };
 
   if (loading) {
@@ -196,6 +206,11 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
                             Bonus
                           </Badge>
                         )}
+                        {getCategoryName(rule.category_id) ? (
+                          <Badge variant="outline">{getCategoryName(rule.category_id)}</Badge>
+                        ) : (
+                          <Badge variant="outline">Global</Badge>
+                        )}
                       </div>
                       {rule.description && (
                         <p className="text-sm text-muted-foreground">{rule.description}</p>
@@ -270,6 +285,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
         onHide={() => setShowRuleModal(false)}
         rule={editingRule}
         competitionId={competitionId}
+        categories={categories}
         onSave={() => {
           loadRules();
           onRuleChange?.();
