@@ -93,13 +93,13 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
         return;
       }
       if (!formData.description?.trim()) {
-        setError('Debes especificar una descripci?n');
+        setError('Debes especificar una descripción');
         setSaving(false);
         return;
       }
       if ((formData.rule_type === 'per_round' || formData.rule_type === 'final') &&
           (!formData.points_structure || Object.keys(formData.points_structure).length === 0)) {
-        setError('Debes especificar al menos una posici?n con puntos');
+        setError('Debes especificar al menos una posición con puntos');
         setSaving(false);
         return;
       }
@@ -130,9 +130,9 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="size-5" />
-            {rule ? 'Editar Regla' : 'Nueva Regla de Puntuaci?n'}
+            {rule ? 'Editar Regla' : 'Nueva Regla de Puntuación'}
           </DialogTitle>
-          <DialogDescription>Configura los puntos para cada posici?n</DialogDescription>
+          <DialogDescription>Configura los puntos para cada posición</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSave}>
           <div className="space-y-4 py-4">
@@ -161,7 +161,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                 <p className="text-sm text-muted-foreground">
                   {formData.rule_type === 'per_round'
                     ? 'Los puntos se asignan en cada ronda individual'
-                    : 'Los puntos se asignan al final de la competici?n'}
+                    : 'Los puntos se asignan al final de la competición'}
                 </p>
               </div>
               <div className="space-y-2">
@@ -170,7 +170,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                   id="rule-desc"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Ej: Puntuaci?n est?ndar F1"
+                  placeholder="Ej: Puntuación estándar F1"
                   disabled={disabled}
                 />
               </div>
@@ -178,7 +178,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
 
             {!disabled && categories.length > 0 && (
               <div className="space-y-2">
-                <Label>Categor?a (opcional)</Label>
+                <Label>Categoría (opcional)</Label>
                 <Select
                   value={formData.category_id || 'all'}
                   onValueChange={(v) =>
@@ -186,10 +186,10 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Todas las categor?as" />
+                    <SelectValue placeholder="Todas las categorías" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todas las categor?as (global)</SelectItem>
+                    <SelectItem value="all">Todas las categorías (global)</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
@@ -198,7 +198,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Si eliges una categor?a, esta regla solo aplicar? a los participantes de esa categor?a.
+                  Si eliges una categor?a, esta regla solo aplicará a los participantes de esa categor?a.
                 </p>
               </div>
             )}
@@ -207,10 +207,10 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
               <Label>Estructura de puntos *</Label>
               <div className="rounded-lg border p-4 space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Define los puntos para cada posici?n</span>
+                  <span className="text-sm text-muted-foreground">Define los puntos para cada posición</span>
                   <Button type="button" variant="outline" size="sm" onClick={addPosition} disabled={disabled} className="flex items-center gap-1">
                     <Plus className="size-4" />
-                    A?adir posici?n
+                    Añadir posición
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -218,7 +218,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                     .sort(([a], [b]) => parseInt(a) - parseInt(b))
                     .map(([position, points]) => (
                       <div key={position} className="flex gap-2 items-center">
-                        <span className="text-sm font-medium w-8">{position}?</span>
+                        <span className="text-sm font-medium w-8">{position}º</span>
                         <Input
                           type="number"
                           min="0"
@@ -249,7 +249,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                 <div className="space-y-0.5">
                   <Label htmlFor="bonus-lap">Bonus por mejor vuelta</Label>
                   <p className="text-sm text-muted-foreground">
-                    El participante con la mejor vuelta de cada ronda recibir? 1 punto adicional.
+                    El participante con la mejor vuelta de cada ronda recibirá 1 punto adicional.
                   </p>
                 </div>
                 <Switch

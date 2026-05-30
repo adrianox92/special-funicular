@@ -493,6 +493,10 @@ router.delete('/:id', async (req, res) => {
  *               competition_id:
  *                 type: string
  *                 description: ID de la competición donde aplicar la plantilla
+ *               category_id:
+ *                 type: string
+ *                 nullable: true
+ *                 description: ID de categoría opcional; null para regla global
  *     responses:
  *       201:
  *         description: Plantilla aplicada correctamente
@@ -508,7 +512,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/apply-template/:templateId', async (req, res) => {
   try {
     const { templateId } = req.params;
-    const { competition_id } = req.body;
+    const { competition_id, category_id } = req.body;
 
     if (!competition_id) {
       return res.status(400).json({ error: 'El ID de la competición es requerido' });
@@ -536,6 +540,18 @@ router.post('/apply-template/:templateId', async (req, res) => {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 
+    if (category_id) {
+      const { data: category, error: catError } = await supabase
+        .from('competition_categories')
+        .select('id')
+        .eq('id', category_id)
+        .eq('competition_id', competition_id)
+        .maybeSingle();
+      if (catError || !category) {
+        return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+      }
+    }
+
     // Crear la regla basada en la plantilla
     const ruleData = {
       competition_id,
@@ -544,7 +560,8 @@ router.post('/apply-template/:templateId', async (req, res) => {
       points_structure: template.points_structure,
       is_template: false,
       created_by: req.user.id,
-      use_bonus_best_lap: template.use_bonus_best_lap
+      use_bonus_best_lap: template.use_bonus_best_lap,
+      category_id: category_id || null,
     };
 
     const { data, error } = await supabase

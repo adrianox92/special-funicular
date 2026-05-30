@@ -5,7 +5,15 @@ import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 import {
   Sheet,
   SheetContent,
@@ -16,12 +24,13 @@ import {
 import { Spinner } from './ui/spinner';
 import { toast } from 'sonner';
 
-const TemplatesDrawer = ({ show, onHide, competitionId, onTemplateApplied, disabled = false }) => {
+const TemplatesDrawer = ({ show, onHide, competitionId, categories = [], onTemplateApplied, disabled = false }) => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [applying, setApplying] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [categoryId, setCategoryId] = useState('');
 
   const loadTemplates = async () => {
     try {
@@ -38,7 +47,10 @@ const TemplatesDrawer = ({ show, onHide, competitionId, onTemplateApplied, disab
   };
 
   useEffect(() => {
-    if (show) loadTemplates();
+    if (show) {
+      loadTemplates();
+      setCategoryId('');
+    }
   }, [show]);
 
   const getRuleTypeDescription = (type) => {
@@ -61,7 +73,18 @@ const TemplatesDrawer = ({ show, onHide, competitionId, onTemplateApplied, disab
   const applyTemplate = async (templateId) => {
     try {
       setApplying(true);
-      await axios.post(`/competition-rules/apply-template/${templateId}`, { competition_id: competitionId });
+      await axios.post(`/competition-rules/apply-template/${templateId}`, {
+        competition_id: competitionId,
+        category_id: categoryId || null,
+      });
+      const categoryLabel = categoryId
+        ? categories.find((c) => c.id === categoryId)?.name
+        : null;
+      toast.success(
+        categoryLabel
+          ? `Plantilla aplicada para la categoría ${categoryLabel}`
+          : 'Plantilla aplicada correctamente'
+      );
       onTemplateApplied?.();
       onHide();
     } catch (err) {
@@ -104,6 +127,35 @@ const TemplatesDrawer = ({ show, onHide, competitionId, onTemplateApplied, disab
                 No se pueden aplicar plantillas porque ya hay tiempos registrados en la competición.
               </AlertDescription>
             </Alert>
+          )}
+
+          {!disabled && categories.length > 0 && (
+            <div className="space-y-2 rounded-lg border p-4">
+              <Label>{'Categoría'}</Label>
+              <Select
+                value={categoryId || 'all'}
+                onValueChange={(v) => setCategoryId(v === 'all' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas las categorías" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías (global)</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                La plantilla se creará como regla{' '}
+                {categoryId
+                  ? `solo para la categoría ${categories.find((c) => c.id === categoryId)?.name || ''}`
+                  : 'válida para todos los participantes'}
+                .
+              </p>
+            </div>
           )}
 
           <div className="relative">

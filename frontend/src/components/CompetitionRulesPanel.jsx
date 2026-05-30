@@ -299,6 +299,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
         show={showTemplatesDrawer}
         onHide={() => setShowTemplatesDrawer(false)}
         competitionId={competitionId}
+        categories={categories}
         onTemplateApplied={() => {
           loadRules();
           onRuleChange?.();
