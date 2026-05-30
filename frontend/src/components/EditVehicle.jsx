@@ -24,6 +24,7 @@ import SetupPerformanceAnalysis, { hasMultipleConfigs } from './SetupPerformance
 import VehicleImageCarouselDialog from './VehicleImageCarouselDialog';
 import MaintenanceCorrelationChart from './charts/MaintenanceCorrelationChart';
 import MaintenanceLog from './MaintenanceLog';
+import VehiclePalmares from './VehiclePalmares';
 import ImportTimingsModal from './ImportTimingsModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -197,6 +198,9 @@ const EditVehicle = () => {
     const q = new URLSearchParams(location.search);
     if (q.get('tab') === 'maintenance' || location.hash === '#maintenance') {
       setActiveTab('maintenance');
+    }
+    if (q.get('tab') === 'palmares' || location.hash === '#palmares') {
+      setActiveTab('palmares');
     }
   }, [location.search, location.hash]);
   const [technicalSpecs, setTechnicalSpecs] = useState({
@@ -1942,6 +1946,7 @@ const EditVehicle = () => {
     { value: 'timings', label: 'Tabla de Tiempos' },
     ...(hasMultipleConfigs(timings) ? [{ value: 'config-analysis', label: 'Análisis Config.' }] : []),
     { value: 'maintenance', label: 'Mantenimiento' },
+    { value: 'palmares', label: 'Palmarés' },
   ];
 
   const vehicleTabsTriggerClass = 'sm:px-3 sm:text-sm';
@@ -2176,8 +2181,8 @@ const EditVehicle = () => {
           className={cn(
             'mb-4 hidden h-auto min-h-9 w-full gap-1 sm:grid',
             hasMultipleConfigs(timings)
-              ? 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-              : 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+              ? 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7'
+              : 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6',
           )}
         >
           <TabsTrigger value="general" className={vehicleTabsTriggerClass}>
@@ -2199,6 +2204,9 @@ const EditVehicle = () => {
           )}
           <TabsTrigger value="maintenance" className={vehicleTabsTriggerClass}>
             Mantenimiento
+          </TabsTrigger>
+          <TabsTrigger value="palmares" className={vehicleTabsTriggerClass}>
+            Palmarés
           </TabsTrigger>
         </TabsList>
 
@@ -2599,6 +2607,9 @@ const EditVehicle = () => {
         <TabsContent value="maintenance">
           <MaintenanceCorrelationChart timings={timings} maintenanceLogs={maintenanceLogs} />
           <MaintenanceLog vehicleId={id} onLogsChange={setMaintenanceLogs} />
+        </TabsContent>
+        <TabsContent value="palmares">
+          <VehiclePalmares vehicleId={id} />
         </TabsContent>
       </Tabs>
 

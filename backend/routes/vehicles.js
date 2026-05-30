@@ -2377,6 +2377,323 @@ router.delete('/:id/timings/:timingId', async (req, res) => {
   }
 });
 
+function normalizePalmaresDate(val) {
+  if (val == null || val === '') return null;
+  const s = String(val).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return s;
+}
+
+function normalizePalmaresPosition(val) {
+  if (val == null || val === '') return null;
+  const n = parseInt(String(val).trim(), 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return n;
+}
+
+function normalizePalmaresText(val) {
+  if (val == null) return null;
+  const s = String(val).trim();
+  return s === '' ? null : s;
+}
+
+function sortPalmaresEntries(entries) {
+  return [...entries].sort((a, b) => {
+    const dateA = a.event_date || '';
+    const dateB = b.event_date || '';
+    if (dateA !== dateB) return dateB.localeCompare(dateA);
+    const createdA = a.created_at || '';
+    const createdB = b.created_at || '';
+    return createdB.localeCompare(createdA);
+  });
+}
+
+async function assertVehicleOwnedByUser(supabase, vehicleId, userId) {
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select('id')
+    .eq('id', vehicleId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+async function fetchSystemPalmaresEntries(supabase, vehicleId) {
+  const { data, error } = await supabase
+    .from('competition_participants')
+    .select(`
+      id,
+      driver_name,
+      team_name,
+      category_id,
+      competition_id,
+      created_at,
+      competitions (
+        id,
+        name,
+        circuit_name,
+        status,
+        created_at
+      ),
+      competition_categories (
+        name
+      )
+    `)
+    .eq('vehicle_id', vehicleId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((row) => {
+    const comp = row.competitions || {};
+    const categoryName = row.competition_categories?.name || null;
+    return {
+      id: row.id,
+      source: 'system',
+      competition_name: comp.name || 'Competición',
+      event_date: comp.created_at ? String(comp.created_at).slice(0, 10) : null,
+      position: null,
+      category: categoryName,
+      notes: null,
+      competition_id: comp.id || row.competition_id || null,
+      participant_id: row.id,
+      driver_name: row.driver_name || null,
+      team_name: row.team_name || null,
+      circuit_name: comp.circuit_name || null,
+      competition_status: comp.status || null,
+      created_at: row.created_at || comp.created_at || null,
+    };
+  });
+}
+
+async function fetchManualPalmaresEntries(supabase, vehicleId, userId) {
+  const { data, error } = await supabase
+    .from('vehicle_palmares')
+    .select('*')
+    .eq('vehicle_id', vehicleId)
+    .eq('user_id', userId)
+    .order('event_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((row) => ({
+    id: row.id,
+    source: 'manual',
+    competition_name: row.competition_name,
+    event_date: row.event_date,
+    position: row.position,
+    category: row.category,
+    notes: row.notes,
+    competition_id: row.competition_id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+}
+
+function buildPalmaresPayload(body) {
+  const competition_name = normalizePalmaresText(body.competition_name);
+  if (!competition_name) {
+    return { error: 'competition_name es requerido' };
+  }
+
+  const event_date = normalizePalmaresDate(body.event_date);
+  if (body.event_date != null && body.event_date !== '' && !event_date) {
+    return { error: 'event_date debe ser YYYY-MM-DD' };
+  }
+
+  const position = normalizePalmaresPosition(body.position);
+  if (body.position != null && body.position !== '' && position == null) {
+    return { error: 'position debe ser un entero mayor o igual a 1' };
+  }
+
+  const competition_id = normalizePalmaresText(body.competition_id);
+
+  return {
+    payload: {
+      competition_name,
+      event_date,
+      position,
+      category: normalizePalmaresText(body.category),
+      notes: normalizePalmaresText(body.notes),
+      competition_id: competition_id || null,
+    },
+  };
+}
+
+// Palmarés del vehículo (manual + competiciones del sistema)
+router.get('/:id/palmares', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const owned = await assertVehicleOwnedByUser(req.supabase, id, req.user.id);
+    if (!owned) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    const [manualEntries, systemEntries] = await Promise.all([
+      fetchManualPalmaresEntries(req.supabase, id, req.user.id),
+      fetchSystemPalmaresEntries(req.supabase, id),
+    ]);
+
+    res.json(sortPalmaresEntries([...manualEntries, ...systemEntries]));
+  } catch (err) {
+    console.error('Error al obtener palmarés:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/palmares', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const owned = await assertVehicleOwnedByUser(req.supabase, id, req.user.id);
+    if (!owned) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    const built = buildPalmaresPayload(req.body);
+    if (built.error) {
+      return res.status(400).json({ error: built.error });
+    }
+
+    const { data, error } = await req.supabase
+      .from('vehicle_palmares')
+      .insert([{
+        vehicle_id: id,
+        user_id: req.user.id,
+        ...built.payload,
+      }])
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Error al crear entrada de palmarés:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(201).json({
+      id: data.id,
+      source: 'manual',
+      competition_name: data.competition_name,
+      event_date: data.event_date,
+      position: data.position,
+      category: data.category,
+      notes: data.notes,
+      competition_id: data.competition_id,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    });
+  } catch (err) {
+    console.error('Error al crear entrada de palmarés:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:id/palmares/:entryId', async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    const owned = await assertVehicleOwnedByUser(req.supabase, id, req.user.id);
+    if (!owned) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    const { data: existing, error: existingError } = await req.supabase
+      .from('vehicle_palmares')
+      .select('id')
+      .eq('id', entryId)
+      .eq('vehicle_id', id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (existingError) {
+      return res.status(500).json({ error: existingError.message });
+    }
+    if (!existing) {
+      return res.status(404).json({ error: 'Entrada de palmarés no encontrada' });
+    }
+
+    const built = buildPalmaresPayload(req.body);
+    if (built.error) {
+      return res.status(400).json({ error: built.error });
+    }
+
+    const { data, error } = await req.supabase
+      .from('vehicle_palmares')
+      .update({
+        ...built.payload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', entryId)
+      .eq('vehicle_id', id)
+      .eq('user_id', req.user.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Error al actualizar entrada de palmarés:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({
+      id: data.id,
+      source: 'manual',
+      competition_name: data.competition_name,
+      event_date: data.event_date,
+      position: data.position,
+      category: data.category,
+      notes: data.notes,
+      competition_id: data.competition_id,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    });
+  } catch (err) {
+    console.error('Error al actualizar entrada de palmarés:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/palmares/:entryId', async (req, res) => {
+  try {
+    const { id, entryId } = req.params;
+    const owned = await assertVehicleOwnedByUser(req.supabase, id, req.user.id);
+    if (!owned) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    const { data: existing, error: existingError } = await req.supabase
+      .from('vehicle_palmares')
+      .select('id')
+      .eq('id', entryId)
+      .eq('vehicle_id', id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (existingError) {
+      return res.status(500).json({ error: existingError.message });
+    }
+    if (!existing) {
+      return res.status(404).json({ error: 'Entrada de palmarés no encontrada' });
+    }
+
+    const { error } = await req.supabase
+      .from('vehicle_palmares')
+      .delete()
+      .eq('id', entryId)
+      .eq('vehicle_id', id)
+      .eq('user_id', req.user.id);
+
+    if (error) {
+      console.error('Error al eliminar entrada de palmarés:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ message: 'Entrada de palmarés eliminada correctamente' });
+  } catch (err) {
+    console.error('Error al eliminar entrada de palmarés:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint para generar y descargar la ficha técnica en PDF (solo propietario)
 router.get('/:id/specs-pdf', async (req, res) => {
   try {
