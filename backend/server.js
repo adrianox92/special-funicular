@@ -41,6 +41,7 @@ const {
   publicSignupLimiter,
   publicCatalogReadLimiter,
   publicClubIcsFeedLimiter,
+  publicRefereeLimiter,
   authSoftLimiter,
   contactLimiter,
 } = require('./middleware/rateLimits');
@@ -184,6 +185,8 @@ app.use('/api/public/vehicles', publicCatalogReadLimiter, publicVehicleRoute);
 app.use('/api/public/contact', contactLimiter, contactRoute);
 const publicClubCalendarRoute = require('./routes/publicClubCalendar');
 app.use('/api/public/clubs', publicClubIcsFeedLimiter, publicClubCalendarRoute);
+const publicRefereeRoute = require('./routes/publicReferee');
+app.use('/api/referee', publicRefereeLimiter, publicRefereeRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');

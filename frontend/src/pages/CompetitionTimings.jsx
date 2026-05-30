@@ -18,6 +18,9 @@ import {
   Clock,
   Smartphone,
   Share2,
+  Link2,
+  ClipboardCopy,
+  Loader2,
 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -145,6 +148,9 @@ const CompetitionTimings = () => {
   const [penaltyValue, setPenaltyValue] = useState(0);
   const [penaltyLoading, setPenaltyLoading] = useState(false);
   const [deleteTimingConfirm, setDeleteTimingConfirm] = useState({ open: false, timingId: null });
+
+  const [refereeLinkStatus, setRefereeLinkStatus] = useState(null);
+  const [refereeLinkLoading, setRefereeLinkLoading] = useState(false);
 
   // Memo: Mapa de participantes por ID
   const canUseOrganizerTools = useMemo(
@@ -285,6 +291,74 @@ const CompetitionTimings = () => {
       return { ...prev, average_time: avg };
     });
   }, [showModal, formData.total_time, formData.laps, formData.did_not_participate]);
+
+  const loadRefereeLinkStatus = async () => {
+    try {
+      const { data } = await axios.get(`/competitions/${id}/referee-link/status`);
+      setRefereeLinkStatus(data);
+    } catch {
+      setRefereeLinkStatus({ enabled: false, referee_url: null });
+    }
+  };
+
+  useEffect(() => {
+    if (!canUseOrganizerTools || !id) return;
+    loadRefereeLinkStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canUseOrganizerTools, id]);
+
+  const copyRefereeLink = async () => {
+    const u = refereeLinkStatus?.referee_url;
+    if (!u || !navigator.clipboard?.writeText) {
+      toast.error('No hay enlace para copiar');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(u);
+      toast.success('Enlace copiado');
+    } catch {
+      toast.error('No se pudo copiar');
+    }
+  };
+
+  const enableRefereeLink = async () => {
+    try {
+      setRefereeLinkLoading(true);
+      const { data } = await axios.post(`/competitions/${id}/referee-link/enable`);
+      setRefereeLinkStatus(data);
+      toast.success('Enlace de árbitro activado');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'No se pudo activar');
+    } finally {
+      setRefereeLinkLoading(false);
+    }
+  };
+
+  const regenerateRefereeLink = async () => {
+    try {
+      setRefereeLinkLoading(true);
+      const { data } = await axios.post(`/competitions/${id}/referee-link/regenerate`);
+      setRefereeLinkStatus(data);
+      toast.success('Enlace regenerado (el anterior deja de funcionar)');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'No se pudo regenerar');
+    } finally {
+      setRefereeLinkLoading(false);
+    }
+  };
+
+  const disableRefereeLink = async () => {
+    try {
+      setRefereeLinkLoading(true);
+      const { data } = await axios.post(`/competitions/${id}/referee-link/disable`);
+      setRefereeLinkStatus(data);
+      toast.success('Enlace desactivado');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'No se pudo desactivar');
+    } finally {
+      setRefereeLinkLoading(false);
+    }
+  };
 
   const loadCompetitionData = async () => {
     try {
@@ -908,6 +982,64 @@ const CompetitionTimings = () => {
             </div>
           </div>
         </div>
+
+        {canUseOrganizerTools && (
+          <Card className="border-border/60 bg-muted/20">
+            <CardContent className="pt-6 space-y-3 text-sm">
+              <div className="flex items-center gap-2 font-semibold">
+                <Link2 className="size-4" />
+                Enlace para árbitro
+              </div>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Comparte este enlace con quien registre tiempos en pista. No requiere cuenta. Quien tenga el enlace
+                puede registrar tiempos y penalizaciones; revócalo si se filtra.
+              </p>
+              {refereeLinkLoading && !refereeLinkStatus ? (
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              ) : refereeLinkStatus?.enabled && refereeLinkStatus.referee_url ? (
+                <>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Input readOnly value={refereeLinkStatus.referee_url} className="font-mono text-xs" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 shrink-0"
+                      onClick={copyRefereeLink}
+                    >
+                      <ClipboardCopy className="size-4" />
+                      Copiar
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={regenerateRefereeLink}
+                      disabled={refereeLinkLoading}
+                    >
+                      Regenerar enlace
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={disableRefereeLink}
+                      disabled={refereeLinkLoading}
+                    >
+                      Desactivar
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button type="button" size="sm" onClick={enableRefereeLink} disabled={refereeLinkLoading}>
+                  Activar enlace de árbitro
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Progreso de la competición */}
         {progress && (

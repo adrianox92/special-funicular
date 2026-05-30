@@ -95,10 +95,20 @@ const publicClubIcsFeedLimiter = rateLimit({
   message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
 });
 
+/** Modo árbitro por enlace compartible (token en URL). */
+const publicRefereeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
+});
+
 module.exports = {
   publicSignupLimiter,
   publicCatalogReadLimiter,
   publicClubIcsFeedLimiter,
+  publicRefereeLimiter,
   authSoftLimiter,
   contactLimiter,
   helpAskLimiter,

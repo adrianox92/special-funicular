@@ -65,6 +65,46 @@ function canManageCompetition(user, competition) {
 }
 
 /**
+ * Token de enlace árbitro válido para esta competición.
+ * @param {{ referee_access_token?: string|null }} competition
+ * @param {string|undefined|null} refereeToken
+ */
+function isValidRefereeAccessToken(competition, refereeToken) {
+  const stored = competition?.referee_access_token;
+  const provided = refereeToken && String(refereeToken).trim();
+  if (!stored || !provided) return false;
+  return stored === provided;
+}
+
+/**
+ * Modo árbitro: gestionar tiempos (organizador, admin de licencia o enlace con token).
+ * @param {{ id?: string, email?: string } | null | undefined} user
+ * @param {{ organizer?: string|null, referee_access_token?: string|null }} competition
+ * @param {string} [refereeToken]
+ */
+function canRefereeCompetition(user, competition, refereeToken) {
+  if (!competition) return false;
+  if (canManageCompetition(user, competition)) return true;
+  return isValidRefereeAccessToken(competition, refereeToken);
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} token
+ * @param {string} [select]
+ */
+async function fetchCompetitionByRefereeToken(supabase, token, select = 'id, name, rounds, circuit_id, status, organizer, referee_access_token') {
+  const trimmed = token && String(token).trim();
+  if (!trimmed) return { competition: null, error: null };
+  const { data, error } = await supabase
+    .from('competitions')
+    .select(select)
+    .eq('referee_access_token', trimmed)
+    .maybeSingle();
+  return { competition: data, error };
+}
+
+/**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {{ id?: string, email?: string } | null | undefined} user
  * @param {string} competitionId
@@ -108,10 +148,61 @@ async function requireManageCompetition(supabase, user, competitionId, select = 
   return { ok: true, competition: r.competition };
 }
 
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ id?: string, email?: string } | null | undefined} user
+ * @param {string} competitionId
+ * @param {string} [select]
+ * @param {string} [refereeToken]
+ */
+async function requireRefereeCompetition(
+  supabase,
+  user,
+  competitionId,
+  select = 'id, organizer, club_id, rounds, status, referee_access_token',
+  refereeToken,
+) {
+  const { competition, error } = await fetchCompetitionAccess(supabase, competitionId, select);
+  if (error || !competition) {
+    return {
+      ok: false,
+      respond: (res) => res.status(404).json({ error: 'Competición no encontrada' }),
+    };
+  }
+  if (!canRefereeCompetition(user, competition, refereeToken)) {
+    return {
+      ok: false,
+      respond: (res) => res.status(404).json({ error: 'Competición no encontrada' }),
+    };
+  }
+  return { ok: true, competition };
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} token
+ * @param {string} [select]
+ */
+async function requireRefereeByToken(supabase, token, select = 'id, name, rounds, circuit_id, status, organizer, referee_access_token') {
+  const { competition, error } = await fetchCompetitionByRefereeToken(supabase, token, select);
+  if (error || !competition) {
+    return {
+      ok: false,
+      respond: (res) => res.status(404).json({ error: 'Enlace no válido o desactivado' }),
+    };
+  }
+  return { ok: true, competition };
+}
+
 module.exports = {
   fetchCompetitionAccess,
+  fetchCompetitionByRefereeToken,
   canViewCompetition,
   canManageCompetition,
+  canRefereeCompetition,
+  isValidRefereeAccessToken,
   requireViewCompetition,
   requireManageCompetition,
+  requireRefereeCompetition,
+  requireRefereeByToken,
 };

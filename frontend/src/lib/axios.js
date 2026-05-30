@@ -22,7 +22,16 @@ export function invalidateApiAccessTokenCache() {
 api.interceptors.request.use(
   async (config) => {
     // Rutas públicas que no requieren autenticación
-    const publicRoutes = ['/public-signup/', '/api/public-signup/', '/public/', '/api/public/', '/public/clubs/', '/api/public/clubs/'];
+    const publicRoutes = [
+      '/public-signup/',
+      '/api/public-signup/',
+      '/public/',
+      '/api/public/',
+      '/public/clubs/',
+      '/api/public/clubs/',
+      '/referee/',
+      '/api/referee/',
+    ];
 
     const isPublicRoute = publicRoutes.some((route) => config.url.includes(route));
 

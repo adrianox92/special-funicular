@@ -1,5 +1,5 @@
 const express = require('express');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const router = express.Router();
 const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
@@ -28,6 +28,14 @@ const {
   validateManualStatusTransition,
 } = require('../lib/competitionLifecycle');
 const { sendWaitlistPromotionEmail } = require('../lib/waitlistMailer');
+const { generateRefereeAccessToken, buildRefereeUrl } = require('../lib/refereeLink');
+const {
+  listCompetitionTimings,
+  createCompetitionTiming,
+  updateCompetitionTiming,
+  updateCompetitionTimingPenalty,
+  sendHandlerError,
+} = require('../lib/competitionTimingHandlers');
 
 /** Cliente que usa service role si existe (omite RLS; el API valida permisos). Igual que clubs/sync. */
 const supabase = getServiceOrAnonClient();
@@ -1304,207 +1312,119 @@ router.get('/:id/progress', async (req, res) => {
   }
 });
 
+// ==================== ENLACE MODO ÁRBITRO ====================
+
+router.get(
+  '/:id/referee-link/status',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const access = await requireManageCompetition(supabase, req.user, id, 'id, referee_access_token');
+      if (!access.ok) return access.respond(res);
+      const enabled = Boolean(access.competition.referee_access_token);
+      res.json({
+        enabled,
+        referee_url: enabled ? buildRefereeUrl(access.competition.referee_access_token) : null,
+      });
+    } catch (e) {
+      console.error('GET /competitions/:id/referee-link/status', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/referee-link/enable',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const access = await requireManageCompetition(supabase, req.user, id, 'id, referee_access_token');
+      if (!access.ok) return access.respond(res);
+
+      let token = access.competition.referee_access_token;
+      if (!token) {
+        token = generateRefereeAccessToken();
+        const { error } = await supabase
+          .from('competitions')
+          .update({ referee_access_token: token })
+          .eq('id', id);
+        if (error) return res.status(500).json({ error: error.message });
+      }
+
+      res.status(200).json({ enabled: true, referee_url: buildRefereeUrl(token) });
+    } catch (e) {
+      console.error('POST /competitions/:id/referee-link/enable', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/referee-link/regenerate',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const access = await requireManageCompetition(supabase, req.user, id);
+      if (!access.ok) return access.respond(res);
+
+      const token = generateRefereeAccessToken();
+      const { error } = await supabase
+        .from('competitions')
+        .update({ referee_access_token: token })
+        .eq('id', id);
+      if (error) return res.status(500).json({ error: error.message });
+
+      res.json({ enabled: true, referee_url: buildRefereeUrl(token) });
+    } catch (e) {
+      console.error('POST /competitions/:id/referee-link/regenerate', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/referee-link/disable',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const access = await requireManageCompetition(supabase, req.user, id);
+      if (!access.ok) return access.respond(res);
+
+      const { error } = await supabase
+        .from('competitions')
+        .update({ referee_access_token: null })
+        .eq('id', id);
+      if (error) return res.status(500).json({ error: error.message });
+
+      res.json({ enabled: false, referee_url: null });
+    } catch (e) {
+      console.error('POST /competitions/:id/referee-link/disable', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
 // ==================== TIEMPOS DE COMPETICIÓN ====================
 
 // Registrar un tiempo de competición
 router.post('/:id/timings', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
-    const { 
-      participant_id, 
-      best_lap_time, 
-      total_time, 
-      laps, 
-      lane, 
-      driver, 
-      timing_date,
-      best_lap_timestamp,
-      total_time_timestamp,
-      setup_snapshot,
-      circuit,
-      circuit_id,
-      round_number,
-      did_not_participate,
-    } = req.body;
 
-    const isDnp = Boolean(did_not_participate);
-
-    const access = await requireManageCompetition(supabase, req.user, competitionId, 'id, rounds, organizer, club_id');
+    const access = await requireManageCompetition(supabase, req.user, competitionId, 'id, rounds, organizer, club_id, status');
     if (!access.ok) return access.respond(res);
-    const competition = access.competition;
 
-    const timingBlock = timingForbiddenReason(competition.status);
-    if (timingBlock) {
-      return res.status(400).json({ error: timingBlock });
-    }
-
-    // Verificar que el participante existe y pertenece a esta competición
-    const { data: participant, error: partError } = await supabase
-      .from('competition_participants')
-      .select('id, vehicle_id')
-      .eq('id', participant_id)
-      .eq('competition_id', competitionId)
-      .single();
-
-    if (partError || !participant) {
-      return res.status(404).json({ error: 'Participante no encontrado en esta competición' });
-    }
-
-    // Obtener scale_factor del vehículo si el participante tiene uno
-    let scaleFactor = DEFAULT_SCALE_FACTOR;
-    if (participant.vehicle_id) {
-      const { data: vehicle } = await supabase
-        .from('vehicles')
-        .select('scale_factor')
-        .eq('id', participant.vehicle_id)
-        .single();
-      if (vehicle?.scale_factor) scaleFactor = vehicle.scale_factor;
-    }
-
-    // Validaciones de tiempo (saltadas para NP)
-    let derivedAverage = null;
-    if (!isDnp) {
-      if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
-        return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
-      }
-
-      derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
-      if (!derivedAverage) {
-        return res.status(400).json({
-          error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
-        });
-      }
-    }
-
-    if (!round_number || round_number <= 0 || round_number > competition.rounds) {
-      return res.status(400).json({ 
-        error: `El número de ronda debe estar entre 1 y ${competition.rounds}` 
-      });
-    }
-
-    // Verificar que no existe ya un tiempo para este participante en esta ronda
-    const { data: existingTiming, error: existingError } = await supabase
-      .from('competition_timings')
-      .select('id')
-      .eq('participant_id', participant_id)
-      .eq('round_number', round_number)
-      .single();
-
-    if (existingTiming) {
-      return res.status(400).json({ 
-        error: `Ya existe un tiempo registrado para este participante en la ronda ${round_number}` 
-      });
-    }
-
-    let timingsBefore = 0;
-    const { data: partRowsForCount } = await supabase
-      .from('competition_participants')
-      .select('id')
-      .eq('competition_id', competitionId);
-    const pidList = (partRowsForCount || []).map((p) => p.id);
-    if (pidList.length > 0) {
-      const { count: tb } = await supabase
-        .from('competition_timings')
-        .select('*', { count: 'exact', head: true })
-        .in('participant_id', pidList);
-      timingsBefore = tb || 0;
-    }
-
-    // Crear el tiempo
-    const timingData = isDnp
-      ? {
-          participant_id,
-          did_not_participate: true,
-          best_lap_time: '00:00.000',
-          total_time: '00:00.000',
-          laps: 0,
-          average_time: '00:00.000',
-          round_number,
-          timing_date: timing_date || new Date().toISOString().split('T')[0],
-        }
-      : {
-          participant_id,
-          did_not_participate: false,
-          best_lap_time,
-          total_time,
-          laps,
-          average_time: derivedAverage.average_time,
-          average_time_timestamp: derivedAverage.average_time_timestamp,
-          round_number,
-          timing_date: timing_date || new Date().toISOString().split('T')[0],
-        };
-
-    // Campos opcionales (no aplican a NP)
-    if (!isDnp) {
-      if (lane) timingData.lane = lane;
-      if (driver) timingData.driver = driver;
-      if (best_lap_timestamp) timingData.best_lap_timestamp = best_lap_timestamp;
-      if (total_time_timestamp) timingData.total_time_timestamp = total_time_timestamp;
-      if (setup_snapshot) timingData.setup_snapshot = setup_snapshot;
-    }
-    let circuitLaneLengths = [];
-    if (!isDnp && circuit_id) {
-      const { data: circuit, error: circuitError } = await supabase
-        .from('circuits')
-        .select('name, lane_lengths')
-        .eq('id', circuit_id)
-        .eq('user_id', competition.organizer)
-        .single();
-      if (!circuitError && circuit) {
-        timingData.circuit_id = circuit_id;
-        timingData.circuit = circuit.name;
-        circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
-      }
-    } else if (!isDnp && circuit) {
-      timingData.circuit = circuit;
-    }
-
-    // Calcular distancia y velocidad (no aplica a NP)
-    if (!isDnp) {
-      const distanceSpeed = calculateDistanceAndSpeed({
-        laps,
-        lane,
-        circuitLaneLengths,
-        totalTimeSeconds: total_time_timestamp,
-        bestLapSeconds: best_lap_timestamp,
-        scaleFactor,
-      });
-      if (distanceSpeed) {
-        Object.assign(timingData, distanceSpeed);
-      }
-    }
-
-    const { data, error } = await supabase
-      .from('competition_timings')
-      .insert([timingData])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error al registrar tiempo:', error);
-      return res.status(500).json({ error: error.message });
-    }
-
-    if (normalizeStatus(competition) === 'published' && timingsBefore === 0) {
-      const { error: stErr } = await supabase
-        .from('competitions')
-        .update({ status: 'running' })
-        .eq('id', competitionId);
-      if (stErr) {
-        console.warn('No se pudo pasar la competición a en_curso:', stErr.message);
-      }
-    }
-
-    // Actualizar odómetro del vehículo si el participante tiene uno (no aplica a NP)
-    if (!isDnp && participant.vehicle_id) {
-      try {
-        await updateVehicleOdometer(supabase, participant.vehicle_id);
-      } catch (odometerError) {
-        console.warn('Error al actualizar odómetro:', odometerError);
-      }
-    }
-
-    res.status(201).json(data);
+    const result = await createCompetitionTiming(supabase, competitionId, access.competition, req.body);
+    if (result.error) return sendHandlerError(res, result.error);
+    res.status(result.status || 201).json(result.data);
   } catch (error) {
     console.error('Error en POST /competitions/:id/timings:', error);
     res.status(500).json({ error: error.message });
@@ -1515,61 +1435,17 @@ router.post('/:id/timings', async (req, res) => {
 router.get('/:id/timings', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
-    const { round_number, participant_id } = req.query;
 
     const access = await requireViewCompetition(supabase, req.user, competitionId);
     if (!access.ok) return access.respond(res);
 
-    // Construir la consulta
-    let query = supabase
-      .from('competition_timings')
-      .select(`
-        *,
-        competition_participants!inner(
-          id,
-          competition_id
-        )
-      `)
-      .eq('competition_participants.competition_id', competitionId)
-      .order('round_number', { ascending: true })
-      .order('created_at', { ascending: true });
-
-    // Filtros opcionales
-    if (round_number) {
-      query = query.eq('round_number', round_number);
+    const result = await listCompetitionTimings(supabase, competitionId, req.query);
+    if (result.error) {
+      console.error('Error al obtener tiempos:', result.error);
+      return sendHandlerError(res, result.error);
     }
 
-    if (participant_id) {
-      query = query.eq('participant_id', participant_id);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error al obtener tiempos:', error);
-      return res.status(500).json({ error: error.message });
-    }
-
-    const formatTime = (seconds) => {
-      if (typeof seconds !== 'number' || isNaN(seconds)) return null;
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = (seconds % 60).toFixed(3);
-      return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
-    };
-
-    const timingsWithPenalty = (data || []).map(t => {
-      const penalty = Number(t.penalty_seconds) || 0;
-      const totalTime = Number(t.total_time_timestamp) || 0;
-      const adjustedTotal = totalTime + penalty;
-      return {
-        ...t,
-        penalty_seconds: penalty,
-        adjusted_total_time_timestamp: adjustedTotal,
-        adjusted_total_time: formatTime(adjustedTotal),
-      };
-    });
-
-    res.json(timingsWithPenalty);
+    res.json(result.data);
   } catch (error) {
     console.error('Error en GET /competitions/:id/timings:', error);
     res.status(500).json({ error: error.message });
@@ -1580,200 +1456,19 @@ router.get('/:id/timings', async (req, res) => {
 router.put('/:id/timings/:timingId', async (req, res) => {
   try {
     const { id: competitionId, timingId } = req.params;
-    const { 
-      best_lap_time, 
-      total_time, 
-      laps, 
-      lane, 
-      driver, 
-      timing_date,
-      best_lap_timestamp,
-      total_time_timestamp,
-      setup_snapshot,
-      circuit,
-      circuit_id,
-      did_not_participate,
-    } = req.body;
 
-    const isDnp = Boolean(did_not_participate);
-
-    const access = await requireManageCompetition(supabase, req.user, competitionId);
+    const access = await requireManageCompetition(supabase, req.user, competitionId, 'id, rounds, organizer, club_id, status');
     if (!access.ok) return access.respond(res);
-    const competition = access.competition;
 
-    const timingBlockPut = timingForbiddenReason(competition.status);
-    if (timingBlockPut) {
-      return res.status(400).json({ error: timingBlockPut });
-    }
-
-    // Verificar que el tiempo existe y pertenece a esta competición
-    const { data: existingTiming, error: timingError } = await supabase
-      .from('competition_timings')
-      .select('id, participant_id, lane, total_time_timestamp, best_lap_timestamp, circuit_id')
-      .eq('id', timingId)
-      .single();
-
-    if (timingError || !existingTiming) {
-      return res.status(404).json({ error: 'Tiempo no encontrado' });
-    }
-
-    // Verificar que el participante pertenece a esta competición
-    const { data: participant, error: partError } = await supabase
-      .from('competition_participants')
-      .select('id, vehicle_id')
-      .eq('id', existingTiming.participant_id)
-      .eq('competition_id', competitionId)
-      .single();
-
-    if (partError || !participant) {
-      return res.status(404).json({ error: 'Participante no encontrado en esta competición' });
-    }
-
-    // Obtener scale_factor del vehículo
-    let scaleFactor = DEFAULT_SCALE_FACTOR;
-    if (participant.vehicle_id) {
-      const { data: vehicle } = await supabase
-        .from('vehicles')
-        .select('scale_factor')
-        .eq('id', participant.vehicle_id)
-        .single();
-      if (vehicle?.scale_factor) scaleFactor = vehicle.scale_factor;
-    }
-
-    // Validaciones de tiempo (saltadas para NP)
-    let derivedAverage = null;
-    if (!isDnp) {
-      if (!best_lap_time || !total_time || laps === undefined || laps === null || laps === '') {
-        return res.status(400).json({ error: 'Mejor vuelta, tiempo total y vueltas son requeridos' });
-      }
-
-      derivedAverage = deriveCompetitionAverageFromTotalAndLaps(total_time, laps);
-      if (!derivedAverage) {
-        return res.status(400).json({
-          error: 'Tiempo total debe ser mm:ss.mmm y el número de vueltas un entero mayor que 0',
-        });
-      }
-    }
-
-    // Actualizar el tiempo
-    const updateData = isDnp
-      ? {
-          did_not_participate: true,
-          best_lap_time: '00:00.000',
-          total_time: '00:00.000',
-          laps: 0,
-          average_time: '00:00.000',
-          average_time_timestamp: null,
-          best_lap_timestamp: null,
-          total_time_timestamp: null,
-          penalty_seconds: 0,
-          track_length_meters: null,
-          total_distance_meters: null,
-          avg_speed_kmh: null,
-          avg_speed_scale_kmh: null,
-          best_lap_speed_kmh: null,
-          best_lap_speed_scale_kmh: null,
-        }
-      : {
-          did_not_participate: false,
-          best_lap_time,
-          total_time,
-          laps,
-          average_time: derivedAverage.average_time,
-          average_time_timestamp: derivedAverage.average_time_timestamp,
-        };
-
-    // Campos opcionales y cálculos de circuito/distancia (saltados cuando es NP)
-    if (isDnp) {
-      if (timing_date) updateData.timing_date = timing_date;
-      updateData.lane = null;
-      updateData.driver = null;
-      updateData.setup_snapshot = null;
-      updateData.circuit_id = null;
-      updateData.circuit = null;
-    } else {
-      if (lane !== undefined) updateData.lane = lane;
-      if (driver !== undefined) updateData.driver = driver;
-      if (timing_date) updateData.timing_date = timing_date;
-      if (best_lap_timestamp !== undefined) updateData.best_lap_timestamp = best_lap_timestamp;
-      if (total_time_timestamp !== undefined) updateData.total_time_timestamp = total_time_timestamp;
-      if (setup_snapshot !== undefined) updateData.setup_snapshot = setup_snapshot;
-      let circuitLaneLengths = [];
-      if (circuit_id !== undefined) {
-        if (circuit_id) {
-          const { data: circuit, error: circuitError } = await supabase
-            .from('circuits')
-            .select('name, lane_lengths')
-            .eq('id', circuit_id)
-            .eq('user_id', competition.organizer)
-            .single();
-          if (!circuitError && circuit) {
-            updateData.circuit_id = circuit_id;
-            updateData.circuit = circuit.name;
-            circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
-          }
-        } else {
-          updateData.circuit_id = null;
-          updateData.circuit = null;
-        }
-      } else if (circuit !== undefined) {
-        updateData.circuit = circuit;
-      } else if (existingTiming.circuit_id) {
-        const { data: circuit } = await supabase
-          .from('circuits')
-          .select('lane_lengths')
-          .eq('id', existingTiming.circuit_id)
-          .single();
-        if (circuit) {
-          circuitLaneLengths = Array.isArray(circuit.lane_lengths) ? circuit.lane_lengths : [];
-        }
-      }
-
-      const effectiveLane = lane !== undefined ? lane : existingTiming.lane;
-      const effectiveTotalTime = total_time_timestamp ?? existingTiming.total_time_timestamp;
-      const effectiveBestLap = best_lap_timestamp ?? existingTiming.best_lap_timestamp;
-      const distanceSpeed = calculateDistanceAndSpeed({
-        laps,
-        lane: effectiveLane,
-        circuitLaneLengths,
-        totalTimeSeconds: effectiveTotalTime,
-        bestLapSeconds: effectiveBestLap,
-        scaleFactor,
-      });
-      if (distanceSpeed) {
-        Object.assign(updateData, distanceSpeed);
-      } else {
-        updateData.track_length_meters = null;
-        updateData.total_distance_meters = null;
-        updateData.avg_speed_kmh = null;
-        updateData.avg_speed_scale_kmh = null;
-        updateData.best_lap_speed_kmh = null;
-        updateData.best_lap_speed_scale_kmh = null;
-      }
-    }
-
-    const { data, error } = await supabase
-      .from('competition_timings')
-      .update(updateData)
-      .eq('id', timingId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error al actualizar tiempo:', error);
-      return res.status(500).json({ error: error.message });
-    }
-
-    // Actualizar odómetro del vehículo si el participante tiene uno (no aplica a NP)
-    if (!isDnp && participant.vehicle_id) {
-      try {
-        await updateVehicleOdometer(supabase, participant.vehicle_id);
-      } catch (odometerError) {
-        console.warn('Error al actualizar odómetro:', odometerError);
-      }
-    }
-
-    res.json(data);
+    const result = await updateCompetitionTiming(
+      supabase,
+      competitionId,
+      access.competition,
+      timingId,
+      req.body,
+    );
+    if (result.error) return sendHandlerError(res, result.error);
+    res.json(result.data);
   } catch (error) {
     console.error('Error en PUT /competitions/:id/timings/:timingId:', error);
     res.status(500).json({ error: error.message });
@@ -2558,20 +2253,51 @@ router.delete('/:id/signups/:signupId', async (req, res) => {
  *         description: Error al actualizar la penalización
  */
 router.patch('/competition-timings/:id/penalty', async (req, res) => {
-  const { id } = req.params;
-  const { penalty_seconds } = req.body;
+  try {
+    const { id: timingId } = req.params;
+    const { penalty_seconds } = req.body;
 
-  if (typeof penalty_seconds !== 'number' || penalty_seconds < 0) {
-    return res.status(400).json({ error: 'penalty_seconds debe ser un número positivo' });
+    if (typeof penalty_seconds !== 'number' || penalty_seconds < 0) {
+      return res.status(400).json({ error: 'penalty_seconds debe ser un número positivo' });
+    }
+
+    const { data: timingRow, error: timingErr } = await supabase
+      .from('competition_timings')
+      .select('id, participant_id')
+      .eq('id', timingId)
+      .single();
+
+    if (timingErr || !timingRow) {
+      return res.status(404).json({ error: 'Tiempo no encontrado' });
+    }
+
+    const { data: partRow, error: partErr } = await supabase
+      .from('competition_participants')
+      .select('competition_id')
+      .eq('id', timingRow.participant_id)
+      .single();
+
+    if (partErr || !partRow?.competition_id) {
+      return res.status(404).json({ error: 'Tiempo no encontrado' });
+    }
+
+    const competitionId = partRow.competition_id;
+
+    const access = await requireManageCompetition(supabase, req.user, competitionId);
+    if (!access.ok) return access.respond(res);
+
+    const result = await updateCompetitionTimingPenalty(
+      supabase,
+      competitionId,
+      timingId,
+      penalty_seconds,
+    );
+    if (result.error) return sendHandlerError(res, result.error);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('PATCH /competition-timings/:id/penalty', error);
+    res.status(500).json({ error: error.message });
   }
-
-  const { error } = await supabase
-    .from('competition_timings')
-    .update({ penalty_seconds })
-    .eq('id', id);
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
 });
 
 module.exports = router; 
