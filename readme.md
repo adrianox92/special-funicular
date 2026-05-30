@@ -407,20 +407,23 @@ Si no ves el botón de instalación:
 
 **Usage**: Import `toast` from `sonner` for notifications (`toast.error()`, `toast.success()`, `toast.warning()`). Use AlertDialog for confirmation flows.
 
-#### Vehicle Image Lightbox
+#### Vehicle Image Carousel (visor de fotografías)
 
-**Description**: In the vehicle detail page, clicking on any photograph in the gallery opens it in a lightbox at full/original size.
+**Description**: En la ficha del vehículo (`/vehicles/:id`, `EditVehicle`), al hacer clic en una miniatura con imagen se abre un carrusel con todas las fotografías cargadas del vehículo.
 
 **Features**:
 
-- Click on any vehicle image to view it enlarged
-- Modal overlay with the image at maximum viewable size (up to 95% of viewport)
-- Close by clicking the X button or outside the image
-- Cursor indicates images are clickable
+- Clic en miniatura → carrusel modal con todas las vistas disponibles (delantera, perfiles, etc.)
+- Navegación con flechas, teclado (←/→) y gestos swipe en móvil
+- Contador de posición (ej. `2 / 5`) y etiqueta de cada vista
+- Subir o reemplazar foto: arrastrar y soltar, o botón «Cambiar foto» en cada slot
+- Slots vacíos: clic en la zona punteada abre el selector de archivos
+- Cerrar con X, Escape o clic fuera del diálogo
 
-**Files modified**:
+**Files**:
 
-- `frontend/src/components/VehicleDetail.jsx` - Added Dialog lightbox for image viewing
+- `frontend/src/components/VehicleImageCarouselDialog.jsx` - Dialog + Carousel (Embla/shadcn)
+- `frontend/src/components/EditVehicle.jsx` - Integración en la pestaña General
 
 ### Problemas Resueltos
 

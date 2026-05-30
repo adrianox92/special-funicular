@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ExternalLink,
@@ -21,6 +21,7 @@ import SpeedEvolutionChart from './charts/SpeedEvolutionChart';
 import TimingSpecsModal from './TimingSpecsModal';
 import SessionPerformanceModal from './SessionPerformanceModal';
 import SetupPerformanceAnalysis, { hasMultipleConfigs } from './SetupPerformanceAnalysis';
+import VehicleImageCarouselDialog from './VehicleImageCarouselDialog';
 import MaintenanceCorrelationChart from './charts/MaintenanceCorrelationChart';
 import MaintenanceLog from './MaintenanceLog';
 import ImportTimingsModal from './ImportTimingsModal';
@@ -188,6 +189,8 @@ const EditVehicle = () => {
   const [pendingSpecSave, setPendingSpecSave] = useState(null);
   const [specDeleteReturnToInventory, setSpecDeleteReturnToInventory] = useState(false);
   const [draggingOver, setDraggingOver] = useState(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryStartIndex, setGalleryStartIndex] = useState(0);
   const imageRefs = useRef({});
   const [activeTab, setActiveTab] = useState('general');
   useEffect(() => {
@@ -351,6 +354,33 @@ const EditVehicle = () => {
       observers.forEach(observer => observer.disconnect());
     };
   }, [previews, images]);
+
+  const gallerySlides = useMemo(
+    () =>
+      imageFields
+        .filter(({ name }) => previews[name] || images[name])
+        .map(({ name, label }) => ({
+          name,
+          label,
+          url: previews[name] || URL.createObjectURL(images[name]),
+        })),
+    [previews, images],
+  );
+
+  const gallerySlideIndexByName = useMemo(() => {
+    const map = {};
+    gallerySlides.forEach((slide, index) => {
+      map[slide.name] = index;
+    });
+    return map;
+  }, [gallerySlides]);
+
+  const openGallery = (name) => {
+    const index = gallerySlideIndexByName[name];
+    if (index === undefined) return;
+    setGalleryStartIndex(index);
+    setGalleryOpen(true);
+  };
 
   useEffect(() => {
     const loadTechnicalSpecs = async () => {
@@ -2015,6 +2045,13 @@ const EditVehicle = () => {
         </AlertDialog>
       )}
 
+      <VehicleImageCarouselDialog
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        slides={gallerySlides}
+        initialIndex={galleryStartIndex}
+      />
+
       <div className="container mt-4">
       <Dialog
         open={showQrDialog}
@@ -2441,12 +2478,17 @@ const EditVehicle = () => {
                         <Label className="text-xs sm:text-sm leading-snug">{label}</Label>
                         <div
                           className={cn(
-                            'border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-2 sm:p-4 relative min-h-[100px] sm:min-h-[120px] cursor-pointer transition-colors',
+                            'border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-2 sm:p-4 relative min-h-[100px] sm:min-h-[120px] transition-colors',
                             draggingOver === name
                               ? 'border-primary bg-primary/10'
                               : 'border-muted-foreground/25 bg-muted/30 hover:bg-muted/50',
+                            !(previews[name] || images[name]) && 'cursor-pointer',
                           )}
-                          onClick={() => document.getElementById(`img-${name}`).click()}
+                          onClick={
+                            previews[name] || images[name]
+                              ? undefined
+                              : () => document.getElementById(`img-${name}`).click()
+                          }
                           onDragEnter={(e) => handleDragEnter(e, name)}
                           onDragLeave={(e) => handleDragLeave(e, name)}
                           onDragOver={handleDragOver}
@@ -2460,8 +2502,12 @@ const EditVehicle = () => {
                                 }}
                                 src={previews[name] || URL.createObjectURL(images[name])}
                                 alt={label}
-                                className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain pointer-events-none"
+                                className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
                                 loading="lazy"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openGallery(name);
+                                }}
                               />
                               <Button
                                 type="button"
@@ -2476,6 +2522,20 @@ const EditVehicle = () => {
                                 disabled={deletingImage === name}
                               >
                                 {deletingImage === name ? <Spinner className="size-3.5 sm:size-4" /> : '×'}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 h-8 gap-1 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  document.getElementById(`img-${name}`).click();
+                                }}
+                              >
+                                <Upload className="size-3.5" />
+                                Cambiar foto
                               </Button>
                             </>
                           ) : (
