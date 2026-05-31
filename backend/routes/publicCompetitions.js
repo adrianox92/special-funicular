@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
-const supabase = getAnonClient();
+const { getServiceClient, getServiceOrAnonClient } = require('../lib/supabaseClients');
+/** Service role: lecturas públicas por slug; el API filtra borradores y valida inscripciones. */
+const supabase = getServiceOrAnonClient();
 const { loadCompetitionExportByPublicSlug } = require('../lib/competitionExportPayload');
 const {
   calculatePoints,
@@ -13,6 +14,8 @@ const { generateCompetitionXLSX } = require('../lib/competitionXlsxGenerator');
 const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
 const { generateCompetitionSocialPDF } = require('../src/utils/competitionSocialPdfGenerator');
 const { normalizeStatus, signupForbiddenReason } = require('../lib/competitionLifecycle');
+const { appendRegulationFileUrl } = require('../lib/competitionRegulationUpload');
+const supabaseStorage = getServiceOrAnonClient();
 
 function isDraftCompetitionPublic(competition) {
   return normalizeStatus(competition) === 'draft';
@@ -385,7 +388,10 @@ router.get('/:slug', async (req, res) => {
         rounds,
         circuit_name,
         created_at,
-        status
+        status,
+        regulation_url,
+        regulation_file_path,
+        regulation_file_name
       `)
       .eq('public_slug', slug)
       .single();
@@ -401,19 +407,12 @@ router.get('/:slug', async (req, res) => {
     // Obtener categorías disponibles
     const { data: categories, error: catError } = await supabase
       .from('competition_categories')
-      .select('id, name')
+      .select('id, name, regulation_url, regulation_file_path, regulation_file_name')
       .eq('competition_id', competition.id)
       .order('name', { ascending: true });
 
     if (catError) {
       console.error('Error al obtener categorías:', catError);
-    }
-
-    // Verificar que hay al menos una categoría
-    if (!categories || categories.length === 0) {
-      return res.status(400).json({ 
-        error: 'Esta competición no tiene categorías configuradas. Contacta al organizador.' 
-      });
     }
 
     const { count: participantsCount, error: pcErr } = await supabase
@@ -437,10 +436,14 @@ router.get('/:slug', async (req, res) => {
     if (spErr) console.error('Error al contar inscripciones:', spErr);
     if (wlErr) console.error('Error al contar lista de espera:', wlErr);
 
-    // Preparar respuesta
+    const enrichedCategories = (categories || []).map((cat) =>
+      appendRegulationFileUrl(supabaseStorage, cat)
+    );
+    const enrichedCompetition = appendRegulationFileUrl(supabaseStorage, competition);
+
     const response = {
-      ...competition,
-      categories: categories || [],
+      ...enrichedCompetition,
+      categories: enrichedCategories,
       participants_count: participantsCount || 0,
       signups_count: signupsPending || 0,
       waitlist_count: waitlistCount || 0,
@@ -468,10 +471,6 @@ router.post('/:slug/signup', async (req, res) => {
       return res.status(400).json({ error: 'El email es requerido' });
     }
 
-    if (!category_id) {
-      return res.status(400).json({ error: 'Debes seleccionar una categoría' });
-    }
-
     if (!vehicle || !vehicle.trim()) {
       return res.status(400).json({ error: 'El vehículo es requerido' });
     }
@@ -492,16 +491,40 @@ router.post('/:slug/signup', async (req, res) => {
       return res.status(400).json({ error: signupBlock });
     }
 
-    // Verificar que la categoría existe y pertenece a esta competición
-    const { data: category, error: catError } = await supabase
+    const { data: competitionCategories, error: categoriesError } = await supabase
       .from('competition_categories')
-      .select('id, name')
-      .eq('id', category_id)
-      .eq('competition_id', competition.id)
-      .single();
+      .select('id')
+      .eq('competition_id', competition.id);
 
-    if (catError || !category) {
-      return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+    if (categoriesError) {
+      console.error('Error al obtener categorías:', categoriesError);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
+    const hasCategories = Array.isArray(competitionCategories) && competitionCategories.length > 0;
+
+    if (hasCategories && !category_id) {
+      return res.status(400).json({ error: 'Debes seleccionar una categoría' });
+    }
+
+    let resolvedCategoryId = null;
+    let categoryName = null;
+
+    if (hasCategories) {
+      const { data: category, error: catError } = await supabase
+        .from('competition_categories')
+        .select('id, name')
+        .eq('id', category_id)
+        .eq('competition_id', competition.id)
+        .single();
+
+      if (catError || !category) {
+        return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+      }
+      resolvedCategoryId = category.id;
+      categoryName = category.name;
+    } else if (category_id) {
+      return res.status(400).json({ error: 'Esta competición no tiene categorías' });
     }
 
     const { count: participantsCount, error: pcErr } = await supabase
@@ -537,7 +560,7 @@ router.post('/:slug/signup', async (req, res) => {
       name: name.trim(),
       email: email.trim(),
       vehicle: vehicle.trim(),
-      category_id: category_id,
+      category_id: resolvedCategoryId,
       is_waitlist: false,
       waitlist_position: null,
     };
@@ -587,7 +610,7 @@ router.post('/:slug/signup', async (req, res) => {
         name: signup.name,
         email: signup.email,
         vehicle: signup.vehicle,
-        category: signup.competition_categories?.name
+        category: signup.competition_categories?.name || categoryName,
       }
     });
   } catch (error) {
@@ -739,6 +762,7 @@ router.get('/:slug/status', async (req, res) => {
         times_remaining: Math.max(0, totalRequiredTimes - timesCount)
       },
       participants: sortedParticipants,
+      categories: categories || [],
       category_rankings: categoryRankings || [],
       has_category_rules: (rules || []).some((r) => r.category_id != null),
       global_best_lap: globalBestLap ? {

@@ -100,6 +100,19 @@ const CompetitionStatus = () => {
     return buildRoundLeaderboard(competitionData.participants, selectedRound);
   }, [competitionData, selectedRound]);
 
+  const categoryNameById = useMemo(() => {
+    const map = {};
+    (competitionData?.categories || []).forEach((cat) => {
+      map[cat.id] = cat.name;
+    });
+    (competitionData?.category_rankings || []).forEach((ranking) => {
+      if (ranking.category_id && ranking.category_name) {
+        map[ranking.category_id] = ranking.category_name;
+      }
+    });
+    return map;
+  }, [competitionData?.categories, competitionData?.category_rankings]);
+
   const loadCompetitionStatus = async () => {
     try {
       setLoading(true);
@@ -292,8 +305,18 @@ const CompetitionStatus = () => {
     );
   }
 
-  const { competition, status, participants, global_best_lap, category_rankings: categoryRankings = [], has_category_rules: hasCategoryRules = false } = competitionData;
+  const {
+    competition,
+    status,
+    participants,
+    global_best_lap,
+    category_rankings: categoryRankings = [],
+    has_category_rules: hasCategoryRules = false,
+  } = competitionData;
   const isCompleted = status.is_completed;
+
+  const showCategoryColumn =
+    activeClassificationTab === 'general' && Object.keys(categoryNameById).length > 0;
 
   const displayedGeneralParticipants = (() => {
     if (!competitionData) return [];
@@ -321,6 +344,7 @@ const CompetitionStatus = () => {
           <TableRow>
             <TableHead>Pos.</TableHead>
             <TableHead>Piloto</TableHead>
+            {showCategoryColumn && <TableHead>Categoría</TableHead>}
             <TableHead>Vehículo</TableHead>
             <TableHead className="tabular-nums">Rondas</TableHead>
             <TableHead className="tabular-nums">Tiempo total</TableHead>
@@ -363,6 +387,17 @@ const CompetitionStatus = () => {
                     ) : null}
                   </div>
                 </TableCell>
+                {showCategoryColumn && (
+                  <TableCell>
+                    {participant.category_id && categoryNameById[participant.category_id] ? (
+                      <Badge variant="outline" className="whitespace-nowrap">
+                        {categoryNameById[participant.category_id]}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell className="max-w-[220px]">{participant.vehicle_info}</TableCell>
                 <TableCell className="tabular-nums text-muted-foreground">
                   {participant.rounds_completed}/{competition.rounds}

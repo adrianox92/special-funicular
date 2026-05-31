@@ -65,26 +65,6 @@ function sortByPointsThenTime(stats) {
 }
 
 /**
- * Orden general absoluto: tiempo asc → rondas disputadas desc.
- */
-function sortByTimeOnly(stats) {
-  return stats.slice().sort((a, b) => {
-    const racedA = a.rounds_completed - (a.rounds_dnp || 0);
-    const racedB = b.rounds_completed - (b.rounds_dnp || 0);
-    if (a.total_time_seconds && b.total_time_seconds) {
-      const diff = a.total_time_seconds - b.total_time_seconds;
-      if (diff !== 0) return diff;
-    }
-    if (a.total_time_seconds && !b.total_time_seconds) return -1;
-    if (!a.total_time_seconds && b.total_time_seconds) return 1;
-    if (racedA !== racedB) {
-      return racedB - racedA;
-    }
-    return 0;
-  });
-}
-
-/**
  * Núcleo del cálculo de puntos para un subconjunto de participantes y reglas.
  * @returns {{ pointsByParticipant: Object, participantStats: Array }}
  */
@@ -352,7 +332,7 @@ function calculatePoints({ competition, participants, timings, rules, categories
     points: mergedPointsByParticipant[stat.participant_id] || 0,
   }));
 
-  const sortedParticipants = sortByTimeOnly(participantStats);
+  const sortedParticipants = sortByPointsThenTime(participantStats);
   sortedParticipants.forEach((participant, index) => {
     participant.position = index + 1;
   });

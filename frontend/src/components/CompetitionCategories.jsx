@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tags, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Tags, Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader } from './ui/card';
@@ -27,6 +27,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
+import CompetitionRegulation from './CompetitionRegulation';
+import { hasRegulation } from '../utils/competitionRegulation';
+
+const REGULATION_MAX = 10 * 1024 * 1024;
+const ACCEPTED_TYPES = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+const emptyForm = () => ({
+  name: '',
+  regulation_url: '',
+  regulationMode: 'none',
+});
 
 const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = false }) => {
   const [categories, setCategories] = useState([]);
@@ -36,7 +47,8 @@ const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = fal
   const [saveError, setSaveError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [formData, setFormData] = useState({ name: '' });
+  const [formData, setFormData] = useState(emptyForm());
+  const [pendingFile, setPendingFile] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, categoryId: null });
 
   const loadCategories = async () => {
@@ -60,9 +72,29 @@ const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = fal
 
   const openModal = (category = null) => {
     setEditingCategory(category);
-    setFormData({ name: category ? category.name : '' });
+    setFormData({
+      name: category ? category.name : '',
+      regulation_url: category?.regulation_url || '',
+      regulationMode: category?.regulation_url
+        ? 'url'
+        : category?.regulation_file_path
+          ? 'file'
+          : 'none',
+    });
+    setPendingFile(null);
     setShowModal(true);
     setSaveError(null);
+  };
+
+  const uploadCategoryRegulation = async (categoryId, file) => {
+    if (file.size > REGULATION_MAX) {
+      throw new Error('El archivo no puede superar 10 MB');
+    }
+    const fd = new FormData();
+    fd.append('file', file);
+    await axios.post(`/competitions/${competitionId}/categories/${categoryId}/regulation`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   };
 
   const handleSave = async (e) => {
@@ -71,22 +103,75 @@ const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = fal
       setSaveError('El nombre de la categoría es requerido');
       return;
     }
+    if (formData.regulationMode === 'file' && pendingFile && pendingFile.size > REGULATION_MAX) {
+      setSaveError('El archivo no puede superar 10 MB');
+      return;
+    }
+
     try {
       setSaving(true);
       setSaveError(null);
+
+      const payload = {
+        name: formData.name.trim(),
+        regulation_url:
+          formData.regulationMode === 'url' ? formData.regulation_url.trim() || null : null,
+      };
+
+      let categoryId = editingCategory?.id;
       if (editingCategory) {
-        await axios.put(`/competitions/${competitionId}/categories/${editingCategory.id}`, formData);
+        if (formData.regulationMode === 'none' && editingCategory.regulation_file_path) {
+          await axios.delete(
+            `/competitions/${competitionId}/categories/${editingCategory.id}/regulation`
+          );
+        }
+        await axios.put(`/competitions/${competitionId}/categories/${editingCategory.id}`, payload);
       } else {
-        await axios.post(`/competitions/${competitionId}/categories`, formData);
+        const { data } = await axios.post(`/competitions/${competitionId}/categories`, payload);
+        categoryId = data.id;
       }
+
+      if (formData.regulationMode === 'file' && pendingFile && categoryId) {
+        await uploadCategoryRegulation(categoryId, pendingFile);
+      }
+
       setShowModal(false);
       setEditingCategory(null);
-      setFormData({ name: '' });
+      setFormData(emptyForm());
+      setPendingFile(null);
       loadCategories();
       onCategoryChange?.();
+      toast.success(editingCategory ? 'Categoría actualizada' : 'Categoría creada');
     } catch (err) {
       console.error('Error al guardar categoría:', err);
-      setSaveError(err.response?.data?.error || 'Error al guardar la categoría');
+      setSaveError(err.response?.data?.error || err.message || 'Error al guardar la categoría');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveRegulationFile = async () => {
+    if (!editingCategory) return;
+    try {
+      setSaving(true);
+      await axios.delete(
+        `/competitions/${competitionId}/categories/${editingCategory.id}/regulation`
+      );
+      setEditingCategory((prev) =>
+        prev
+          ? {
+              ...prev,
+              regulation_file_path: null,
+              regulation_file_name: null,
+              regulation_file_url: null,
+            }
+          : prev
+      );
+      setFormData((prev) => ({ ...prev, regulationMode: 'none' }));
+      toast.success('Fichero de reglamento eliminado');
+      loadCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al eliminar el fichero');
     } finally {
       setSaving(false);
     }
@@ -128,6 +213,12 @@ const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = fal
 
   return (
     <>
+      {categories.length === 0 && (
+        <div className="mb-4">
+          <CompetitionRegulation competitionId={competitionId} readOnly={readOnly} />
+        </div>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <h6 className="font-semibold flex items-center gap-2">
@@ -166,7 +257,15 @@ const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = fal
                   key={category.id}
                   className="flex items-center justify-between p-3 rounded-lg border bg-card"
                 >
-                  <Badge variant="secondary">{category.name}</Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="secondary">{category.name}</Badge>
+                    {hasRegulation(category) && (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <FileText className="size-3.5" />
+                        Reglamento
+                      </span>
+                    )}
+                  </div>
                   {!readOnly && (
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => openModal(category)}>
@@ -210,7 +309,7 @@ const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = fal
 
       {!readOnly && (
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tags className="size-5" />
@@ -235,6 +334,73 @@ const CompetitionCategories = ({ competitionId, onCategoryChange, readOnly = fal
                   required
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label>Reglamento (opcional)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'none', label: 'Sin reglamento' },
+                    { value: 'url', label: 'URL externa' },
+                    { value: 'file', label: 'Subir fichero' },
+                  ].map((opt) => (
+                    <Button
+                      key={opt.value}
+                      type="button"
+                      size="sm"
+                      variant={formData.regulationMode === opt.value ? 'default' : 'outline'}
+                      onClick={() => {
+                        setFormData((prev) => ({ ...prev, regulationMode: opt.value }));
+                        if (opt.value !== 'file') setPendingFile(null);
+                      }}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {formData.regulationMode === 'url' && (
+                <div className="space-y-2">
+                  <Label htmlFor="category-regulation-url">URL del reglamento</Label>
+                  <Input
+                    id="category-regulation-url"
+                    type="url"
+                    value={formData.regulation_url}
+                    onChange={(e) => setFormData({ ...formData, regulation_url: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+              )}
+
+              {formData.regulationMode === 'file' && (
+                <div className="space-y-2">
+                  {editingCategory?.regulation_file_name && !pendingFile && (
+                    <div className="flex items-center justify-between rounded-md border p-2 text-sm">
+                      <span className="flex items-center gap-2">
+                        <FileText className="size-4" />
+                        {editingCategory.regulation_file_name}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={handleRemoveRegulationFile}
+                        disabled={saving}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <Label htmlFor="category-regulation-file">Fichero (PDF o Word, máx. 10 MB)</Label>
+                  <Input
+                    id="category-regulation-file"
+                    type="file"
+                    accept={ACCEPTED_TYPES}
+                    onChange={(e) => setPendingFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>

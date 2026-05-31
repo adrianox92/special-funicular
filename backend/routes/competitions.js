@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const { body, param } = require('express-validator');
 const router = express.Router();
 const { getServiceOrAnonClient } = require('../lib/supabaseClients');
@@ -36,9 +37,26 @@ const {
   updateCompetitionTimingPenalty,
   sendHandlerError,
 } = require('../lib/competitionTimingHandlers');
+const {
+  appendRegulationFileUrl,
+  uploadRegulationFile,
+  removeRegulationFile,
+  normalizeRegulationUrl,
+  isAllowedRegulationMime,
+  REGULATION_MAX_BYTES,
+} = require('../lib/competitionRegulationUpload');
 
 /** Cliente que usa service role si existe (omite RLS; el API valida permisos). Igual que clubs/sync. */
 const supabase = getServiceOrAnonClient();
+
+const regulationFileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: REGULATION_MAX_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (isAllowedRegulationMime(file.mimetype)) cb(null, true);
+    else cb(new Error('Solo se permiten archivos PDF o Word'));
+  },
+});
 
 /** Promociona el primer signup en lista de espera y envía email (tras liberar plaza de participante). */
 async function promoteWaitlistAfterParticipantRemoval(competitionId) {
@@ -491,9 +509,9 @@ router.get('/:id', async (req, res) => {
     }
 
     res.json({
-      ...competition,
+      ...appendRegulationFileUrl(supabase, competition),
       participants: participants || [],
-      categories: categories || [],
+      categories: (categories || []).map((cat) => appendRegulationFileUrl(supabase, cat)),
       signups_count: signupsPending || 0,
       waitlist_count: waitlistCount || 0,
     });
@@ -1717,11 +1735,22 @@ router.get('/:id/export/xlsx', async (req, res) => {
 
 // ==================== CATEGORÍAS DE COMPETICIÓN ====================
 
+async function fetchCategoryForCompetition(competitionId, categoryId) {
+  const { data, error } = await supabase
+    .from('competition_categories')
+    .select('*')
+    .eq('id', categoryId)
+    .eq('competition_id', competitionId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 // Crear categoría para una competición
 router.post('/:id/categories', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, regulation_url } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, id);
     if (!access.ok) return access.respond(res);
@@ -1730,11 +1759,20 @@ router.post('/:id/categories', async (req, res) => {
       return res.status(400).json({ error: 'El nombre de la categoría es requerido' });
     }
 
+    let normalizedUrl = null;
+    if (regulation_url != null && regulation_url !== '') {
+      normalizedUrl = normalizeRegulationUrl(regulation_url);
+      if (!normalizedUrl) {
+        return res.status(400).json({ error: 'La URL del reglamento no es válida' });
+      }
+    }
+
     const { data, error } = await supabase
       .from('competition_categories')
       .insert([{
         competition_id: id,
-        name: name.trim()
+        name: name.trim(),
+        regulation_url: normalizedUrl,
       }])
       .select()
       .single();
@@ -1744,7 +1782,7 @@ router.post('/:id/categories', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    res.status(201).json(data);
+    res.status(201).json(appendRegulationFileUrl(supabase, data));
   } catch (error) {
     console.error('Error en POST /competitions/:id/categories:', error);
     res.status(500).json({ error: error.message });
@@ -1770,9 +1808,176 @@ router.get('/:id/categories', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    res.json(data || []);
+    res.json((data || []).map((row) => appendRegulationFileUrl(supabase, row)));
   } catch (error) {
     console.error('Error en GET /competitions/:id/categories:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Actualizar categoría
+router.put('/:id/categories/:categoryId', async (req, res) => {
+  try {
+    const { id, categoryId } = req.params;
+    const { name, regulation_url } = req.body;
+
+    const access = await requireManageCompetition(supabase, req.user, id);
+    if (!access.ok) return access.respond(res);
+
+    const existing = await fetchCategoryForCompetition(id, categoryId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Categoría no encontrada' });
+    }
+
+    const updateData = {};
+    if (name !== undefined) {
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({ error: 'El nombre de la categoría es requerido' });
+      }
+      updateData.name = String(name).trim();
+    }
+
+    if (regulation_url !== undefined) {
+      if (regulation_url == null || regulation_url === '') {
+        updateData.regulation_url = null;
+      } else {
+        const normalizedUrl = normalizeRegulationUrl(regulation_url);
+        if (!normalizedUrl) {
+          return res.status(400).json({ error: 'La URL del reglamento no es válida' });
+        }
+        updateData.regulation_url = normalizedUrl;
+        if (existing.regulation_file_path) {
+          await removeRegulationFile(supabase, existing.regulation_file_path);
+          updateData.regulation_file_path = null;
+          updateData.regulation_file_name = null;
+        }
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No hay datos para actualizar' });
+    }
+
+    const { data, error } = await supabase
+      .from('competition_categories')
+      .update(updateData)
+      .eq('id', categoryId)
+      .eq('competition_id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error al actualizar categoría:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(appendRegulationFileUrl(supabase, data));
+  } catch (error) {
+    console.error('Error en PUT /competitions/:id/categories/:categoryId:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Subir fichero de reglamento de categoría
+router.post(
+  '/:id/categories/:categoryId/regulation',
+  param('id').isUUID(),
+  param('categoryId').isUUID(),
+  handleValidationErrors,
+  regulationFileUpload.single('file'),
+  async (req, res) => {
+    try {
+      const { id, categoryId } = req.params;
+
+      const access = await requireManageCompetition(supabase, req.user, id);
+      if (!access.ok) return access.respond(res);
+
+      if (!req.file?.buffer) {
+        return res.status(400).json({ error: 'Falta el archivo del reglamento' });
+      }
+
+      const existing = await fetchCategoryForCompetition(id, categoryId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Categoría no encontrada' });
+      }
+
+      const { storagePath, fileName } = await uploadRegulationFile(supabase, {
+        buffer: req.file.buffer,
+        originalName: req.file.originalname || 'reglamento.pdf',
+        mimeType: req.file.mimetype,
+        competitionId: id,
+        categoryId,
+      });
+
+      if (existing.regulation_file_path && existing.regulation_file_path !== storagePath) {
+        await removeRegulationFile(supabase, existing.regulation_file_path);
+      }
+
+      const { data, error } = await supabase
+        .from('competition_categories')
+        .update({
+          regulation_file_path: storagePath,
+          regulation_file_name: fileName,
+          regulation_url: null,
+        })
+        .eq('id', categoryId)
+        .eq('competition_id', id)
+        .select()
+        .single();
+
+      if (error) {
+        await removeRegulationFile(supabase, storagePath);
+        console.error('Error al guardar reglamento de categoría:', error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json(appendRegulationFileUrl(supabase, data));
+    } catch (error) {
+      if (error.message === 'Solo se permiten archivos PDF o Word') {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error('Error en POST /competitions/:id/categories/:categoryId/regulation:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Eliminar fichero de reglamento de categoría
+router.delete('/:id/categories/:categoryId/regulation', async (req, res) => {
+  try {
+    const { id, categoryId } = req.params;
+
+    const access = await requireManageCompetition(supabase, req.user, id);
+    if (!access.ok) return access.respond(res);
+
+    const existing = await fetchCategoryForCompetition(id, categoryId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Categoría no encontrada' });
+    }
+
+    if (existing.regulation_file_path) {
+      await removeRegulationFile(supabase, existing.regulation_file_path);
+    }
+
+    const { data, error } = await supabase
+      .from('competition_categories')
+      .update({
+        regulation_file_path: null,
+        regulation_file_name: null,
+      })
+      .eq('id', categoryId)
+      .eq('competition_id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error al eliminar reglamento de categoría:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(appendRegulationFileUrl(supabase, data));
+  } catch (error) {
+    console.error('Error en DELETE /competitions/:id/categories/:categoryId/regulation:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1784,6 +1989,11 @@ router.delete('/:id/categories/:categoryId', async (req, res) => {
 
     const access = await requireManageCompetition(supabase, req.user, id);
     if (!access.ok) return access.respond(res);
+
+    const existing = await fetchCategoryForCompetition(id, categoryId);
+    if (existing?.regulation_file_path) {
+      await removeRegulationFile(supabase, existing.regulation_file_path);
+    }
 
     const { error } = await supabase
       .from('competition_categories')
@@ -1799,6 +2009,168 @@ router.delete('/:id/categories/:categoryId', async (req, res) => {
     res.json({ message: 'Categoría eliminada correctamente' });
   } catch (error) {
     console.error('Error en DELETE /competitions/:id/categories/:categoryId:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== REGLAMENTO GLOBAL DE COMPETICIÓN ====================
+
+// Actualizar URL del reglamento global (competiciones sin categorías)
+router.put('/:id/regulation', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { regulation_url } = req.body;
+
+    const access = await requireManageCompetition(supabase, req.user, id);
+    if (!access.ok) return access.respond(res);
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('competitions')
+      .select('id, regulation_file_path')
+      .eq('id', id)
+      .maybeSingle();
+    if (fetchError || !existing) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    let normalizedUrl = null;
+    if (regulation_url != null && regulation_url !== '') {
+      normalizedUrl = normalizeRegulationUrl(regulation_url);
+      if (!normalizedUrl) {
+        return res.status(400).json({ error: 'La URL del reglamento no es válida' });
+      }
+    }
+
+    const updateData = { regulation_url: normalizedUrl };
+    if (existing.regulation_file_path) {
+      await removeRegulationFile(supabase, existing.regulation_file_path);
+      updateData.regulation_file_path = null;
+      updateData.regulation_file_name = null;
+    }
+
+    const { data, error } = await supabase
+      .from('competitions')
+      .update(updateData)
+      .eq('id', id)
+      .select('id, regulation_url, regulation_file_path, regulation_file_name')
+      .single();
+
+    if (error) {
+      console.error('Error al actualizar reglamento de competición:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(appendRegulationFileUrl(supabase, data));
+  } catch (error) {
+    console.error('Error en PUT /competitions/:id/regulation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Subir fichero de reglamento global
+router.post(
+  '/:id/regulation',
+  param('id').isUUID(),
+  handleValidationErrors,
+  regulationFileUpload.single('file'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const access = await requireManageCompetition(supabase, req.user, id);
+      if (!access.ok) return access.respond(res);
+
+      if (!req.file?.buffer) {
+        return res.status(400).json({ error: 'Falta el archivo del reglamento' });
+      }
+
+      const { data: existing, error: fetchError } = await supabase
+        .from('competitions')
+        .select('id, regulation_file_path')
+        .eq('id', id)
+        .maybeSingle();
+      if (fetchError || !existing) {
+        return res.status(404).json({ error: 'Competición no encontrada' });
+      }
+
+      const { storagePath, fileName } = await uploadRegulationFile(supabase, {
+        buffer: req.file.buffer,
+        originalName: req.file.originalname || 'reglamento.pdf',
+        mimeType: req.file.mimetype,
+        competitionId: id,
+      });
+
+      if (existing.regulation_file_path && existing.regulation_file_path !== storagePath) {
+        await removeRegulationFile(supabase, existing.regulation_file_path);
+      }
+
+      const { data, error } = await supabase
+        .from('competitions')
+        .update({
+          regulation_file_path: storagePath,
+          regulation_file_name: fileName,
+          regulation_url: null,
+        })
+        .eq('id', id)
+        .select('id, regulation_url, regulation_file_path, regulation_file_name')
+        .single();
+
+      if (error) {
+        await removeRegulationFile(supabase, storagePath);
+        console.error('Error al subir reglamento de competición:', error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json(appendRegulationFileUrl(supabase, data));
+    } catch (error) {
+      if (error.message === 'Solo se permiten archivos PDF o Word') {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error('Error en POST /competitions/:id/regulation:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Eliminar fichero de reglamento global
+router.delete('/:id/regulation', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const access = await requireManageCompetition(supabase, req.user, id);
+    if (!access.ok) return access.respond(res);
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('competitions')
+      .select('id, regulation_file_path')
+      .eq('id', id)
+      .maybeSingle();
+    if (fetchError || !existing) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    if (existing.regulation_file_path) {
+      await removeRegulationFile(supabase, existing.regulation_file_path);
+    }
+
+    const { data, error } = await supabase
+      .from('competitions')
+      .update({
+        regulation_file_path: null,
+        regulation_file_name: null,
+      })
+      .eq('id', id)
+      .select('id, regulation_url, regulation_file_path, regulation_file_name')
+      .single();
+
+    if (error) {
+      console.error('Error al eliminar reglamento de competición:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(appendRegulationFileUrl(supabase, data));
+  } catch (error) {
+    console.error('Error en DELETE /competitions/:id/regulation:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Trophy, Users, Calendar, Flag, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Trophy, Users, Calendar, Flag, CheckCircle, AlertTriangle, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
 import axios from '../lib/axios';
 import { useTheme } from '../context/ThemeContext';
+import { resolveRegulationLink } from '../utils/competitionRegulation';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -69,6 +70,26 @@ const SignupLayout = ({ headerLogoSrc, headerRight, title, children }) => (
   </div>
 );
 
+const RegulationNotice = ({ link, title = 'Reglamento' }) => {
+  if (!link) return null;
+  return (
+    <Alert className="border-primary/30 bg-primary/5">
+      <FileText className="size-4" />
+      <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          <strong>{title}:</strong> consulta las normas antes de inscribirte.
+        </span>
+        <Button variant="outline" size="sm" asChild className="shrink-0">
+          <a href={link.href} target="_blank" rel="noopener noreferrer">
+            {link.label}
+            {link.external ? <ExternalLink className="size-3.5 ml-1" /> : null}
+          </a>
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+};
+
 const CompetitionSignup = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -128,7 +149,7 @@ const CompetitionSignup = () => {
       setSubmitError('El email es requerido');
       return;
     }
-    if (!formData.category_id) {
+    if (competition.categories?.length > 0 && !formData.category_id) {
       setSubmitError('Debes seleccionar una categoría');
       return;
     }
@@ -201,6 +222,13 @@ const CompetitionSignup = () => {
   const canSignup =
     effectiveStatus === 'published' && (!status || status.times_registered === 0);
 
+  const hasCategories = (competition.categories?.length ?? 0) > 0;
+  const selectedCategory = hasCategories
+    ? competition.categories.find((cat) => String(cat.id) === String(formData.category_id))
+    : null;
+  const categoryRegulation = selectedCategory ? resolveRegulationLink(selectedCategory) : null;
+  const competitionRegulation = !hasCategories ? resolveRegulationLink(competition) : null;
+
   return (
     <SignupLayout
       headerLogoSrc={headerLogoSrc}
@@ -266,9 +294,10 @@ const CompetitionSignup = () => {
                     {competition.categories.map((cat) => (
                       <span
                         key={cat.id}
-                        className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium"
+                        className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-xs font-medium"
                       >
                         {cat.name}
+                        {resolveRegulationLink(cat) ? <FileText className="size-3" /> : null}
                       </span>
                     ))}
                   </div>
@@ -301,6 +330,9 @@ const CompetitionSignup = () => {
                 </Alert>
               ) : (
                 <>
+                  {!hasCategories && competitionRegulation && (
+                    <RegulationNotice link={competitionRegulation} />
+                  )}
                   {slotsFull && (
                     <Alert className="mb-4 border-amber-600/50 bg-amber-50 dark:bg-amber-950/30">
                       <AlertTriangle className="size-4 text-amber-700" />
@@ -341,7 +373,7 @@ const CompetitionSignup = () => {
                     </div>
                   </div>
 
-                  {competition.categories?.length > 0 ? (
+                  {hasCategories ? (
                     <div className="space-y-2">
                       <Label>Categoría *</Label>
                       <Select
@@ -359,12 +391,17 @@ const CompetitionSignup = () => {
                         </SelectContent>
                       </Select>
                       <p className="text-sm text-muted-foreground">Selecciona la categoría en la que quieres competir</p>
+                      {categoryRegulation && (
+                        <RegulationNotice
+                          link={categoryRegulation}
+                          title={`Reglamento de ${selectedCategory?.name || 'la categoría'}`}
+                        />
+                      )}
                     </div>
                   ) : (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="size-4" />
+                    <Alert>
                       <AlertDescription>
-                        <strong>No hay categorías disponibles</strong> para esta competición. Contacta al organizador.
+                        Esta competición no tiene categorías. Te inscribirás en la competición general.
                       </AlertDescription>
                     </Alert>
                   )}
