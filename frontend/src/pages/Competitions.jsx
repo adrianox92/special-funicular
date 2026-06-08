@@ -455,7 +455,6 @@ const Competitions = () => {
                     id="rounds"
                     type="number"
                     min="1"
-                    max="10"
                     placeholder="Ej: 3"
                     value={createForm.rounds}
                     onChange={(e) => setCreateForm({ ...createForm, rounds: e.target.value })}
