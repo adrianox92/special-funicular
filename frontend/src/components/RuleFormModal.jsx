@@ -23,14 +23,17 @@ import {
 } from './ui/select';
 import { Spinner } from './ui/spinner';
 
-const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onSave, disabled = false }) => {
-  const [formData, setFormData] = useState({
-    rule_type: 'per_round',
-    description: '',
-    points_structure: { "1": 10, "2": 8, "3": 6, "4": 4, "5": 2 },
-    use_bonus_best_lap: false,
-    category_id: '',
-  });
+const DEFAULT_FORM_DATA = {
+  rule_type: 'per_round',
+  description: '',
+  points_structure: { "1": 10, "2": 8, "3": 6, "4": 4, "5": 2 },
+  use_bonus_best_lap: false,
+  category_id: '',
+  target_rounds: [],
+};
+
+const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], totalRounds = 1, onSave, disabled = false }) => {
+  const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -43,15 +46,10 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
           points_structure: rule.points_structure,
           use_bonus_best_lap: rule.use_bonus_best_lap || false,
           category_id: rule.category_id || '',
+          target_rounds: Array.isArray(rule.target_rounds) ? rule.target_rounds : [],
         });
       } else {
-        setFormData({
-          rule_type: 'per_round',
-          description: '',
-          points_structure: { "1": 10, "2": 8, "3": 6, "4": 4, "5": 2 },
-          use_bonus_best_lap: false,
-          category_id: '',
-        });
+        setFormData(DEFAULT_FORM_DATA);
       }
       setError(null);
     }
@@ -82,6 +80,27 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
     setFormData({ ...formData, points_structure: newStructure });
   };
 
+  const toggleTargetRound = (round) => {
+    const current = formData.target_rounds || [];
+    const next = current.includes(round)
+      ? current.filter((r) => r !== round)
+      : [...current, round].sort((a, b) => a - b);
+    setFormData({ ...formData, target_rounds: next });
+  };
+
+  const getRuleTypeDescription = () => {
+    switch (formData.rule_type) {
+      case 'per_round':
+        return 'Los puntos se asignan en cada ronda individual';
+      case 'final':
+        return 'Los puntos se asignan al final de la competición';
+      case 'power_stage':
+        return 'Puntos extra en rondas específicas según la mejor vuelta (estilo WRC Power Stage)';
+      default:
+        return '';
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setError(null);
@@ -97,9 +116,14 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
         setSaving(false);
         return;
       }
-      if ((formData.rule_type === 'per_round' || formData.rule_type === 'final') &&
+      if ((formData.rule_type === 'per_round' || formData.rule_type === 'final' || formData.rule_type === 'power_stage') &&
           (!formData.points_structure || Object.keys(formData.points_structure).length === 0)) {
         setError('Debes especificar al menos una posición con puntos');
+        setSaving(false);
+        return;
+      }
+      if (formData.rule_type === 'power_stage' && (!formData.target_rounds || formData.target_rounds.length === 0)) {
+        setError('Debes seleccionar al menos una ronda para Power Stage');
         setSaving(false);
         return;
       }
@@ -108,6 +132,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
         competition_id: rule ? undefined : competitionId,
         is_template: false,
         category_id: formData.category_id || null,
+        target_rounds: formData.rule_type === 'power_stage' ? formData.target_rounds : null,
       };
       if (rule) {
         await axios.put(`/competition-rules/${rule.id}`, ruleData);
@@ -156,12 +181,11 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                   <SelectContent>
                     <SelectItem value="per_round">Por ronda</SelectItem>
                     <SelectItem value="final">Final</SelectItem>
+                    <SelectItem value="power_stage">Power Stage</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  {formData.rule_type === 'per_round'
-                    ? 'Los puntos se asignan en cada ronda individual'
-                    : 'Los puntos se asignan al final de la competición'}
+                  {getRuleTypeDescription()}
                 </p>
               </div>
               <div className="space-y-2">
@@ -243,6 +267,34 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], onS
                 </div>
               </div>
             </div>
+
+            {formData.rule_type === 'power_stage' && (
+              <div className="space-y-2">
+                <Label>Rondas objetivo *</Label>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Selecciona las rondas en las que se aplicará la puntuación Power Stage.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: totalRounds }, (_, i) => i + 1).map((round) => {
+                      const selected = (formData.target_rounds || []).includes(round);
+                      return (
+                        <Button
+                          key={round}
+                          type="button"
+                          variant={selected ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => toggleTargetRound(round)}
+                          disabled={disabled}
+                        >
+                          Ronda {round}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {formData.rule_type === 'per_round' && (
               <div className="flex items-center justify-between rounded-lg border p-4">

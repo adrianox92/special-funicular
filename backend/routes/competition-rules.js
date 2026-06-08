@@ -6,6 +6,25 @@ const { requireViewCompetition, canManageCompetition } = require('../lib/competi
 const router = express.Router();
 const supabase = getAnonClient();
 
+const VALID_RULE_TYPES = ['per_round', 'final', 'best_time_per_round', 'power_stage'];
+
+function validateTargetRounds(ruleType, targetRounds) {
+  if (ruleType !== 'power_stage') {
+    return { ok: true, value: null };
+  }
+
+  if (!Array.isArray(targetRounds) || targetRounds.length === 0) {
+    return { ok: false, error: 'Debes seleccionar al menos una ronda para Power Stage' };
+  }
+
+  const normalized = [...new Set(targetRounds.map((r) => Number(r)).filter((r) => Number.isInteger(r) && r > 0))];
+  if (normalized.length === 0) {
+    return { ok: false, error: 'Las rondas objetivo deben ser números enteros positivos' };
+  }
+
+  return { ok: true, value: normalized.sort((a, b) => a - b) };
+}
+
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
 
@@ -181,11 +200,17 @@ router.post('/', async (req, res) => {
       competition_id, 
       use_bonus_best_lap = false,
       category_id,
+      target_rounds,
     } = req.body;
 
     // Validaciones básicas
-    if (!rule_type || !['per_round', 'final', 'best_time_per_round'].includes(rule_type)) {
-      return res.status(400).json({ error: 'Tipo de regla debe ser "per_round", "final" o "best_time_per_round"' });
+    if (!rule_type || !VALID_RULE_TYPES.includes(rule_type)) {
+      return res.status(400).json({ error: 'Tipo de regla debe ser "per_round", "final", "best_time_per_round" o "power_stage"' });
+    }
+
+    const targetRoundsValidation = validateTargetRounds(rule_type, target_rounds);
+    if (!targetRoundsValidation.ok) {
+      return res.status(400).json({ error: targetRoundsValidation.error });
     }
 
     if (!points_structure || typeof points_structure !== 'object') {
@@ -231,7 +256,8 @@ router.post('/', async (req, res) => {
       points_structure,
       is_template,
       created_by: req.user.id,
-      use_bonus_best_lap
+      use_bonus_best_lap,
+      target_rounds: targetRoundsValidation.value,
     };
 
     // Agregar campos específicos según el tipo
@@ -308,7 +334,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, rule_type, points_structure, use_bonus_best_lap, category_id } = req.body;
+    const { name, description, rule_type, points_structure, use_bonus_best_lap, category_id, target_rounds } = req.body;
 
     // Verificar que la regla existe y pertenece al usuario
     const { data: existingRule, error: ruleError } = await supabase
@@ -339,9 +365,19 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    const effectiveRuleType = rule_type || existingRule.rule_type;
+
     // Validaciones
-    if (rule_type && !['per_round', 'final', 'best_time_per_round'].includes(rule_type)) {
-      return res.status(400).json({ error: 'Tipo de regla debe ser "per_round", "final" o "best_time_per_round"' });
+    if (rule_type && !VALID_RULE_TYPES.includes(rule_type)) {
+      return res.status(400).json({ error: 'Tipo de regla debe ser "per_round", "final", "best_time_per_round" o "power_stage"' });
+    }
+
+    const targetRoundsValidation = validateTargetRounds(
+      effectiveRuleType,
+      target_rounds !== undefined ? target_rounds : existingRule.target_rounds
+    );
+    if (!targetRoundsValidation.ok) {
+      return res.status(400).json({ error: targetRoundsValidation.error });
     }
 
     if (points_structure && typeof points_structure !== 'object') {
@@ -368,6 +404,9 @@ router.put('/:id', async (req, res) => {
     if (use_bonus_best_lap !== undefined) updateData.use_bonus_best_lap = use_bonus_best_lap;
     if (category_id !== undefined && !existingRule.is_template) {
       updateData.category_id = category_id || null;
+    }
+    if (target_rounds !== undefined || effectiveRuleType !== 'power_stage') {
+      updateData.target_rounds = targetRoundsValidation.value;
     }
 
     const { data, error } = await supabase
@@ -562,6 +601,7 @@ router.post('/apply-template/:templateId', async (req, res) => {
       created_by: req.user.id,
       use_bonus_best_lap: template.use_bonus_best_lap,
       category_id: category_id || null,
+      target_rounds: template.target_rounds || null,
     };
 
     const { data, error } = await supabase

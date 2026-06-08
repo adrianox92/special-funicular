@@ -28,7 +28,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
   const [showRuleModal, setShowRuleModal] = useState(false);
   const [showTemplatesDrawer, setShowTemplatesDrawer] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
-  const [, setCompetition] = useState(null);
+  const [competition, setCompetition] = useState(null);
   const [timesRegistered, setTimesRegistered] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, ruleId: null });
 
@@ -87,6 +87,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
     switch (type) {
       case 'per_round': return 'Por ronda';
       case 'final': return 'Final';
+      case 'power_stage': return 'Power Stage';
       default: return type;
     }
   };
@@ -95,6 +96,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
     switch (type) {
       case 'per_round': return 'default';
       case 'final': return 'secondary';
+      case 'power_stage': return 'destructive';
       case 'best_time_per_round': return 'outline';
       default: return 'secondary';
     }
@@ -211,6 +213,11 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
                         ) : (
                           <Badge variant="outline">Global</Badge>
                         )}
+                        {rule.rule_type === 'power_stage' && Array.isArray(rule.target_rounds) && rule.target_rounds.length > 0 && (
+                          <Badge variant="outline">
+                            Rondas: {rule.target_rounds.join(', ')}
+                          </Badge>
+                        )}
                       </div>
                       {rule.description && (
                         <p className="text-sm text-muted-foreground">{rule.description}</p>
@@ -286,6 +293,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
         rule={editingRule}
         competitionId={competitionId}
         categories={categories}
+        totalRounds={competition?.rounds || 1}
         onSave={() => {
           loadRules();
           onRuleChange?.();

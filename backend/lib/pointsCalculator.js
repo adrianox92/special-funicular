@@ -17,7 +17,7 @@ function isUsableBestLapTimeString(str) {
   return s != null && s > 0;
 }
 
-const RULE_TYPES = ['per_round', 'final', 'best_time_per_round'];
+const RULE_TYPES = ['per_round', 'final', 'best_time_per_round', 'power_stage'];
 
 /**
  * Reglas aplicables a una categoría: específicas de la categoría o fallback global (category_id null).
@@ -84,6 +84,7 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
 
   const perRoundRule = rules.find((r) => r.rule_type === 'per_round');
   const finalRule = rules.find((r) => r.rule_type === 'final');
+  const powerStageRules = rules.filter((r) => r.rule_type === 'power_stage');
 
   if (perRoundRule) {
     for (let round = 1; round <= competition.rounds; round++) {
@@ -125,6 +126,39 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
             pointsByParticipant[bestLapTiming.participant_id] += 1;
           }
         }
+      }
+    }
+  }
+
+  if (powerStageRules.length > 0) {
+    for (const powerStageRule of powerStageRules) {
+      const targetRounds = Array.isArray(powerStageRule.target_rounds)
+        ? powerStageRule.target_rounds
+        : [];
+
+      for (const round of targetRounds) {
+        const roundTimings = participants
+          .map((p) => (timesByParticipant[p.id] || []).find((t) => t.round_number === round))
+          .filter(Boolean);
+
+        if (roundTimings.length !== participants.length) {
+          continue;
+        }
+
+        const participatingTimings = roundTimings.filter((t) => !t.did_not_participate);
+        const sorted = participatingTimings.slice().sort((a, b) => {
+          const aLap = lapTimeStringToSeconds(a.best_lap_time);
+          const bLap = lapTimeStringToSeconds(b.best_lap_time);
+          const aTime = aLap != null ? aLap : Infinity;
+          const bTime = bLap != null ? bLap : Infinity;
+          return aTime - bTime;
+        });
+
+        Object.entries(powerStageRule.points_structure).forEach(([, pts], idx) => {
+          if (sorted[idx]) {
+            pointsByParticipant[sorted[idx].participant_id] += pts;
+          }
+        });
       }
     }
   }

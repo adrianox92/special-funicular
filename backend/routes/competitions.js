@@ -2181,13 +2181,19 @@ router.delete('/:id/regulation', async (req, res) => {
 router.post('/:id/rules', async (req, res) => {
   try {
     const { id } = req.params;
-    const { rule_type, description, points_structure, category_id } = req.body;
+    const { rule_type, description, points_structure, category_id, target_rounds } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, id);
     if (!access.ok) return access.respond(res);
 
-    if (!rule_type || !['per_round', 'final', 'best_time_per_round'].includes(rule_type)) {
-      return res.status(400).json({ error: 'Tipo de regla debe ser "per_round", "final" o "best_time_per_round"' });
+    if (!rule_type || !['per_round', 'final', 'best_time_per_round', 'power_stage'].includes(rule_type)) {
+      return res.status(400).json({ error: 'Tipo de regla debe ser "per_round", "final", "best_time_per_round" o "power_stage"' });
+    }
+
+    if (rule_type === 'power_stage') {
+      if (!Array.isArray(target_rounds) || target_rounds.length === 0) {
+        return res.status(400).json({ error: 'Debes seleccionar al menos una ronda para Power Stage' });
+      }
     }
 
     if (!points_structure || typeof points_structure !== 'object') {
@@ -2214,6 +2220,9 @@ router.post('/:id/rules', async (req, res) => {
         description: description ? description.trim() : null,
         points_structure,
         category_id: category_id || null,
+        target_rounds: rule_type === 'power_stage'
+          ? [...new Set(target_rounds.map((r) => Number(r)).filter((r) => Number.isInteger(r) && r > 0))].sort((a, b) => a - b)
+          : null,
       }])
       .select()
       .single();
