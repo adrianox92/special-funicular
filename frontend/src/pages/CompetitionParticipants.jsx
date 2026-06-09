@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
@@ -575,6 +575,13 @@ const CompetitionParticipants = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold">{competition.name}</h1>
                 <CompetitionStatusBadge status={competition.status} />
+                {competition.league && (
+                  <Link to={`/leagues/${competition.league.id}`}>
+                    <Badge variant="secondary" className="hover:bg-secondary/80">
+                      Liga: {competition.league.name}
+                    </Badge>
+                  </Link>
+                )}
               </div>
               <p className="text-muted-foreground text-sm">
                 {canUseOrganizerTools ? 'Gestionar competición' : 'Miembro del club — la gestión la lleva el organizador'}

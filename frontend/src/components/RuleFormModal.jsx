@@ -32,7 +32,7 @@ const DEFAULT_FORM_DATA = {
   target_rounds: [],
 };
 
-const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], totalRounds = 1, onSave, disabled = false }) => {
+const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories = [], totalRounds = 1, onSave, disabled = false }) => {
   const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -129,9 +129,10 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, categories = [], tot
       }
       const ruleData = {
         ...formData,
-        competition_id: rule ? undefined : competitionId,
+        competition_id: rule ? undefined : (leagueId ? undefined : competitionId),
+        league_id: rule ? undefined : (leagueId || undefined),
         is_template: false,
-        category_id: formData.category_id || null,
+        category_id: leagueId ? null : (formData.category_id || null),
         target_rounds: formData.rule_type === 'power_stage' ? formData.target_rounds : null,
       };
       if (rule) {

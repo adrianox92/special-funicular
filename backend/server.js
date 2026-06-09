@@ -187,6 +187,8 @@ const publicClubCalendarRoute = require('./routes/publicClubCalendar');
 app.use('/api/public/clubs', publicClubIcsFeedLimiter, publicClubCalendarRoute);
 const publicRefereeRoute = require('./routes/publicReferee');
 app.use('/api/referee', publicRefereeLimiter, publicRefereeRoute);
+const publicLeaguesRoute = require('./routes/publicLeagues');
+app.use('/api/public-leagues', publicSignupLimiter, publicLeaguesRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');
@@ -231,9 +233,11 @@ app.use('/api/changelog', changelogRoute);
 app.use('/api/admin', authMiddleware, adminPlatformMetricsRoute);
 
 const competitionsRoute = require('./routes/competitions');
+const leaguesRoute = require('./routes/leagues');
 const clubsRoute = require('./routes/clubs');
 const favoritePilotsRoute = require('./routes/favoritePilots');
 app.use('/api/competitions', competitionsRoute);
+app.use('/api/leagues', leaguesRoute);
 app.use('/api/clubs', clubsRoute);
 app.use('/api/favorite-pilots', favoritePilotsRoute);
 

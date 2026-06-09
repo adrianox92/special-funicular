@@ -11,6 +11,11 @@ import AddVehicle from './components/AddVehicle';
 import EditVehicle from './components/EditVehicle';
 import TimingsList from './components/TimingsList';
 import Competitions from './pages/Competitions';
+import Leagues from './pages/Leagues';
+import LeagueCreate from './pages/LeagueCreate';
+import LeagueDetail from './pages/LeagueDetail';
+import LeagueSignup from './pages/LeagueSignup';
+import LeagueStandings from './pages/LeagueStandings';
 import Clubs from './pages/Clubs';
 import ClubMembers from './pages/ClubMembers';
 import PendingInviteConsumer from './components/PendingInviteConsumer';
@@ -86,6 +91,8 @@ const AppContent = () => {
     '/competitions/signup',
     '/competitions/status',
     '/competitions/presentation',
+    '/leagues/signup',
+    '/leagues/standings',
     '/referee',
     '/club',
     '/piloto',
@@ -148,6 +155,8 @@ const AppContent = () => {
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
         <Route path="/competitions/status/:slug" element={<CompetitionStatus />} />
         <Route path="/competitions/presentation/:slug" element={<CompetitionPresentation />} />
+        <Route path="/leagues/signup/:slug" element={<LeagueSignup />} />
+        <Route path="/leagues/standings/:slug" element={<LeagueStandings />} />
         <Route path="/referee/:token" element={<PublicRefereeView />} />
         <Route path="/club/:slug" element={<PublicClubProfile />} />
         <Route path="/piloto/:slug" element={<PublicPilotProfile />} />
@@ -369,6 +378,39 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <Competitions />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/leagues"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <Leagues />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/leagues/create"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <LeagueCreate />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/leagues/:id"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <LeagueDetail />
               </AuthedShell>
             </PrivateRoute>
           }

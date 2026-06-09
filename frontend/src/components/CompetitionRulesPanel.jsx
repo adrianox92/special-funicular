@@ -20,7 +20,7 @@ import {
 import RuleFormModal from './RuleFormModal';
 import TemplatesDrawer from './TemplatesDrawer';
 
-const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }) => {
+const CompetitionRulesPanel = ({ competitionId, leagueId, onRuleChange, readOnly = false }) => {
   const [rules, setRules] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,13 +39,20 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
         setCategories(Array.isArray(res.data?.categories) ? res.data.categories : []);
       }).catch(() => {});
       axios.get(`/competitions/${competitionId}/progress`).then(res => setTimesRegistered(res.data.times_registered || 0)).catch(() => setTimesRegistered(0));
+    } else if (leagueId) {
+      setCompetition(null);
+      setCategories([]);
+      setTimesRegistered(0);
     }
-  }, [competitionId]);
+  }, [competitionId, leagueId]);
 
   const loadRules = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/competition-rules/competition/${competitionId}`);
+      const url = leagueId
+        ? `/competition-rules/league/${leagueId}`
+        : `/competition-rules/competition/${competitionId}`;
+      const response = await axios.get(url);
       setRules(response.data);
       setError(null);
     } catch (err) {
@@ -59,7 +66,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
   useEffect(() => {
     loadRules();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [competitionId]);
+  }, [competitionId, leagueId]);
 
   const openRuleModal = (rule = null) => {
     setEditingRule(rule);
@@ -139,7 +146,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
                 variant="outline"
                 size="sm"
                 onClick={() => setShowTemplatesDrawer(true)}
-                disabled={timesRegistered > 0}
+                disabled={!leagueId && timesRegistered > 0}
                 className="flex items-center gap-1"
               >
                 <Wand2 className="size-4" />
@@ -148,7 +155,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
               <Button
                 size="sm"
                 onClick={() => openRuleModal()}
-                disabled={timesRegistered > 0}
+                disabled={!leagueId && timesRegistered > 0}
                 className="flex items-center gap-1"
               >
                 <Plus className="size-4" />
@@ -163,7 +170,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          {!readOnly && timesRegistered > 0 && (
+          {!readOnly && !leagueId && timesRegistered > 0 && (
             <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="size-4" />
               <AlertDescription>
@@ -229,7 +236,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
                           variant="outline"
                           size="sm"
                           onClick={() => openRuleModal(rule)}
-                          disabled={timesRegistered > 0}
+                          disabled={!leagueId && timesRegistered > 0}
                           title="Editar regla"
                         >
                           <Pencil className="size-4" />
@@ -239,7 +246,7 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
                           size="sm"
                           className="text-destructive hover:text-destructive"
                           onClick={() => handleDelete(rule.id)}
-                          disabled={timesRegistered > 0}
+                          disabled={!leagueId && timesRegistered > 0}
                           title="Eliminar regla"
                         >
                           <Trash2 className="size-4" />
@@ -292,13 +299,14 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
         onHide={() => setShowRuleModal(false)}
         rule={editingRule}
         competitionId={competitionId}
+        leagueId={leagueId}
         categories={categories}
         totalRounds={competition?.rounds || 1}
         onSave={() => {
           loadRules();
           onRuleChange?.();
         }}
-        disabled={timesRegistered > 0}
+        disabled={!leagueId && timesRegistered > 0}
       />
       )}
 
@@ -307,12 +315,13 @@ const CompetitionRulesPanel = ({ competitionId, onRuleChange, readOnly = false }
         show={showTemplatesDrawer}
         onHide={() => setShowTemplatesDrawer(false)}
         competitionId={competitionId}
+        leagueId={leagueId}
         categories={categories}
         onTemplateApplied={() => {
           loadRules();
           onRuleChange?.();
         }}
-        disabled={timesRegistered > 0}
+        disabled={!leagueId && timesRegistered > 0}
       />
       )}
     </>

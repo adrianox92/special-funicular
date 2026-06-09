@@ -222,6 +222,7 @@ const Navbar = () => {
       icon: Trophy,
       children: [
         { path: '/competitions', label: 'Mis competiciones', icon: Trophy },
+        { path: '/leagues', label: 'Ligas', icon: Trophy },
         { path: '/pilots/favorites', label: 'Pilotos favoritos', icon: Star },
       ],
     },

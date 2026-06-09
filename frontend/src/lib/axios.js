@@ -25,6 +25,8 @@ api.interceptors.request.use(
     const publicRoutes = [
       '/public-signup/',
       '/api/public-signup/',
+      '/public-leagues/',
+      '/api/public-leagues/',
       '/public/',
       '/api/public/',
       '/public/clubs/',

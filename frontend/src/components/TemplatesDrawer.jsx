@@ -24,7 +24,7 @@ import {
 import { Spinner } from './ui/spinner';
 import { toast } from 'sonner';
 
-const TemplatesDrawer = ({ show, onHide, competitionId, categories = [], onTemplateApplied, disabled = false }) => {
+const TemplatesDrawer = ({ show, onHide, competitionId, leagueId, categories = [], onTemplateApplied, disabled = false }) => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -74,8 +74,9 @@ const TemplatesDrawer = ({ show, onHide, competitionId, categories = [], onTempl
     try {
       setApplying(true);
       await axios.post(`/competition-rules/apply-template/${templateId}`, {
-        competition_id: competitionId,
-        category_id: categoryId || null,
+        competition_id: leagueId ? undefined : competitionId,
+        league_id: leagueId || undefined,
+        category_id: leagueId ? null : (categoryId || null),
       });
       const categoryLabel = categoryId
         ? categories.find((c) => c.id === categoryId)?.name

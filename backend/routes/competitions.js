@@ -508,12 +508,29 @@ router.get('/:id', async (req, res) => {
       console.error('Error al contar lista de espera:', waitlistErr);
     }
 
+    const { data: leagueLink } = await supabase
+      .from('league_competitions')
+      .select(`
+        league_id,
+        leagues ( id, name, slug, status )
+      `)
+      .eq('competition_id', id)
+      .maybeSingle();
+
     res.json({
       ...appendRegulationFileUrl(supabase, competition),
       participants: participants || [],
       categories: (categories || []).map((cat) => appendRegulationFileUrl(supabase, cat)),
       signups_count: signupsPending || 0,
       waitlist_count: waitlistCount || 0,
+      league: leagueLink?.leagues
+        ? {
+            id: leagueLink.leagues.id,
+            name: leagueLink.leagues.name,
+            slug: leagueLink.leagues.slug,
+            status: leagueLink.leagues.status,
+          }
+        : null,
     });
   } catch (error) {
     console.error('Error en GET /competitions/:id:', error);

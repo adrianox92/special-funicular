@@ -2,6 +2,7 @@ const express = require('express');
 const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { requireViewCompetition, canManageCompetition } = require('../lib/competitionPermissions');
+const { requireManageLeague, canManageLeague } = require('../lib/leaguePermissions');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -114,6 +115,32 @@ router.get('/templates', async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
+router.get('/league/:leagueId', async (req, res) => {
+  try {
+    const { leagueId } = req.params;
+
+    const access = await requireManageLeague(supabase, req.user, leagueId);
+    if (!access.ok) return access.respond(res);
+
+    const { data, error } = await supabase
+      .from('competition_rules')
+      .select('*')
+      .eq('league_id', leagueId)
+      .eq('is_template', false)
+      .order('rule_type', { ascending: true });
+
+    if (error) {
+      console.error('Error al obtener reglas de liga:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('Error en GET /league/:leagueId:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/competition/:competitionId', async (req, res) => {
   try {
     const { competitionId } = req.params;
@@ -197,7 +224,8 @@ router.post('/', async (req, res) => {
       rule_type, 
       points_structure, 
       is_template = false, 
-      competition_id, 
+      competition_id,
+      league_id,
       use_bonus_best_lap = false,
       category_id,
       target_rounds,
@@ -222,9 +250,20 @@ router.post('/', async (req, res) => {
       if (!name || name.trim() === '') {
         return res.status(400).json({ error: 'El nombre es requerido para las plantillas' });
       }
+    } else if (league_id) {
+      const access = await requireManageLeague(supabase, req.user, league_id);
+      if (!access.ok) return access.respond(res);
+
+      if (access.league.scoring_mode !== 'league_rules') {
+        return res.status(400).json({ error: 'Esta liga usa reglas por competición, no a nivel de liga' });
+      }
+
+      if (category_id) {
+        return res.status(400).json({ error: 'Las reglas de liga no admiten categorías por ahora' });
+      }
     } else {
       if (!competition_id) {
-        return res.status(400).json({ error: 'El ID de la competición es requerido para las reglas' });
+        return res.status(400).json({ error: 'El ID de la competición o de la liga es requerido para las reglas' });
       }
 
       const { data: competition, error: compError } = await supabase
@@ -263,6 +302,10 @@ router.post('/', async (req, res) => {
     // Agregar campos específicos según el tipo
     if (is_template) {
       ruleData.name = name.trim();
+    } else if (league_id) {
+      ruleData.league_id = league_id;
+      ruleData.competition_id = null;
+      ruleData.category_id = null;
     } else {
       ruleData.competition_id = competition_id;
       ruleData.category_id = category_id || null;
@@ -352,6 +395,16 @@ router.put('/:id', async (req, res) => {
       // Para plantillas, verificar que el usuario es el creador
       if (existingRule.created_by !== req.user.id) {
         return res.status(403).json({ error: 'No tienes permisos para editar esta plantilla' });
+      }
+    } else if (existingRule.league_id) {
+      const { data: league, error: leagueErr } = await supabase
+        .from('leagues')
+        .select('id, organizer')
+        .eq('id', existingRule.league_id)
+        .maybeSingle();
+
+      if (leagueErr || !league || !canManageLeague(req.user, league)) {
+        return res.status(403).json({ error: 'No tienes permisos para editar esta regla' });
       }
     } else {
       const { data: competition, error: compError } = await supabase
@@ -476,6 +529,16 @@ router.delete('/:id', async (req, res) => {
       if (existingRule.created_by !== req.user.id) {
         return res.status(403).json({ error: 'No tienes permisos para eliminar esta plantilla' });
       }
+    } else if (existingRule.league_id) {
+      const { data: league, error: leagueErr } = await supabase
+        .from('leagues')
+        .select('id, organizer')
+        .eq('id', existingRule.league_id)
+        .maybeSingle();
+
+      if (leagueErr || !league || !canManageLeague(req.user, league)) {
+        return res.status(403).json({ error: 'No tienes permisos para eliminar esta regla' });
+      }
     } else {
       const { data: competition, error: compError } = await supabase
         .from('competitions')
@@ -551,10 +614,10 @@ router.delete('/:id', async (req, res) => {
 router.post('/apply-template/:templateId', async (req, res) => {
   try {
     const { templateId } = req.params;
-    const { competition_id, category_id } = req.body;
+    const { competition_id, league_id, category_id } = req.body;
 
-    if (!competition_id) {
-      return res.status(400).json({ error: 'El ID de la competición es requerido' });
+    if (!competition_id && !league_id) {
+      return res.status(400).json({ error: 'El ID de la competición o de la liga es requerido' });
     }
 
     // Verificar que la plantilla existe
@@ -569,38 +632,48 @@ router.post('/apply-template/:templateId', async (req, res) => {
       return res.status(404).json({ error: 'Plantilla no encontrada' });
     }
 
-    const { data: competition, error: compError } = await supabase
-      .from('competitions')
-      .select('id, organizer')
-      .eq('id', competition_id)
-      .maybeSingle();
+    if (league_id) {
+      const access = await requireManageLeague(supabase, req.user, league_id);
+      if (!access.ok) return access.respond(res);
 
-    if (compError || !competition || !canManageCompetition(req.user, competition)) {
-      return res.status(404).json({ error: 'Competición no encontrada' });
-    }
-
-    if (category_id) {
-      const { data: category, error: catError } = await supabase
-        .from('competition_categories')
-        .select('id')
-        .eq('id', category_id)
-        .eq('competition_id', competition_id)
+      if (access.league.scoring_mode !== 'league_rules') {
+        return res.status(400).json({ error: 'Esta liga usa reglas por competición' });
+      }
+    } else {
+      const { data: competition, error: compError } = await supabase
+        .from('competitions')
+        .select('id, organizer')
+        .eq('id', competition_id)
         .maybeSingle();
-      if (catError || !category) {
-        return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+
+      if (compError || !competition || !canManageCompetition(req.user, competition)) {
+        return res.status(404).json({ error: 'Competición no encontrada' });
+      }
+
+      if (category_id) {
+        const { data: category, error: catError } = await supabase
+          .from('competition_categories')
+          .select('id')
+          .eq('id', category_id)
+          .eq('competition_id', competition_id)
+          .maybeSingle();
+        if (catError || !category) {
+          return res.status(400).json({ error: 'Categoría no válida para esta competición' });
+        }
       }
     }
 
     // Crear la regla basada en la plantilla
     const ruleData = {
-      competition_id,
+      competition_id: league_id ? null : competition_id,
+      league_id: league_id || null,
       rule_type: template.rule_type,
       description: template.description,
       points_structure: template.points_structure,
       is_template: false,
       created_by: req.user.id,
       use_bonus_best_lap: template.use_bonus_best_lap,
-      category_id: category_id || null,
+      category_id: league_id ? null : (category_id || null),
       target_rounds: template.target_rounds || null,
     };
 
