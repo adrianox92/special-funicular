@@ -190,7 +190,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rule-desc">Descripci?n (opcional)</Label>
+                <Label htmlFor="rule-desc">Descripción (opcional)</Label>
                 <Input
                   id="rule-desc"
                   value={formData.description}
@@ -223,7 +223,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Si eliges una categor?a, esta regla solo aplicará a los participantes de esa categor?a.
+                  Si eliges una categoría, esta regla solo aplicará a los participantes de esa categoría.
                 </p>
               </div>
             )}
