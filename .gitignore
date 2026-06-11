@@ -66,3 +66,4 @@ frontend/.cache/
 # Supabase
 .supabase/ 
 node_modules
+docs/PROYECTO_Y_API_APP_MOVIL.md

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, RefreshCw, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, ExternalLink, ChevronUp, ChevronDown, Import } from 'lucide-react';
 import axios from '../../lib/axios';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -32,6 +32,10 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
   const [loadingAvailable, setLoadingAvailable] = useState(false);
   const [adding, setAdding] = useState(false);
   const [syncingId, setSyncingId] = useState(null);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [importingId, setImportingId] = useState(null);
+  const [importingAll, setImportingAll] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState({ open: false, competitionId: null });
 
   const loadAvailable = useCallback(async () => {
@@ -82,11 +86,12 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
     }
   };
 
-  const handleSync = async (competitionId) => {
+  const handleSync = async (competitionId, autoApprove = false) => {
     try {
       setSyncingId(competitionId);
       const res = await axios.post(
         `/leagues/${league.id}/competitions/${competitionId}/sync-participants`,
+        { auto_approve: autoApprove },
       );
       toast.success(`Sincronizados ${res.data.created || 0} participantes`);
     } catch (err) {
@@ -96,31 +101,160 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
     }
   };
 
-  const competitions = league?.competitions || [];
+  const formatImportResult = (data) => {
+    const created = data.created || 0;
+    const updated = data.updated || 0;
+    if (created === 0 && updated === 0) {
+      return data.message || 'No hay participantes nuevos para importar';
+    }
+    const parts = [];
+    if (created > 0) parts.push(`${created} nuevos`);
+    if (updated > 0) parts.push(`${updated} actualizados`);
+    return `Importados a la liga: ${parts.join(', ')}`;
+  };
+
+  const handleImport = async (competitionId) => {
+    try {
+      setImportingId(competitionId);
+      const res = await axios.post(
+        `/leagues/${league.id}/competitions/${competitionId}/import-participants`,
+      );
+      const msg = formatImportResult(res.data);
+      if (res.data.created === 0 && res.data.updated === 0) {
+        toast.info(msg);
+      } else {
+        toast.success(msg);
+        onRefresh?.();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al importar participantes');
+    } finally {
+      setImportingId(null);
+    }
+  };
+
+  const handleImportAll = async () => {
+    try {
+      setImportingAll(true);
+      const res = await axios.post(`/leagues/${league.id}/import-from-competitions`);
+      const msg = formatImportResult(res.data);
+      if (res.data.created === 0 && res.data.updated === 0) {
+        toast.info(msg);
+      } else {
+        toast.success(msg);
+        onRefresh?.();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al importar participantes');
+    } finally {
+      setImportingAll(false);
+    }
+  };
+
+  const handleSyncAll = async (autoApprove = false) => {
+    try {
+      setSyncingAll(true);
+      const res = await axios.post(`/leagues/${league.id}/sync-all-competitions`, {
+        auto_approve: autoApprove,
+      });
+      toast.success(`Sincronizados ${res.data.total_created || 0} participantes en total`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al sincronizar');
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
+  const handleReorder = async (competitionId, direction) => {
+    const competitions = [...(league?.competitions || [])].sort(
+      (a, b) => a.order_index - b.order_index,
+    );
+    const idx = competitions.findIndex((c) => c.id === competitionId);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= competitions.length) return;
+
+    const order = competitions.map((c, i) => ({
+      competition_id: c.id,
+      order_index: i,
+    }));
+    [order[idx], order[swapIdx]] = [order[swapIdx], order[idx]];
+    order.forEach((item, i) => {
+      item.order_index = i;
+    });
+
+    try {
+      setReordering(true);
+      await axios.patch(`/leagues/${league.id}/competitions/reorder`, { order });
+      toast.success('Orden actualizado');
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al reordenar');
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const competitions = [...(league?.competitions || [])].sort(
+    (a, b) => a.order_index - b.order_index,
+  );
 
   return (
     <div className="space-y-4">
       {canManage && (
-        <Card>
-          <CardContent className="pt-6 flex flex-col sm:flex-row gap-3">
-            <Select value={selectedCompetitionId} onValueChange={setSelectedCompetitionId}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder={loadingAvailable ? 'Cargando...' : 'Seleccionar competición'} />
-              </SelectTrigger>
-              <SelectContent>
-                {available.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleAdd} disabled={!selectedCompetitionId || adding}>
-              {adding ? <Spinner className="size-4" /> : <Plus className="size-4 mr-2" />}
-              Añadir prueba
-            </Button>
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardContent className="pt-6 flex flex-col sm:flex-row gap-3">
+              <Select value={selectedCompetitionId} onValueChange={setSelectedCompetitionId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder={loadingAvailable ? 'Cargando...' : 'Seleccionar competición'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {available.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleAdd} disabled={!selectedCompetitionId || adding}>
+                {adding ? <Spinner className="size-4" /> : <Plus className="size-4 mr-2" />}
+                Añadir prueba
+              </Button>
+            </CardContent>
+          </Card>
+
+          {competitions.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImportAll}
+                disabled={importingAll}
+              >
+                <Import className={`size-4 mr-2 ${importingAll ? 'animate-pulse' : ''}`} />
+                Importar pilotos a la liga
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSyncAll(false)}
+                disabled={syncingAll}
+              >
+                <RefreshCw className={`size-4 mr-2 ${syncingAll ? 'animate-spin' : ''}`} />
+                Enviar inscritos de liga a pruebas
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSyncAll(true)}
+                disabled={syncingAll}
+              >
+                Enviar inscritos (aprobar directo)
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {competitions.length === 0 ? (
@@ -146,6 +280,26 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {canManage && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={index === 0 || reordering}
+                        onClick={() => handleReorder(comp.id, 'up')}
+                      >
+                        <ChevronUp className="size-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={index === competitions.length - 1 || reordering}
+                        onClick={() => handleReorder(comp.id, 'down')}
+                      >
+                        <ChevronDown className="size-4" />
+                      </Button>
+                    </>
+                  )}
                   <Button variant="outline" size="sm" asChild>
                     <Link to={`/competitions/${comp.id}/participants`}>
                       <ExternalLink className="size-4 mr-2" />
@@ -157,11 +311,20 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleSync(comp.id)}
+                        onClick={() => handleImport(comp.id)}
+                        disabled={importingId === comp.id}
+                      >
+                        <Import className={`size-4 mr-2 ${importingId === comp.id ? 'animate-pulse' : ''}`} />
+                        Importar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSync(comp.id, false)}
                         disabled={syncingId === comp.id}
                       >
                         <RefreshCw className={`size-4 mr-2 ${syncingId === comp.id ? 'animate-spin' : ''}`} />
-                        Sincronizar inscritos
+                        Enviar a prueba
                       </Button>
                       <Button
                         variant="outline"

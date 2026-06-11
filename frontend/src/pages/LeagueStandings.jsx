@@ -88,6 +88,9 @@ const LeagueStandings = () => {
         <LeagueStandingsTable
           standings={data.standings || []}
           competitions={data.competitions || []}
+          countingRaces={data.league?.counting_races}
+          exportBasePath={`/public-leagues/${slug}`}
+          leagueName={data.league?.name}
         />
       </main>
     </div>

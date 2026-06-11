@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Users, Loader2, CalendarDays, Megaphone, Building2 } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { ArrowLeft, Users, Loader2, CalendarDays, Megaphone, Building2, Trophy } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -48,8 +48,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import ClubCalendar from '../components/ClubCalendar';
 import ClubBoard from '../components/ClubBoard';
 
-const ADMIN_TABS = new Set(['members', 'board', 'calendar']);
-const MEMBER_TABS = new Set(['board', 'calendar']);
+const ADMIN_TABS = new Set(['members', 'board', 'calendar', 'leagues']);
+const MEMBER_TABS = new Set(['board', 'calendar', 'leagues']);
 
 const ClubMembers = () => {
   const { id: clubId } = useParams();
@@ -255,7 +255,7 @@ const ClubMembers = () => {
       {canManage ? (
         <>
           <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
+            <TabsList className="grid w-full max-w-3xl grid-cols-4">
               <TabsTrigger value="members" className="gap-2">
                 <Users className="size-4 shrink-0" />
                 Miembros
@@ -267,6 +267,10 @@ const ClubMembers = () => {
               <TabsTrigger value="calendar" className="gap-2">
                 <CalendarDays className="size-4 shrink-0" />
                 Calendario
+              </TabsTrigger>
+              <TabsTrigger value="leagues" className="gap-2">
+                <Trophy className="size-4 shrink-0" />
+                Ligas
               </TabsTrigger>
             </TabsList>
             <TabsContent value="members" className="mt-4">
@@ -356,6 +360,34 @@ const ClubMembers = () => {
             <TabsContent value="calendar" className="mt-4">
               <ClubCalendar clubId={clubId} canManage={canManage} />
             </TabsContent>
+            <TabsContent value="leagues" className="mt-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Ligas del club</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(club.leagues || []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay ligas publicadas en este club.</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {(club.leagues || []).map((lg) => (
+                        <li key={lg.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border rounded-md p-3">
+                          <div>
+                            <Link to={`/leagues/${lg.id}`} className="font-medium hover:underline">
+                              {lg.name}
+                            </Link>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {lg.competitions_count ?? 0} pruebas · {lg.participants_count ?? 0} participantes
+                            </p>
+                          </div>
+                          <Badge variant="outline">{lg.status}</Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
 
           <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
@@ -430,7 +462,7 @@ const ClubMembers = () => {
         </>
       ) : (
         <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="board" className="gap-2">
               <Megaphone className="size-4 shrink-0" />
               Tablón
@@ -439,12 +471,44 @@ const ClubMembers = () => {
               <CalendarDays className="size-4 shrink-0" />
               Calendario
             </TabsTrigger>
+            <TabsTrigger value="leagues" className="gap-2">
+              <Trophy className="size-4 shrink-0" />
+              Ligas
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="board" className="mt-4">
             <ClubBoard clubId={clubId} canManage={false} />
           </TabsContent>
           <TabsContent value="calendar" className="mt-4">
             <ClubCalendar clubId={clubId} canManage={false} />
+          </TabsContent>
+          <TabsContent value="leagues" className="mt-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Ligas del club</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(club.leagues || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay ligas publicadas en este club.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {(club.leagues || []).map((lg) => (
+                      <li key={lg.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border rounded-md p-3">
+                        <div>
+                          <Link to={`/leagues/${lg.id}`} className="font-medium hover:underline">
+                            {lg.name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {lg.competitions_count ?? 0} pruebas · {lg.participants_count ?? 0} participantes
+                          </p>
+                        </div>
+                        <Badge variant="outline">{lg.status}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       )}

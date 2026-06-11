@@ -111,6 +111,17 @@ const Leagues = () => {
                   {league.clubs?.name && (
                     <p className="text-sm text-muted-foreground">Club: {league.clubs.name}</p>
                   )}
+                  <p className="text-sm text-muted-foreground">
+                    {league.competitions_count ?? 0} prueba{(league.competitions_count ?? 0) !== 1 ? 's' : ''}
+                    {league.competitions_closed_count != null
+                      ? ` (${league.competitions_closed_count} cerrada${league.competitions_closed_count !== 1 ? 's' : ''})`
+                      : ''}
+                    {' · '}
+                    {league.participants_count ?? 0} participante{(league.participants_count ?? 0) !== 1 ? 's' : ''}
+                    {league.leader
+                      ? ` · Líder: ${league.leader.name} (${league.leader.total_points} pts)`
+                      : ''}
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {league.status !== 'draft' && (

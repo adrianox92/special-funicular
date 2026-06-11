@@ -24,6 +24,9 @@ const LeagueCreate = () => {
     name: '',
     club_id: '',
     scoring_mode: 'league_rules',
+    counting_races: '',
+    max_participants: '',
+    tiebreak_mode: 'competitions_completed',
   });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
@@ -38,11 +41,16 @@ const LeagueCreate = () => {
     try {
       setCreating(true);
       setError(null);
-      const res = await axios.post('/leagues', {
+      const payload = {
         name: form.name.trim(),
         club_id: form.club_id || undefined,
         scoring_mode: form.scoring_mode,
-      });
+        tiebreak_mode: form.tiebreak_mode,
+      };
+      if (form.counting_races) payload.counting_races = parseInt(form.counting_races, 10);
+      if (form.max_participants) payload.max_participants = parseInt(form.max_participants, 10);
+
+      const res = await axios.post('/leagues', payload);
       toast.success('Liga creada');
       navigate(`/leagues/${res.data.id}`);
     } catch (err) {
@@ -102,9 +110,50 @@ const LeagueCreate = () => {
                   <SelectItem value="per_competition">Cada prueba con sus propias reglas</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="counting-races">Pruebas que cuentan (opcional)</Label>
+              <Input
+                id="counting-races"
+                type="number"
+                min={1}
+                value={form.counting_races}
+                onChange={(e) => setForm({ ...form, counting_races: e.target.value })}
+                placeholder="Ej: 5 (descarta las peores)"
+              />
               <p className="text-xs text-muted-foreground">
-                Esta opción no se puede cambiar una vez añadidas pruebas o reglas.
+                Si hay más pruebas que este número, se descartan las de menor puntuación.
               </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="max-participants">Cupo máximo (opcional)</Label>
+              <Input
+                id="max-participants"
+                type="number"
+                min={1}
+                value={form.max_participants}
+                onChange={(e) => setForm({ ...form, max_participants: e.target.value })}
+                placeholder="Sin límite"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Criterio de desempate</Label>
+              <Select
+                value={form.tiebreak_mode}
+                onValueChange={(v) => setForm({ ...form, tiebreak_mode: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="competitions_completed">Más pruebas disputadas</SelectItem>
+                  <SelectItem value="most_wins">Más victorias</SelectItem>
+                  <SelectItem value="last_race_position">Mejor posición en última prueba</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

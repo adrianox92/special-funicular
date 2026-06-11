@@ -966,9 +966,35 @@ router.get('/:id', param('id').isUUID(), handleValidationErrors, async (req, res
       .eq('user_id', req.user.id)
       .maybeSingle();
 
+    const { data: clubLeagues } = await supabaseAdmin
+      .from('leagues')
+      .select('id, name, slug, status, scoring_mode, created_at')
+      .eq('club_id', id)
+      .neq('status', 'draft')
+      .order('created_at', { ascending: false });
+
+    const leaguesWithStats = [];
+    for (const lg of clubLeagues || []) {
+      const { count: compCount } = await supabaseAdmin
+        .from('league_competitions')
+        .select('*', { count: 'exact', head: true })
+        .eq('league_id', lg.id);
+      const { count: partCount } = await supabaseAdmin
+        .from('league_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('league_id', lg.id)
+        .eq('status', 'confirmed');
+      leaguesWithStats.push({
+        ...lg,
+        competitions_count: compCount || 0,
+        participants_count: partCount || 0,
+      });
+    }
+
     res.json({
       ...stripSensitiveClubRow(club),
       my_role: (await userOwnsClub(req.user.id, id)) ? 'admin' : (mem?.role || 'member'),
+      leagues: leaguesWithStats,
     });
   } catch (e) {
     console.error('GET /clubs/:id', e);

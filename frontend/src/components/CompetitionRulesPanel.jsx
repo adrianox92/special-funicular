@@ -47,6 +47,12 @@ const CompetitionRulesPanel = ({ competitionId, leagueId, onRuleChange, readOnly
   }, [competitionId, leagueId]);
 
   const loadRules = async () => {
+    if (!leagueId && !competitionId) {
+      setRules([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const url = leagueId

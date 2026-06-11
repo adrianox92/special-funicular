@@ -2419,6 +2419,62 @@ async function assertVehicleOwnedByUser(supabase, vehicleId, userId) {
   return !!data;
 }
 
+async function fetchLeaguePalmaresEntries(supabase, vehicleId) {
+  const { computeLeagueStandings } = require('../lib/leagueStandings');
+
+  const { data: leagueParticipants, error } = await supabase
+    .from('league_participants')
+    .select(`
+      id,
+      name,
+      league_id,
+      leagues ( id, name, status, created_at )
+    `)
+    .eq('vehicle_id', vehicleId);
+
+  if (error) throw error;
+
+  const entries = [];
+  const seenLeagues = new Set();
+
+  for (const lp of leagueParticipants || []) {
+    const league = lp.leagues;
+    if (!league?.id || league.status !== 'closed' || seenLeagues.has(league.id)) continue;
+    seenLeagues.add(league.id);
+
+    try {
+      const result = await computeLeagueStandings(supabase, league.id);
+      const standing = (result.standings || []).find(
+        (s) => s.league_participant_id === lp.id || s.name === lp.name,
+      );
+      if (!standing) continue;
+
+      entries.push({
+        id: `league-${league.id}`,
+        source: 'system',
+        competition_name: league.name,
+        event_date: league.created_at ? String(league.created_at).slice(0, 10) : null,
+        position: standing.position,
+        category: 'Liga',
+        notes: standing.total_points != null ? `${standing.total_points} pts` : null,
+        competition_id: null,
+        league_id: league.id,
+        league_position: standing.position,
+        participant_id: null,
+        driver_name: lp.name || null,
+        team_name: null,
+        circuit_name: null,
+        competition_status: league.status,
+        created_at: league.created_at || null,
+      });
+    } catch {
+      // omitir ligas con error de cálculo
+    }
+  }
+
+  return entries;
+}
+
 async function fetchSystemPalmaresEntries(supabase, vehicleId) {
   const { data, error } = await supabase
     .from('competition_participants')
@@ -2445,7 +2501,7 @@ async function fetchSystemPalmaresEntries(supabase, vehicleId) {
 
   if (error) throw error;
 
-  return (data || []).map((row) => {
+  const competitionEntries = (data || []).map((row) => {
     const comp = row.competitions || {};
     const categoryName = row.competition_categories?.name || null;
     return {
@@ -2457,6 +2513,8 @@ async function fetchSystemPalmaresEntries(supabase, vehicleId) {
       category: categoryName,
       notes: null,
       competition_id: comp.id || row.competition_id || null,
+      league_id: null,
+      league_position: null,
       participant_id: row.id,
       driver_name: row.driver_name || null,
       team_name: row.team_name || null,
@@ -2465,6 +2523,9 @@ async function fetchSystemPalmaresEntries(supabase, vehicleId) {
       created_at: row.created_at || comp.created_at || null,
     };
   });
+
+  const leagueEntries = await fetchLeaguePalmaresEntries(supabase, vehicleId);
+  return [...competitionEntries, ...leagueEntries];
 }
 
 async function fetchManualPalmaresEntries(supabase, vehicleId, userId) {

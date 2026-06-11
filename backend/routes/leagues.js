@@ -1,5 +1,5 @@
 const express = require('express');
-const { body, param } = require('express-validator');
+const { body, param, query } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
@@ -10,16 +10,15 @@ const {
   userIsClubMember,
 } = require('../lib/leaguePermissions');
 const { computeLeagueStandings } = require('../lib/leagueStandings');
+const {
+  syncLeagueParticipantsToCompetition,
+  importCompetitionParticipantsToLeague,
+} = require('../lib/leagueSync');
+const { generateLeagueCSV, safeFilenamePart } = require('../lib/leagueCsvGenerator');
+const { generateLeagueSocialPDF } = require('../src/utils/leagueSocialPdfGenerator');
 
 const router = express.Router();
 const supabase = getServiceOrAnonClient();
-
-function isUuid(id) {
-  return (
-    typeof id === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
-  );
-}
 
 function generateLeagueSlug(name) {
   const baseSlug = name
@@ -34,6 +33,64 @@ function generateLeagueSlug(name) {
 
   const uuid = uuidv4().substring(0, 8);
   return `${baseSlug}-${uuid}`;
+}
+
+async function enrichLeaguesWithStats(leagues) {
+  if (!leagues.length) return [];
+
+  const ids = leagues.map((l) => l.id);
+
+  const { data: compRows } = await supabase
+    .from('league_competitions')
+    .select('league_id, competitions ( status )')
+    .in('league_id', ids);
+
+  const { data: partRows } = await supabase
+    .from('league_participants')
+    .select('league_id, status')
+    .in('league_id', ids);
+
+  const compStats = new Map();
+  for (const row of compRows || []) {
+    const cur = compStats.get(row.league_id) || { total: 0, closed: 0 };
+    cur.total += 1;
+    if (row.competitions?.status === 'closed') cur.closed += 1;
+    compStats.set(row.league_id, cur);
+  }
+
+  const partStats = new Map();
+  for (const row of partRows || []) {
+    const cur = partStats.get(row.league_id) || { confirmed: 0, waitlist: 0 };
+    if (row.status === 'waitlist') cur.waitlist += 1;
+    else cur.confirmed += 1;
+    partStats.set(row.league_id, cur);
+  }
+
+  const enriched = [];
+  for (const league of leagues) {
+    const cs = compStats.get(league.id) || { total: 0, closed: 0 };
+    const ps = partStats.get(league.id) || { confirmed: 0, waitlist: 0 };
+    let leader = null;
+    try {
+      const standingsResult = await computeLeagueStandings(supabase, league.id);
+      const top = standingsResult.standings?.[0];
+      if (top) {
+        leader = { name: top.name, total_points: top.total_points };
+      }
+    } catch {
+      leader = null;
+    }
+    enriched.push({
+      ...league,
+      competitions_count: cs.total,
+      competitions_closed_count: cs.closed,
+      participants_count: ps.confirmed,
+      waitlist_count: ps.waitlist,
+      leader,
+    });
+  }
+
+  return enriched;
 }
 
 router.use(authMiddleware);
@@ -86,7 +143,8 @@ router.get('/', async (req, res) => {
       merged.set(l.id, l);
     }
 
-    res.json(Array.from(merged.values()));
+    const list = await enrichLeaguesWithStats(Array.from(merged.values()));
+    res.json(list);
   } catch (error) {
     console.error('GET /leagues:', error);
     res.status(500).json({ error: error.message });
@@ -98,10 +156,22 @@ router.post(
   body('name').trim().notEmpty().isLength({ max: 200 }),
   body('scoring_mode').optional().isIn(['league_rules', 'per_competition']),
   body('club_id').optional({ values: 'falsy' }).isUUID(),
+  body('counting_races').optional({ nullable: true }).isInt({ min: 1 }),
+  body('max_participants').optional({ nullable: true }).isInt({ min: 1 }),
+  body('tiebreak_mode')
+    .optional()
+    .isIn(['competitions_completed', 'most_wins', 'last_race_position']),
   handleValidationErrors,
   async (req, res) => {
     try {
-      const { name, scoring_mode = 'league_rules', club_id } = req.body;
+      const {
+        name,
+        scoring_mode = 'league_rules',
+        club_id,
+        counting_races,
+        max_participants,
+        tiebreak_mode = 'competitions_completed',
+      } = req.body;
 
       if (club_id) {
         const isMember = await userIsClubMember(supabase, req.user.id, club_id);
@@ -117,6 +187,9 @@ router.post(
         club_id: club_id || null,
         status: 'draft',
         scoring_mode,
+        counting_races: counting_races ?? null,
+        max_participants: max_participants ?? null,
+        tiebreak_mode,
       };
 
       const { data, error } = await supabase
@@ -239,6 +312,11 @@ router.put(
   body('name').optional().trim().notEmpty().isLength({ max: 200 }),
   body('status').optional().isIn(['draft', 'published', 'running', 'closed']),
   body('scoring_mode').optional().isIn(['league_rules', 'per_competition']),
+  body('counting_races').optional({ nullable: true }).isInt({ min: 1 }),
+  body('max_participants').optional({ nullable: true }).isInt({ min: 1 }),
+  body('tiebreak_mode')
+    .optional()
+    .isIn(['competitions_completed', 'most_wins', 'last_race_position']),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -248,6 +326,14 @@ router.put(
       const updates = {};
       if (req.body.name != null) updates.name = String(req.body.name).trim();
       if (req.body.status != null) updates.status = req.body.status;
+      if (req.body.counting_races !== undefined) {
+        updates.counting_races = req.body.counting_races === null ? null : Number(req.body.counting_races);
+      }
+      if (req.body.max_participants !== undefined) {
+        updates.max_participants =
+          req.body.max_participants === null ? null : Number(req.body.max_participants);
+      }
+      if (req.body.tiebreak_mode != null) updates.tiebreak_mode = req.body.tiebreak_mode;
 
       if (req.body.scoring_mode != null && req.body.scoring_mode !== access.league.scoring_mode) {
         const { count: compCount } = await supabase
@@ -287,6 +373,61 @@ router.put(
       res.json(data);
     } catch (error) {
       console.error('PUT /leagues/:id:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.delete(
+  '/:id',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const { error } = await supabase.from('leagues').delete().eq('id', req.params.id);
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /leagues/:id:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.patch(
+  '/:id/competitions/reorder',
+  param('id').isUUID(),
+  body('order').isArray({ min: 1 }),
+  body('order.*.competition_id').isUUID(),
+  body('order.*.order_index').isInt({ min: 0 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      for (const item of req.body.order) {
+        const { error } = await supabase
+          .from('league_competitions')
+          .update({ order_index: item.order_index })
+          .eq('league_id', req.params.id)
+          .eq('competition_id', item.competition_id);
+
+        if (error) {
+          return res.status(500).json({ error: error.message });
+        }
+      }
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('PATCH /leagues/:id/competitions/reorder:', error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -449,6 +590,58 @@ router.post(
   },
 );
 
+router.patch(
+  '/:id/participants/:participantId',
+  param('id').isUUID(),
+  param('participantId').isUUID(),
+  body('name').optional().trim().notEmpty().isLength({ max: 200 }),
+  body('email').optional({ nullable: true }).isEmail(),
+  body('vehicle_model').optional({ nullable: true }).isString().trim().isLength({ max: 200 }),
+  body('vehicle_id').optional({ nullable: true }).isUUID(),
+  body('status').optional().isIn(['confirmed', 'waitlist']),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const updates = {};
+      if (req.body.name != null) updates.name = String(req.body.name).trim();
+      if (req.body.email !== undefined) {
+        updates.email = req.body.email ? String(req.body.email).trim().toLowerCase() : null;
+      }
+      if (req.body.vehicle_model !== undefined) {
+        updates.vehicle_model = req.body.vehicle_model
+          ? String(req.body.vehicle_model).trim()
+          : null;
+      }
+      if (req.body.vehicle_id !== undefined) updates.vehicle_id = req.body.vehicle_id || null;
+      if (req.body.status != null) updates.status = req.body.status;
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No hay campos para actualizar' });
+      }
+
+      const { data, error } = await supabase
+        .from('league_participants')
+        .update(updates)
+        .eq('league_id', req.params.id)
+        .eq('id', req.params.participantId)
+        .select('*')
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json(data);
+    } catch (error) {
+      console.error('PATCH /leagues/:id/participants/:participantId:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
 router.delete(
   '/:id/participants/:participantId',
   param('id').isUUID(),
@@ -481,6 +674,7 @@ router.post(
   '/:id/competitions/:compId/sync-participants',
   param('id').isUUID(),
   param('compId').isUUID(),
+  body('auto_approve').optional().isBoolean(),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -498,57 +692,18 @@ router.post(
         return res.status(404).json({ error: 'La competición no pertenece a esta liga' });
       }
 
-      const { data: leagueParticipants, error: lpErr } = await supabase
-        .from('league_participants')
-        .select('*')
-        .eq('league_id', req.params.id)
-        .eq('status', 'confirmed');
-
-      if (lpErr) {
-        return res.status(500).json({ error: lpErr.message });
-      }
-
-      const { data: existingSignups } = await supabase
-        .from('competition_signups')
-        .select('name, email')
-        .eq('competition_id', req.params.compId);
-
-      const existingKeys = new Set(
-        (existingSignups || []).map((s) =>
-          `${String(s.name).trim().toLowerCase()}|${String(s.email || '').trim().toLowerCase()}`,
-        ),
+      const result = await syncLeagueParticipantsToCompetition(
+        supabase,
+        req.params.id,
+        req.params.compId,
+        { autoApprove: Boolean(req.body.auto_approve) },
       );
 
-      const toInsert = [];
-      for (const lp of leagueParticipants || []) {
-        const key = `${String(lp.name).trim().toLowerCase()}|${String(lp.email || '').trim().toLowerCase()}`;
-        if (existingKeys.has(key)) continue;
-
-        toInsert.push({
-          competition_id: req.params.compId,
-          name: lp.name,
-          email: lp.email,
-          vehicle: lp.vehicle_model || null,
-          vehicle_id: lp.vehicle_id || null,
-          is_waitlist: false,
-        });
-        existingKeys.add(key);
-      }
-
-      if (toInsert.length === 0) {
+      if (result.created === 0) {
         return res.json({ created: 0, message: 'No hay participantes nuevos para sincronizar' });
       }
 
-      const { data: created, error: insErr } = await supabase
-        .from('competition_signups')
-        .insert(toInsert)
-        .select('id, name, email');
-
-      if (insErr) {
-        return res.status(500).json({ error: insErr.message });
-      }
-
-      res.json({ created: (created || []).length, signups: created || [] });
+      res.json(result);
     } catch (error) {
       console.error('POST sync-participants:', error);
       res.status(500).json({ error: error.message });
@@ -556,17 +711,192 @@ router.post(
   },
 );
 
-router.get('/:id/standings', param('id').isUUID(), handleValidationErrors, async (req, res) => {
-  try {
-    const access = await requireViewLeague(supabase, req.user, req.params.id);
-    if (!access.ok) return access.respond(res);
+router.post(
+  '/:id/import-from-competitions',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
 
-    const result = await computeLeagueStandings(supabase, req.params.id);
-    res.json(result);
-  } catch (error) {
-    console.error('GET /leagues/:id/standings:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      const result = await importCompetitionParticipantsToLeague(supabase, req.params.id, {
+        registeredBy: req.user.id,
+      });
+
+      if (result.created === 0 && result.updated === 0) {
+        return res.json({
+          ...result,
+          message: 'No hay participantes nuevos para importar desde las competiciones',
+        });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('POST import-from-competitions:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/competitions/:compId/import-participants',
+  param('id').isUUID(),
+  param('compId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const result = await importCompetitionParticipantsToLeague(supabase, req.params.id, {
+        competitionId: req.params.compId,
+        registeredBy: req.user.id,
+      });
+
+      if (result.created === 0 && result.updated === 0) {
+        return res.json({
+          ...result,
+          message: 'No hay participantes nuevos para importar desde esta competición',
+        });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('POST import-participants:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/sync-all-competitions',
+  param('id').isUUID(),
+  body('auto_approve').optional().isBoolean(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const { data: links, error: linkErr } = await supabase
+        .from('league_competitions')
+        .select('competition_id')
+        .eq('league_id', req.params.id);
+
+      if (linkErr) {
+        return res.status(500).json({ error: linkErr.message });
+      }
+
+      const autoApprove = Boolean(req.body.auto_approve);
+      const results = [];
+      let totalCreated = 0;
+
+      for (const link of links || []) {
+        const result = await syncLeagueParticipantsToCompetition(
+          supabase,
+          req.params.id,
+          link.competition_id,
+          { autoApprove },
+        );
+        totalCreated += result.created;
+        results.push({ competition_id: link.competition_id, ...result });
+      }
+
+      res.json({ total_created: totalCreated, competitions: results });
+    } catch (error) {
+      console.error('POST sync-all-competitions:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/standings',
+  param('id').isUUID(),
+  query('category_id').optional().isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireViewLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const result = await computeLeagueStandings(supabase, req.params.id, {
+        categoryId: req.query.category_id || undefined,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('GET /leagues/:id/standings:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/export/csv',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireViewLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const payload = await computeLeagueStandings(supabase, req.params.id);
+      const csvData = generateLeagueCSV(payload);
+      const base = safeFilenamePart(payload.league.name);
+      const day = new Date().toISOString().split('T')[0];
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=liga_${base}_${day}.csv`);
+      res.send(csvData);
+    } catch (error) {
+      console.error('GET /leagues/:id/export/csv:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/export/social',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireViewLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const payload = await computeLeagueStandings(supabase, req.params.id);
+
+      let clubName = null;
+      const { data: leagueRow } = await supabase
+        .from('leagues')
+        .select('club_id')
+        .eq('id', req.params.id)
+        .maybeSingle();
+      if (leagueRow?.club_id) {
+        const { data: clubRow } = await supabase
+          .from('clubs')
+          .select('name')
+          .eq('id', leagueRow.club_id)
+          .maybeSingle();
+        clubName = clubRow?.name || null;
+      }
+
+      const pdfBuffer = await generateLeagueSocialPDF(payload.league, {
+        standings: payload.standings,
+        clubName,
+      });
+
+      const base = safeFilenamePart(payload.league.name);
+      const day = new Date().toISOString().split('T')[0];
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=liga_${base}_social_${day}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('GET /leagues/:id/export/social:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 module.exports = router;
