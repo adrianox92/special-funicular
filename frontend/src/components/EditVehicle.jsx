@@ -28,7 +28,7 @@ import VehiclePalmares from './VehiclePalmares';
 import ImportTimingsModal from './ImportTimingsModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { TimeInput } from './ui/TimeInput';
+import { TimeInput, TimeInputHint } from './ui/TimeInput';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
@@ -1662,6 +1662,7 @@ const EditVehicle = () => {
           </Alert>
         )}
         <form onSubmit={handleAddTiming}>
+          <TimeInputHint className="mb-3" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="best_lap_time">Mejor Vuelta (mm:ss.mmm)</Label>
@@ -1674,9 +1675,6 @@ const EditVehicle = () => {
                 }
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Escribe solo dígitos; el formato 00:00.000 se completa automáticamente.
-              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="total_time">Tiempo Total (mm:ss.mmm)</Label>
@@ -1689,9 +1687,6 @@ const EditVehicle = () => {
                 }
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Escribe solo dígitos; el formato 00:00.000 se completa automáticamente.
-              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="laps">Vueltas</Label>

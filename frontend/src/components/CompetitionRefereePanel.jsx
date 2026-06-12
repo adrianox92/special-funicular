@@ -11,7 +11,7 @@ import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
-import { TimeInput } from './ui/TimeInput';
+import { TimeInput, TimeInputHint } from './ui/TimeInput';
 import { Label } from './ui/label';
 import {
   Dialog,
@@ -345,6 +345,7 @@ export default function CompetitionRefereePanel({
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={submitTiming} className="grid gap-4 py-2">
+            <TimeInputHint />
             <div className="space-y-2">
               <Label htmlFor="ref-total">Tiempo total (mm:ss.mmm)</Label>
               <TimeInput
