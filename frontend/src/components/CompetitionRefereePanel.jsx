@@ -11,6 +11,7 @@ import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
+import { TimeInput } from './ui/TimeInput';
 import { Label } from './ui/label';
 import {
   Dialog,
@@ -346,12 +347,10 @@ export default function CompetitionRefereePanel({
           <form onSubmit={submitTiming} className="grid gap-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="ref-total">Tiempo total (mm:ss.mmm)</Label>
-              <Input
+              <TimeInput
                 id="ref-total"
-                placeholder="01:23.456"
                 value={form.total_time}
-                onChange={(e) => setForm((f) => ({ ...f, total_time: e.target.value }))}
-                autoComplete="off"
+                onChange={(val) => setForm((f) => ({ ...f, total_time: val }))}
               />
             </div>
             <div className="space-y-2">
@@ -366,12 +365,10 @@ export default function CompetitionRefereePanel({
             </div>
             <div className="space-y-2">
               <Label htmlFor="ref-best">Mejor vuelta (mm:ss.mmm)</Label>
-              <Input
+              <TimeInput
                 id="ref-best"
-                placeholder="00:12.345"
                 value={form.best_lap_time}
-                onChange={(e) => setForm((f) => ({ ...f, best_lap_time: e.target.value }))}
-                autoComplete="off"
+                onChange={(val) => setForm((f) => ({ ...f, best_lap_time: val }))}
               />
             </div>
             <div className="space-y-2">

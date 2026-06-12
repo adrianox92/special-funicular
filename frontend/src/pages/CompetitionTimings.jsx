@@ -27,6 +27,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { TimeInput } from '../components/ui/TimeInput';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import {
@@ -2119,17 +2120,15 @@ const CompetitionTimings = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="best_lap_time">Mejor Vuelta {!formData.did_not_participate && '*'}</Label>
-                    <Input
+                    <TimeInput
                       id="best_lap_time"
-                      type="text"
                       value={formData.best_lap_time}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         setFormData({
                           ...formData,
-                          best_lap_time: e.target.value,
+                          best_lap_time: val,
                         })
                       }
-                      placeholder="00:00.000"
                       required={!formData.did_not_participate}
                       disabled={formData.did_not_participate}
                     />
@@ -2137,17 +2136,15 @@ const CompetitionTimings = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="total_time">Tiempo Total {!formData.did_not_participate && '*'}</Label>
-                    <Input
+                    <TimeInput
                       id="total_time"
-                      type="text"
                       value={formData.total_time}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         setFormData({
                           ...formData,
-                          total_time: e.target.value,
+                          total_time: val,
                         })
                       }
-                      placeholder="00:00.000"
                       required={!formData.did_not_participate}
                       disabled={formData.did_not_participate}
                     />

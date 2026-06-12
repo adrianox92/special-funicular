@@ -28,6 +28,7 @@ import VehiclePalmares from './VehiclePalmares';
 import ImportTimingsModal from './ImportTimingsModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { TimeInput } from './ui/TimeInput';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
@@ -1663,32 +1664,34 @@ const EditVehicle = () => {
         <form onSubmit={handleAddTiming}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="best_lap_time">Mejor Vuelta (mm:ss.ms)</Label>
-              <Input
+              <Label htmlFor="best_lap_time">Mejor Vuelta (mm:ss.mmm)</Label>
+              <TimeInput
                 id="best_lap_time"
                 name="best_lap_time"
                 value={editingTiming?.best_lap_time || newTiming.best_lap_time}
-                onChange={handleTimingChange}
-                placeholder="00:00.000"
-                pattern="\d{2}:\d{2}\.\d{3}"
-                title="Formato: mm:ss.ms (ejemplo: 01:23.456)"
+                onChange={(val) =>
+                  handleTimingChange({ target: { name: 'best_lap_time', value: val } })
+                }
                 required
               />
-              <p className="text-xs text-muted-foreground">Formato: mm:ss.ms (ejemplo: 01:23.456)</p>
+              <p className="text-xs text-muted-foreground">
+                Escribe solo dígitos; el formato 00:00.000 se completa automáticamente.
+              </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="total_time">Tiempo Total (mm:ss.ms)</Label>
-              <Input
+              <Label htmlFor="total_time">Tiempo Total (mm:ss.mmm)</Label>
+              <TimeInput
                 id="total_time"
                 name="total_time"
                 value={editingTiming?.total_time || newTiming.total_time}
-                onChange={handleTimingChange}
-                placeholder="00:00.000"
-                pattern="\d{2}:\d{2}\.\d{3}"
-                title="Formato: mm:ss.ms (ejemplo: 01:23.456)"
+                onChange={(val) =>
+                  handleTimingChange({ target: { name: 'total_time', value: val } })
+                }
                 required
               />
-              <p className="text-xs text-muted-foreground">Formato: mm:ss.ms (ejemplo: 01:23.456)</p>
+              <p className="text-xs text-muted-foreground">
+                Escribe solo dígitos; el formato 00:00.000 se completa automáticamente.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="laps">Vueltas</Label>
