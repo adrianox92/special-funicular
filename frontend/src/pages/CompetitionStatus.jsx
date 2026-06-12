@@ -337,6 +337,8 @@ const CompetitionStatus = () => {
       ? 'Clasificación general'
       : `Clasificación — ${categoryRankings.find((r) => r.category_id === activeClassificationTab)?.category_name || 'Categoría'}`;
 
+  const hasPowerStageRules = rules.some((r) => r.rule_type === 'power_stage');
+
   const renderGeneralClassificationTable = (rows) => (
     <div className="overflow-x-auto rounded-md border">
       <Table>
@@ -348,6 +350,9 @@ const CompetitionStatus = () => {
             <TableHead>Vehículo</TableHead>
             <TableHead className="tabular-nums">Rondas</TableHead>
             <TableHead className="tabular-nums">Tiempo total</TableHead>
+            {rules.length > 0 && hasPowerStageRules && (
+              <TableHead className="tabular-nums">⚡ PS</TableHead>
+            )}
             {rules.length > 0 && <TableHead className="tabular-nums">Puntos</TableHead>}
             {showGeneralExtraColumns && (
               <>
@@ -403,6 +408,13 @@ const CompetitionStatus = () => {
                   {participant.rounds_completed}/{competition.rounds}
                 </TableCell>
                 <TableCell>{renderGeneralTotalCell(participant)}</TableCell>
+                {rules.length > 0 && hasPowerStageRules && (
+                  <TableCell className="tabular-nums text-muted-foreground">
+                    {(participant.power_stage_points || 0) > 0
+                      ? participant.power_stage_points
+                      : '—'}
+                  </TableCell>
+                )}
                 {rules.length > 0 && (
                   <TableCell className="tabular-nums font-medium">{participant.points || 0}</TableCell>
                 )}

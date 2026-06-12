@@ -78,8 +78,10 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
   });
 
   const pointsByParticipant = {};
+  const powerStagePointsByParticipant = {};
   participants.forEach((p) => {
     pointsByParticipant[p.id] = 0;
+    powerStagePointsByParticipant[p.id] = 0;
   });
 
   const perRoundRule = rules.find((r) => r.rule_type === 'per_round');
@@ -156,6 +158,7 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
 
         Object.entries(powerStageRule.points_structure).forEach(([, pts], idx) => {
           if (sorted[idx]) {
+            powerStagePointsByParticipant[sorted[idx].participant_id] += pts;
             pointsByParticipant[sorted[idx].participant_id] += pts;
           }
         });
@@ -261,10 +264,11 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
       penalty_seconds: totalPenalty,
       timings: participantTimings,
       points: pointsByParticipant[p.id] || 0,
+      power_stage_points: powerStagePointsByParticipant[p.id] || 0,
     };
   });
 
-  return { pointsByParticipant, participantStats };
+  return { pointsByParticipant, powerStagePointsByParticipant, participantStats };
 }
 
 /**
@@ -298,8 +302,10 @@ function calculatePoints({ competition, participants, timings, rules, categories
 
   const categoryRankings = [];
   const mergedPointsByParticipant = {};
+  const mergedPowerStagePointsByParticipant = {};
   participants.forEach((p) => {
     mergedPointsByParticipant[p.id] = 0;
+    mergedPowerStagePointsByParticipant[p.id] = 0;
   });
 
   const categoriesWithParticipants = safeCategories.filter((cat) =>
@@ -321,6 +327,9 @@ function calculatePoints({ competition, participants, timings, rules, categories
 
     Object.entries(core.pointsByParticipant).forEach(([pid, pts]) => {
       mergedPointsByParticipant[pid] = pts;
+    });
+    Object.entries(core.powerStagePointsByParticipant).forEach(([pid, pts]) => {
+      mergedPowerStagePointsByParticipant[pid] = pts;
     });
 
     const sortedCat = sortByPointsThenTime(core.participantStats);
@@ -352,6 +361,9 @@ function calculatePoints({ competition, participants, timings, rules, categories
     Object.entries(core.pointsByParticipant).forEach(([pid, pts]) => {
       mergedPointsByParticipant[pid] = pts;
     });
+    Object.entries(core.powerStagePointsByParticipant).forEach(([pid, pts]) => {
+      mergedPowerStagePointsByParticipant[pid] = pts;
+    });
   }
 
   const globalCore = calculatePointsCore({
@@ -364,6 +376,7 @@ function calculatePoints({ competition, participants, timings, rules, categories
   const participantStats = globalCore.participantStats.map((stat) => ({
     ...stat,
     points: mergedPointsByParticipant[stat.participant_id] || 0,
+    power_stage_points: mergedPowerStagePointsByParticipant[stat.participant_id] || 0,
   }));
 
   const sortedParticipants = sortByPointsThenTime(participantStats);

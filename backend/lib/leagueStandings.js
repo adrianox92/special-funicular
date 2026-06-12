@@ -34,13 +34,15 @@ function formatParticipantVehicle(participant) {
  * @param {number} points
  * @param {number} position
  * @param {string|null} vehicle
+ * @param {number} [powerStagePoints]
  */
-function buildCompetitionStandingEntry(points, position, vehicle) {
+function buildCompetitionStandingEntry(points, position, vehicle, powerStagePoints = 0) {
   return {
     points,
     position,
     dropped: false,
     vehicle: vehicle || null,
+    power_stage_points: powerStagePoints || 0,
   };
 }
 
@@ -362,14 +364,16 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
       const email = signupEmailByName.get(participantMatchKey(participant.driver_name, null)) || null;
       const key = resolveParticipantKey(keyAliases, standingsMap, participant.driver_name, email);
       const pts = stat.points || 0;
+      const powerStagePts = stat.power_stage_points || 0;
       const vehicle = formatParticipantVehicle(participant);
       const compEntry = {
-        ...buildCompetitionStandingEntry(pts, stat.position, vehicle),
+        ...buildCompetitionStandingEntry(pts, stat.position, vehicle, powerStagePts),
         competition_name: comp.name,
       };
 
       compResult.points_by_participant_key[key] = {
         points: pts,
+        power_stage_points: powerStagePts,
         position: stat.position,
         driver_name: participant.driver_name,
         vehicle,

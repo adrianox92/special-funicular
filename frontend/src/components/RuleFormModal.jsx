@@ -111,11 +111,6 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
         setSaving(false);
         return;
       }
-      if (!formData.description?.trim()) {
-        setError('Debes especificar una descripción');
-        setSaving(false);
-        return;
-      }
       if ((formData.rule_type === 'per_round' || formData.rule_type === 'final' || formData.rule_type === 'power_stage') &&
           (!formData.points_structure || Object.keys(formData.points_structure).length === 0)) {
         setError('Debes especificar al menos una posición con puntos');

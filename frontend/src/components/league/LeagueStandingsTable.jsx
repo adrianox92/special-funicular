@@ -126,6 +126,15 @@ const LeagueStandingsTable = ({
                       {pts != null ? (
                         <div className="space-y-0.5">
                           <div className={dropped ? 'line-through' : 'font-medium'}>{pts}</div>
+                          {(entry?.power_stage_points || 0) > 0 && (
+                            <div
+                              className={`text-[10px] leading-tight ${
+                                dropped ? 'line-through opacity-70' : 'text-muted-foreground'
+                              }`}
+                            >
+                              ⚡ +{entry.power_stage_points} PS
+                            </div>
+                          )}
                           {vehicle ? (
                             <div
                               className={`text-[10px] leading-tight truncate max-w-[7rem] mx-auto ${
