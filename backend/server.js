@@ -104,7 +104,8 @@ function pickCorsOptions(path) {
   if (
     path.startsWith('/api/sync') ||
     path === '/api/auth/api-key' ||
-    path.startsWith('/api/license')
+    path.startsWith('/api/license') ||
+    path.startsWith('/api/lap-timer/license')
   ) return corsSyncOptions;
   return corsOptions;
 }
@@ -206,6 +207,7 @@ const apiKeyAuth = require('./middleware/apiKeyAuth');
 const authMiddleware = require('./middleware/auth');
 const licenseRoute = require('./routes/license');
 const licenseAccountRoute = require('./routes/licenseAccount');
+const lapTimerLicenseRoute = require('./routes/lapTimerLicense');
 const helpRoute = require('./routes/help');
 const catalogRoute = require('./routes/catalog');
 const storeListingsRoute = require('./routes/storeListings');
@@ -219,6 +221,7 @@ app.use('/api/sync', syncRoute);
 app.use('/api/auth', authSoftLimiter, authRoute);
 app.use('/api/license', apiKeyAuth, licenseRoute);
 app.use('/api/license-account', authMiddleware, licenseAccountRoute);
+app.use('/api/lap-timer/license', lapTimerLicenseRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
 app.use('/api/circuits', circuitsRoute);
