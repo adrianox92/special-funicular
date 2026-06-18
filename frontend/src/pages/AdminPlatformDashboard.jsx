@@ -151,6 +151,21 @@ const AdminPlatformDashboard = () => {
     }
   }, [isAdmin, refsPage, refsOnlyUnlinked]);
 
+  const linkPreviewCounts = (row, restrictMfg) => {
+    if (!row) return { vehicles: 0, users: 0 };
+    const hasSampleMfg = row.sample_manufacturer != null && String(row.sample_manufacturer).trim() !== '';
+    if (restrictMfg && hasSampleMfg) {
+      return {
+        vehicles: row.linkable_vehicle_count_sample_mfg ?? row.linkable_vehicle_count ?? 0,
+        users: row.linkable_distinct_user_count_sample_mfg ?? row.linkable_distinct_user_count ?? 0,
+      };
+    }
+    return {
+      vehicles: row.linkable_vehicle_count ?? row.vehicle_count ?? 0,
+      users: row.linkable_distinct_user_count ?? row.distinct_user_count ?? 0,
+    };
+  };
+
   const openLinkDialog = (row) => {
     setRefsLinkBanner(null);
     setLinkFeedback(null);
@@ -393,8 +408,10 @@ const AdminPlatformDashboard = () => {
           <CardTitle className="text-base">Referencias de garaje ausentes del catálogo</CardTitle>
           <CardDescription>
             Agrupadas por referencia normalizada (espacios y mayúsculas/minúsculas). Si algún ítem del
-            catálogo público comparte la misma referencia normalizada, no aparece aquí. No depende del
-            periodo de fechas de arriba.
+            catálogo público comparte la misma referencia normalizada, no aparece aquí. Ejemplares y
+            usuarios muestran solo vehículos sin enlace a catálogo (
+            <span className="font-mono">catalog_item_id</span> vacío), alineados con la acción Enlazar. No
+            depende del periodo de fechas de arriba.
           </CardDescription>
           <div className="flex flex-wrap items-center gap-3 pt-3">
             <div className="flex items-center gap-2">
@@ -441,7 +458,7 @@ const AdminPlatformDashboard = () => {
               <p className="text-sm text-muted-foreground">
                 {refsData.total === 0
                   ? 'Ningún grupo cumple los criterios.'
-                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares).`}
+                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables).`}
               </p>
               {refsData.total > 0 && (
                 <div className="rounded-md border">
@@ -457,14 +474,28 @@ const AdminPlatformDashboard = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(refsData.rows || []).map((row, idx) => (
+                      {(refsData.rows || []).map((row, idx) => {
+                        const linkableVehicles = row.linkable_vehicle_count ?? row.vehicle_count ?? 0;
+                        const linkableUsers =
+                          row.linkable_distinct_user_count ?? row.distinct_user_count ?? '—';
+                        const totalVehicles = row.vehicle_count ?? 0;
+                        const showTotalHint =
+                          !refsOnlyUnlinked &&
+                          Number.isFinite(totalVehicles) &&
+                          totalVehicles > linkableVehicles;
+                        return (
                         <TableRow key={`${refsData.offset}-${idx}`}>
                           <TableCell className="text-right tabular-nums font-semibold">
-                            {row.vehicle_count ?? 0}
+                            {linkableVehicles}
+                            {showTotalHint && (
+                              <span className="block text-xs font-normal text-muted-foreground">
+                                de {totalVehicles} tot.
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="font-mono text-sm">{row.reference || '—'}</TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {row.distinct_user_count ?? '—'}
+                            {linkableUsers}
                           </TableCell>
                           <TableCell className="text-sm">{row.sample_manufacturer ?? '—'}</TableCell>
                           <TableCell className="text-sm">{row.sample_model ?? '—'}</TableCell>
@@ -474,7 +505,8 @@ const AdminPlatformDashboard = () => {
                             </Button>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -528,8 +560,8 @@ const AdminPlatformDashboard = () => {
                   <span className="font-mono font-medium">{linkDialogRow.reference || '—'}</span>
                 </p>
                 <p className="text-muted-foreground tabular-nums">
-                  Vehículos afectados (aprox.): {linkDialogRow.vehicle_count ?? 0} · Usuarios:{' '}
-                  {linkDialogRow.distinct_user_count ?? '—'}
+                  Vehículos a enlazar: {linkPreviewCounts(linkDialogRow, linkRestrictMfg).vehicles} ·
+                  Usuarios: {linkPreviewCounts(linkDialogRow, linkRestrictMfg).users}
                 </p>
               </div>
               {linkDialogRow.sample_manufacturer != null && String(linkDialogRow.sample_manufacturer).trim() !== '' && (
