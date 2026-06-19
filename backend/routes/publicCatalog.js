@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { getAnonClient } = require('../lib/supabaseClients');
+const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -124,7 +125,6 @@ router.get('/items', async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(String(req.query.page  || '1'),  10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24));
-    const from  = (page - 1) * limit;
 
     // --- Filtros básicos (SEO path) ---
     const manufacturerSlug = String(req.query.manufacturer_slug ?? '').trim();
@@ -164,96 +164,92 @@ router.get('/items', async (req, res) => {
       resolvedManufacturerId = manufacturerId;
     }
 
-    let q_builder = supabase
-      .from('slot_catalog_items_with_ratings')
-      .select(PUBLIC_SELECT, { count: 'exact' });
+    const buildPublicCatalogItemsQuery = (opts = {}) => {
+      const selectOpts =
+        opts.head === true ? { count: 'exact', head: true } : { count: 'exact' };
+      let q_builder = supabase
+        .from('slot_catalog_items_with_ratings')
+        .select(PUBLIC_SELECT, selectOpts);
 
-    // Marca
-    if (resolvedManufacturerId) {
-      q_builder = q_builder.eq('manufacturer_id', resolvedManufacturerId);
-    } else if (manufacturerText) {
-      q_builder = q_builder.ilike('manufacturer', `%${escapeIlikePattern(manufacturerText)}%`);
-    }
+      if (resolvedManufacturerId) {
+        q_builder = q_builder.eq('manufacturer_id', resolvedManufacturerId);
+      } else if (manufacturerText) {
+        q_builder = q_builder.ilike('manufacturer', `%${escapeIlikePattern(manufacturerText)}%`);
+      }
 
-    // Tipo
-    if (vehicleType) {
-      q_builder = q_builder.eq('vehicle_type', vehicleType);
-    }
+      if (vehicleType) {
+        q_builder = q_builder.eq('vehicle_type', vehicleType);
+      }
 
-    // Tracción
-    if (tractionFilter) {
-      q_builder = q_builder.eq('traction', tractionFilter);
-    }
+      if (tractionFilter) {
+        q_builder = q_builder.eq('traction', tractionFilter);
+      }
 
-    // Año exacto (legacy)
-    if (year != null && Number.isFinite(year)) {
-      q_builder = q_builder.eq('commercial_release_year', year);
-    }
+      if (year != null && Number.isFinite(year)) {
+        q_builder = q_builder.eq('commercial_release_year', year);
+      }
 
-    // Búsqueda libre
-    if (q) {
-      const escaped = escapeIlikePattern(q);
-      q_builder = q_builder.or(
-        `reference.ilike.%${escaped}%,model_name.ilike.%${escaped}%,manufacturer.ilike.%${escaped}%`,
-      );
-    }
+      if (q) {
+        const escaped = escapeIlikePattern(q);
+        q_builder = q_builder.or(
+          `reference.ilike.%${escaped}%,model_name.ilike.%${escaped}%,manufacturer.ilike.%${escaped}%`,
+        );
+      }
 
-    // Posición de motor
-    if (motorPosition) {
-      q_builder = q_builder.eq('motor_position', motorPosition);
-    }
+      if (motorPosition) {
+        q_builder = q_builder.eq('motor_position', motorPosition);
+      }
 
-    // Descatalogado / próximo lanzamiento
-    if (discontinuedRaw === 'true')    q_builder = q_builder.eq('discontinued', true);
-    if (discontinuedRaw === 'false')   q_builder = q_builder.eq('discontinued', false);
-    if (upcomingReleaseRaw === 'true')  q_builder = q_builder.eq('upcoming_release', true);
-    if (upcomingReleaseRaw === 'false') q_builder = q_builder.eq('upcoming_release', false);
+      if (discontinuedRaw === 'true') q_builder = q_builder.eq('discontinued', true);
+      if (discontinuedRaw === 'false') q_builder = q_builder.eq('discontinued', false);
+      if (upcomingReleaseRaw === 'true') q_builder = q_builder.eq('upcoming_release', true);
+      if (upcomingReleaseRaw === 'false') q_builder = q_builder.eq('upcoming_release', false);
 
-    // Rango de años
-    if (yearFrom != null && Number.isFinite(yearFrom)) {
-      q_builder = q_builder.gte('commercial_release_year', yearFrom);
-    }
-    if (yearTo != null && Number.isFinite(yearTo)) {
-      q_builder = q_builder.lte('commercial_release_year', yearTo);
-    }
+      if (yearFrom != null && Number.isFinite(yearFrom)) {
+        q_builder = q_builder.gte('commercial_release_year', yearFrom);
+      }
+      if (yearTo != null && Number.isFinite(yearTo)) {
+        q_builder = q_builder.lte('commercial_release_year', yearTo);
+      }
 
-    // Ordenación
-    switch (sort) {
-      case 'year_desc':
-        q_builder = q_builder
-          .order('commercial_release_year', { ascending: false, nullsFirst: false })
-          .order('manufacturer', { ascending: true })
-          .order('reference',    { ascending: true });
-        break;
-      case 'rating_desc':
-        q_builder = q_builder
-          .order('rating_avg',  { ascending: false, nullsFirst: false })
-          .order('manufacturer', { ascending: true })
-          .order('reference',    { ascending: true });
-        break;
-      case 'newest':
-        q_builder = q_builder
-          .order('created_at', { ascending: false });
-        break;
-      default: // 'manufacturer'
-        q_builder = q_builder
-          .order('manufacturer', { ascending: true })
-          .order('reference',    { ascending: true });
-    }
+      if (opts.head !== true) {
+        switch (sort) {
+          case 'year_desc':
+            q_builder = q_builder
+              .order('commercial_release_year', { ascending: false, nullsFirst: false })
+              .order('manufacturer', { ascending: true })
+              .order('reference', { ascending: true });
+            break;
+          case 'rating_desc':
+            q_builder = q_builder
+              .order('rating_avg', { ascending: false, nullsFirst: false })
+              .order('manufacturer', { ascending: true })
+              .order('reference', { ascending: true });
+            break;
+          case 'newest':
+            q_builder = q_builder.order('created_at', { ascending: false });
+            break;
+          default:
+            q_builder = q_builder
+              .order('manufacturer', { ascending: true })
+              .order('reference', { ascending: true });
+        }
+      }
 
-    // limit/offset (no Range): evita 416 si page > totalPages tras filtrar.
-    q_builder = q_builder.limit(limit).offset(from);
+      return q_builder;
+    };
 
-    const { data, error, count } = await q_builder;
-    if (error) return res.status(500).json({ error: error.message });
-
-    const total = count ?? 0;
-    res.json({
-      items: data ?? [],
-      total,
+    const { data, count, totalPages } = await fetchSupabaseRangePage(buildPublicCatalogItemsQuery, {
       page,
       limit,
-      totalPages: total > 0 ? Math.ceil(total / limit) : 0,
+    });
+
+    res.json({
+      items: data,
+      total: count,
+      page,
+      limit,
+      totalPages,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

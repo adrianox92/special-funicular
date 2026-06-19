@@ -17,6 +17,7 @@ const {
 const { catalogContributionsLimiter } = require('../middleware/rateLimits');
 const { isExcelImportFile, normalizeBlankColumnHeaders } = require('../lib/vehicleImport');
 const { parseImportCommercialReleaseYear } = require('../lib/importDateParse');
+const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
 
 const router = express.Router();
 
@@ -944,49 +945,54 @@ router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
-    const offset = (page - 1) * limit;
     const refFilter = String(req.query.reference ?? '').trim();
     const manufacturerId = String(req.query.manufacturer_id ?? '').trim();
     const mfgFilter = String(req.query.manufacturer ?? '').trim();
     /** Hueco de datos: solo ítems que carecen de ese campo (alineado con métricas del dashboard). */
     const missing = String(req.query.missing ?? '').trim().toLowerCase();
 
-    let q = req.supabase.from('slot_catalog_items_with_ratings').select('*', { count: 'exact' });
-    if (refFilter) {
-      const p = `%${escapeIlikePattern(refFilter)}%`;
-      q = q.ilike('reference', p);
-    }
-    if (manufacturerId && isUuid(manufacturerId)) {
-      q = q.eq('manufacturer_id', manufacturerId);
-    } else if (mfgFilter) {
-      const p = `%${escapeIlikePattern(mfgFilter)}%`;
-      q = q.ilike('manufacturer', p);
-    }
-    if (missing === 'image') {
-      q = q.or('image_url.is.null,image_url.eq.');
-    } else if (missing === 'vehicle_type') {
-      q = q.or('vehicle_type.is.null,vehicle_type.eq.');
-    } else if (missing === 'traction') {
-      q = q.or('traction.is.null,traction.eq.');
-    } else if (missing === 'motor' || missing === 'motor_position') {
-      q = q.or('motor_position.is.null,motor_position.eq.');
-    } else if (missing === 'year') {
-      q = q.or(
-        'commercial_release_year.is.null,commercial_release_year.lt.1900,commercial_release_year.gt.2100',
-      );
-    } else if (missing === 'dorsal') {
-      q = q.or('dorsal.is.null,dorsal.eq.');
-    }
-    // limit/offset (no Range): evita 416 "Requested range not satisfiable" si page > totalPages.
-    q = q.order('reference', { ascending: true }).limit(limit).offset(offset);
+    const buildCatalogItemsQuery = (opts = {}) => {
+      const selectOpts =
+        opts.head === true ? { count: 'exact', head: true } : { count: 'exact' };
+      let q = req.supabase.from('slot_catalog_items_with_ratings').select('*', selectOpts);
+      if (refFilter) {
+        const p = `%${escapeIlikePattern(refFilter)}%`;
+        q = q.ilike('reference', p);
+      }
+      if (manufacturerId && isUuid(manufacturerId)) {
+        q = q.eq('manufacturer_id', manufacturerId);
+      } else if (mfgFilter) {
+        const p = `%${escapeIlikePattern(mfgFilter)}%`;
+        q = q.ilike('manufacturer', p);
+      }
+      if (missing === 'image') {
+        q = q.or('image_url.is.null,image_url.eq.');
+      } else if (missing === 'vehicle_type') {
+        q = q.or('vehicle_type.is.null,vehicle_type.eq.');
+      } else if (missing === 'traction') {
+        q = q.or('traction.is.null,traction.eq.');
+      } else if (missing === 'motor' || missing === 'motor_position') {
+        q = q.or('motor_position.is.null,motor_position.eq.');
+      } else if (missing === 'year') {
+        q = q.or(
+          'commercial_release_year.is.null,commercial_release_year.lt.1900,commercial_release_year.gt.2100',
+        );
+      } else if (missing === 'dorsal') {
+        q = q.or('dorsal.is.null,dorsal.eq.');
+      }
+      if (opts.head !== true) {
+        q = q.order('reference', { ascending: true });
+      }
+      return q;
+    };
 
-    const { data, error, count } = await q;
-    if (error) return res.status(500).json({ error: error.message });
-    const total = count ?? 0;
-    const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+    const { data, count, totalPages } = await fetchSupabaseRangePage(buildCatalogItemsQuery, {
+      page,
+      limit,
+    });
     res.json({
-      items: data ?? [],
-      total,
+      items: data,
+      total: count,
       page,
       limit,
       totalPages,
