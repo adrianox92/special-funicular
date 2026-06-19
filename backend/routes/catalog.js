@@ -944,8 +944,7 @@ router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+    const offset = (page - 1) * limit;
     const refFilter = String(req.query.reference ?? '').trim();
     const manufacturerId = String(req.query.manufacturer_id ?? '').trim();
     const mfgFilter = String(req.query.manufacturer ?? '').trim();
@@ -978,16 +977,19 @@ router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
     } else if (missing === 'dorsal') {
       q = q.or('dorsal.is.null,dorsal.eq.');
     }
-    q = q.order('reference', { ascending: true }).range(from, to);
+    // limit/offset (no Range): evita 416 "Requested range not satisfiable" si page > totalPages.
+    q = q.order('reference', { ascending: true }).limit(limit).offset(offset);
 
     const { data, error, count } = await q;
     if (error) return res.status(500).json({ error: error.message });
+    const total = count ?? 0;
+    const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
     res.json({
       items: data ?? [],
-      total: count ?? 0,
+      total,
       page,
       limit,
-      totalPages: count != null ? Math.ceil(count / limit) : 0,
+      totalPages,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

@@ -337,8 +337,14 @@ function AdminSlotCatalog() {
           missing: itemsMissingFilter || undefined,
         },
       });
+      const tp = Number(data.totalPages) || 0;
+      setTotalPages(tp);
+      const lastValidPage = tp > 0 ? tp : 1;
+      if (page > lastValidPage) {
+        setPage(lastValidPage);
+        return;
+      }
       setItems(data.items ?? []);
-      setTotalPages(data.totalPages ?? 1);
     } catch (e) {
       setItemsError(e.response?.data?.error || e.message || 'Error');
       setItems([]);

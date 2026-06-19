@@ -125,7 +125,6 @@ router.get('/items', async (req, res) => {
     const page  = Math.max(1, parseInt(String(req.query.page  || '1'),  10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24));
     const from  = (page - 1) * limit;
-    const to    = from + limit - 1;
 
     // --- Filtros básicos (SEO path) ---
     const manufacturerSlug = String(req.query.manufacturer_slug ?? '').trim();
@@ -242,7 +241,8 @@ router.get('/items', async (req, res) => {
           .order('reference',    { ascending: true });
     }
 
-    q_builder = q_builder.range(from, to);
+    // limit/offset (no Range): evita 416 si page > totalPages tras filtrar.
+    q_builder = q_builder.limit(limit).offset(from);
 
     const { data, error, count } = await q_builder;
     if (error) return res.status(500).json({ error: error.message });
