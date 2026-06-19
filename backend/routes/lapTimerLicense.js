@@ -7,9 +7,9 @@
  *                               autenticado por cabecera Authorization)
  */
 const express = require('express');
-const crypto = require('crypto');
 const { getServiceClient } = require('../lib/supabaseClients');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
+const revenueCatWebhookAuth = require('../middleware/revenueCatWebhookAuth');
 const { hashApiKey } = require('../lib/apiKeyHash');
 
 const router = express.Router();
@@ -113,33 +113,8 @@ router.get('/status', apiKeyAuth, async (req, res) => {
 // ── POST /webhook ─────────────────────────────────────────────────────────────
 // Sin apiKeyAuth: autenticado por cabecera Authorization == REVENUECAT_WEBHOOK_SECRET.
 // RevenueCat reintenta si recibe != 2xx → responde 200 siempre para evitar bucles.
-router.post('/webhook', async (req, res) => {
+async function handleRevenueCatWebhookEvent(req, res) {
   try {
-    const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
-
-    if (!secret) {
-      console.error('[lapTimerLicense] webhook: REVENUECAT_WEBHOOK_SECRET no configurado');
-      return res.sendStatus(200);
-    }
-
-    // La cabecera puede llegar como valor plano o con prefijo "Bearer ".
-    const rawAuth = String(req.headers.authorization || '');
-    const incoming = rawAuth.toLowerCase().startsWith('bearer ')
-      ? rawAuth.slice(7).trim()
-      : rawAuth.trim();
-
-    // Comparación de tiempo constante para evitar timing attacks.
-    const secretBuf = Buffer.from(secret, 'utf8');
-    const incomingBuf = Buffer.from(incoming, 'utf8');
-    const valid =
-      secretBuf.length === incomingBuf.length &&
-      crypto.timingSafeEqual(secretBuf, incomingBuf);
-
-    if (!valid) {
-      console.warn('[lapTimerLicense] webhook: firma inválida');
-      return res.sendStatus(200);
-    }
-
     const event = req.body?.event;
     if (!event) {
       return res.sendStatus(200);
@@ -222,6 +197,11 @@ router.post('/webhook', async (req, res) => {
     console.error('[lapTimerLicense] webhook:', err);
     return res.sendStatus(200);
   }
-});
+}
+
+const revenueCatWebhookRoute = [revenueCatWebhookAuth, handleRevenueCatWebhookEvent];
+
+router.post('/webhook', ...revenueCatWebhookRoute);
 
 module.exports = router;
+module.exports.revenueCatWebhookRoute = revenueCatWebhookRoute;

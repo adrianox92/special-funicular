@@ -101,11 +101,11 @@ const corsOptions = {
 function pickCorsOptions(path) {
   // /api/license-account/* comparte prefijo con /api/license pero es JWT + PATCH → corsOptions.
   if (path.startsWith('/api/license-account')) return corsOptions;
+  if (path.startsWith('/api/lap-timer/license')) return corsSyncOptions;
   if (
     path.startsWith('/api/sync') ||
     path === '/api/auth/api-key' ||
-    path.startsWith('/api/license') ||
-    path.startsWith('/api/lap-timer/license')
+    path.startsWith('/api/license')
   ) return corsSyncOptions;
   return corsOptions;
 }
@@ -208,6 +208,7 @@ const authMiddleware = require('./middleware/auth');
 const licenseRoute = require('./routes/license');
 const licenseAccountRoute = require('./routes/licenseAccount');
 const lapTimerLicenseRoute = require('./routes/lapTimerLicense');
+const { revenueCatWebhookRoute } = require('./routes/lapTimerLicense');
 const helpRoute = require('./routes/help');
 const catalogRoute = require('./routes/catalog');
 const storeListingsRoute = require('./routes/storeListings');
@@ -219,6 +220,10 @@ app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
 app.use('/api/sync', syncRoute);
 app.use('/api/auth', authSoftLimiter, authRoute);
+// Webhook RevenueCat: montado ANTES de /api/license + apiKeyAuth.
+// Si RC apunta a /api/license/webhook (ruta habitual por error), no exige X-API-Key.
+app.post('/api/lap-timer/license/webhook', ...revenueCatWebhookRoute);
+app.post('/api/license/webhook', ...revenueCatWebhookRoute);
 app.use('/api/license', apiKeyAuth, licenseRoute);
 app.use('/api/license-account', authMiddleware, licenseAccountRoute);
 app.use('/api/lap-timer/license', lapTimerLicenseRoute);
