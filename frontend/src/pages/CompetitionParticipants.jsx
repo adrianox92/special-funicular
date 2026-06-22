@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus } from 'lucide-react';
+import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
 import CompetitionCategories from '../components/CompetitionCategories';
@@ -102,6 +102,8 @@ const CompetitionParticipants = () => {
   const [favoritesCategoryId, setFavoritesCategoryId] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState(null);
+  const [startOrderSavingId, setStartOrderSavingId] = useState(null);
+  const [startOrderDraft, setStartOrderDraft] = useState({});
 
   const canUseOrganizerTools = Boolean(
     (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
@@ -481,6 +483,76 @@ const CompetitionParticipants = () => {
     const category = competition.categories.find(cat => cat.id === categoryId);
     return category ? category.name : 'Sin categoría';
   }, [competition?.categories]);
+
+  const sortedParticipants = useMemo(() => {
+    return [...(participants || [])].sort((a, b) => {
+      const ao = a.start_order;
+      const bo = b.start_order;
+      if (ao != null && bo != null) return ao - bo;
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+  }, [participants]);
+
+  const saveStartOrder = useCallback(async (participantId, value) => {
+    const trimmed = String(value ?? '').trim();
+    const parsed = trimmed === '' ? null : Number(trimmed);
+    if (parsed != null && (!Number.isFinite(parsed) || parsed < 1)) {
+      toast.error('El orden de salida debe ser un número ≥ 1');
+      return;
+    }
+    try {
+      setStartOrderSavingId(participantId);
+      await axios.put(`/competitions/${competitionId}/participants/${participantId}`, {
+        driver_name: participants.find((p) => p.id === participantId)?.driver_name,
+        category_id: participants.find((p) => p.id === participantId)?.category_id,
+        ...(participants.find((p) => p.id === participantId)?.vehicle_id
+          ? { vehicle_id: participants.find((p) => p.id === participantId)?.vehicle_id }
+          : { vehicle_model: participants.find((p) => p.id === participantId)?.vehicle_model }),
+        start_order: parsed,
+      });
+      await loadCompetition();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'No se pudo guardar el orden de salida');
+    } finally {
+      setStartOrderSavingId(null);
+    }
+  }, [competitionId, participants, loadCompetition]);
+
+  const moveParticipantOrder = useCallback(async (participantId, direction) => {
+    const list = sortedParticipants;
+    const idx = list.findIndex((p) => p.id === participantId);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= list.length) return;
+    const current = list[idx];
+    const other = list[swapIdx];
+    const currentOrder = current.start_order ?? idx + 1;
+    const otherOrder = other.start_order ?? swapIdx + 1;
+    try {
+      setStartOrderSavingId(participantId);
+      await Promise.all([
+        axios.put(`/competitions/${competitionId}/participants/${current.id}`, {
+          driver_name: current.driver_name,
+          category_id: current.category_id,
+          ...(current.vehicle_id ? { vehicle_id: current.vehicle_id } : { vehicle_model: current.vehicle_model }),
+          start_order: otherOrder,
+        }),
+        axios.put(`/competitions/${competitionId}/participants/${other.id}`, {
+          driver_name: other.driver_name,
+          category_id: other.category_id,
+          ...(other.vehicle_id ? { vehicle_id: other.vehicle_id } : { vehicle_model: other.vehicle_model }),
+          start_order: currentOrder,
+        }),
+      ]);
+      await loadCompetition();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'No se pudo reordenar');
+    } finally {
+      setStartOrderSavingId(null);
+    }
+  }, [competitionId, sortedParticipants, loadCompetition]);
 
   const generatePublicLink = () => {
     if (competition?.public_slug && competition.categories && competition.categories.length > 0) {
@@ -925,6 +997,7 @@ const CompetitionParticipants = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>#</TableHead>
+                    <TableHead>Orden salida</TableHead>
                     <TableHead>Piloto</TableHead>
                     <TableHead>Categoría</TableHead>
                     <TableHead>Vehículo</TableHead>
@@ -933,11 +1006,61 @@ const CompetitionParticipants = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {participants.map((participant, idx) => {
+                  {sortedParticipants.map((participant, idx) => {
                     const info = getVehicleInfo(participant);
+                    const draftValue = startOrderDraft[participant.id] ?? (
+                      participant.start_order != null ? String(participant.start_order) : ''
+                    );
                     return (
                       <TableRow key={participant.id}>
-                        <TableCell>{idx + 1}</TableCell>
+                        <TableCell>{participant.start_order ?? idx + 1}</TableCell>
+                        <TableCell>
+                          {canUseOrganizerTools ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={1}
+                                className="h-8 w-16"
+                                value={draftValue}
+                                disabled={startOrderSavingId === participant.id}
+                                onChange={(e) => setStartOrderDraft((prev) => ({
+                                  ...prev,
+                                  [participant.id]: e.target.value,
+                                }))}
+                                onBlur={() => {
+                                  const original = participant.start_order != null
+                                    ? String(participant.start_order)
+                                    : '';
+                                  if (draftValue !== original) {
+                                    saveStartOrder(participant.id, draftValue);
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={idx === 0 || startOrderSavingId != null}
+                                onClick={() => moveParticipantOrder(participant.id, 'up')}
+                              >
+                                <ArrowUp className="size-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={idx === sortedParticipants.length - 1 || startOrderSavingId != null}
+                                onClick={() => moveParticipantOrder(participant.id, 'down')}
+                              >
+                                <ArrowDown className="size-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            participant.start_order ?? idx + 1
+                          )}
+                        </TableCell>
                         <TableCell>{participant.driver_name}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="flex items-center gap-1 w-fit">

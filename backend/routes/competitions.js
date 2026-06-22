@@ -463,19 +463,27 @@ router.get('/:id', async (req, res) => {
     }
 
     // Obtener los participantes
-    const { data: participants, error: partError } = await supabase
+    const { data: participantsRaw, error: partError } = await supabase
       .from('competition_participants')
       .select(`
         *,
         vehicles(model, manufacturer)
       `)
-      .eq('competition_id', id)
-      .order('created_at', { ascending: true });
+      .eq('competition_id', id);
 
     if (partError) {
       console.error('Error al obtener participantes:', partError);
       return res.status(500).json({ error: partError.message });
     }
+
+    const participants = [...(participantsRaw || [])].sort((a, b) => {
+      const ao = a.start_order;
+      const bo = b.start_order;
+      if (ao != null && bo != null) return ao - bo;
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
 
     // Obtener las categorías
     const { data: categories, error: catError } = await supabase
@@ -726,7 +734,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/participants', async (req, res) => {
   try {
     const { id: competitionId } = req.params;
-    const { vehicle_id, driver_name, vehicle_model, category_id, team_name } = req.body;
+    const { vehicle_id, driver_name, vehicle_model, category_id, team_name, start_order } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, competitionId, 'id, num_slots, organizer, club_id');
     if (!access.ok) return access.respond(res);
@@ -812,6 +820,9 @@ router.post('/:id/participants', async (req, res) => {
 
     if (team_name != null && String(team_name).trim()) {
       participantData.team_name = String(team_name).trim();
+    }
+    if (start_order != null && Number.isFinite(Number(start_order)) && Number(start_order) >= 1) {
+      participantData.start_order = Number(start_order);
     }
 
     const { data, error } = await supabase
@@ -1062,15 +1073,23 @@ router.get('/:id/participants', async (req, res) => {
         *,
         vehicles(model, manufacturer)
       `)
-      .eq('competition_id', competitionId)
-      .order('created_at', { ascending: true });
+      .eq('competition_id', competitionId);
 
     if (error) {
       console.error('Error al obtener participantes:', error);
       return res.status(500).json({ error: error.message });
     }
 
-    res.json(data || []);
+    const sorted = [...(data || [])].sort((a, b) => {
+      const ao = a.start_order;
+      const bo = b.start_order;
+      if (ao != null && bo != null) return ao - bo;
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
+    res.json(sorted);
   } catch (error) {
     console.error('Error en GET /competitions/:id/participants:', error);
     res.status(500).json({ error: error.message });
@@ -1081,7 +1100,7 @@ router.get('/:id/participants', async (req, res) => {
 router.put('/:id/participants/:participantId', async (req, res) => {
   try {
     const { id: competitionId, participantId } = req.params;
-    const { vehicle_id, driver_name, vehicle_model, category_id, team_name } = req.body;
+    const { vehicle_id, driver_name, vehicle_model, category_id, team_name, start_order } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, competitionId);
     if (!access.ok) return access.respond(res);
@@ -1123,24 +1142,25 @@ router.put('/:id/participants/:participantId', async (req, res) => {
       }
     }
 
-    // Verificar que se proporcione exactamente una fuente de vehículo
-    if ((vehicle_id && vehicle_model) || (!vehicle_id && !vehicle_model)) {
-      return res.status(400).json({ 
-        error: 'Debe proporcionar un vehículo de la colección O un modelo de vehículo externo, pero no ambos' 
-      });
-    }
+    const hasVehicleFields = vehicle_id !== undefined || vehicle_model !== undefined;
+    if (hasVehicleFields) {
+      if ((vehicle_id && vehicle_model) || (!vehicle_id && !vehicle_model)) {
+        return res.status(400).json({
+          error: 'Debe proporcionar un vehículo de la colección O un modelo de vehículo externo, pero no ambos',
+        });
+      }
 
-    // Si se proporciona vehicle_id, verificar que existe y pertenece al garaje del organizador
-    if (vehicle_id) {
-      const { data: vehicle, error: vehicleError } = await supabase
-        .from('vehicles')
-        .select('id')
-        .eq('id', vehicle_id)
-        .eq('user_id', competition.organizer)
-        .single();
+      if (vehicle_id) {
+        const { data: vehicle, error: vehicleError } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('id', vehicle_id)
+          .eq('user_id', competition.organizer)
+          .single();
 
-      if (vehicleError || !vehicle) {
-        return res.status(404).json({ error: 'Vehículo no encontrado en la colección del organizador' });
+        if (vehicleError || !vehicle) {
+          return res.status(404).json({ error: 'Vehículo no encontrado en la colección del organizador' });
+        }
       }
     }
 
@@ -1160,6 +1180,14 @@ router.put('/:id/participants/:participantId', async (req, res) => {
     } else if (vehicle_model) {
       updateData.vehicle_id = null;
       updateData.vehicle_model = vehicle_model.trim();
+    }
+    if (start_order !== undefined) {
+      updateData.start_order =
+        start_order == null || start_order === ''
+          ? null
+          : Number.isFinite(Number(start_order)) && Number(start_order) >= 1
+            ? Number(start_order)
+            : null;
     }
 
     const { data, error } = await supabase

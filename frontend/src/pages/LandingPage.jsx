@@ -98,7 +98,7 @@ const featureBlocks = [
     id: 'collection',
     title: 'Gestión de colección',
     description:
-      'Catálogo profesional para coches de slot (Scalextric, Ninco, Avant Slot y más): imágenes, datos de compra, reglaje y documentación lista para compartir.',
+      'Catálogo profesional para coches de slot (Scalextric, Ninco, Avant Slot, Scaleauto, etc.): imágenes, datos de compra, reglaje y documentación lista para compartir.',
     bullets: [
       'Fotos por 6 vistas (frontal, perfiles, trasera, superior, chasis, 3/4)',
       'Especificaciones técnicas con componentes (motor, piñón, corona, guía, ejes…)',
@@ -322,7 +322,7 @@ const LandingPage = () => {
               </span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
-              También conocida como Slot Database: gestiona coches de slot con fichas completas,
+             Gestiona coches de slot con fichas completas,
               inventario de piezas y consumibles, cronometra por vuelta, compara reglajes y organiza
               competiciones con inscripción pública y ranking en vivo — todo en una sola plataforma.
             </p>

@@ -176,6 +176,54 @@ router.post('/timings', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/sync/timings
+ * List timing records for the authenticated user (via API key).
+ * Query: ?vehicle_id=&circuit_id=&lane=&limit=
+ */
+router.get('/timings', async (req, res) => {
+  try {
+    const { vehicle_id, circuit_id, lane } = req.query;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
+
+    const db = supabaseForSyncWrite();
+    let query = db
+      .from('vehicle_timings')
+      .select('id, vehicle_id, best_lap_time, best_lap_timestamp, lane, circuit_id, timing_date, laps')
+      .eq('user_id', req.user.id)
+      .order('timing_date', { ascending: false })
+      .limit(limit);
+
+    if (vehicle_id) query = query.eq('vehicle_id', vehicle_id);
+    if (circuit_id) query = query.eq('circuit_id', circuit_id);
+    if (lane) query = query.eq('lane', String(lane));
+
+    const { data: timings, error } = await query;
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    const sorted = (timings || []).slice().sort((a, b) => {
+      const aSec = a.best_lap_timestamp ?? parseTimeToSeconds(a.best_lap_time);
+      const bSec = b.best_lap_timestamp ?? parseTimeToSeconds(b.best_lap_time);
+      return aSec - bSec;
+    });
+
+    res.json({ timings: sorted });
+  } catch (error) {
+    console.error('Error en GET /api/sync/timings:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+function parseTimeToSeconds(timeStr) {
+  if (!timeStr || typeof timeStr !== 'string') return Infinity;
+  const match = timeStr.match(/^(\d+):(\d{2})\.(\d{3})$/);
+  if (!match) return Infinity;
+  const [, mins, secs, ms] = match;
+  return parseInt(mins, 10) * 60 + parseInt(secs, 10) + parseInt(ms, 10) / 1000;
+}
+
 const syncCompetitionsRoute = require('./syncCompetitions');
 router.use(syncCompetitionsRoute);
 

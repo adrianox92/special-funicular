@@ -46,6 +46,7 @@ import AdminSlotCatalog from './pages/AdminSlotCatalog';
 import Changelog from './pages/Changelog';
 import AdminChangelog from './pages/AdminChangelog';
 import AdminPlatformDashboard from './pages/AdminPlatformDashboard';
+import AdminLapTimerLicensesPage from './pages/AdminLapTimerLicensesPage';
 import SellerDashboard from './pages/SellerDashboard';
 import PublicCatalogList from './pages/PublicCatalogList';
 import PublicCatalogEntry from './pages/PublicCatalogEntry';
@@ -356,6 +357,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <AdminPlatformDashboard />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/lap-timer-licenses"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <AdminLapTimerLicensesPage />
               </AuthedShell>
             </PrivateRoute>
           }

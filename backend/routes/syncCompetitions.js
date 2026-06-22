@@ -9,6 +9,7 @@ const { body, param } = require('express-validator');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { deriveCompetitionAverageFromTotalAndLaps } = require('../lib/competitionTimingDerivation');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
+const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
 
 const router = express.Router();
 
@@ -64,6 +65,59 @@ async function assertClubMembership(userId, clubId) {
     .eq('user_id', userId)
     .maybeSingle();
   return Boolean(mem);
+}
+
+function sortParticipantsByStartOrder(participants) {
+  return [...(participants || [])].sort((a, b) => {
+    const ao = a.start_order;
+    const bo = b.start_order;
+    if (ao != null && bo != null) return ao - bo;
+    if (ao != null) return -1;
+    if (bo != null) return 1;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+}
+
+/**
+ * Si el participante tiene vehicle_id vinculado a un garaje, sincroniza la sesión HEAT
+ * en la cuenta personal del propietario del vehículo (best-effort).
+ */
+async function syncPersonalTimingFromCompetition(supabase, participant, timingData, competitionMeta) {
+  if (!participant?.vehicle_id) return;
+
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('id, user_id')
+    .eq('id', participant.vehicle_id)
+    .maybeSingle();
+
+  if (!vehicle?.user_id) return;
+
+  const body = {
+    vehicle_id: participant.vehicle_id,
+    best_lap_time: timingData.best_lap_time,
+    total_time: timingData.total_time,
+    laps: timingData.laps,
+    average_time: timingData.average_time,
+    lane: timingData.lane,
+    driver: participant.driver_name || timingData.driver,
+    circuit: timingData.circuit || competitionMeta?.circuit_name || null,
+    circuit_id: timingData.circuit_id || competitionMeta?.circuit_id || null,
+    timing_date: timingData.timing_date,
+    best_lap_timestamp: timingData.best_lap_timestamp,
+    total_time_timestamp: timingData.total_time_timestamp,
+    average_time_timestamp: timingData.average_time_timestamp,
+    session_type: 'HEAT',
+  };
+
+  try {
+    const result = await insertVehicleTimingFromSyncBody(supabase, vehicle.user_id, body);
+    if (!result.success) {
+      console.warn('personal sync from competition timing:', result.error);
+    }
+  } catch (e) {
+    console.warn('personal sync from competition timing', e);
+  }
 }
 
 async function ensureDefaultCategory(competitionId) {
@@ -153,11 +207,11 @@ router.get('/competitions/:id', param('id').isUUID(), handleValidationErrors, as
 
     if (cErr || !competition) return res.status(404).json({ error: 'Competición no encontrada' });
 
-    const { data: participants } = await supabaseAdmin
+    const { data: participantsRaw } = await supabaseAdmin
       .from('competition_participants')
       .select(`*, vehicles(model, manufacturer)`)
-      .eq('competition_id', id)
-      .order('created_at', { ascending: true });
+      .eq('competition_id', id);
+    const participants = sortParticipantsByStartOrder(participantsRaw);
 
     const { data: categories } = await supabaseAdmin
       .from('competition_categories')
@@ -342,6 +396,7 @@ router.post(
   body('participants.*.id').optional().isUUID(),
   body('participants.*.vehicle_model').optional({ values: 'null' }).isString(),
   body('participants.*.vehicle_id').optional({ values: 'null' }).isUUID(),
+  body('participants.*.start_order').optional({ values: 'null' }).isInt({ min: 1 }),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -384,6 +439,9 @@ router.post(
         };
         if (vehicleId) row.vehicle_id = vehicleId;
         else row.vehicle_model = vehicleModel;
+        if (p.start_order != null && Number.isFinite(Number(p.start_order))) {
+          row.start_order = Number(p.start_order);
+        }
 
         const { data: inserted, error } = await supabaseAdmin
           .from('competition_participants')
@@ -424,7 +482,7 @@ router.post(
       const competitionId = req.params.id;
       const { data: competition } = await supabaseAdmin
         .from('competitions')
-        .select('id, rounds')
+        .select('id, rounds, circuit_id, circuit_name')
         .eq('id', competitionId)
         .single();
 
@@ -457,7 +515,7 @@ router.post(
 
         const { data: participant } = await supabaseAdmin
           .from('competition_participants')
-          .select('id, vehicle_id')
+          .select('id, vehicle_id, driver_name')
           .eq('id', participantId)
           .eq('competition_id', competitionId)
           .maybeSingle();
@@ -560,6 +618,12 @@ router.post(
           } catch (e) {
             console.warn('odometer', e);
           }
+          await syncPersonalTimingFromCompetition(
+            supabaseAdmin,
+            participant,
+            timingData,
+            competition,
+          );
         }
       }
 
