@@ -325,6 +325,7 @@ router.put(
   body('circuit_id').optional({ values: 'null' }).isUUID(),
   body('circuit_name').optional({ values: 'null' }).isString(),
   body('external_status').optional().isIn(['DRAFT', 'RUNNING', 'FINISHED']),
+  body('status').optional().isIn(['closed']),
   body('updated_at').optional().isString(),
   handleValidationErrors,
   async (req, res) => {
@@ -352,6 +353,7 @@ router.put(
       if (req.body.num_slots != null) patch.num_slots = req.body.num_slots;
       if (req.body.rounds != null) patch.rounds = req.body.rounds;
       if (req.body.external_status != null) patch.external_status = req.body.external_status;
+      if (req.body.status != null) patch.status = req.body.status;
       if (req.body.circuit_name !== undefined) {
         patch.circuit_name = req.body.circuit_name ? String(req.body.circuit_name).trim() : null;
       }
