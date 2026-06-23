@@ -96,4 +96,14 @@ describe('syncTimingsQuery', () => {
     expect(laneFallback).toBe(true);
     expect(timings.map((t) => t.id)).toEqual(['5']);
   });
+
+  test('resolveBaselineTimings does not fall back to a different numbered lane', () => {
+    const { timings, laneFallback } = resolveBaselineTimings(sampleTimings, {
+      circuit_id: 'c1',
+      circuitName: 'Pista A',
+      lane: '3',
+    });
+    expect(laneFallback).toBe(false);
+    expect(timings).toEqual([]);
+  });
 });

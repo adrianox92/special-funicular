@@ -233,10 +233,11 @@ router.get('/timings', async (req, res) => {
     }
 
     let circuitName = null;
+    let circuitNumLanes = null;
     if (circuit_id) {
       const { data: circuitRow, error: circuitError } = await db
         .from('circuits')
-        .select('name')
+        .select('name, num_lanes')
         .eq('id', circuit_id)
         .eq('user_id', req.user.id)
         .single();
@@ -250,6 +251,29 @@ router.get('/timings', async (req, res) => {
         return res.status(404).json({ error: 'Circuito no encontrado' });
       }
       circuitName = circuitRow.name;
+      circuitNumLanes = circuitRow.num_lanes;
+
+      if (lane && circuitNumLanes > 0) {
+        const laneNum = parseInt(String(lane), 10);
+        if (Number.isNaN(laneNum) || laneNum < 1 || laneNum > circuitNumLanes) {
+          console.log('[sync:timings:reject] carril fuera de rango', {
+            userId: req.user.id,
+            vehicle_id,
+            circuit_id,
+            lane,
+            circuitNumLanes,
+          });
+          return res.json({
+            timings: [],
+            meta: {
+              rawCount: 0,
+              filteredCount: 0,
+              invalidLane: true,
+              circuitNumLanes,
+            },
+          });
+        }
+      }
     }
 
     const fetchLimit = circuit_id || lane ? 200 : limit;

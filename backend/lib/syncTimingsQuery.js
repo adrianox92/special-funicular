@@ -44,7 +44,8 @@ function sortTimingsByBestLap(timings) {
 }
 
 /**
- * Filtra sesiones para baseline; si el carril no coincide, reintenta sin filtro de carril.
+ * Filtra sesiones para baseline; si no hay coincidencia exacta de carril,
+ * solo reutiliza sesiones legacy sin carril registrado (nunca otro carril).
  * @returns {{ timings: object[], laneFallback: boolean }}
  */
 function resolveBaselineTimings(rawTimings, filters) {
@@ -53,11 +54,27 @@ function resolveBaselineTimings(rawTimings, filters) {
     return { timings: strict, laneFallback: false };
   }
 
-  const withoutLane = filterTimingsForBaseline(rawTimings, {
-    ...filters,
-    lane: null,
+  const normalizedCircuitName = filters.circuitName
+    ? String(filters.circuitName).trim().toLowerCase()
+    : null;
+
+  const legacyNoLane = (rawTimings || []).filter((row) => {
+    if (normalizeLane(row.lane) != null) return false;
+
+    if (filters.circuit_id) {
+      const matchesCircuitId = row.circuit_id === filters.circuit_id;
+      const matchesLegacyName =
+        !row.circuit_id &&
+        normalizedCircuitName &&
+        row.circuit &&
+        String(row.circuit).trim().toLowerCase() === normalizedCircuitName;
+      if (!matchesCircuitId && !matchesLegacyName) return false;
+    }
+
+    return bestLapSecondsFromTimingRow(row) != null;
   });
-  return { timings: withoutLane, laneFallback: withoutLane.length > 0 };
+
+  return { timings: legacyNoLane, laneFallback: legacyNoLane.length > 0 };
 }
 
 module.exports = {
