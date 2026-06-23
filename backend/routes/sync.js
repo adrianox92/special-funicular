@@ -5,6 +5,10 @@ const authMiddleware = require('../middleware/auth');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
 const { findOrCreateCircuit } = require('../lib/circuitResolver');
 const { sendTimingNotification, sendTestNotification } = require('../lib/notifier');
+const {
+  filterTimingsForBaseline,
+  sortTimingsByBestLap,
+} = require('../lib/syncTimingsQuery');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -182,47 +186,100 @@ router.post('/timings', async (req, res) => {
  * Query: ?vehicle_id=&circuit_id=&lane=&limit=
  */
 router.get('/timings', async (req, res) => {
+  const { vehicle_id, circuit_id, lane } = req.query;
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
+
   try {
-    const { vehicle_id, circuit_id, lane } = req.query;
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
+    if (!vehicle_id) {
+      return res.status(400).json({ error: 'vehicle_id es requerido' });
+    }
 
     const db = supabaseForSyncWrite();
-    let query = db
-      .from('vehicle_timings')
-      .select('id, vehicle_id, best_lap_time, best_lap_timestamp, lane, circuit_id, timing_date, laps')
+
+    const { data: vehicle, error: vehicleError } = await db
+      .from('vehicles')
+      .select('id')
+      .eq('id', vehicle_id)
       .eq('user_id', req.user.id)
+      .single();
+
+    if (vehicleError || !vehicle) {
+      console.warn('[GET /api/sync/timings] vehículo no encontrado', {
+        userId: req.user.id,
+        vehicle_id,
+        error: vehicleError?.message ?? null,
+      });
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    let circuitName = null;
+    if (circuit_id) {
+      const { data: circuitRow, error: circuitError } = await db
+        .from('circuits')
+        .select('name')
+        .eq('id', circuit_id)
+        .eq('user_id', req.user.id)
+        .single();
+      if (circuitError || !circuitRow) {
+        console.warn('[GET /api/sync/timings] circuito no encontrado', {
+          userId: req.user.id,
+          vehicle_id,
+          circuit_id,
+          error: circuitError?.message ?? null,
+        });
+        return res.status(404).json({ error: 'Circuito no encontrado' });
+      }
+      circuitName = circuitRow.name;
+    }
+
+    const fetchLimit = circuit_id || lane ? 200 : limit;
+    const { data: rawTimings, error } = await db
+      .from('vehicle_timings')
+      .select('id, vehicle_id, best_lap_time, best_lap_timestamp, lane, circuit_id, circuit, timing_date, laps')
+      .eq('vehicle_id', vehicle_id)
       .order('timing_date', { ascending: false })
-      .limit(limit);
+      .limit(fetchLimit);
 
-    if (vehicle_id) query = query.eq('vehicle_id', vehicle_id);
-    if (circuit_id) query = query.eq('circuit_id', circuit_id);
-    if (lane) query = query.eq('lane', String(lane));
-
-    const { data: timings, error } = await query;
     if (error) {
+      console.error('[GET /api/sync/timings] error Supabase', {
+        userId: req.user.id,
+        vehicle_id,
+        circuit_id: circuit_id ?? null,
+        lane: lane ?? null,
+        error: error.message,
+      });
       return res.status(500).json({ error: error.message });
     }
 
-    const sorted = (timings || []).slice().sort((a, b) => {
-      const aSec = a.best_lap_timestamp ?? parseTimeToSeconds(a.best_lap_time);
-      const bSec = b.best_lap_timestamp ?? parseTimeToSeconds(b.best_lap_time);
-      return aSec - bSec;
+    const filtered = filterTimingsForBaseline(rawTimings, {
+      circuit_id: circuit_id || null,
+      circuitName,
+      lane: lane ?? null,
+    });
+    const sorted = sortTimingsByBestLap(filtered).slice(0, limit);
+
+    console.info('[GET /api/sync/timings]', {
+      userId: req.user.id,
+      vehicle_id,
+      circuit_id: circuit_id ?? null,
+      lane: lane ?? null,
+      rawCount: rawTimings?.length ?? 0,
+      filteredCount: filtered.length,
+      returnedCount: sorted.length,
     });
 
     res.json({ timings: sorted });
   } catch (error) {
-    console.error('Error en GET /api/sync/timings:', error);
+    console.error('[GET /api/sync/timings] error inesperado', {
+      userId: req.user?.id ?? null,
+      vehicle_id: vehicle_id ?? null,
+      circuit_id: circuit_id ?? null,
+      lane: lane ?? null,
+      message: error?.message ?? String(error),
+    });
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
-
-function parseTimeToSeconds(timeStr) {
-  if (!timeStr || typeof timeStr !== 'string') return Infinity;
-  const match = timeStr.match(/^(\d+):(\d{2})\.(\d{3})$/);
-  if (!match) return Infinity;
-  const [, mins, secs, ms] = match;
-  return parseInt(mins, 10) * 60 + parseInt(secs, 10) + parseInt(ms, 10) / 1000;
-}
 
 const syncCompetitionsRoute = require('./syncCompetitions');
 router.use(syncCompetitionsRoute);
