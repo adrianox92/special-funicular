@@ -1,6 +1,7 @@
 const {
   filterTimingsForBaseline,
   sortTimingsByBestLap,
+  resolveBaselineTimings,
 } = require('../../lib/syncTimingsQuery');
 
 describe('syncTimingsQuery', () => {
@@ -73,5 +74,26 @@ describe('syncTimingsQuery', () => {
   test('sortTimingsByBestLap orders by best lap ascending', () => {
     const sorted = sortTimingsByBestLap(sampleTimings);
     expect(sorted.map((t) => t.id)).toEqual(['3', '1', '2', '4']);
+  });
+
+  test('resolveBaselineTimings falls back when lane does not match', () => {
+    const legacyNoLane = [
+      {
+        id: '5',
+        vehicle_id: 'v1',
+        circuit_id: 'c1',
+        circuit: 'Pista A',
+        lane: null,
+        best_lap_timestamp: 8.2,
+        best_lap_time: '00:08.200',
+      },
+    ];
+    const { timings, laneFallback } = resolveBaselineTimings(legacyNoLane, {
+      circuit_id: 'c1',
+      circuitName: 'Pista A',
+      lane: '1',
+    });
+    expect(laneFallback).toBe(true);
+    expect(timings.map((t) => t.id)).toEqual(['5']);
   });
 });

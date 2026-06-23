@@ -6,7 +6,7 @@ const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert'
 const { findOrCreateCircuit } = require('../lib/circuitResolver');
 const { sendTimingNotification, sendTestNotification } = require('../lib/notifier');
 const {
-  filterTimingsForBaseline,
+  resolveBaselineTimings,
   sortTimingsByBestLap,
 } = require('../lib/syncTimingsQuery');
 
@@ -36,6 +36,22 @@ router.post('/test-notification', authMiddleware, async (req, res) => {
 });
 
 router.use(apiKeyAuth);
+
+router.use((req, res, next) => {
+  if (req.method === 'GET' && req.path === '/timings') {
+    console.log(
+      '[sync:timings:request]',
+      JSON.stringify({
+        at: new Date().toISOString(),
+        userId: req.user?.id ?? null,
+        vehicle_id: req.query.vehicle_id ?? null,
+        circuit_id: req.query.circuit_id ?? null,
+        lane: req.query.lane ?? null,
+      }),
+    );
+  }
+  next();
+});
 
 /**
  * GET /api/sync/vehicles
@@ -191,6 +207,10 @@ router.get('/timings', async (req, res) => {
 
   try {
     if (!vehicle_id) {
+      console.log('[sync:timings:reject] vehicle_id requerido', {
+        userId: req.user?.id ?? null,
+        query: req.query,
+      });
       return res.status(400).json({ error: 'vehicle_id es requerido' });
     }
 
@@ -251,14 +271,14 @@ router.get('/timings', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    const filtered = filterTimingsForBaseline(rawTimings, {
+    const { timings: filtered, laneFallback } = resolveBaselineTimings(rawTimings, {
       circuit_id: circuit_id || null,
       circuitName,
       lane: lane ?? null,
     });
     const sorted = sortTimingsByBestLap(filtered).slice(0, limit);
 
-    console.info('[GET /api/sync/timings]', {
+    console.log('[sync:timings:response]', JSON.stringify({
       userId: req.user.id,
       vehicle_id,
       circuit_id: circuit_id ?? null,
@@ -266,9 +286,17 @@ router.get('/timings', async (req, res) => {
       rawCount: rawTimings?.length ?? 0,
       filteredCount: filtered.length,
       returnedCount: sorted.length,
-    });
+      laneFallback,
+    }));
 
-    res.json({ timings: sorted });
+    res.json({
+      timings: sorted,
+      meta: {
+        rawCount: rawTimings?.length ?? 0,
+        filteredCount: filtered.length,
+        laneFallback,
+      },
+    });
   } catch (error) {
     console.error('[GET /api/sync/timings] error inesperado', {
       userId: req.user?.id ?? null,

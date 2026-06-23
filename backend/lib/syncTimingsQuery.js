@@ -43,8 +43,26 @@ function sortTimingsByBestLap(timings) {
   });
 }
 
+/**
+ * Filtra sesiones para baseline; si el carril no coincide, reintenta sin filtro de carril.
+ * @returns {{ timings: object[], laneFallback: boolean }}
+ */
+function resolveBaselineTimings(rawTimings, filters) {
+  const strict = filterTimingsForBaseline(rawTimings, filters);
+  if (strict.length > 0 || !normalizeLane(filters.lane)) {
+    return { timings: strict, laneFallback: false };
+  }
+
+  const withoutLane = filterTimingsForBaseline(rawTimings, {
+    ...filters,
+    lane: null,
+  });
+  return { timings: withoutLane, laneFallback: withoutLane.length > 0 };
+}
+
 module.exports = {
   normalizeLane,
   filterTimingsForBaseline,
   sortTimingsByBestLap,
+  resolveBaselineTimings,
 };

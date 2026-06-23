@@ -134,6 +134,18 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.use(express.json({ limit: '1mb' }));
 
+// Traza peticiones de baseline (entrenamiento guiado) también en producción.
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.path === '/api/sync/timings') {
+    console.log('[access] GET /api/sync/timings', {
+      vehicle_id: req.query.vehicle_id ?? null,
+      circuit_id: req.query.circuit_id ?? null,
+      lane: req.query.lane ?? null,
+    });
+  }
+  next();
+});
+
 /**
  * @returns {{ ok: boolean, uptime: number, memory: object, activeHandles: number|null }}
  */
