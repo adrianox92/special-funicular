@@ -64,7 +64,8 @@ const Competitions = () => {
     num_slots: '',
     rounds: '1',
     circuit_id: '',
-    club_id: ''
+    club_id: '',
+    registration_deadline: '',
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
@@ -216,7 +217,10 @@ const Competitions = () => {
         num_slots: parseInt(createForm.num_slots),
         rounds: parseInt(createForm.rounds),
         circuit_id: createForm.circuit_id || null,
-        club_id: createForm.club_id || null
+        club_id: createForm.club_id || null,
+        registration_deadline: createForm.registration_deadline
+          ? new Date(createForm.registration_deadline).toISOString()
+          : null,
       });
 
       const competitionId = response.data.id;
@@ -256,7 +260,7 @@ const Competitions = () => {
       }
 
       setShowCreateModal(false);
-      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '', club_id: '' });
+      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '', club_id: '', registration_deadline: '' });
       setSelectedFavorites({});
       setFavoritesExpanded(false);
       setDefaultCategoryName('General');
@@ -410,7 +414,7 @@ const Competitions = () => {
               Nueva Competición
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Nueva Competición</DialogTitle>
               <DialogDescription>Crea una nueva competición para gestionar participantes y tiempos</DialogDescription>
@@ -464,6 +468,19 @@ const Competitions = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="registration_deadline">Fecha límite de inscripción (opcional)</Label>
+                  <Input
+                    id="registration_deadline"
+                    type="datetime-local"
+                    value={createForm.registration_deadline}
+                    onChange={(e) => setCreateForm({ ...createForm, registration_deadline: e.target.value })}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Tras esta fecha no se aceptarán inscripciones públicas. El organizador podrá añadir participantes manualmente.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="circuit_id">Circuito</Label>
                   <Select
                     value={createForm.circuit_id || 'none'}
@@ -506,7 +523,7 @@ const Competitions = () => {
                 <div className="rounded-md border">
                   <button
                     type="button"
-                    onClick={() => setFavoritesExpanded((v) => !v)}
+                    onClick={() => requestAnimationFrame(() => setFavoritesExpanded((v) => !v))}
                     className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent rounded-md"
                   >
                     <span className="flex items-center gap-2">

@@ -45,6 +45,19 @@ function signupForbiddenReason(status) {
   return null;
 }
 
+function registrationDeadlineExpired(competition) {
+  const deadline = competition?.registration_deadline;
+  if (!deadline) return false;
+  return new Date() > new Date(deadline);
+}
+
+function registrationDeadlineForbiddenReason(competition) {
+  if (registrationDeadlineExpired(competition)) {
+    return 'El plazo de inscripción ha finalizado.';
+  }
+  return null;
+}
+
 /**
  * Transiciones manuales permitidas para PATCH status.
  * @returns {string|null} error message or null
@@ -79,5 +92,7 @@ module.exports = {
   participantMutationForbiddenReason,
   metadataEditForbiddenReason,
   signupForbiddenReason,
+  registrationDeadlineExpired,
+  registrationDeadlineForbiddenReason,
   validateManualStatusTransition,
 };

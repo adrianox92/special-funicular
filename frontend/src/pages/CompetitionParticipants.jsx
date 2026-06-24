@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown } from 'lucide-react';
+import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
 import CompetitionCategories from '../components/CompetitionCategories';
@@ -50,6 +50,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+
+function formatCompetitionDate(dateString) {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getCompetitionProgressStatus(competition, participantsCount, timingsCount) {
+  const status = competition?.status || 'published';
+  const slotCap = competition?.num_slots ?? 0;
+  const isFull = slotCap > 0 && participantsCount >= slotCap;
+  const maxTimings = participantsCount * (competition?.rounds || 0);
+  const allTimingsComplete = maxTimings > 0 && timingsCount >= maxTimings;
+
+  if (status === 'draft') {
+    return { label: 'Borrador', variant: 'outline' };
+  }
+  if (status === 'closed') {
+    return { label: 'Cerrada', variant: 'destructive' };
+  }
+  if (isFull && allTimingsComplete) {
+    return { label: 'Completa', variant: 'default' };
+  }
+  if (status === 'running') {
+    return { label: 'En curso', variant: 'secondary' };
+  }
+  if (status === 'published') {
+    return { label: 'En proceso de inscripción', variant: 'secondary' };
+  }
+  return { label: status, variant: 'outline' };
+}
 
 const CompetitionParticipants = () => {
   const { id: competitionId } = useParams();
@@ -109,7 +145,12 @@ const CompetitionParticipants = () => {
     (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
   );
   const effectiveCompetitionStatus = competition?.status || 'published';
-  const memberSignupBlocked = effectiveCompetitionStatus !== 'published';
+  const registrationDeadlineExpired = Boolean(
+    competition?.registration_deadline &&
+      new Date() > new Date(competition.registration_deadline),
+  );
+  const memberSignupBlocked =
+    effectiveCompetitionStatus !== 'published' || registrationDeadlineExpired;
   const participantsFull = competition
     ? participants.length >= (competition.num_slots ?? 0)
     : false;
@@ -554,6 +595,19 @@ const CompetitionParticipants = () => {
     }
   }, [competitionId, sortedParticipants, loadCompetition]);
 
+  const patchCompetitionStatus = useCallback(
+    async (status) => {
+      try {
+        await axios.patch(`/competitions/${competitionId}/status`, { status });
+        toast.success('Estado actualizado');
+        await loadCompetition();
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'No se pudo cambiar el estado');
+      }
+    },
+    [competitionId, loadCompetition],
+  );
+
   const generatePublicLink = () => {
     if (competition?.public_slug && competition.categories && competition.categories.length > 0) {
       return `${window.location.origin}/competitions/signup/${competition.public_slug}`;
@@ -597,14 +651,22 @@ const CompetitionParticipants = () => {
   const publicLink = generatePublicLink();
   const statusLink = generateStatusLink();
   const progressPercent = (participants.length / competition.num_slots) * 100;
+  const timingsCount = competition.timings_count ?? 0;
+  const maxTimings = participants.length * competition.rounds;
+  const progressStatus = getCompetitionProgressStatus(competition, participants.length, timingsCount);
 
   return (
     <div className="space-y-6">
       {canUseOrganizerTools && effectiveCompetitionStatus === 'draft' && (
         <Alert>
-          <AlertDescription>
-            Esta competición está en <strong>borrador</strong>: el formulario público de inscripción no es visible.
-            Publícala desde la lista de competiciones cuando esté lista.
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Esta competición está en <strong>borrador</strong>: el formulario público de inscripción no es visible.
+              Publícala cuando esté lista.
+            </span>
+            <Button type="button" size="sm" variant="secondary" onClick={() => patchCompetitionStatus('published')}>
+              Publicar
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -647,6 +709,30 @@ const CompetitionParticipants = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold">{competition.name}</h1>
                 <CompetitionStatusBadge status={competition.status} />
+                {canUseOrganizerTools && (
+                  <>
+                    {effectiveCompetitionStatus === 'draft' && (
+                      <Button type="button" size="sm" variant="secondary" onClick={() => patchCompetitionStatus('published')}>
+                        Publicar
+                      </Button>
+                    )}
+                    {effectiveCompetitionStatus === 'published' && (
+                      <Button type="button" size="sm" variant="outline" onClick={() => patchCompetitionStatus('draft')}>
+                        Despublicar
+                      </Button>
+                    )}
+                    {effectiveCompetitionStatus === 'running' && (
+                      <Button type="button" size="sm" variant="destructive" onClick={() => patchCompetitionStatus('closed')}>
+                        Cerrar
+                      </Button>
+                    )}
+                    {effectiveCompetitionStatus === 'closed' && (
+                      <Button type="button" size="sm" variant="outline" onClick={() => patchCompetitionStatus('published')}>
+                        Reabrir
+                      </Button>
+                    )}
+                  </>
+                )}
                 {competition.league && (
                   <Link to={`/leagues/${competition.league.id}`}>
                     <Badge variant="secondary" className="hover:bg-secondary/80">
@@ -695,15 +781,6 @@ const CompetitionParticipants = () => {
               >
                 <Clock className="size-4 mr-2" />
                 Gestionar Tiempos
-                {!canStartCompetition && (
-                  <Badge variant="secondary" className="ml-2">Sin participantes</Badge>
-                )}
-                {canStartCompetition && !isFull && (
-                  <Badge variant="secondary" className="ml-2">{participants.length} participantes</Badge>
-                )}
-                {isFull && (
-                  <Badge variant="default" className="ml-2">Completa</Badge>
-                )}
               </Button>
             )}
             {!canUseOrganizerTools && canStartCompetition && (
@@ -737,7 +814,7 @@ const CompetitionParticipants = () => {
               {isFull && (
                 <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                   <Check className="size-4" />
-                  Competición completa
+                  Cupo de participación completo
                 </div>
               )}
               {participants.length > 0 && !isFull && (
@@ -757,11 +834,9 @@ const CompetitionParticipants = () => {
               <div className="flex items-center gap-2 mb-2">
                 <Trophy className="size-4" />
                 <strong>Estado:</strong>
-                <Badge variant={isFull ? 'default' : participants.length > 0 ? 'secondary' : 'outline'}>
-                  {isFull ? 'Completa' : participants.length > 0 ? 'Lista' : 'Vacía'}
-                </Badge>
+                <Badge variant={progressStatus.variant}>{progressStatus.label}</Badge>
               </div>
-              {participants.length === 0 && (
+              {effectiveCompetitionStatus === 'published' && participants.length === 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <AlertTriangle className="size-4" />
                   Añade al menos un participante
@@ -775,9 +850,23 @@ const CompetitionParticipants = () => {
                 <Badge variant="secondary">{competition.rounds}</Badge>
               </div>
               <div className="text-sm text-muted-foreground">
-                Total de tiempos: {participants.length * competition.rounds}
+                Total de tiempos: {timingsCount} / {maxTimings}
               </div>
             </div>
+            {competition.registration_deadline && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="size-4" />
+                  <strong>Inscripciones hasta:</strong>
+                </div>
+                <div
+                  className={`text-sm ${registrationDeadlineExpired ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                >
+                  {formatCompetitionDate(competition.registration_deadline)}
+                  {registrationDeadlineExpired ? ' (plazo cerrado)' : ''}
+                </div>
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Link2 className="size-4" />

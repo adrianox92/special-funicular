@@ -30,4 +30,29 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = authMiddleware; 
+/** Autenticación opcional: adjunta req.user si hay token válido; continúa sin usuario si no. */
+const optionalAuthMiddleware = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return next();
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (!error && user) {
+      req.user = user;
+    }
+  } catch (error) {
+    console.error('Error en middleware de autenticación opcional:', error);
+  }
+
+  next();
+};
+
+module.exports = authMiddleware;
+module.exports.optionalAuthMiddleware = optionalAuthMiddleware; 

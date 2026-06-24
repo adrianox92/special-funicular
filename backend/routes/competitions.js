@@ -26,6 +26,7 @@ const {
   participantMutationForbiddenReason,
   metadataEditForbiddenReason,
   signupForbiddenReason,
+  registrationDeadlineForbiddenReason,
   validateManualStatusTransition,
 } = require('../lib/competitionLifecycle');
 const { sendWaitlistPromotionEmail } = require('../lib/waitlistMailer');
@@ -103,6 +104,13 @@ function isUuid(id) {
     typeof id === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
   );
+}
+
+function parseRegistrationDeadline(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
 }
 
 // Aplicar middleware de autenticación SOLO a las rutas siguientes
@@ -250,12 +258,16 @@ const competitionCreateValidators = [
     .isUUID()
     .withMessage('circuit_id inválido'),
   body('club_id').optional({ values: 'falsy' }).isUUID().withMessage('club_id inválido'),
+  body('registration_deadline')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('registration_deadline inválido'),
 ];
 
 // Crear una nueva competición
 router.post('/', competitionCreateValidators, handleValidationErrors, async (req, res) => {
   try {
-    const { name, num_slots, rounds, circuit_name, circuit_id, club_id } = req.body;
+    const { name, num_slots, rounds, circuit_name, circuit_id, club_id, registration_deadline } = req.body;
 
     if (club_id) {
       const { data: mem } = await supabase
@@ -292,6 +304,11 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
     // Generar public_slug único
     const public_slug = generateSlug(name.trim());
 
+    const parsedDeadline = parseRegistrationDeadline(registration_deadline);
+    if (parsedDeadline === undefined) {
+      return res.status(400).json({ error: 'Fecha límite de inscripción inválida' });
+    }
+
     const insertData = {
       name: name.trim(),
       public_slug: public_slug,
@@ -302,6 +319,7 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       circuit_id: circuit_id || null,
       club_id: club_id || null,
       status: 'draft',
+      registration_deadline: parsedDeadline,
     };
 
     const { data, error } = await supabase
@@ -516,6 +534,15 @@ router.get('/:id', async (req, res) => {
       console.error('Error al contar lista de espera:', waitlistErr);
     }
 
+    const { count: timingsCount, error: timingsCountErr } = await supabase
+      .from('competition_timings')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', id);
+
+    if (timingsCountErr) {
+      console.error('Error al contar tiempos:', timingsCountErr);
+    }
+
     const { data: leagueLink } = await supabase
       .from('league_competitions')
       .select(`
@@ -531,6 +558,7 @@ router.get('/:id', async (req, res) => {
       categories: (categories || []).map((cat) => appendRegulationFileUrl(supabase, cat)),
       signups_count: signupsPending || 0,
       waitlist_count: waitlistCount || 0,
+      timings_count: timingsCount || 0,
       league: leagueLink?.leagues
         ? {
             id: leagueLink.leagues.id,
@@ -550,7 +578,7 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, num_slots, rounds, circuit_name, circuit_id } = req.body;
+    const { name, num_slots, rounds, circuit_name, circuit_id, registration_deadline } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, id, 'id, num_slots, rounds, organizer, club_id');
     if (!access.ok) return access.respond(res);
@@ -629,6 +657,14 @@ router.put('/:id', async (req, res) => {
         updateData.circuit_id = null;
         updateData.circuit_name = null;
       }
+    }
+
+    if (registration_deadline !== undefined) {
+      const parsedDeadline = parseRegistrationDeadline(registration_deadline);
+      if (parsedDeadline === undefined) {
+        return res.status(400).json({ error: 'Fecha límite de inscripción inválida' });
+      }
+      updateData.registration_deadline = parsedDeadline;
     }
 
     const { data, error } = await supabase
@@ -2409,13 +2445,22 @@ router.post(
         });
       }
 
-      const access = await requireViewCompetition(supabase, req.user, id, 'id, num_slots, organizer, club_id');
+      const access = await requireViewCompetition(supabase, req.user, id, 'id, num_slots, organizer, club_id, status, registration_deadline');
       if (!access.ok) return access.respond(res);
       const competition = access.competition;
 
       const signupBlock = signupForbiddenReason(competition.status);
       if (signupBlock) {
         return res.status(400).json({ error: signupBlock });
+      }
+
+      const isOrganizerOrAdmin =
+        competition.organizer === req.user.id || isLicenseAdminUser(req.user);
+      if (!isOrganizerOrAdmin) {
+        const deadlineBlock = registrationDeadlineForbiddenReason(competition);
+        if (deadlineBlock) {
+          return res.status(400).json({ error: deadlineBlock });
+        }
       }
 
       const email = (req.user.email || '').trim().toLowerCase();

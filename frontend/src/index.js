@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import './styles/competitions.css';
 import App from './App';
+import ResizeObserverProvider from './components/ResizeObserverProvider';
 import reportWebVitals from './reportWebVitals';
 import { CookieConsentProvider } from './context/CookieConsentContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -15,7 +16,9 @@ root.render(
   <React.StrictMode>
     <CookieConsentProvider>
       <ThemeProvider>
-        <App />
+        <ResizeObserverProvider>
+          <App />
+        </ResizeObserverProvider>
       </ThemeProvider>
     </CookieConsentProvider>
   </React.StrictMode>

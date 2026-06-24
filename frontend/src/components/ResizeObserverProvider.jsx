@@ -1,27 +1,41 @@
 import React, { useEffect } from 'react';
 
-// Componente provider para manejar ResizeObserver de forma segura
+const RESIZE_OBSERVER_LOOP_RE =
+  /ResizeObserver loop (completed with undelivered notifications|limit exceeded)/i;
+
+function isResizeObserverLoopMessage(message) {
+  if (typeof message !== 'string') return false;
+  return RESIZE_OBSERVER_LOOP_RE.test(message) || message.includes('ResizeObserver loop');
+}
+
+// Suprime el aviso benigno de ResizeObserver que dispara el overlay de errores en desarrollo
+// (común con Radix Dialog/Select al cambiar el tamaño dentro de modales con scroll).
 const ResizeObserverProvider = ({ children }) => {
   useEffect(() => {
-    // Solo suprimir específicamente el warning de ResizeObserver loop limit exceeded
     const originalConsoleError = console.error;
     console.error = (...args) => {
-      // Solo suprimir si es específicamente el warning de ResizeObserver loop
-      if (args[0] && typeof args[0] === 'string' && 
-          (args[0].includes('ResizeObserver loop limit exceeded') || 
-           args[0].includes('ResizeObserver loop'))) {
-        return;
-      }
+      const first = args[0];
+      if (isResizeObserverLoopMessage(first)) return;
+      if (first instanceof Error && isResizeObserverLoopMessage(first.message)) return;
       originalConsoleError.apply(console, args);
     };
 
-    // Limpiar al desmontar
+    const onError = (event) => {
+      if (isResizeObserverLoopMessage(event.message)) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('error', onError);
+
     return () => {
       console.error = originalConsoleError;
+      window.removeEventListener('error', onError);
     };
   }, []);
 
   return <>{children}</>;
 };
 
-export default ResizeObserverProvider; 
+export default ResizeObserverProvider;

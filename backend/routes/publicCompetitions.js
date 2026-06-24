@@ -13,7 +13,9 @@ const { generateCompetitionCSV, safeFilenamePart } = require('../lib/competition
 const { generateCompetitionXLSX } = require('../lib/competitionXlsxGenerator');
 const { generateCompetitionPDF } = require('../src/utils/competitionPdfGenerator');
 const { generateCompetitionSocialPDF } = require('../src/utils/competitionSocialPdfGenerator');
-const { normalizeStatus, signupForbiddenReason } = require('../lib/competitionLifecycle');
+const { normalizeStatus, signupForbiddenReason, registrationDeadlineForbiddenReason } = require('../lib/competitionLifecycle');
+const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
+const { optionalAuthMiddleware } = require('../middleware/auth');
 const { appendRegulationFileUrl } = require('../lib/competitionRegulationUpload');
 const supabaseStorage = getServiceOrAnonClient();
 
@@ -389,6 +391,7 @@ router.get('/:slug', async (req, res) => {
         circuit_name,
         created_at,
         status,
+        registration_deadline,
         regulation_url,
         regulation_file_path,
         regulation_file_name
@@ -456,8 +459,8 @@ router.get('/:slug', async (req, res) => {
   }
 });
 
-// Inscripción pública (sin autenticación)
-router.post('/:slug/signup', async (req, res) => {
+// Inscripción pública (autenticación opcional para exenciones de organizador/admin)
+router.post('/:slug/signup', optionalAuthMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
     const { name, email, category_id, vehicle } = req.body;
@@ -478,7 +481,7 @@ router.post('/:slug/signup', async (req, res) => {
     // Obtener la competición por public_slug
     const { data: competition, error: compError } = await supabase
       .from('competitions')
-      .select('id, num_slots, status')
+      .select('id, num_slots, status, registration_deadline, organizer')
       .eq('public_slug', slug)
       .single();
 
@@ -489,6 +492,16 @@ router.post('/:slug/signup', async (req, res) => {
     const signupBlock = signupForbiddenReason(competition.status);
     if (signupBlock) {
       return res.status(400).json({ error: signupBlock });
+    }
+
+    const isOrganizerOrAdmin =
+      req.user &&
+      (competition.organizer === req.user.id || isLicenseAdminUser(req.user));
+    if (!isOrganizerOrAdmin) {
+      const deadlineBlock = registrationDeadlineForbiddenReason(competition);
+      if (deadlineBlock) {
+        return res.status(400).json({ error: deadlineBlock });
+      }
     }
 
     const { data: competitionCategories, error: categoriesError } = await supabase

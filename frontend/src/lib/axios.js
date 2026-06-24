@@ -18,45 +18,29 @@ export function invalidateApiAccessTokenCache() {
   cachedTokenAt = 0;
 }
 
-// Interceptor para añadir token de autenticación automáticamente
+// Interceptor para añadir token de autenticación cuando hay sesión (incluye rutas públicas con auth opcional)
 api.interceptors.request.use(
   async (config) => {
-    // Rutas públicas que no requieren autenticación
-    const publicRoutes = [
-      '/public-signup/',
-      '/api/public-signup/',
-      '/public-leagues/',
-      '/api/public-leagues/',
-      '/public/',
-      '/api/public/',
-      '/public/clubs/',
-      '/api/public/clubs/',
-      '/referee/',
-      '/api/referee/',
-    ];
-
-    const isPublicRoute = publicRoutes.some((route) => config.url.includes(route));
-
-    if (!isPublicRoute) {
-      try {
-        const now = Date.now();
-        if (cachedToken && now - cachedTokenAt < TOKEN_CACHE_TTL_MS) {
+    try {
+      const now = Date.now();
+      if (cachedToken && now - cachedTokenAt < TOKEN_CACHE_TTL_MS) {
+        if (cachedToken) {
           config.headers.Authorization = `Bearer ${cachedToken}`;
-          return config;
         }
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const token = session?.access_token || null;
-        cachedToken = token;
-        cachedTokenAt = now;
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      } catch (error) {
-        // Error al obtener la sesión, continuar sin token
+        return config;
       }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token || null;
+      cachedToken = token;
+      cachedTokenAt = now;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      // Error al obtener la sesión, continuar sin token
     }
 
     return config;

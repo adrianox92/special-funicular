@@ -218,9 +218,15 @@ const CompetitionSignup = () => {
   const waitlistCount = competition.waitlist_count ?? 0;
   const slotsFull = participantsCount >= competition.num_slots;
   const effectiveStatus = competition.status || 'published';
+  const registrationDeadlineExpired = Boolean(
+    competition.registration_deadline &&
+      new Date() > new Date(competition.registration_deadline),
+  );
   const progressPercent = Math.min(100, (participantsCount / competition.num_slots) * 100);
   const canSignup =
-    effectiveStatus === 'published' && (!status || status.times_registered === 0);
+    effectiveStatus === 'published' &&
+    (!status || status.times_registered === 0) &&
+    !registrationDeadlineExpired;
 
   const hasCategories = (competition.categories?.length ?? 0) > 0;
   const selectedCategory = hasCategories
@@ -276,6 +282,18 @@ const CompetitionSignup = () => {
                   <Calendar className="size-4" />
                   Creada: {formatDate(competition.created_at)}
                 </div>
+                {competition.registration_deadline && (
+                  <div
+                    className={`flex items-center gap-2 text-sm ${
+                      registrationDeadlineExpired
+                        ? 'text-destructive font-medium'
+                        : 'text-muted-foreground'
+                    }`}
+                  >
+                    <Calendar className="size-4" />
+                    Inscripciones hasta: {formatDate(competition.registration_deadline)}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Trophy className="size-4" />
                   Rondas: {competition.rounds}
@@ -316,7 +334,11 @@ const CompetitionSignup = () => {
                 <Alert variant="destructive">
                   <AlertTriangle className="size-4" />
                   <AlertDescription>
-                    {effectiveStatus !== 'published' ? (
+                    {registrationDeadlineExpired ? (
+                      <>
+                        <strong>Plazo de inscripción cerrado.</strong> La fecha límite para inscribirse ha finalizado.
+                      </>
+                    ) : effectiveStatus !== 'published' ? (
                       <>
                         <strong>Inscripción no disponible.</strong> Esta competición no está abierta a nuevas
                         inscripciones en este momento.
