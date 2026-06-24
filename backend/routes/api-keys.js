@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { hashApiKey } = require('../lib/apiKeyHash');
+const { encryptApiKey } = require('../lib/apiKeyEncrypt');
 
 const router = express.Router();
 const isProd = process.env.NODE_ENV === 'production';
@@ -59,9 +60,20 @@ router.get('/me', async (req, res) => {
     if (!existing) {
       const apiKey = generateApiKey();
       const apiKeyHash = hashApiKey(apiKey);
+      let apiKeyEnc;
+      try {
+        apiKeyEnc = encryptApiKey(apiKey);
+      } catch (encErr) {
+        return serverConfigError(
+          res,
+          503,
+          encErr,
+          encErr.message || 'API_KEY_ENCRYPT_SECRET no configurada correctamente',
+        );
+      }
       const { data: inserted, error: insertError } = await getSupabase()
         .from('user_api_keys')
-        .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
+        .insert([{ user_id: userId, api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc }])
         .select('created_at')
         .single();
 
@@ -125,9 +137,20 @@ router.post('/regenerate', async (req, res) => {
 
     const apiKey = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
+    let apiKeyEnc;
+    try {
+      apiKeyEnc = encryptApiKey(apiKey);
+    } catch (encErr) {
+      return serverConfigError(
+        res,
+        503,
+        encErr,
+        encErr.message || 'API_KEY_ENCRYPT_SECRET no configurada correctamente',
+      );
+    }
     const { data: inserted, error: insertError } = await getSupabase()
       .from('user_api_keys')
-      .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
+      .insert([{ user_id: userId, api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc }])
       .select('created_at')
       .single();
 

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const router = express.Router();
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { hashApiKey } = require('../lib/apiKeyHash');
+const { encryptApiKey, decryptApiKey } = require('../lib/apiKeyEncrypt');
 const { removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const authMiddleware = require('../middleware/auth');
 
@@ -75,8 +76,9 @@ router.post('/login', async (req, res) => {
 
 /**
  * POST /api/auth/api-key
- * Public endpoint: authenticate with email/password and return API key
- * (creates one if not exists). CORS permisivo for external apps.
+ * Public endpoint: authenticate with email/password and return API key.
+ * Never regenerates an existing key; creates one only on first login.
+ * Rows with hash-only (pre-migration) are migrated once on login.
  */
 router.post('/api-key', async (req, res) => {
   try {
@@ -97,7 +99,7 @@ router.post('/api-key', async (req, res) => {
 
     let { data: existing, error: fetchError } = await getSupabaseAdmin()
       .from('user_api_keys')
-      .select('api_key_hash, created_at')
+      .select('api_key_hash, api_key_enc, created_at')
       .eq('user_id', userId)
       .single();
 
@@ -118,102 +120,115 @@ router.post('/api-key', async (req, res) => {
       );
     }
 
-    // Si ya había clave solo tenemos el hash: hay que rotar para devolver texto plano.
-    // Por defecto regeneramos (clientes viejos no envían regenerate_if_exists).
-    // Solo se mantiene la respuesta api_key: null si el cliente pide explícitamente regenerate_if_exists: false.
-    if (existing && req.body.regenerate_if_exists !== false) {
-      const { error: deleteError } = await getSupabaseAdmin()
-        .from('user_api_keys')
-        .delete()
-        .eq('user_id', userId);
-
-      if (deleteError) {
-        if (deleteError.code === '42P01') {
-          return serverConfigErrorResponse(
-            res,
-            503,
-            deleteError,
-            'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
-          );
-        }
+    if (existing?.api_key_enc) {
+      try {
+        const plain = decryptApiKey(existing.api_key_enc);
+        return res.json({
+          api_key: plain,
+          created_at: existing.created_at,
+          regenerated: false,
+          source: 'existing',
+        });
+      } catch (decryptErr) {
+        console.error('Error al descifrar api_key_enc:', decryptErr);
         return serverConfigErrorResponse(
           res,
           500,
-          deleteError,
-          `Error al regenerar la API key: ${deleteError.message}`,
+          decryptErr,
+          'Error al descifrar la API key almacenada',
+        );
+      }
+    }
+
+    if (existing && !existing.api_key_enc) {
+      const apiKey = generateApiKey();
+      const apiKeyHash = hashApiKey(apiKey);
+      let apiKeyEnc;
+      try {
+        apiKeyEnc = encryptApiKey(apiKey);
+      } catch (encErr) {
+        return serverConfigErrorResponse(
+          res,
+          503,
+          encErr,
+          encErr.message || 'API_KEY_ENCRYPT_SECRET no configurada correctamente',
         );
       }
 
-      const apiKey = generateApiKey();
-      const apiKeyHash = hashApiKey(apiKey);
-      const { data: inserted, error: insertError } = await getSupabaseAdmin()
+      const { data: updated, error: updateError } = await getSupabaseAdmin()
         .from('user_api_keys')
-        .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
+        .update({ api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc })
+        .eq('user_id', userId)
         .select('created_at')
         .single();
 
-      if (insertError) {
-        if (insertError.code === '42P01') {
+      if (updateError) {
+        if (updateError.code === '42P01') {
           return serverConfigErrorResponse(
             res,
             503,
-            insertError,
+            updateError,
             'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
           );
         }
         return serverConfigErrorResponse(
           res,
           500,
-          insertError,
-          `Error al crear la API key: ${insertError.message}`,
+          updateError,
+          `Error al migrar la API key: ${updateError.message}`,
         );
       }
 
       return res.json({
         api_key: apiKey,
-        created_at: inserted.created_at,
+        created_at: updated?.created_at ?? existing.created_at,
         regenerated: true,
+        source: 'migrated',
       });
     }
 
-    if (!existing) {
-      const apiKey = generateApiKey();
-      const apiKeyHash = hashApiKey(apiKey);
-      const { data: inserted, error: insertError } = await getSupabaseAdmin()
-      .from('user_api_keys')
-        .insert([{ user_id: userId, api_key_hash: apiKeyHash }])
-        .select('created_at')
-        .single();
+    const apiKey = generateApiKey();
+    const apiKeyHash = hashApiKey(apiKey);
+    let apiKeyEnc;
+    try {
+      apiKeyEnc = encryptApiKey(apiKey);
+    } catch (encErr) {
+      return serverConfigErrorResponse(
+        res,
+        503,
+        encErr,
+        encErr.message || 'API_KEY_ENCRYPT_SECRET no configurada correctamente',
+      );
+    }
 
-      if (insertError) {
-        if (insertError.code === '42P01') {
-          return serverConfigErrorResponse(
-            res,
-            503,
-            insertError,
-            'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
-          );
-        }
+    const { data: inserted, error: insertError } = await getSupabaseAdmin()
+      .from('user_api_keys')
+      .insert([{ user_id: userId, api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc }])
+      .select('created_at')
+      .single();
+
+    if (insertError) {
+      if (insertError.code === '42P01') {
         return serverConfigErrorResponse(
           res,
-          500,
+          503,
           insertError,
-          `Error al crear la API key: ${insertError.message}`,
+          'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
         );
       }
-
-      return res.json({
-        api_key: apiKey,
-        created_at: inserted.created_at,
-      });
+      return serverConfigErrorResponse(
+        res,
+        500,
+        insertError,
+        `Error al crear la API key: ${insertError.message}`,
+      );
     }
 
     return res.json({
-      api_key: null,
-      key_exists: true,
-      created_at: existing.created_at,
-      message:
-        'Ya existe una API key. El texto completo no se puede recuperar. Regenera la clave desde Perfil en la web si la necesitas de nuevo.',
+      api_key: apiKey,
+      created_at: inserted.created_at,
+      regenerated: false,
+      source: 'created',
     });
   } catch (error) {
     console.error('Error en POST /api/auth/api-key:', error);
