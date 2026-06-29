@@ -108,13 +108,26 @@ async function buildCompetitionProgress(supabase, competitionId, competition) {
   );
   const allTimings = Object.values(timesByParticipant).flat();
 
-  const { participantStats, categoryRankings } = calculatePoints({
+  const { participantStats, categoryRankings, sortedParticipants } = calculatePoints({
     competition,
     participants: participantsForPoints,
     timings: allTimings,
     rules: rules || [],
     categories: categories || [],
   });
+
+  const generalRanking = {
+    category_id: null,
+    category_name: 'General',
+    sortedParticipants: sortedParticipants || [],
+  };
+
+  const category_rankings =
+    (categoryRankings || []).length > 0
+      ? [generalRanking, ...(categoryRankings || [])]
+      : generalRanking.sortedParticipants.length > 0
+        ? [generalRanking]
+        : [];
 
   return {
     competition_id: competitionId,
@@ -127,7 +140,7 @@ async function buildCompetitionProgress(supabase, competitionId, competition) {
     progress_percentage: Math.round(progressPercentage),
     times_by_round: timesByRound,
     participant_stats: participantStats,
-    category_rankings: categoryRankings || [],
+    category_rankings,
     has_category_rules: (rules || []).some((r) => r.category_id != null),
   };
 }

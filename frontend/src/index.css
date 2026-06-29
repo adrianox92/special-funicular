@@ -84,14 +84,29 @@ html.dark {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Pantalla completa: evita scroll del documento y el “salto” por 100vh en móvil */
+/* Presentación: scroll natural en móvil/PC; modo TV bloquea documento (ver ?tv=1) */
 html.presentation-mode {
+  overflow-y: auto;
+  overscroll-behavior: auto;
+  height: auto;
+  min-height: 100%;
+}
+
+html.presentation-mode body {
+  overflow-y: auto;
+  overscroll-behavior: auto;
+  min-height: 100dvh;
+  height: auto;
+  max-height: none;
+}
+
+html.presentation-mode.presentation-mode-tv {
   overflow: hidden;
   overscroll-behavior: none;
   height: 100%;
 }
 
-html.presentation-mode body {
+html.presentation-mode.presentation-mode-tv body {
   overflow: hidden;
   overscroll-behavior: none;
   min-height: 100dvh;

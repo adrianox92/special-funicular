@@ -82,7 +82,7 @@ function sortParticipantsByStartOrder(participants) {
  * Si el participante tiene vehicle_id vinculado a un garaje, sincroniza la sesión HEAT
  * en la cuenta personal del propietario del vehículo (best-effort).
  */
-async function syncPersonalTimingFromCompetition(supabase, participant, timingData, competitionMeta) {
+async function syncPersonalTimingFromCompetition(supabase, participant, timingData, competitionMeta, extras = {}) {
   if (!participant?.vehicle_id) return;
 
   const { data: vehicle } = await supabase
@@ -108,10 +108,17 @@ async function syncPersonalTimingFromCompetition(supabase, participant, timingDa
     total_time_timestamp: timingData.total_time_timestamp,
     average_time_timestamp: timingData.average_time_timestamp,
     session_type: 'HEAT',
+    recorded_from: 'lap_timer',
   };
 
+  if (Array.isArray(extras.lap_times) && extras.lap_times.length > 0) {
+    body.lap_times = extras.lap_times;
+  }
+
   try {
-    const result = await insertVehicleTimingFromSyncBody(supabase, vehicle.user_id, body);
+    const result = await insertVehicleTimingFromSyncBody(supabase, vehicle.user_id, body, {
+      recordedFrom: 'lap_timer',
+    });
     if (!result.success) {
       console.warn('personal sync from competition timing:', result.error);
     }
@@ -533,7 +540,19 @@ router.post(
           circuit,
           circuit_id: circuitId,
           penalty_seconds: penaltySeconds,
+          lap_times: lapTimes,
         } = t;
+
+        const normalizedLapTimes = Array.isArray(lapTimes)
+          ? lapTimes
+              .map((lap, idx) => ({
+                lap_number: lap.lap_number ?? lap.lapNumber ?? idx + 1,
+                time_seconds:
+                  lap.time_seconds ?? lap.lap_time_seconds ?? lap.lapTimeSeconds ?? 0,
+                time_text: lap.time_text ?? lap.lap_time_text ?? null,
+              }))
+              .filter((lap) => Number(lap.time_seconds) > 0)
+          : [];
 
         if (roundNumber > competition.rounds) {
           return res.status(400).json({ error: `Ronda ${roundNumber} fuera de rango (1-${competition.rounds})` });
@@ -649,6 +668,7 @@ router.post(
             participant,
             timingData,
             competition,
+            { lap_times: normalizedLapTimes },
           );
         }
       }

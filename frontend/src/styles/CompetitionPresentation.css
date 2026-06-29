@@ -11,17 +11,14 @@ html.presentation-mode .presentation-container {
 }
 
 .presentation-container {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
+  position: relative;
+  z-index: 1;
   box-sizing: border-box;
   width: 100%;
   min-height: 100dvh;
-  height: 100dvh;
-  max-height: 100dvh;
   background: var(--background);
   color: var(--foreground);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .presentation-container::before {
@@ -38,17 +35,17 @@ html.presentation-mode .presentation-container {
 
 .presentation-content {
   width: 100%;
-  height: 100%;
-  max-height: 100%;
+  min-height: min(100dvh, 100%);
+  height: auto;
+  max-height: none;
   display: flex;
   flex-direction: column;
   padding: max(0.75rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(0.75rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   position: relative;
   z-index: 1;
-  min-height: 0;
-  overflow: hidden;
-  gap: 0;
+  overflow: visible;
+  gap: 0.75rem;
 }
 
 @media (min-width: 640px) {
@@ -412,14 +409,15 @@ html.presentation-mode .presentation-container {
   color: var(--foreground);
 }
 
-/* Layout Principal */
+/* Layout Principal — scroll natural en móvil/tablet/desktop estándar */
 .presentation-main {
   display: flex;
-  flex: 1 1 auto;
+  flex-direction: column;
+  flex: none;
   gap: 1rem;
-  min-height: 0;
-  overflow: hidden;
-  margin-top: 0.5rem;
+  min-height: auto;
+  overflow: visible;
+  margin-top: 0;
 }
 
 @media (min-width: 640px) {
@@ -428,21 +426,41 @@ html.presentation-mode .presentation-container {
   }
 }
 
+@media (min-width: 1024px) {
+  .presentation-main {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
 .presentation-left {
-  flex: 2 1 0;
+  flex: none;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: auto;
+  width: 100%;
 }
 
 .presentation-right {
-  flex: 1 1 0;
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   min-width: 0;
-  min-height: 0;
+  min-height: auto;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .presentation-left {
+    flex: 2 1 0;
+  }
+
+  .presentation-right {
+    flex: 1 1 0;
+    min-width: 280px;
+  }
 }
 
 @media (min-width: 640px) {
@@ -461,12 +479,12 @@ html.presentation-mode .presentation-container {
   box-shadow:
     0 1px 0 color-mix(in oklch, var(--primary) 6%, transparent),
     0 12px 36px oklch(0 0 0 / 0.07);
-  flex: 1 1 auto;
+  flex: none;
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
-  min-height: 0;
+  overflow: visible;
+  min-height: auto;
 }
 
 @media (min-width: 640px) {
@@ -513,9 +531,11 @@ html.presentation-mode .presentation-container {
 }
 
 .table-container {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
+  flex: none;
+  min-height: auto;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   border-radius: calc(var(--radius) + 4px);
   background: color-mix(in oklch, var(--muted) 40%, var(--background));
@@ -527,6 +547,7 @@ html.presentation-mode .presentation-container {
 
 .ranking-table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
@@ -865,9 +886,9 @@ html.presentation-mode .presentation-container {
     0 1px 0 color-mix(in oklch, var(--primary) 6%, transparent),
     0 12px 36px oklch(0 0 0 / 0.07);
   position: relative;
-  overflow: hidden;
-  flex: 1 1 auto;
-  min-height: 0;
+  overflow: visible;
+  flex: none;
+  min-height: auto;
   display: flex;
   flex-direction: column;
 }
@@ -930,11 +951,13 @@ html.presentation-mode .presentation-container {
   background: color-mix(in oklch, var(--muted) 40%, transparent);
   border-radius: calc(var(--radius) + 4px);
   border: 1px solid var(--border);
-  overflow: hidden;
-  flex: 1 1 auto;
-  min-height: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  flex: none;
+  min-height: auto;
   display: flex;
   flex-direction: column;
+  -webkit-overflow-scrolling: touch;
 }
 
 .grid-header {
@@ -949,6 +972,7 @@ html.presentation-mode .presentation-container {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  min-width: max(100%, 28rem);
 }
 
 .participant-header {
@@ -964,17 +988,10 @@ html.presentation-mode .presentation-container {
 }
 
 .grid-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: min(320px, 42dvh);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-@media (min-width: 1024px) {
-  .grid-body {
-    max-height: min(360px, 38dvh);
-  }
+  flex: none;
+  min-height: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .participant-row {
@@ -983,6 +1000,7 @@ html.presentation-mode .presentation-container {
   padding: 1rem;
   border-bottom: 1px solid var(--border);
   transition: background 0.15s ease;
+  min-width: max(100%, 28rem);
 }
 
 .participant-row:hover {
@@ -1147,20 +1165,71 @@ html.presentation-mode .presentation-container {
   color: var(--foreground);
 }
 
+/* Modo proyector / TV (?tv=1): viewport fijo con scroll interno en paneles */
+html.presentation-mode-tv .presentation-container {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+html.presentation-mode-tv .presentation-content {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  gap: 0;
+}
+
+html.presentation-mode-tv .presentation-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: row;
+  margin-top: 0.5rem;
+}
+
+html.presentation-mode-tv .presentation-left,
+html.presentation-mode-tv .presentation-right {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.presentation-mode-tv .presentation-left {
+  flex: 2 1 0;
+}
+
+html.presentation-mode-tv .live-ranking-table,
+html.presentation-mode-tv .round-progress-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.presentation-mode-tv .table-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+html.presentation-mode-tv .grid-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.presentation-mode-tv .grid-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(360px, 38dvh);
+  overflow-y: auto;
+}
+
 /* Responsive Design */
-@media (max-width: 1200px) {
-  .presentation-main {
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .presentation-left,
-  .presentation-right {
-    flex: 1 1 0;
-    min-height: 0;
-    overflow: hidden;
-  }
-
+@media (max-width: 1023px) {
   .gap-previous-col,
   .gap-leader-col {
     display: none;

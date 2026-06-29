@@ -45,8 +45,15 @@ const CompetitionPresentation = () => {
   }, [fetchData]);
 
   useEffect(() => {
-    document.documentElement.classList.add('presentation-mode');
-    return () => document.documentElement.classList.remove('presentation-mode');
+    const root = document.documentElement;
+    root.classList.add('presentation-mode');
+    const tvMode = new URLSearchParams(window.location.search).get('tv') === '1';
+    if (tvMode) {
+      root.classList.add('presentation-mode-tv');
+    }
+    return () => {
+      root.classList.remove('presentation-mode', 'presentation-mode-tv');
+    };
   }, []);
 
   const displayedParticipants = useMemo(() => {
