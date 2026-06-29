@@ -244,6 +244,30 @@ router.get('/competitions/:id', param('id').isUUID(), handleValidationErrors, as
   }
 });
 
+router.get('/competitions/:id/progress', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const access = await assertCompetitionAccess(req.user.id, req.params.id);
+    if (!access.ok) return res.status(access.status).json({ error: access.error });
+
+    const { data: competition, error: cErr } = await supabaseAdmin
+      .from('competitions')
+      .select('id, num_slots, rounds, organizer, club_id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (cErr || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    const { buildCompetitionProgress } = require('../lib/competitionProgress');
+    const payload = await buildCompetitionProgress(supabaseAdmin, req.params.id, competition);
+    res.json(payload);
+  } catch (err) {
+    console.error('GET /sync/competitions/:id/progress', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post(
   '/competitions',
   body('name').trim().notEmpty(),
