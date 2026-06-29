@@ -3,6 +3,7 @@ const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
 const authMiddleware = require('../middleware/auth');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
+const { resolveClientContext } = require('../lib/clientApp');
 const { findOrCreateCircuit } = require('../lib/circuitResolver');
 const { sendTimingNotification, sendTestNotification } = require('../lib/notifier');
 const {
@@ -180,16 +181,17 @@ router.post('/circuits', async (req, res) => {
 router.post('/timings', async (req, res) => {
   try {
     const db = supabaseForSyncWrite();
-    const result = await insertVehicleTimingFromSyncBody(db, req.user.id, req.body);
+    const { recordedFrom } = resolveClientContext(req);
+    const result = await insertVehicleTimingFromSyncBody(db, req.user.id, req.body, { recordedFrom });
     if (!result.success) {
       return res.status(result.status).json({ error: result.error });
     }
 
-    const { finalTiming, previousBestLapSeconds } = result;
+    const { finalTiming, previousBestLapSeconds, syncMeta } = result;
 
     sendTimingNotification(req.user.id, finalTiming, previousBestLapSeconds, db).catch(() => {});
 
-    res.status(201).json(finalTiming);
+    res.status(201).json({ ...finalTiming, sync_meta: syncMeta });
   } catch (error) {
     console.error('Error en POST /api/sync/timings:', error);
     res.status(500).json({ error: 'Error interno del servidor' });

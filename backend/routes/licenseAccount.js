@@ -79,6 +79,45 @@ router.get('/me', async (req, res) => {
 });
 
 /**
+ * GET /lap-timer/me
+ * Estado Premium de Slot Lap Timer (user_licenses) para la cuenta web.
+ */
+router.get('/lap-timer/me', async (req, res) => {
+  const inactive = { active: false, product_id: null, updated_at: null };
+
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'No autenticado' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('user_licenses')
+      .select('active, product_id, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('licenseAccount lap-timer me', error);
+      return res.json(inactive);
+    }
+
+    if (!data || !data.active) {
+      return res.json(inactive);
+    }
+
+    return res.json({
+      active: true,
+      product_id: data.product_id,
+      updated_at: data.updated_at,
+    });
+  } catch (err) {
+    console.error('licenseAccount lap-timer me', err);
+    return res.json(inactive);
+  }
+});
+
+/**
  * GET /admin/lookup?email=
  * Resuelve email → usuario Auth + fila de suscripción (si existe).
  */

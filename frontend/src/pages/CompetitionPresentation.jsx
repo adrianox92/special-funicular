@@ -7,6 +7,7 @@ import LiveRankingTable from '../components/presentation/LiveRankingTable';
 import RoundProgressGrid from '../components/presentation/RoundProgressGrid';
 import BestLapHighlight from '../components/presentation/BestLapHighlight';
 import { Spinner } from '../components/ui/spinner';
+import { usePresentationLive } from '../hooks/usePresentationLive';
 import '../styles/CompetitionPresentation.css';
 
 const CompetitionPresentation = () => {
@@ -37,12 +38,10 @@ const CompetitionPresentation = () => {
     }
   }, [slug]);
 
+  const { isLive } = usePresentationLive(slug, fetchData);
+
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => {
-      fetchData();
-    }, 10000);
-    return () => clearInterval(interval);
   }, [fetchData]);
 
   useEffect(() => {
@@ -131,10 +130,10 @@ const CompetitionPresentation = () => {
       <div className="presentation-content">
         <div className="presentation-live-bar" aria-live="polite">
           <div className="presentation-live-bar-left">
-            <span className="presentation-live-pill" title="La clasificación se actualiza sola">
+            <span className="presentation-live-pill" title={isLive ? 'Conectado en tiempo real' : 'Reconectando… actualización periódica de respaldo'}>
               <Radio className="presentation-live-pill-icon" aria-hidden />
-              <span className="presentation-live-dot" aria-hidden />
-              <span>En directo</span>
+              <span className={`presentation-live-dot${isLive ? '' : ' is-reconnecting'}`} aria-hidden />
+              <span>{isLive ? 'En vivo' : 'En directo'}</span>
             </span>
             <span className="presentation-live-meta">
               <Users className="presentation-live-meta-icon" aria-hidden />

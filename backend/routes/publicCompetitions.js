@@ -17,6 +17,7 @@ const { normalizeStatus, signupForbiddenReason, registrationDeadlineForbiddenRea
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 const { optionalAuthMiddleware } = require('../middleware/auth');
 const { appendRegulationFileUrl } = require('../lib/competitionRegulationUpload');
+const { handlePresentationStream } = require('../lib/presentationStream');
 const supabaseStorage = getServiceOrAnonClient();
 
 function isDraftCompetitionPublic(competition) {
@@ -823,6 +824,18 @@ router.get('/:slug/rules', async (req, res) => {
     res.json(rules || []);
   } catch (error) {
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Endpoint específico para el modo presentación
+router.get('/:slug/presentation/stream', async (req, res) => {
+  try {
+    await handlePresentationStream(req, res, req.params.slug);
+  } catch (error) {
+    console.error('Error en GET /public-signup/:slug/presentation/stream:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error interno del servidor' });
+    }
   }
 });
 

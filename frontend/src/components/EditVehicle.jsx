@@ -26,8 +26,11 @@ import MaintenanceCorrelationChart from './charts/MaintenanceCorrelationChart';
 import MaintenanceLog from './MaintenanceLog';
 import VehiclePalmares from './VehiclePalmares';
 import ImportTimingsModal from './ImportTimingsModal';
+import LapTimerTrainingCard from './LapTimerTrainingCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { getRecordedFromLabel } from '../utils/recordedFromLabel';
 import { TimeInput, TimeInputHint } from './ui/TimeInput';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
@@ -1643,6 +1646,7 @@ const EditVehicle = () => {
           fixedVehicleId={id}
           onImported={loadTimings}
         />
+        <LapTimerTrainingCard vehicleId={id} circuits={circuits} />
         <h4 className="text-lg font-semibold">{editingTiming ? 'Editar' : 'Añadir'} Registro de Tiempo</h4>
         {timingNotice && (
           <Alert
@@ -1807,7 +1811,14 @@ const EditVehicle = () => {
                     )}
                     {timings.map((timing) => (
                       <TableRow key={timing.id}>
-                        <TableCell>{new Date(timing.timing_date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {new Date(timing.timing_date).toLocaleDateString()}
+                          {getRecordedFromLabel(timing.recorded_from) && timing.recorded_from !== 'web' && (
+                            <Badge variant="outline" className="ml-2 text-[10px]">
+                              {getRecordedFromLabel(timing.recorded_from)}
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono">{timing.best_lap_time}</TableCell>
                         <TableCell className="font-mono">{timing.total_time}</TableCell>
                         <TableCell>{timing.laps}</TableCell>

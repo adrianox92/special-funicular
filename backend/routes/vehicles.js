@@ -23,6 +23,9 @@ const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
+const { resolveBaselineTimings, sortTimingsByBestLap } = require('../lib/syncTimingsQuery');
+const { bestLapSecondsFromTimingRow } = require('../lib/personalBest');
+const { formatSecondsToLapTime } = require('../lib/timingUtils');
 
 
 /** Columnas permitidas para GET /vehicles y /vehicles/export (ordenación). */
@@ -1863,6 +1866,71 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
   }
 });
 
+// Baseline de entrenamiento guiado (misma lógica que GET /api/sync/timings en Lap Timer)
+router.get('/:id/training-baseline', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { circuit_id, lane } = req.query;
+
+    if (!circuit_id) {
+      return res.status(400).json({ error: 'circuit_id es requerido' });
+    }
+
+    const { data: existingVehicle, error: checkError } = await req.supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (checkError || !existingVehicle) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    const { data: circuitRow, error: circuitError } = await req.supabase
+      .from('circuits')
+      .select('id, name')
+      .eq('id', circuit_id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (circuitError || !circuitRow) {
+      return res.status(404).json({ error: 'Circuito no encontrado' });
+    }
+
+    const { data: rawTimings, error: timingsError } = await req.supabase
+      .from('vehicle_timings')
+      .select('id, vehicle_id, circuit_id, circuit, lane, best_lap_time, best_lap_timestamp, laps')
+      .eq('vehicle_id', id)
+      .order('timing_date', { ascending: false })
+      .limit(100);
+
+    if (timingsError) {
+      return res.status(500).json({ error: timingsError.message });
+    }
+
+    const { timings: filtered, laneFallback } = resolveBaselineTimings(rawTimings || [], {
+      circuit_id,
+      circuitName: circuitRow.name,
+      lane,
+    });
+
+    const sorted = sortTimingsByBestLap(filtered);
+    const best = sorted[0];
+    const bestLapSeconds = best ? bestLapSecondsFromTimingRow(best) : null;
+
+    res.json({
+      best_lap_seconds: bestLapSeconds,
+      best_lap_time: bestLapSeconds != null ? formatSecondsToLapTime(bestLapSeconds) : null,
+      timings_count: filtered.length,
+      lane_fallback: laneFallback,
+    });
+  } catch (err) {
+    console.error('Error en GET /vehicles/:id/training-baseline:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Obtener los tiempos de vuelta de un vehículo
 router.get('/:id/timings', async (req, res) => {
   try {
@@ -1998,6 +2066,7 @@ router.post('/:id/timings', async (req, res) => {
       circuit: circuitToStore,
       circuit_id: circuitIdToStore,
       setup_snapshot: JSON.stringify(componentsSnapshot),
+      recorded_from: 'web',
       created_at: new Date().toISOString()
     };
     if (supply_voltage_volts !== undefined) {

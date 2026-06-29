@@ -42,6 +42,8 @@ import { toast } from 'sonner';
 import './TimingsList.css';
 import { formatDistance } from '../utils/formatUtils';
 import { cn } from '../lib/utils';
+import { isLapTimerSession, getRecordedFromLabel } from '../utils/recordedFromLabel';
+import LapTimerTrainingCard from './LapTimerTrainingCard';
 
 /** Igual que VehicleList: GET /vehicles está paginado (25 por defecto). */
 const TIMINGS_VEHICLES_PAGE_LIMIT = 10000;
@@ -77,6 +79,16 @@ function formatVoltageVolts(v) {
   if (v == null || v === '') return '—';
   const n = Number(v);
   return Number.isFinite(n) ? `${n.toFixed(2)} V` : '—';
+}
+
+function RecordedFromBadge({ recordedFrom }) {
+  const label = getRecordedFromLabel(recordedFrom);
+  if (!label || recordedFrom === 'web') return null;
+  return (
+    <Badge variant={isLapTimerSession(recordedFrom) ? 'default' : 'outline'} className="text-[10px]">
+      {label}
+    </Badge>
+  );
 }
 
 function getSeconds(timeStr) {
@@ -189,6 +201,7 @@ function calculateCircuitRanking(groupedTimings) {
 /** Vista móvil: una tarjeta por grupo (misma agrupación que la tabla desktop). */
 function TimingMobileGroupCard({
   group,
+  allCircuits,
   expandedGroups,
   toggleGroup,
   getLaneBadgeVariant,
@@ -234,6 +247,15 @@ function TimingMobileGroupCard({
                 </Badge>
               ) : null}
               <Badge>{group.total_sessions} ses.</Badge>
+              {group.circuit_id && (
+                <LapTimerTrainingCard
+                  compact
+                  vehicleId={group.vehicle_id}
+                  circuits={allCircuits}
+                  initialCircuitId={group.circuit_id}
+                  initialLane={group.lane}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -338,6 +360,7 @@ function TimingMobileGroupCard({
                   <div className="flex flex-wrap justify-between gap-2">
                     <span className="text-muted-foreground">{new Date(session.timing_date).toLocaleDateString()}</span>
                     <Badge variant={getLaneBadgeVariant(session.lane)}>Carril {session.lane}</Badge>
+                    <RecordedFromBadge recordedFrom={session.recorded_from} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 font-mono text-xs">
                     <div>
@@ -782,6 +805,7 @@ const TimingsList = () => {
             <TimingMobileGroupCard
               key={group.key}
               group={group}
+              allCircuits={circuits}
               expandedGroups={expandedGroups}
               toggleGroup={toggleGroup}
               getLaneBadgeVariant={getLaneBadgeVariant}
@@ -947,6 +971,7 @@ const TimingsList = () => {
                           <TableCell className="font-mono">
                             {session.best_lap_time}
                             {index === 0 && <Badge variant="secondary" className="ml-2">Mejor Vuelta</Badge>}
+                            <RecordedFromBadge recordedFrom={session.recorded_from} />
                           </TableCell>
                           <TableCell className="font-mono">
                             {session.total_time}

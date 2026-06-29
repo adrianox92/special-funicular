@@ -30,6 +30,7 @@ import CompetitionSignup from './pages/CompetitionSignup';
 import PublicClubProfile from './pages/PublicClubProfile';
 import CompetitionStatus from './pages/CompetitionStatus';
 import CompetitionPresentation from './pages/CompetitionPresentation';
+import AppTimingRedirect from './pages/AppTimingRedirect';
 import Profile from './pages/Profile';
 import PublicPilotProfile from './pages/PublicPilotProfile';
 import SettingsPage from './pages/SettingsPage';
@@ -192,6 +193,16 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <Dashboard />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/app/timing"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <AppTimingRedirect />
               </AuthedShell>
             </PrivateRoute>
           }

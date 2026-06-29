@@ -4,15 +4,18 @@ const { getPreviousBestLapSeconds } = require('./personalBest');
 const { updatePositionsAfterNewTiming } = require('./positionTracker');
 const { calculateConsistencyFromLaps } = require('./timingUtils');
 const { parseSupplyVoltageVolts } = require('./pilotProfileUtils');
+const { resolveRecordedFrom, buildSyncMeta } = require('./clientApp');
+const { bestLapSecondsFromInput } = require('./personalBest');
 
 /**
  * Inserta una sesión de cronometraje (misma lógica que POST /api/sync/timings).
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId
  * @param {Record<string, unknown>} body
- * @returns {Promise<{ success: true, finalTiming: object, previousBestLapSeconds: number|null } | { success: false, error: string, status: number }>}
+ * @param {{ recordedFrom?: string }} [options]
+ * @returns {Promise<{ success: true, finalTiming: object, previousBestLapSeconds: number|null, syncMeta: object } | { success: false, error: string, status: number }>}
  */
-async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
+async function insertVehicleTimingFromSyncBody(supabase, userId, body, options = {}) {
   const {
     vehicle_id,
     best_lap_time,
@@ -34,6 +37,7 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     reaction_time_ms,
     reactionTime,
     reactionTimeMs,
+    recorded_from,
   } = body;
 
   if (!vehicle_id || !best_lap_time || !total_time || laps == null || !average_time) {
@@ -138,6 +142,7 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     best_lap_timestamp: best_lap_timestamp || null,
     total_time_timestamp: total_time_timestamp || null,
     average_time_timestamp: average_time_timestamp || null,
+    recorded_from: resolveRecordedFrom(recorded_from, options.recordedFrom ?? 'web'),
   };
   if (sessionTypeToStore) {
     timingData.session_type = sessionTypeToStore;
@@ -247,7 +252,12 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body) {
     }
   }
 
-  return { success: true, finalTiming, previousBestLapSeconds };
+  const syncMeta = buildSyncMeta(
+    previousBestLapSeconds,
+    bestLapSecondsFromInput({ best_lap_timestamp, best_lap_time }),
+  );
+
+  return { success: true, finalTiming, previousBestLapSeconds, syncMeta };
 }
 
 module.exports = {
