@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ArrowLeft, Users, Loader2, CalendarDays, Megaphone, Building2, Trophy } from 'lucide-react';
+import { ArrowLeft, Users, Loader2, CalendarDays, Megaphone, Building2, Trophy, Flag } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -47,9 +47,10 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import ClubCalendar from '../components/ClubCalendar';
 import ClubBoard from '../components/ClubBoard';
+import ClubCircuits from '../components/ClubCircuits';
 
-const ADMIN_TABS = new Set(['members', 'board', 'calendar', 'leagues']);
-const MEMBER_TABS = new Set(['board', 'calendar', 'leagues']);
+const ADMIN_TABS = new Set(['members', 'board', 'calendar', 'leagues', 'circuits']);
+const MEMBER_TABS = new Set(['board', 'calendar', 'leagues', 'circuits']);
 
 const ClubMembers = () => {
   const { id: clubId } = useParams();
@@ -255,7 +256,7 @@ const ClubMembers = () => {
       {canManage ? (
         <>
           <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-            <TabsList className="grid w-full max-w-3xl grid-cols-4">
+            <TabsList className="grid w-full max-w-4xl grid-cols-5">
               <TabsTrigger value="members" className="gap-2">
                 <Users className="size-4 shrink-0" />
                 Miembros
@@ -267,6 +268,10 @@ const ClubMembers = () => {
               <TabsTrigger value="calendar" className="gap-2">
                 <CalendarDays className="size-4 shrink-0" />
                 Calendario
+              </TabsTrigger>
+              <TabsTrigger value="circuits" className="gap-2">
+                <Flag className="size-4 shrink-0" />
+                Circuitos
               </TabsTrigger>
               <TabsTrigger value="leagues" className="gap-2">
                 <Trophy className="size-4 shrink-0" />
@@ -359,6 +364,14 @@ const ClubMembers = () => {
             </TabsContent>
             <TabsContent value="calendar" className="mt-4">
               <ClubCalendar clubId={clubId} canManage={canManage} />
+            </TabsContent>
+            <TabsContent value="circuits" className="mt-4">
+              <ClubCircuits
+                clubId={clubId}
+                canManage={canManage}
+                club={club}
+                onClubUpdated={load}
+              />
             </TabsContent>
             <TabsContent value="leagues" className="mt-4">
               <Card>
@@ -462,7 +475,7 @@ const ClubMembers = () => {
         </>
       ) : (
         <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="board" className="gap-2">
               <Megaphone className="size-4 shrink-0" />
               Tablón
@@ -470,6 +483,10 @@ const ClubMembers = () => {
             <TabsTrigger value="calendar" className="gap-2">
               <CalendarDays className="size-4 shrink-0" />
               Calendario
+            </TabsTrigger>
+            <TabsTrigger value="circuits" className="gap-2">
+              <Flag className="size-4 shrink-0" />
+              Circuitos
             </TabsTrigger>
             <TabsTrigger value="leagues" className="gap-2">
               <Trophy className="size-4 shrink-0" />
@@ -481,6 +498,9 @@ const ClubMembers = () => {
           </TabsContent>
           <TabsContent value="calendar" className="mt-4">
             <ClubCalendar clubId={clubId} canManage={false} />
+          </TabsContent>
+          <TabsContent value="circuits" className="mt-4">
+            <ClubCircuits clubId={clubId} canManage={false} club={club} />
           </TabsContent>
           <TabsContent value="leagues" className="mt-4">
             <Card>

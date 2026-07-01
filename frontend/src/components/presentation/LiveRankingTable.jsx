@@ -1,7 +1,89 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { formatTimeDiff } from '../../utils/formatTimeDiff';
 
-const LiveRankingTable = ({ participants, title = 'Clasificación general', subtitle = 'Orden por puntos y tiempo · Se actualiza automáticamente' }) => {
+const OVERLAY_SCROLL_PX_PER_SEC = 28;
+const OVERLAY_SCROLL_PAUSE_START_MS = 1800;
+const OVERLAY_SCROLL_PAUSE_END_MS = 2400;
+
+function useOverlayRankingAutoScroll(containerRef, enabled, itemCount) {
+  useEffect(() => {
+    if (!enabled) return undefined;
+
+    let rafId = 0;
+    let phase = 'start-pause';
+    let phaseEndsAt = performance.now() + OVERLAY_SCROLL_PAUSE_START_MS;
+    let lastFrame = 0;
+
+    const step = (now) => {
+      const el = containerRef.current;
+      if (!el) {
+        rafId = requestAnimationFrame(step);
+        return;
+      }
+
+      const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
+      if (maxScroll <= 4) {
+        el.scrollTop = 0;
+        rafId = requestAnimationFrame(step);
+        return;
+      }
+
+      if (phase === 'start-pause' || phase === 'end-pause') {
+        if (now >= phaseEndsAt) {
+          if (phase === 'end-pause') {
+            el.scrollTop = 0;
+            phase = 'start-pause';
+            phaseEndsAt = now + OVERLAY_SCROLL_PAUSE_START_MS;
+          } else {
+            phase = 'scrolling';
+            lastFrame = now;
+          }
+        }
+      } else if (phase === 'scrolling') {
+        const dt = Math.min((now - lastFrame) / 1000, 0.05);
+        lastFrame = now;
+        const next = el.scrollTop + OVERLAY_SCROLL_PX_PER_SEC * dt;
+        if (next >= maxScroll) {
+          el.scrollTop = maxScroll;
+          phase = 'end-pause';
+          phaseEndsAt = now + OVERLAY_SCROLL_PAUSE_END_MS;
+        } else {
+          el.scrollTop = next;
+        }
+      }
+
+      rafId = requestAnimationFrame(step);
+    };
+
+    rafId = requestAnimationFrame(step);
+
+    const el = containerRef.current;
+    const ro =
+      el &&
+      new ResizeObserver(() => {
+        if (phase !== 'scrolling' && containerRef.current) {
+          const maxScroll = Math.max(
+            0,
+            containerRef.current.scrollHeight - containerRef.current.clientHeight,
+          );
+          if (maxScroll <= 4) containerRef.current.scrollTop = 0;
+        }
+      });
+    if (el && ro) ro.observe(el);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro?.disconnect();
+    };
+  }, [containerRef, enabled, itemCount]);
+}
+
+const LiveRankingTable = ({
+  participants,
+  title = 'Clasificación general',
+  subtitle = 'Orden por puntos y tiempo · Se actualiza automáticamente',
+  autoScroll = false,
+}) => {
   /** Mismo criterio que la clasificación pública: puntos → tiempo (orden del API / calculatePoints). */
   const orderedParticipants = useMemo(() => {
     return [...participants].sort((a, b) => {
@@ -95,13 +177,19 @@ const LiveRankingTable = ({ participants, title = 'Clasificación general', subt
     };
   });
 
+  const scrollContainerRef = useRef(null);
+  useOverlayRankingAutoScroll(scrollContainerRef, autoScroll, participantsWithGaps.length);
+
   return (
-    <div className="live-ranking-table">
+    <div className={`live-ranking-table${autoScroll ? ' live-ranking-table--auto-scroll' : ''}`}>
       <div className="table-title-block">
         <h2 className="table-title">{title}</h2>
         <p className="table-subtitle">{subtitle}</p>
       </div>
-      <div className="table-container">
+      <div
+        ref={scrollContainerRef}
+        className={`table-container${autoScroll ? ' table-container--auto-scroll' : ''}`}
+      >
         <table className="ranking-table">
           <thead>
             <tr>

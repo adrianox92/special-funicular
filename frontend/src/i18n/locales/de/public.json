@@ -1,0 +1,41 @@
+{
+  "pilot": {
+    "title": "Öffentliches Profil",
+    "notFound": "Profil nicht gefunden",
+    "loadError": "Profil konnte nicht geladen werden",
+    "vehicles": "Fahrzeuge",
+    "vehiclesHint": "Fahrzeuge in der Sammlung",
+    "bestTimes": "Bestzeiten pro Strecke",
+    "bestTimesHint": "Beste Runde (alle Fahrzeuge)",
+    "circuit": "Strecke",
+    "bestLap": "Beste Runde",
+    "vehicle": "Fahrzeug",
+    "date": "Datum",
+    "mode": "Modus",
+    "heat": "Lauf",
+    "practice": "Training",
+    "noTimings": "Noch keine synchronisierten Zeiten.",
+    "organized": "Als Organisator",
+    "participated": "Teilnahmen",
+    "participatedHint": "Wettkämpfe mit Teilnahme",
+    "viewStatus": "Status anzeigen",
+    "palmares": "Verifiziertes Palmarès",
+    "palmaresHint": "Ergebnisse in abgeschlossenen Wettkämpfen",
+    "position": "Platz",
+    "points": "Punkte",
+    "compareTitle": "Head-to-Head-Vergleich",
+    "compareHint": "Mit anderem Fahrer per Slug vergleichen",
+    "compareWith": "Vergleichen mit",
+    "compareButton": "Vergleichen",
+    "compareWins": "{{name}} gewinnt {{count}} von {{total}} Duellen",
+    "compareCircuit": "Strecke",
+    "compareYou": "Du",
+    "compareThem": "Rivale",
+    "compareNoData": "Keine vergleichbaren Daten"
+  },
+  "competitionStatus": {
+    "loading": "Wettkampf wird geladen…",
+    "participants": "Teilnehmer",
+    "classification": "Gesamtwertung"
+  }
+}

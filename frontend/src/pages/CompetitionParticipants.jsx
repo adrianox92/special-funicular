@@ -6,6 +6,7 @@ import CompetitionSignups from '../components/CompetitionSignups';
 import CompetitionCategories from '../components/CompetitionCategories';
 import CompetitionRulesPanel from '../components/CompetitionRulesPanel';
 import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
+import LiveEventHubLinks from '../components/LiveEventHubLinks';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -903,6 +904,10 @@ const CompetitionParticipants = () => {
           </div>
         </CardContent>
       </Card>
+
+      {canUseOrganizerTools && competition.public_slug && (
+        <LiveEventHubLinks publicSlug={competition.public_slug} />
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -1,0 +1,55 @@
+{
+  "componentTypes": {
+    "pinion": "Pinion",
+    "crown": "Crown gear",
+    "front_wheel": "Front tyre",
+    "rear_wheel": "Rear tyre",
+    "front_rim": "Front rim",
+    "rear_rim": "Rear rim",
+    "axle": "Axles",
+    "chassis": "Chassis",
+    "other": "Other",
+    "guide": "Guide blade",
+    "motor": "Motor",
+    "trencillas": "Braids",
+    "tornillos": "Screws",
+    "stoppers": "Stoppers",
+    "topes_y_centradores": "Stops & guides",
+    "cojinetes": "Bearings"
+  },
+  "clubEvents": {
+    "meeting": "Meeting",
+    "competition": "Competition",
+    "training": "Training",
+    "social": "Social event",
+    "maintenance": "Maintenance",
+    "other": "Other"
+  },
+  "maintenanceKinds": {
+    "limpieza_general": "General cleaning",
+    "guias": "Guide blades",
+    "escobillas": "Brushes",
+    "engrase": "Lubrication",
+    "iman": "Magnet",
+    "contactos": "Contacts",
+    "neumaticos": "Tyres",
+    "cables": "Cables",
+    "suspension": "Suspension",
+    "otro": "Other"
+  },
+  "inventoryExtra": {
+    "aceite": "Oil / lubricant",
+    "limpiador": "Cleaner",
+    "electronica": "Electronics",
+    "herramienta": "Tool",
+    "neumaticos": "Tyres",
+    "cables": "Cables",
+    "suspension": "Suspension",
+    "trencillas": "Braids",
+    "tornillos": "Screws",
+    "stoppers": "Stoppers",
+    "topes_y_centradores": "Stops & guides",
+    "cojinetes": "Bearings",
+    "otro": "Other"
+  }
+}

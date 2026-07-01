@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../lib/axios';
@@ -43,6 +44,8 @@ const emptyForm = () => ({
 });
 
 const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
+  const { t } = useTranslation('vehicles');
+  const { t: tc } = useTranslation('common');
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,12 +70,12 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
       pushLogs(list);
     } catch (e) {
       console.error(e);
-      toast.error(e.response?.data?.error || 'No se pudo cargar el historial de mantenimiento');
+      toast.error(e.response?.data?.error || t('maintenance.loadError'));
       pushLogs([]);
     } finally {
       setLoading(false);
     }
-  }, [vehicleId, pushLogs]);
+  }, [vehicleId, pushLogs, t]);
 
   useEffect(() => {
     load();
@@ -100,15 +103,15 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
           .map((row) => (row.id === editingId ? data : row))
           .sort((a, b) => String(b.performed_at).localeCompare(String(a.performed_at)));
         pushLogs(next);
-        toast.success('Mantenimiento actualizado');
+        toast.success(t('maintenance.updateSuccess'));
       } else {
         const { data } = await api.post('/maintenance', { vehicle_id: vehicleId, ...baseFields });
         pushLogs([data, ...logs].sort((a, b) => String(b.performed_at).localeCompare(String(a.performed_at))));
-        toast.success('Mantenimiento registrado');
+        toast.success(t('maintenance.addSuccess'));
       }
       resetForm();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al guardar');
+      toast.error(err.response?.data?.error || t('maintenance.saveError'));
     } finally {
       setSaving(false);
     }
@@ -129,10 +132,10 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
     try {
       await api.delete(`/maintenance/${deleteId}`);
       pushLogs(logs.filter((l) => l.id !== deleteId));
-      toast.success('Registro eliminado');
+      toast.success(t('maintenance.deleteSuccess'));
       if (editingId === deleteId) resetForm();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'No se pudo eliminar');
+      toast.error(err.response?.data?.error || t('maintenance.deleteError'));
     } finally {
       setDeleteId(null);
     }
@@ -140,16 +143,13 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
 
   return (
     <div className="mt-6 space-y-6">
-      <h4 className="text-lg font-semibold">Historial de mantenimiento</h4>
-      <p className="text-sm text-muted-foreground">
-        Registra limpieza, escobillas, engrase u otras intervenciones. Se pueden visualizar junto a la evolución de
-        tiempos en el gráfico superior cuando hay sesiones el mismo día.
-      </p>
+      <h4 className="text-lg font-semibold">{t('maintenance.title')}</h4>
+      <p className="text-sm text-muted-foreground">{t('maintenance.description')}</p>
 
       <form onSubmit={handleSubmit} className="rounded-md border p-4 space-y-4 max-w-2xl">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="maint-date">Fecha del mantenimiento</Label>
+            <Label htmlFor="maint-date">{t('maintenance.dateLabel')}</Label>
             <Input
               id="maint-date"
               type="date"
@@ -159,7 +159,7 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="maint-kind">Tipo</Label>
+            <Label htmlFor="maint-kind">{t('maintenance.kindLabel')}</Label>
             <Select value={form.kind} onValueChange={(v) => setForm((f) => ({ ...f, kind: v }))}>
               <SelectTrigger id="maint-kind">
                 <SelectValue />
@@ -167,7 +167,7 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
               <SelectContent>
                 {MAINTENANCE_KINDS.map((k) => (
                   <SelectItem key={k.value} value={k.value}>
-                    {k.label}
+                    {formatMaintenanceKind(k.value)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -175,17 +175,17 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="maint-notes">Notas (opcional)</Label>
+          <Label htmlFor="maint-notes">{t('maintenance.notesLabel')}</Label>
           <Textarea
             id="maint-notes"
             rows={3}
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-            placeholder="Detalle de la intervención…"
+            placeholder={t('maintenance.notesPlaceholder')}
           />
         </div>
         <div className="space-y-2 max-w-xs">
-          <Label htmlFor="maint-next">Próxima revisión (opcional)</Label>
+          <Label htmlFor="maint-next">{t('maintenance.nextDueLabel')}</Label>
           <Input
             id="maint-next"
             type="date"
@@ -198,38 +198,38 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
             {saving ? (
               <>
                 <Spinner className="size-4 mr-2" />
-                Guardando…
+                {t('maintenance.saving')}
               </>
             ) : editingId ? (
-              'Actualizar registro'
+              t('maintenance.updateRecord')
             ) : (
-              'Añadir registro'
+              t('maintenance.addRecord')
             )}
           </Button>
           {editingId && (
             <Button type="button" variant="secondary" onClick={resetForm}>
-              Cancelar edición
+              {t('maintenance.cancelEdit')}
             </Button>
           )}
         </div>
       </form>
 
       <div>
-        <h5 className="font-medium mb-3">Registros</h5>
+        <h5 className="font-medium mb-3">{t('maintenance.recordsTitle')}</h5>
         {loading ? (
           <Spinner className="size-6" />
         ) : logs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aún no hay mantenimientos registrados.</p>
+          <p className="text-sm text-muted-foreground">{t('maintenance.noRecords')}</p>
         ) : (
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Notas</TableHead>
-                  <TableHead>Próxima</TableHead>
-                  <TableHead className="w-[100px]">Acciones</TableHead>
+                  <TableHead>{t('maintenance.tableDate')}</TableHead>
+                  <TableHead>{t('maintenance.tableKind')}</TableHead>
+                  <TableHead>{t('maintenance.tableNotes')}</TableHead>
+                  <TableHead>{t('maintenance.tableNext')}</TableHead>
+                  <TableHead className="w-[100px]">{t('maintenance.tableActions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -245,7 +245,7 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
                     <TableCell>{row.next_due_at ? formatHistoryDate(row.next_due_at) : '—'}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button type="button" variant="outline" size="sm" onClick={() => startEdit(row)} title="Editar">
+                        <Button type="button" variant="outline" size="sm" onClick={() => startEdit(row)} title={tc('actions.edit')}>
                           <Pencil className="size-4" />
                         </Button>
                         <Button
@@ -253,7 +253,7 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
                           variant="destructive"
                           size="sm"
                           onClick={() => setDeleteId(row.id)}
-                          title="Eliminar"
+                          title={tc('actions.delete')}
                         >
                           <Trash2 className="size-4" />
                         </Button>
@@ -270,13 +270,13 @@ const MaintenanceLog = ({ vehicleId, onLogsChange }) => {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este registro?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t('maintenance.deleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('maintenance.deleteBody')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel type="button">{tc('actions.cancel')}</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
+              {tc('actions.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

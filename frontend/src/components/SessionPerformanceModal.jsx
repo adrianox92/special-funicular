@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,7 @@ const formatTimeCompact = (seconds) => {
 };
 
 const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
+  const { t } = useTranslation('timings');
   const [laps, setLaps] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -68,7 +70,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
 
   if (!timing) return null;
 
-  const times = laps.map((l) => parseFloat(l.lap_time_seconds) || 0).filter((t) => t > 0);
+  const times = laps.map((l) => parseFloat(l.lap_time_seconds) || 0).filter((val) => val > 0);
   const bestTime = timing.best_lap_timestamp ?? (times.length ? Math.min(...times) : null);
   const worstTime = timing.worst_lap_timestamp ?? (times.length ? Math.max(...times) : null);
   const meanTime = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
@@ -79,9 +81,11 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
       : sortedTimes[Math.floor(sortedTimes.length / 2)]
     : null;
   const bestWorstDiff = bestTime != null && worstTime != null ? worstTime - bestTime : null;
-  const consistencyScore = timing.consistency_score ?? (meanTime > 0 && times.length >= 3
-    ? (Math.sqrt(times.reduce((s, t) => s + (t - meanTime) ** 2, 0) / times.length) / meanTime) * 100
-    : null);
+  const consistencyScore =
+    timing.consistency_score ??
+    (meanTime > 0 && times.length >= 3
+      ? (Math.sqrt(times.reduce((s, val) => s + (val - meanTime) ** 2, 0) / times.length) / meanTime) * 100
+      : null);
 
   const movingAvg = (arr, window = 3) => {
     const result = [];
@@ -96,7 +100,6 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
     return result;
   };
 
-  // Compute moving average once (not per-lap) for performance.
   const movingAvgs = movingAvg(times, 3);
 
   const evolutionData = laps.map((lap, i) => {
@@ -111,8 +114,8 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
   const mid = Math.floor(laps.length / 2);
   const firstHalf = laps.slice(0, mid);
   const secondHalf = laps.slice(mid);
-  const firstHalfTimes = firstHalf.map((l) => parseFloat(l.lap_time_seconds) || 0).filter((t) => t > 0);
-  const secondHalfTimes = secondHalf.map((l) => parseFloat(l.lap_time_seconds) || 0).filter((t) => t > 0);
+  const firstHalfTimes = firstHalf.map((l) => parseFloat(l.lap_time_seconds) || 0).filter((val) => val > 0);
+  const secondHalfTimes = secondHalf.map((l) => parseFloat(l.lap_time_seconds) || 0).filter((val) => val > 0);
   const firstHalfMean = firstHalfTimes.length ? firstHalfTimes.reduce((a, b) => a + b, 0) / firstHalfTimes.length : null;
   const secondHalfMean = secondHalfTimes.length ? secondHalfTimes.reduce((a, b) => a + b, 0) / secondHalfTimes.length : null;
   const firstHalfBest = firstHalfTimes.length ? Math.min(...firstHalfTimes) : null;
@@ -120,18 +123,28 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
 
   const bucketSize = 0.5;
   const histogram = {};
-  times.forEach((t) => {
-    const bucket = Math.floor(t / bucketSize) * bucketSize;
+  times.forEach((val) => {
+    const bucket = Math.floor(val / bucketSize) * bucketSize;
     histogram[bucket] = (histogram[bucket] || 0) + 1;
   });
   const histogramData = Object.entries(histogram)
     .map(([k, v]) => ({ range: `${Number(k).toFixed(1)}s`, count: v }))
     .sort((a, b) => parseFloat(a.range) - parseFloat(b.range));
 
+  const circuitPart = timing.circuit
+    ? timing.lane
+      ? t('performanceModal.circuitLaneSubtitle', { circuit: timing.circuit, lane: timing.lane })
+      : timing.circuit
+    : null;
+
   const subtitle = [
-    vehicle ? `${vehicle.manufacturer} ${vehicle.model}` : timing.vehicle_manufacturer && timing.vehicle_model ? `${timing.vehicle_manufacturer} ${timing.vehicle_model}` : null,
+    vehicle
+      ? `${vehicle.manufacturer} ${vehicle.model}`
+      : timing.vehicle_manufacturer && timing.vehicle_model
+        ? `${timing.vehicle_manufacturer} ${timing.vehicle_model}`
+        : null,
     new Date(timing.timing_date).toLocaleDateString(),
-    timing.circuit ? `${timing.circuit}${timing.lane ? ` (Carril ${timing.lane})` : ''}` : null,
+    circuitPart,
   ]
     .filter(Boolean)
     .join(' — ');
@@ -142,10 +155,12 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
       const delta = d.time != null && bestTime != null ? d.time - bestTime : null;
       return (
         <div className="rounded-md border bg-popover p-3 shadow-md">
-          <p className="font-semibold mb-1">Vuelta {d.lap}</p>
-          <p className="text-sm">Tiempo: {d.time != null ? formatTime(d.time) : '—'}</p>
+          <p className="font-semibold mb-1">{t('performanceModal.tooltipLap', { lap: d.lap })}</p>
+          <p className="text-sm">
+            {t('performanceModal.tooltipTime', { time: d.time != null ? formatTime(d.time) : '—' })}
+          </p>
           {delta != null && Math.abs(delta) > 0.001 && (
-            <p className="text-sm text-muted-foreground">Delta: +{delta.toFixed(3)}s</p>
+            <p className="text-sm text-muted-foreground">{t('performanceModal.tooltipDelta', { delta: delta.toFixed(3) })}</p>
           )}
         </div>
       );
@@ -177,30 +192,30 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
         <DialogHeader>
           <DialogTitle>
             <div>
-              <div>Análisis de rendimiento</div>
-              <small className="text-muted-foreground font-normal block mt-1">{subtitle || 'Sesión'}</small>
+              <div>{t('performanceModal.title')}</div>
+              <small className="text-muted-foreground font-normal block mt-1">
+                {subtitle || t('performanceModal.sessionFallback')}
+              </small>
             </div>
           </DialogTitle>
         </DialogHeader>
 
         {loading ? (
-          <p className="text-muted-foreground py-8 text-center">Cargando vueltas...</p>
+          <p className="text-muted-foreground py-8 text-center">{t('performanceModal.loadingLaps')}</p>
         ) : !hasLaps ? (
-          <p className="text-muted-foreground py-8 text-center">
-            No hay datos de vueltas individuales para esta sesión.
-          </p>
+          <p className="text-muted-foreground py-8 text-center">{t('performanceModal.noLaps')}</p>
         ) : (
           <Tabs defaultValue="evolution" className="mt-4">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="evolution">Evolución</TabsTrigger>
-              <TabsTrigger value="statistics">Estadísticas</TabsTrigger>
+              <TabsTrigger value="evolution">{t('performanceModal.tabEvolution')}</TabsTrigger>
+              <TabsTrigger value="statistics">{t('performanceModal.tabStatistics')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="evolution" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <Card>
                   <CardHeader className="py-2 px-3">
-                    <p className="text-xs text-muted-foreground">Mejor vuelta</p>
+                    <p className="text-xs text-muted-foreground">{t('bestLap')}</p>
                   </CardHeader>
                   <CardContent className="py-1 px-3 pb-3">
                     <p className="font-mono font-semibold">{formatTime(bestTime)}</p>
@@ -208,7 +223,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                 </Card>
                 <Card>
                   <CardHeader className="py-2 px-3">
-                    <p className="text-xs text-muted-foreground">Peor vuelta</p>
+                    <p className="text-xs text-muted-foreground">{t('performanceModal.worstLap')}</p>
                   </CardHeader>
                   <CardContent className="py-1 px-3 pb-3">
                     <p className="font-mono font-semibold">{formatTime(worstTime)}</p>
@@ -216,7 +231,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                 </Card>
                 <Card>
                   <CardHeader className="py-2 px-3">
-                    <p className="text-xs text-muted-foreground">Media</p>
+                    <p className="text-xs text-muted-foreground">{t('performanceModal.mean')}</p>
                   </CardHeader>
                   <CardContent className="py-1 px-3 pb-3">
                     <p className="font-mono font-semibold">{formatTime(meanTime)}</p>
@@ -224,7 +239,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                 </Card>
                 <Card>
                   <CardHeader className="py-2 px-3">
-                    <p className="text-xs text-muted-foreground">Mediana</p>
+                    <p className="text-xs text-muted-foreground">{t('performanceModal.median')}</p>
                   </CardHeader>
                   <CardContent className="py-1 px-3 pb-3">
                     <p className="font-mono font-semibold">{formatTime(medianTime)}</p>
@@ -233,9 +248,9 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                 {timing.reaction_time_ms != null && Number.isFinite(Number(timing.reaction_time_ms)) && (
                   <Card>
                     <CardHeader className="py-2 px-3">
-                      <p className="text-xs text-muted-foreground">Tiempo de reacción</p>
+                      <p className="text-xs text-muted-foreground">{t('performanceModal.reactionTime')}</p>
                       <p className="text-[10px] text-muted-foreground font-normal leading-tight mt-0.5">
-                        Semáforo hasta cruce en salida
+                        {t('performanceModal.reactionHint')}
                       </p>
                     </CardHeader>
                     <CardContent className="py-1 px-3 pb-3">
@@ -248,27 +263,22 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                 <Card>
                   <CardHeader className="py-2 px-3">
                     <div className="flex items-center gap-1">
-                      <p className="text-xs text-muted-foreground">Consistencia</p>
+                      <p className="text-xs text-muted-foreground">{t('performanceModal.consistency')}</p>
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
                               type="button"
                               className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                              aria-label="Cómo se calcula la consistencia"
+                              aria-label={t('performanceModal.consistencyAria')}
                             >
                               <CircleHelp className="size-3.5" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs leading-relaxed">
-                            <p>
-                              La consistencia mide la variabilidad de tus vueltas: cuanto menor sea el porcentaje, más
-                              regular es la sesión.
-                            </p>
-                            <p className="mt-1">
-                              Formula: <span className="font-mono">((desv. estandar / media) * 100)</span>.
-                            </p>
-                            <p className="mt-1 text-xs">Se calcula cuando hay al menos 3 vueltas válidas.</p>
+                            <p>{t('performanceModal.consistencyTooltip1')}</p>
+                            <p className="mt-1">{t('performanceModal.consistencyTooltip2')}</p>
+                            <p className="mt-1 text-xs">{t('performanceModal.consistencyTooltip3')}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -292,7 +302,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                 </Card>
                 <Card>
                   <CardHeader className="py-2 px-3">
-                    <p className="text-xs text-muted-foreground">Diff. mejor-peor</p>
+                    <p className="text-xs text-muted-foreground">{t('performanceModal.bestWorstDiff')}</p>
                   </CardHeader>
                   <CardContent className="py-1 px-3 pb-3">
                     <p className="font-mono font-semibold">
@@ -304,7 +314,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
 
               <Card>
                 <CardHeader>
-                  <h5 className="font-semibold">Evolución de tiempos por vuelta</h5>
+                  <h5 className="font-semibold">{t('performanceModal.evolutionTitle')}</h5>
                 </CardHeader>
                 <CardContent>
                   <div style={{ width: '100%', height: 280 }}>
@@ -323,17 +333,27 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                         />
                         <RechartsTooltip content={<CustomTooltip />} />
                         {bestTime != null && (
-                          <ReferenceLine y={bestTime} stroke="hsl(142, 76%, 36%)" strokeDasharray="3 3" label={{ value: 'Mejor', position: 'right' }} />
+                          <ReferenceLine
+                            y={bestTime}
+                            stroke="hsl(142, 76%, 36%)"
+                            strokeDasharray="3 3"
+                            label={{ value: t('performanceModal.refBest'), position: 'right' }}
+                          />
                         )}
                         {meanTime != null && (
-                          <ReferenceLine y={meanTime} stroke="hsl(38, 92%, 50%)" strokeDasharray="3 3" label={{ value: 'Media', position: 'right' }} />
+                          <ReferenceLine
+                            y={meanTime}
+                            stroke="hsl(38, 92%, 50%)"
+                            strokeDasharray="3 3"
+                            label={{ value: t('performanceModal.refMean'), position: 'right' }}
+                          />
                         )}
                         <Line
                           type="monotone"
                           dataKey="time"
                           stroke="hsl(var(--primary))"
                           strokeWidth={2}
-                          name="Tiempo"
+                          name={t('performanceModal.chartTime')}
                           dot={{ r: 3, fill: '#000', stroke: '#000' }}
                           activeDot={{ r: 4, fill: '#ef4444', stroke: '#ef4444' }}
                         >
@@ -351,7 +371,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                           stroke="hsl(var(--muted-foreground))"
                           strokeWidth={1.5}
                           strokeDasharray="5 5"
-                          name="Media móvil (3)"
+                          name={t('performanceModal.chartMovingAvg')}
                           dot={false}
                           connectNulls
                         />
@@ -361,19 +381,19 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                   <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-3 h-3 rounded-full shrink-0 border border-border" style={{ backgroundColor: '#000' }} />
-                      Tiempo
+                      {t('performanceModal.chartTime')}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-6 h-1 shrink-0 border-t-2 border-dashed" style={{ borderColor: 'var(--muted-foreground)' }} />
-                      Media móvil (3)
+                      {t('performanceModal.chartMovingAvg')}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-6 h-1 shrink-0 border-t-2 border-dashed" style={{ borderColor: 'hsl(142, 76%, 36%)' }} />
-                      Mejor (referencia)
+                      {t('performanceModal.chartBestRef')}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block w-6 h-1 shrink-0 border-t-2 border-dashed" style={{ borderColor: 'hsl(38, 92%, 50%)' }} />
-                      Media (referencia)
+                      {t('performanceModal.chartMeanRef')}
                     </span>
                   </div>
                 </CardContent>
@@ -385,7 +405,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
             <TabsContent value="statistics" className="space-y-4 mt-4">
               {timing.reaction_time_ms != null && Number.isFinite(Number(timing.reaction_time_ms)) && (
                 <p className="text-sm text-muted-foreground">
-                  Tiempo de reacción (semáforo → salida):{' '}
+                  {t('performanceModal.reactionSummary')}{' '}
                   <span className="font-mono font-medium text-foreground">
                     {(Number(timing.reaction_time_ms) / 1000).toFixed(3)} s
                   </span>
@@ -394,22 +414,22 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
               {firstHalf.length > 0 && secondHalf.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <h5 className="font-semibold">Análisis por mitades</h5>
+                    <h5 className="font-semibold">{t('performanceModal.halvesTitle')}</h5>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Métrica</TableHead>
-                            <TableHead>Primera mitad (vueltas 1-{mid})</TableHead>
-                            <TableHead>Segunda mitad (vueltas {mid + 1}-{laps.length})</TableHead>
-                            <TableHead>Diferencia</TableHead>
+                            <TableHead>{t('performanceModal.halvesMetric')}</TableHead>
+                            <TableHead>{t('performanceModal.firstHalf', { mid })}</TableHead>
+                            <TableHead>{t('performanceModal.secondHalf', { start: mid + 1, end: laps.length })}</TableHead>
+                            <TableHead>{t('performanceModal.difference')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           <TableRow>
-                            <TableCell className="font-medium">Media</TableCell>
+                            <TableCell className="font-medium">{t('performanceModal.mean')}</TableCell>
                             <TableCell className="font-mono">{formatTime(firstHalfMean)}</TableCell>
                             <TableCell className="font-mono">{formatTime(secondHalfMean)}</TableCell>
                             <TableCell>
@@ -428,7 +448,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                             </TableCell>
                           </TableRow>
                           <TableRow>
-                            <TableCell className="font-medium">Mejor vuelta</TableCell>
+                            <TableCell className="font-medium">{t('bestLap')}</TableCell>
                             <TableCell className="font-mono">{formatTime(firstHalfBest)}</TableCell>
                             <TableCell className="font-mono">{formatTime(secondHalfBest)}</TableCell>
                             <TableCell>
@@ -456,7 +476,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
               {histogramData.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <h5 className="font-semibold">Distribución de tiempos</h5>
+                    <h5 className="font-semibold">{t('performanceModal.distributionTitle')}</h5>
                   </CardHeader>
                   <CardContent>
                     <div style={{ width: '100%', height: 200 }}>
@@ -467,7 +487,7 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                           <YAxis />
                           <RechartsTooltip />
                           <Legend />
-                          <Bar dataKey="count" name="Vueltas" radius={[4, 4, 0, 0]} fill="hsl(var(--primary) / 0.7)" />
+                          <Bar dataKey="count" name={t('performanceModal.lapsChartName')} radius={[4, 4, 0, 0]} fill="hsl(var(--primary) / 0.7)" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -477,17 +497,17 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
 
               <Card>
                 <CardHeader>
-                  <h5 className="font-semibold">Tabla detallada de vueltas</h5>
+                  <h5 className="font-semibold">{t('performanceModal.lapsTableTitle')}</h5>
                 </CardHeader>
                 <CardContent>
                   <div className="rounded-md border overflow-x-auto max-h-[300px] overflow-y-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Vuelta</TableHead>
-                          <TableHead>Tiempo</TableHead>
-                          <TableHead>Delta vs mejor</TableHead>
-                          <TableHead>Delta vs media</TableHead>
+                          <TableHead>{t('performanceModal.lapCol')}</TableHead>
+                          <TableHead>{t('performanceModal.timeCol')}</TableHead>
+                          <TableHead>{t('performanceModal.deltaBestCol')}</TableHead>
+                          <TableHead>{t('performanceModal.deltaMeanCol')}</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -507,10 +527,10 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
                             </TableCell>
                             <TableCell>
                               {lap.isBest && (
-                                <span className="text-xs font-medium text-green-600">Mejor</span>
+                                <span className="text-xs font-medium text-green-600">{t('performanceModal.badgeBest')}</span>
                               )}
                               {lap.isWorst && !lap.isBest && (
-                                <span className="text-xs font-medium text-destructive">Peor</span>
+                                <span className="text-xs font-medium text-destructive">{t('performanceModal.badgeWorst')}</span>
                               )}
                             </TableCell>
                           </TableRow>

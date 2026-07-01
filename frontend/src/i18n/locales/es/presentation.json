@@ -1,0 +1,13 @@
+{
+  "live": "En vivo",
+  "reconnecting": "En directo",
+  "updated": "Actualizado {{time}}",
+  "pilots_one": "{{count}} piloto",
+  "pilots_other": "{{count}} pilotos",
+  "generalRanking": "Clasificación general",
+  "categoryRanking": "Clasificación — {{category}}",
+  "bestLapTitle": "Mejor vuelta",
+  "nextPilotTitle": "Próximo piloto",
+  "loading": "Cargando competición…",
+  "notFound": "Competición no encontrada"
+}

@@ -1,0 +1,41 @@
+{
+  "pilot": {
+    "title": "Public profile",
+    "notFound": "Profile not found",
+    "loadError": "Could not load profile",
+    "vehicles": "Vehicles",
+    "vehiclesHint": "Cars in collection",
+    "bestTimes": "Best times by circuit",
+    "bestTimesHint": "Best lap recorded (all vehicles)",
+    "circuit": "Circuit",
+    "bestLap": "Best lap",
+    "vehicle": "Vehicle",
+    "date": "Date",
+    "mode": "Mode",
+    "heat": "Heat",
+    "practice": "Practice",
+    "noTimings": "No synced timings yet.",
+    "organized": "Competitions organized",
+    "participated": "Participations",
+    "participatedHint": "Competitions you joined",
+    "viewStatus": "View status",
+    "palmares": "Verified palmares",
+    "palmaresHint": "Results in completed competitions",
+    "position": "Position",
+    "points": "Points",
+    "compareTitle": "Head-to-head comparison",
+    "compareHint": "Compare with another pilot by slug",
+    "compareWith": "Compare with",
+    "compareButton": "Compare",
+    "compareWins": "{{name}} wins {{count}} of {{total}} duels",
+    "compareCircuit": "Circuit",
+    "compareYou": "You",
+    "compareThem": "Rival",
+    "compareNoData": "No comparable data"
+  },
+  "competitionStatus": {
+    "loading": "Loading competition…",
+    "participants": "Participants",
+    "classification": "Overall standings"
+  }
+}

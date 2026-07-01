@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader } from './ui/card';
 import {
   Table,
@@ -23,8 +24,47 @@ import {
   Cell,
 } from 'recharts';
 import { Check } from 'lucide-react';
-import { formatDistance } from '../utils/formatUtils';
+import { formatDistance, getIntlLocale } from '../utils/formatUtils';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
+
+/** Heurística: correlación modificación ↔ delta de mejor vuelta tras cambio de config. */
+export function computeModLapCorrelations(timings = []) {
+  const withSnapshot = timings.filter((t) => t.setup_snapshot);
+  if (withSnapshot.length < 2) return [];
+
+  const sorted = [...withSnapshot].sort((a, b) => new Date(a.timing_date) - new Date(b.timing_date));
+  const insights = [];
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    const fpPrev = getConfigFingerprint(prev.setup_snapshot);
+    const fpCurr = getConfigFingerprint(curr.setup_snapshot);
+    if (!fpPrev || !fpCurr || fpPrev === fpCurr) continue;
+
+    const prevSec = prev.best_lap_timestamp ?? timeToSeconds(prev.best_lap_time);
+    const currSec = curr.best_lap_timestamp ?? timeToSeconds(curr.best_lap_time);
+    if (prevSec == null || currSec == null) continue;
+
+    const delta = currSec - prevSec;
+    if (Math.abs(delta) < 0.05) continue;
+
+    const diffs = getKeyDiffs(
+      typeof prev.setup_snapshot === 'string' ? JSON.parse(prev.setup_snapshot) : prev.setup_snapshot,
+      typeof curr.setup_snapshot === 'string' ? JSON.parse(curr.setup_snapshot) : curr.setup_snapshot,
+    );
+    const component = diffs[0] || 'reglaje';
+    insights.push({
+      component,
+      delta: Math.abs(delta),
+      direction: delta < 0 ? 'improved' : 'worsened',
+      lane: curr.lane ?? '—',
+      timingDate: curr.timing_date,
+    });
+  }
+
+  return insights.slice(-5).reverse();
+}
 
 const formatTime = (seconds) => {
   if (seconds == null || seconds === 0) return '—';
@@ -194,7 +234,9 @@ const getBetterBetween = (key, prevVal, currVal) => {
 };
 
 const SetupPerformanceAnalysis = ({ timings = [] }) => {
-  const { configGroups, barChartData, timelineData, laneComparisons } = useMemo(() => {
+  const { t, i18n } = useTranslation('vehicles');
+  const { configGroups, barChartData, timelineData, laneComparisons, modInsights } = useMemo(() => {
+    const locale = getIntlLocale();
     const withSnapshot = timings.filter((t) => t.setup_snapshot);
     const byFingerprint = {};
     withSnapshot.forEach((t) => {
@@ -239,7 +281,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
       const keyDiffs = prevGroup ? getKeyDiffs(prevGroup.setupSnapshot, g.setupSnapshot) : [];
 
       return {
-        label: `Config ${idx + 1}`,
+        label: t('analysis.configLabel', { n: idx + 1 }),
         sessions,
         keyDiffs,
         stats: {
@@ -281,7 +323,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
       const isChange = lastFp != null && fp !== lastFp;
       lastFp = fp;
       return {
-        date: new Date(t.timing_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }),
+        date: new Date(t.timing_date).toLocaleDateString(getIntlLocale(), { day: '2-digit', month: 'short', year: '2-digit' }),
         bestLap: t.best_lap_timestamp ?? timeToSeconds(t.best_lap_time),
         configLabel,
         configIdx,
@@ -305,7 +347,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
           currMap[k].push(t);
         });
         const common = Object.keys(prevMap).filter((k) => currMap[k]);
-        common.sort((a, b) => a.localeCompare(b, 'es'));
+        common.sort((a, b) => a.localeCompare(b, locale));
         const rows = common.map((k) => {
           const sample = prevMap[k][0];
           const circuitLabel = sample.circuit || k.split('::')[0] || '—';
@@ -318,63 +360,85 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
           };
         });
         return {
-          prevLabel: `Config ${idx + 1}`,
-          currLabel: `Config ${sortedGroups.length} (actual)`,
+          prevLabel: t('analysis.configLabel', { n: idx + 1 }),
+          currLabel: t('analysis.configCurrentLabel', { n: sortedGroups.length }),
           rows,
         };
       })
       .filter((c) => c.rows.length > 0);
 
-    return { configGroups, barChartData, timelineData, laneComparisons };
-  }, [timings]);
+    return { configGroups, barChartData, timelineData, laneComparisons, modInsights: computeModLapCorrelations(timings) };
+  }, [timings, t, i18n.language]);
+
+  const includeReactionCompare = timings.some((timing) => timing.reaction_time_ms != null);
+
+  const comparisonRows = useMemo(() => {
+    const rows = [
+      { key: 'best_lap_timestamp', label: t('analysis.bestLapMetric'), fmt: (s) => formatTime(s?.best_lap_timestamp) },
+      { key: 'average_time_timestamp', label: t('analysis.averageMetric'), fmt: (s) => formatTime(s?.average_time_timestamp) },
+      { key: 'avg_speed_kmh', label: t('analysis.avgSpeedMetric'), fmt: (s) => (s?.avg_speed_kmh != null ? Number(s.avg_speed_kmh).toFixed(1) : '—') },
+      { key: 'laps', label: t('analysis.lapsMetric'), fmt: (s) => s?.laps ?? '—' },
+      { key: 'total_distance_meters', label: t('analysis.distanceMetric'), fmt: (s) => formatDistance(s?.total_distance_meters) },
+      { key: 'consistency_score', label: t('analysis.consistencyMetric'), fmt: (s) => (s?.consistency_score != null ? `${Number(s.consistency_score).toFixed(2)}%` : '—') },
+    ];
+    if (includeReactionCompare) {
+      rows.push({
+        key: 'reaction_time_ms',
+        label: t('analysis.reactionMetric'),
+        fmt: (s) =>
+          s?.reaction_time_ms != null && Number.isFinite(Number(s.reaction_time_ms))
+            ? `${(Number(s.reaction_time_ms) / 1000).toFixed(3)} s`
+            : '—',
+      });
+    }
+    return rows;
+  }, [t, includeReactionCompare]);
 
   if (configGroups.length < 2) {
     return (
       <div className="text-center text-muted-foreground py-8">
-        <p>No hay suficientes configuraciones distintas para comparar.</p>
-        <p className="text-sm mt-1">Se necesitan al menos 2 reglajes diferentes registrados en sesiones de tiempo.</p>
+        <p>{t('analysis.insufficientTitle')}</p>
+        <p className="text-sm mt-1">{t('analysis.insufficientHint')}</p>
       </div>
     );
   }
 
-  const includeReactionCompare = timings.some((t) => t.reaction_time_ms != null);
-
-  const comparisonRows = [
-    { key: 'best_lap_timestamp', label: 'Mejor vuelta', fmt: (s) => formatTime(s?.best_lap_timestamp) },
-    { key: 'average_time_timestamp', label: 'Promedio', fmt: (s) => formatTime(s?.average_time_timestamp) },
-    { key: 'avg_speed_kmh', label: 'Velocidad media (km/h)', fmt: (s) => (s?.avg_speed_kmh != null ? Number(s.avg_speed_kmh).toFixed(1) : '—') },
-    { key: 'laps', label: 'Vueltas totales', fmt: (s) => s?.laps ?? '—' },
-    { key: 'total_distance_meters', label: 'Distancia', fmt: (s) => formatDistance(s?.total_distance_meters) },
-    { key: 'consistency_score', label: 'Consistencia (%)', fmt: (s) => (s?.consistency_score != null ? `${Number(s.consistency_score).toFixed(2)}%` : '—') },
-    ...(includeReactionCompare
-      ? [
-          {
-            key: 'reaction_time_ms',
-            label: 'Tiempo de reacción',
-            fmt: (s) =>
-              s?.reaction_time_ms != null && Number.isFinite(Number(s.reaction_time_ms))
-                ? `${(Number(s.reaction_time_ms) / 1000).toFixed(3)} s`
-                : '—',
-          },
-        ]
-      : []),
-  ];
-
   const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
+  const barBestLapName = t('analysis.barBestLap');
+  const barAverageName = t('analysis.barAverage');
+  const timelineLineName = t('analysis.bestLapMetric');
 
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">
-        Comparativa de rendimiento entre las distintas configuraciones registradas. Cada configuración agrupa las sesiones con el mismo reglaje de componentes.
-      </p>
+      {modInsights?.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <h5 className="font-semibold text-sm">{t('analysis.modCorrelationTitle')}</h5>
+          </CardHeader>
+          <CardContent>
+            <ul className="text-sm space-y-1.5 text-muted-foreground">
+              {modInsights.map((ins, idx) => (
+                <li key={`${ins.component}-${idx}`}>
+                  {t(ins.direction === 'improved' ? 'analysis.modImproved' : 'analysis.modWorsened', {
+                    component: ins.component,
+                    delta: ins.delta.toFixed(3),
+                    lane: ins.lane,
+                  })}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+      <p className="text-muted-foreground">{t('analysis.intro')}</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {configGroups.map((cg, idx) => (
+        {configGroups.map((cg) => (
           <Card key={cg.label}>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <h5 className="font-semibold">{cg.label}</h5>
-                <span className="text-xs text-muted-foreground">{cg.sessionCount} sesiones</span>
+                <span className="text-xs text-muted-foreground">{t('analysis.sessions', { count: cg.sessionCount })}</span>
               </div>
               {cg.keyDiffs.length > 0 && (
                 <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
@@ -386,27 +450,27 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="text-sm">
-                <span className="text-muted-foreground">Vigencia: </span>
-                {new Date(cg.firstDate).toLocaleDateString()} — {new Date(cg.lastDate).toLocaleDateString()}
+                <span className="text-muted-foreground">{t('analysis.validity')} </span>
+                {new Date(cg.firstDate).toLocaleDateString(getIntlLocale())} — {new Date(cg.lastDate).toLocaleDateString(getIntlLocale())}
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Mejor vuelta: </span>
+                  <span className="text-muted-foreground">{t('analysis.bestLap')} </span>
                   <span className="font-mono font-medium">{formatTime(cg.stats.best_lap_timestamp)}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Promedio: </span>
+                  <span className="text-muted-foreground">{t('analysis.average')} </span>
                   <span className="font-mono font-medium">{formatTime(cg.stats.average_time_timestamp)}</span>
                 </div>
                 {cg.stats.avg_speed_kmh != null && (
                   <div>
-                    <span className="text-muted-foreground">Vel. media: </span>
+                    <span className="text-muted-foreground">{t('analysis.avgSpeed')} </span>
                     <span className="font-medium">{Number(cg.stats.avg_speed_kmh).toFixed(1)} km/h</span>
                   </div>
                 )}
                 {cg.stats.reaction_time_ms != null && Number.isFinite(Number(cg.stats.reaction_time_ms)) && (
                   <div>
-                    <span className="text-muted-foreground">Reacción (media): </span>
+                    <span className="text-muted-foreground">{t('analysis.reaction')} </span>
                     <span className="font-mono font-medium">
                       {(Number(cg.stats.reaction_time_ms) / 1000).toFixed(3)} s
                     </span>
@@ -420,14 +484,14 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
 
       <Card>
         <CardHeader>
-          <h5 className="font-semibold">Tabla comparativa</h5>
+          <h5 className="font-semibold">{t('analysis.comparisonTableTitle')}</h5>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Métrica</TableHead>
+                  <TableHead>{t('analysis.metricColumn')}</TableHead>
                   {configGroups.map((cg) => (
                     <TableHead key={cg.label}>{cg.label}</TableHead>
                   ))}
@@ -446,7 +510,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
                         >
                           {row.fmt(cg.stats)}
                           {bestIdx === idx && (
-                            <Check className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                            <Check className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label={t('analysis.bestAria')} />
                           )}
                         </TableCell>
                       ))}
@@ -462,7 +526,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <h5 className="font-semibold">Mejor vuelta y promedio por configuración</h5>
+            <h5 className="font-semibold">{t('analysis.barChartTitle')}</h5>
           </CardHeader>
           <CardContent>
             <div style={{ width: '100%', height: 260 }}>
@@ -473,18 +537,18 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
                   <YAxis tickFormatter={(v) => formatTime(v)} width={70} />
                   <Tooltip
                     formatter={(value, name) => {
-                      if (name === 'Mejor vuelta' || name === 'Promedio') return formatTime(value);
+                      if (name === barBestLapName || name === barAverageName) return formatTime(value);
                       return value;
                     }}
-                    labelFormatter={(label) => `Configuración: ${label}`}
+                    labelFormatter={(label) => t('analysis.tooltipConfig', { label })}
                   />
                   <Legend />
-                  <Bar dataKey="bestLap" name="Mejor vuelta" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="bestLap" name={barBestLapName} radius={[4, 4, 0, 0]}>
                     {barChartData.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Bar>
-                  <Bar dataKey="avgLap" name="Promedio" radius={[4, 4, 0, 0]} opacity={0.85}>
+                  <Bar dataKey="avgLap" name={barAverageName} radius={[4, 4, 0, 0]} opacity={0.85}>
                     {barChartData.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} opacity={0.85} />
                     ))}
@@ -497,8 +561,8 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
 
         <Card>
           <CardHeader>
-            <h5 className="font-semibold">Evolución en el tiempo</h5>
-            <p className="text-sm text-muted-foreground font-normal">Mejor vuelta por sesión. Líneas verticales indican cambio de configuración.</p>
+            <h5 className="font-semibold">{t('analysis.timelineTitle')}</h5>
+            <p className="text-sm text-muted-foreground font-normal">{t('analysis.timelineHint')}</p>
           </CardHeader>
           <CardContent>
             <div style={{ width: '100%', height: 260 }}>
@@ -515,9 +579,9 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
                         return (
                           <div className="rounded-md border bg-popover p-3 shadow-md">
                             <p className="font-medium">{label}</p>
-                            <p className="text-sm">Mejor vuelta: {formatTime(p.bestLap)}</p>
-                            <p className="text-sm text-muted-foreground">Config: {p.configLabel}</p>
-                            {p.isChange && <p className="text-xs text-primary font-medium">Cambio de configuración</p>}
+                            <p className="text-sm">{t('analysis.timelineTooltipBestLap', { time: formatTime(p.bestLap) })}</p>
+                            <p className="text-sm text-muted-foreground">{t('analysis.timelineTooltipConfig', { label: p.configLabel })}</p>
+                            {p.isChange && <p className="text-xs text-primary font-medium">{t('analysis.timelineConfigChange')}</p>}
                           </div>
                         );
                       }
@@ -531,7 +595,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
                   <Line
                     type="monotone"
                     dataKey="bestLap"
-                    name="Mejor vuelta"
+                    name={timelineLineName}
                     stroke={COLORS[0]}
                     strokeWidth={2}
                     dot={(props) => {
@@ -550,10 +614,8 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
 
       {laneComparisons.length > 0 && (
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold">Comparativa por carril entre reglajes</h4>
-          <p className="text-sm text-muted-foreground">
-            Solo se muestran circuito y carril donde hay sesiones en el reglaje anterior y en el actual. Métricas agregadas por carril dentro de cada configuración.
-          </p>
+          <h4 className="text-lg font-semibold">{t('analysis.laneComparisonTitle')}</h4>
+          <p className="text-sm text-muted-foreground">{t('analysis.laneComparisonHint')}</p>
           {laneComparisons.map((comparison) => (
             <Card key={`${comparison.prevLabel}-${comparison.currLabel}`}>
               <CardHeader>
@@ -567,19 +629,19 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
                     <TableHeader>
                       <TableRow>
                         <TableHead rowSpan={2} className="align-bottom">
-                          Circuito
+                          {t('analysis.circuitColumn')}
                         </TableHead>
                         <TableHead rowSpan={2} className="align-bottom">
-                          Carril
+                          {t('analysis.laneColumn')}
                         </TableHead>
                         <TableHead colSpan={2} className="text-center border-l">
-                          Mejor vuelta
+                          {t('analysis.bestLapColumn')}
                         </TableHead>
                         <TableHead colSpan={2} className="text-center border-l">
-                          Promedio
+                          {t('analysis.averageColumn')}
                         </TableHead>
                         <TableHead colSpan={2} className="text-center border-l">
-                          Vel. media (km/h)
+                          {t('analysis.avgSpeedColumn')}
                         </TableHead>
                       </TableRow>
                       <TableRow>
@@ -604,37 +666,37 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
                             <TableCell className={`border-l ${bestBest === 'prev' ? winClass : ''}`}>
                               <span className="font-mono">{formatTime(row.prev.best_lap_timestamp)}</span>
                               {bestBest === 'prev' && (
-                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label={t('analysis.bestAria')} />
                               )}
                             </TableCell>
                             <TableCell className={bestBest === 'curr' ? winClass : ''}>
                               <span className="font-mono">{formatTime(row.curr.best_lap_timestamp)}</span>
                               {bestBest === 'curr' && (
-                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label={t('analysis.bestAria')} />
                               )}
                             </TableCell>
                             <TableCell className={`border-l ${bestAvg === 'prev' ? winClass : ''}`}>
                               <span className="font-mono">{formatTime(row.prev.average_time_timestamp)}</span>
                               {bestAvg === 'prev' && (
-                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label={t('analysis.bestAria')} />
                               )}
                             </TableCell>
                             <TableCell className={bestAvg === 'curr' ? winClass : ''}>
                               <span className="font-mono">{formatTime(row.curr.average_time_timestamp)}</span>
                               {bestAvg === 'curr' && (
-                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label={t('analysis.bestAria')} />
                               )}
                             </TableCell>
                             <TableCell className={`border-l ${bestSpd === 'prev' ? winClass : ''}`}>
                               {row.prev.avg_speed_kmh != null ? Number(row.prev.avg_speed_kmh).toFixed(1) : '—'}
                               {bestSpd === 'prev' && (
-                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label={t('analysis.bestAria')} />
                               )}
                             </TableCell>
                             <TableCell className={bestSpd === 'curr' ? winClass : ''}>
                               {row.curr.avg_speed_kmh != null ? Number(row.curr.avg_speed_kmh).toFixed(1) : '—'}
                               {bestSpd === 'curr' && (
-                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                                <Check className="ml-1 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label={t('analysis.bestAria')} />
                               )}
                             </TableCell>
                           </TableRow>

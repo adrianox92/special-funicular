@@ -1,0 +1,61 @@
+{
+  "language": { "label": "Language" },
+  "actions": {
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "error": "Error",
+    "save": "Save",
+    "close": "Close",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "back": "Back"
+  },
+  "loading": "Loading…",
+  "footer": {
+    "copyright": "© {{year}} Adrian Palomera Sanz. All rights reserved.",
+    "privacy": "Privacy policy",
+    "terms": "Terms of service",
+    "contact": "Contact",
+    "catalog": "Reference catalog",
+    "cookies": "Manage cookies",
+    "legalNav": "Legal"
+  },
+  "recordedFrom": {
+    "web": "Web",
+    "lap_timer": "Mobile app",
+    "slot_race_manager": "Slot Race Manager",
+    "import": "Import"
+  },
+  "setupIntelligence": {
+    "insightsTitle": "Setup insights",
+    "insightsHint": "Heuristic correlation between component changes and lap times by lane.",
+    "improved": "After {{change}}, best lap on lane {{lane}} ({{circuit}}): {{delta}} s faster ({{before}} → {{after}}).",
+    "worsened": "After {{change}}, best lap on lane {{lane}} ({{circuit}}): {{delta}} s slower ({{before}} → {{after}}).",
+    "neutral": "After {{change}}, no clear change on lane {{lane}} ({{circuit}})."
+  },
+  "training": {
+    "suggestedTarget": "Suggested guided target: {{time}} ({{delta}} s below your PB)",
+    "suggestedTargetConsistency": "Suggested guided target: {{time}} — consistency {{consistency}}%, aim {{delta}} s below PB",
+    "suggestedTargetNoPb": "No previous PB: the app will use your first session as baseline.",
+    "cardTitle": "Lap Timer training",
+    "cardHint": "Beta feature for administrators. The app is not yet published in stores.",
+    "compactTitle": "Guided training with Slot Lap Timer. Administrators only.",
+    "compactTitlePremium": "Guided training with Slot Lap Timer (Premium). Administrators only.",
+    "lapTimerBtn": "Lap Timer",
+    "circuit": "Circuit",
+    "circuitPlaceholder": "Select circuit",
+    "lane": "Lane",
+    "loadError": "Could not load baseline",
+    "bestLapPb": "Best lap (PB):",
+    "noExactLane": "(no exact lane)",
+    "openInApp": "Open in Slot Lap Timer",
+    "loadingBaseline": "Loading baseline…",
+    "referenceSessions": "{{count}} reference session(s)",
+    "noBaseline": "No previous baseline for this circuit/lane. The app will use your first session as baseline.",
+    "startTiming": "Time with Lap Timer",
+    "targetDelta": "Suggested guided target: {{delta}} s faster",
+    "consistencyParen": "(consistency {{score}}%)"
+  }
+}

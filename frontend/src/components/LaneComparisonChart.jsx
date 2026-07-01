@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { Trophy, Clock, Car, TrendingUp } from 'lucide-react';
 import api from '../lib/axios';
+import { formatDate } from '../utils/formatUtils';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
@@ -129,6 +131,8 @@ function computeLaneData(allTimings, circuit) {
 }
 
 const LaneComparisonChart = () => {
+  const { t } = useTranslation('dashboard');
+  const { t: tTimings } = useTranslation('timings');
   const [allTimings, setAllTimings] = useState(null);
   const [timingsLoadError, setTimingsLoadError] = useState(null);
   const [circuits, setCircuits] = useState([]);
@@ -149,7 +153,7 @@ const LaneComparisonChart = () => {
         if (cancelled) return;
         // eslint-disable-next-line no-console
         console.error('Error al cargar tiempos (carriles):', err);
-        setTimingsLoadError('No se pudieron cargar los tiempos.');
+        setTimingsLoadError(tTimings('loadError'));
         setAllTimings([]);
       }
     };
@@ -173,7 +177,7 @@ const LaneComparisonChart = () => {
   }, [allTimings, selectedCircuit]);
 
   const formatTime = (timeStr) => {
-    if (!timeStr) return 'N/A';
+    if (!timeStr || timeStr === 'N/A') return t('na');
     return timeStr;
   };
 
@@ -292,7 +296,7 @@ const LaneComparisonChart = () => {
     <Card className="h-full">
       <CardHeader className="flex items-center">
         <TrendingUp className="size-4 mr-2" />
-        <h6 className="font-semibold">Comparativa de Carriles</h6>
+        <h6 className="font-semibold">{t('laneComparison.title')}</h6>
       </CardHeader>
       <CardContent>
         {timingsLoading && (
@@ -310,16 +314,16 @@ const LaneComparisonChart = () => {
         {!timingsLoading && (
           <>
             <div className="space-y-2 mb-4">
-              <Label className="font-bold">Seleccionar Circuito</Label>
+              <Label className="font-bold">{t('laneComparison.selectCircuit')}</Label>
               <Select
                 value={selectedCircuit || '__none__'}
                 onValueChange={(v) => setSelectedCircuit(v === '__none__' ? '' : v)}
               >
                 <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Selecciona un circuito" />
+                  <SelectValue placeholder={t('laneComparison.selectCircuitPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Selecciona un circuito</SelectItem>
+                  <SelectItem value="__none__">{t('laneComparison.selectCircuitPlaceholder')}</SelectItem>
                   {circuits.map((circuit) => (
                     <SelectItem key={circuit} value={circuit}>
                       {circuit}
@@ -328,12 +332,9 @@ const LaneComparisonChart = () => {
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
-                <strong>Nota:</strong> En cada carril se usa el mejor tiempo de cada vehículo rodado en
-                ese carril (mismo número de vueltas por fila). Un coche puede aparecer en varios
-                carriles con tiempos distintos.
+                <strong>{t('laneComparison.note')}</strong> {t('laneComparison.noteBody')}
                 <br />
-                <strong>Comparativa:</strong> La columna “Diferencia” compara el mismo coche y vueltas
-                entre este carril y el de referencia.
+                <strong>{t('laneComparison.compareLabel')}</strong> {t('laneComparison.compareBody')}
               </p>
             </div>
 
@@ -344,14 +345,16 @@ const LaneComparisonChart = () => {
                     <Card key={lane} className="text-center">
                       <CardContent className="pt-6">
                         <Badge variant={getLaneBadgeVariant(lane)} className="mb-3">
-                          Carril {lane}
+                          {t('laneComparison.lane', { lane })}
                         </Badge>
                         <div className="text-2xl font-bold text-primary">{laneData[lane].totalVehicles}</div>
-                        <small className="text-muted-foreground block mb-3">Vehículos</small>
+                        <small className="text-muted-foreground block mb-3">{t('laneComparison.vehicles')}</small>
                         <div className="font-mono font-medium">{formatTime(laneData[lane].bestTime)}</div>
-                        <small className="text-muted-foreground">Mejor tiempo</small>
+                        <small className="text-muted-foreground">{t('laneComparison.bestTime')}</small>
                         <div className="text-sm text-muted-foreground mt-1">
-                          Promedio: {laneData[lane].averageTime}
+                          {t('laneComparison.average', {
+                            time: formatTime(laneData[lane].averageTime),
+                          })}
                         </div>
                       </CardContent>
                     </Card>
@@ -361,17 +364,15 @@ const LaneComparisonChart = () => {
                 <div className="mb-6">
                   <h6 className="font-semibold flex items-center gap-2 mb-2">
                     <Clock className="size-4" />
-                    Comparativa con Carril de Referencia
+                    {t('laneComparison.refComparisonTitle')}
                   </h6>
                   <p className="text-sm text-muted-foreground mb-3">
-                    <strong>Carril de Referencia:</strong> Se usa como base para comparar. El carril 1
-                    es la referencia si existe.
+                    <strong>{t('laneComparison.refLaneLabel')}</strong> {t('laneComparison.refLaneBody')}
                   </p>
                   {Object.keys(laneData).length < 2 ? (
                     <Alert className="text-center">
                       <AlertDescription>
-                        <strong>Información:</strong> Solo hay un carril disponible, no es posible
-                        comparar.
+                        <strong>{t('laneComparison.onlyOneLane')}</strong> {t('laneComparison.onlyOneLaneBody')}
                       </AlertDescription>
                     </Alert>
                   ) : laneDifferences && Object.keys(laneDifferences).length > 0 ? (
@@ -379,10 +380,10 @@ const LaneComparisonChart = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Carril</TableHead>
-                            <TableHead>Diferencia</TableHead>
-                            <TableHead>Porcentaje</TableHead>
-                            <TableHead>Estado</TableHead>
+                            <TableHead>{t('laneComparison.colLane')}</TableHead>
+                            <TableHead>{t('laneComparison.colDifference')}</TableHead>
+                            <TableHead>{t('laneComparison.colPercentage')}</TableHead>
+                            <TableHead>{t('laneComparison.colStatus')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -393,7 +394,9 @@ const LaneComparisonChart = () => {
                             return (
                               <TableRow key={lane}>
                                 <TableCell>
-                                  <Badge variant={getLaneBadgeVariant(lane)}>Carril {lane}</Badge>
+                                  <Badge variant={getLaneBadgeVariant(lane)}>
+                                    {t('laneComparison.lane', { lane })}
+                                  </Badge>
                                 </TableCell>
                                 <TableCell className="font-mono font-medium">
                                   <span
@@ -403,7 +406,7 @@ const LaneComparisonChart = () => {
                                     {diff.difference}s
                                   </span>
                                   <div className="text-xs text-muted-foreground">
-                                    vs Carril {referenceLane}
+                                    {t('laneComparison.vsLane', { lane: referenceLane })}
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -421,11 +424,11 @@ const LaneComparisonChart = () => {
                                   >
                                     {diff.isSlower ? (
                                       <>
-                                        <Clock className="size-3" /> Más lento
+                                        <Clock className="size-3" /> {t('laneComparison.slower')}
                                       </>
                                     ) : (
                                       <>
-                                        <Trophy className="size-3" /> Más rápido
+                                        <Trophy className="size-3" /> {t('laneComparison.faster')}
                                       </>
                                     )}
                                   </Badge>
@@ -439,8 +442,8 @@ const LaneComparisonChart = () => {
                   ) : (
                     <Alert variant="destructive" className="text-center">
                       <AlertDescription>
-                        <strong>Atención:</strong> No se pueden calcular diferencias con los datos
-                        disponibles.
+                        <strong>{t('laneComparison.cannotCalculate')}</strong>{' '}
+                        {t('laneComparison.cannotCalculateBody')}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -450,7 +453,7 @@ const LaneComparisonChart = () => {
                   <div className="mb-6">
                     <h6 className="font-semibold flex items-center gap-2 mb-4">
                       <Car className="size-4" />
-                      Vehículos Más Rápidos por Carril
+                      {t('laneComparison.fastestByLane')}
                     </h6>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {Object.keys(fastestByLane).map((lane) => {
@@ -459,11 +462,11 @@ const LaneComparisonChart = () => {
                           <Card key={lane} className="text-center">
                             <CardContent className="pt-6">
                               <Badge variant={getLaneBadgeVariant(lane)} className="mb-3">
-                                Carril {lane}
+                                {t('laneComparison.lane', { lane })}
                               </Badge>
                               <div className="font-semibold text-primary mb-2">{fastest.vehicle}</div>
                               <div className="font-mono font-medium mb-2">{fastest.time}</div>
-                              <small className="text-muted-foreground">Mejor tiempo</small>
+                              <small className="text-muted-foreground">{t('laneComparison.bestTime')}</small>
                             </CardContent>
                           </Card>
                         );
@@ -475,26 +478,28 @@ const LaneComparisonChart = () => {
                 <div>
                   <h6 className="font-semibold flex items-center gap-2 mb-4">
                     <TrendingUp className="size-4" />
-                    Ranking Detallado por Carril
+                    {t('laneComparison.detailedRanking')}
                   </h6>
                   {Object.keys(laneData).map((lane) => (
                     <div key={lane} className="mb-6">
                       <h6 className="mb-3 flex items-center gap-2">
-                        <Badge variant={getLaneBadgeVariant(lane)}>Carril {lane}</Badge>
+                        <Badge variant={getLaneBadgeVariant(lane)}>
+                          {t('laneComparison.lane', { lane })}
+                        </Badge>
                         <span className="font-medium text-muted-foreground">
-                          ({laneData[lane].totalVehicles} vehículos)
+                          ({t('laneComparison.vehiclesCount', { count: laneData[lane].totalVehicles })})
                         </span>
                       </h6>
                       <div className="rounded-md border overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Pos</TableHead>
-                              <TableHead>Vehículo</TableHead>
-                              <TableHead>Mejor Vuelta</TableHead>
-                              <TableHead>Diferencia</TableHead>
-                              <TableHead>Vueltas</TableHead>
-                              <TableHead>Fecha</TableHead>
+                              <TableHead>{t('laneComparison.colPos')}</TableHead>
+                              <TableHead>{t('laneComparison.colVehicle')}</TableHead>
+                              <TableHead>{t('laneComparison.colBestLap')}</TableHead>
+                              <TableHead>{t('laneComparison.colDifference')}</TableHead>
+                              <TableHead>{t('laneComparison.colLaps')}</TableHead>
+                              <TableHead>{t('laneComparison.colDate')}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -531,21 +536,23 @@ const LaneComparisonChart = () => {
                                           {Math.abs(timeDifference.seconds).toFixed(3)}s
                                         </span>
                                         <small className="text-muted-foreground">
-                                          vs Carril {timeDifference.referenceLane}
+                                          {t('laneComparison.vsLane', { lane: timeDifference.referenceLane })}
                                         </small>
                                       </div>
                                     ) : Object.keys(laneData).length < 2 ? (
                                       <span className="text-muted-foreground italic">
-                                        Único carril disponible
+                                        {t('laneComparison.onlyOneLaneBody')}
                                       </span>
                                     ) : (
-                                      <span className="text-muted-foreground italic">Sin comparativa</span>
+                                      <span className="text-muted-foreground italic">
+                                        {t('laneComparison.noComparison')}
+                                      </span>
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    <Badge variant="secondary">{vehicle.laps || 'N/A'}</Badge>
+                                    <Badge variant="secondary">{vehicle.laps || t('na')}</Badge>
                                   </TableCell>
-                                  <TableCell>{new Date(vehicle.timing_date).toLocaleDateString()}</TableCell>
+                                  <TableCell>{formatDate(vehicle.timing_date)}</TableCell>
                                 </TableRow>
                               );
                             })}
@@ -561,13 +568,17 @@ const LaneComparisonChart = () => {
             {selectedCircuit && Object.keys(laneData).length === 0 && (
               <Alert className="text-center">
                 <AlertDescription>
-                  <strong>Sin Datos</strong>
+                  <strong>{t('laneComparison.noDataTitle')}</strong>
                   <br />
-                  No hay datos de tiempos registrados para el circuito{' '}
-                  <strong>{selectedCircuit}</strong>.
+                  <Trans
+                    i18nKey="laneComparison.noDataBody"
+                    ns="dashboard"
+                    values={{ circuit: selectedCircuit }}
+                    components={{ 1: <strong /> }}
+                  />
                   <br />
                   <small className="text-muted-foreground">
-                    Intenta seleccionar otro circuito o registra algunos tiempos primero.
+                    {t('laneComparison.noDataHint')}
                   </small>
                 </AlertDescription>
               </Alert>

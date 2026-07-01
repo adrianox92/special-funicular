@@ -1,0 +1,61 @@
+{
+  "language": { "label": "Sprache" },
+  "actions": {
+    "cancel": "Abbrechen",
+    "retry": "Erneut versuchen",
+    "error": "Fehler",
+    "save": "Speichern",
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "add": "Hinzufügen",
+    "back": "Zurück"
+  },
+  "loading": "Laden…",
+  "footer": {
+    "copyright": "© {{year}} Adrian Palomera Sanz. Alle Rechte vorbehalten.",
+    "privacy": "Datenschutz",
+    "terms": "Nutzungsbedingungen",
+    "contact": "Kontakt",
+    "catalog": "Referenzkatalog",
+    "cookies": "Cookies verwalten",
+    "legalNav": "Rechtliches"
+  },
+  "recordedFrom": {
+    "web": "Web",
+    "lap_timer": "Mobile App",
+    "slot_race_manager": "Slot Race Manager",
+    "import": "Import"
+  },
+  "setupIntelligence": {
+    "insightsTitle": "Setup-Einblicke",
+    "insightsHint": "Heuristische Korrelation zwischen Bauteiländerungen und Rundenzeiten pro Spur.",
+    "improved": "Nach {{change}}: Beste Runde Spur {{lane}} ({{circuit}}): {{delta}} s schneller ({{before}} → {{after}}).",
+    "worsened": "Nach {{change}}: Beste Runde Spur {{lane}} ({{circuit}}): {{delta}} s langsamer ({{before}} → {{after}}).",
+    "neutral": "Nach {{change}}: Keine klare Änderung auf Spur {{lane}} ({{circuit}})."
+  },
+  "training": {
+    "suggestedTarget": "Vorgeschlagenes Ziel: {{time}} ({{delta}} s unter PB)",
+    "suggestedTargetConsistency": "Vorgeschlagenes Ziel: {{time}} — Konstanz {{consistency}}%, Ziel {{delta}} s unter PB",
+    "suggestedTargetNoPb": "Kein PB: Die App nutzt die erste Session als Referenz.",
+    "cardTitle": "Lap Timer Training",
+    "cardHint": "Beta-Funktion für Administratoren. Die App ist noch nicht in den Stores.",
+    "compactTitle": "Geführtes Training mit Slot Lap Timer. Nur Administratoren.",
+    "compactTitlePremium": "Geführtes Training mit Slot Lap Timer (Premium). Nur Administratoren.",
+    "lapTimerBtn": "Lap Timer",
+    "circuit": "Strecke",
+    "circuitPlaceholder": "Strecke wählen",
+    "lane": "Spur",
+    "loadError": "Referenz konnte nicht geladen werden",
+    "bestLapPb": "Beste Runde (PB):",
+    "noExactLane": "(keine exakte Spur)",
+    "openInApp": "In Slot Lap Timer öffnen",
+    "loadingBaseline": "Referenz wird geladen…",
+    "referenceSessions": "{{count}} Referenz-Session(s)",
+    "noBaseline": "Keine Referenz für diese Strecke/Spur. Die App nutzt die erste Session als Baseline.",
+    "startTiming": "Mit Lap Timer messen",
+    "targetDelta": "Vorgeschlagenes Ziel: {{delta}} s schneller",
+    "consistencyParen": "(Konstanz {{score}}%)"
+  }
+}

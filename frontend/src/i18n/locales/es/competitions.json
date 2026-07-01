@@ -1,0 +1,14 @@
+{
+  "title": "Competiciones",
+  "create": "Nueva competición",
+  "loadError": "No se pudieron cargar las competiciones",
+  "favorites": "Pilotos favoritos",
+  "participants": "Participantes",
+  "timings": "Tiempos",
+  "signup": "Inscripción",
+  "status": "Estado de la competición",
+  "presentation": "Presentación",
+  "publicStatus": "Estado en vivo",
+  "classification": "Clasificación",
+  "round": "Manga {{n}}"
+}

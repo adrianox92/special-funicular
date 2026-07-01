@@ -1,7 +1,15 @@
-/** SEO del landing público: palabras clave slot, Scalextric, Ninco, Avant Slot. */
+/** SEO del landing público con soporte multiidioma. */
+import i18n from '../i18n';
+import {
+  DEFAULT_LOCALE,
+  SUPPORTED_LOCALES,
+  catalogBasePath,
+  localizePath,
+  toOgLocale,
+  getOgLocaleAlternates,
+} from '../i18n/localeUtils';
 
-export const LANDING_PAGE_TITLE =
-  'Slot Database | Lleva la gestión de tu colección a otro nivel';
+export const LANDING_PAGE_TITLE = 'Slot Database | Lleva la gestión de tu colección a otro nivel';
 
 export const LANDING_PAGE_DESCRIPTION =
   'Slot Database: gestiona coches de slot Scalextric, Ninco y Avant Slot. Fichas técnicas, cronometraje al milisegundo, competiciones y sincronización en la nube.';
@@ -21,26 +29,51 @@ function setMeta(attrName, value, isProperty) {
   el.setAttribute('content', value);
 }
 
+function removeHreflangLinks() {
+  document.querySelectorAll('link[rel="alternate"][hreflang]').forEach((el) => el.remove());
+}
+
+function setHreflangAlternates(origin, path = '/') {
+  removeHreflangLinks();
+  SUPPORTED_LOCALES.forEach((loc) => {
+    const link = document.createElement('link');
+    link.rel = 'alternate';
+    link.hreflang = loc === 'es' ? 'es' : loc;
+    link.href = `${origin}${localizePath(loc, path)}`;
+    document.head.appendChild(link);
+  });
+  const xDefault = document.createElement('link');
+  xDefault.rel = 'alternate';
+  xDefault.hreflang = 'x-default';
+  xDefault.href = `${origin}${localizePath(DEFAULT_LOCALE, path)}`;
+  document.head.appendChild(xDefault);
+}
+
 /**
- * Aplica title, meta y Open Graph. Usa REACT_APP_SITE_URL en producción si está definida;
- * si no, window.location.origin (útil en cualquier dominio).
+ * @param {string} [localeOverride]
  */
-export function applyLandingPageSeo() {
+export function applyLandingPageSeo(localeOverride) {
+  const locale = localeOverride || i18n.language || DEFAULT_LOCALE;
+  const title = i18n.t('seo.title', { ns: 'landing' });
+  const description = i18n.t('seo.description', { ns: 'landing' });
   const origin =
     (typeof process !== 'undefined' && process.env.REACT_APP_SITE_URL) ||
     (typeof window !== 'undefined' ? window.location.origin : '');
-  const canonicalUrl = origin ? `${origin.replace(/\/$/, '')}/` : '';
+  const canonicalUrl = origin ? `${origin.replace(/\/$/, '')}${localizePath(locale, '/')}` : '';
   const imageUrl = origin ? `${origin.replace(/\/$/, '')}/logo512.png` : '';
 
-  document.title = LANDING_PAGE_TITLE;
+  document.title = title;
 
-  setMeta('description', LANDING_PAGE_DESCRIPTION, false);
+  setMeta('description', description, false);
   setMeta('keywords', KEYWORDS, false);
 
   setMeta('og:type', 'website', true);
-  setMeta('og:locale', 'es_ES', true);
-  setMeta('og:title', LANDING_PAGE_TITLE, true);
-  setMeta('og:description', LANDING_PAGE_DESCRIPTION, true);
+  setMeta('og:locale', toOgLocale(locale), true);
+  getOgLocaleAlternates(locale).forEach((alt) => {
+    setMeta('og:locale:alternate', alt, true);
+  });
+  setMeta('og:title', title, true);
+  setMeta('og:description', description, true);
   if (canonicalUrl) setMeta('og:url', canonicalUrl, true);
   if (imageUrl) {
     setMeta('og:image', imageUrl, true);
@@ -49,8 +82,8 @@ export function applyLandingPageSeo() {
   }
 
   setMeta('twitter:card', 'summary_large_image', false);
-  setMeta('twitter:title', LANDING_PAGE_TITLE, false);
-  setMeta('twitter:description', LANDING_PAGE_DESCRIPTION, false);
+  setMeta('twitter:title', title, false);
+  setMeta('twitter:description', description, false);
   if (imageUrl) setMeta('twitter:image', imageUrl, false);
 
   let linkCanonical = document.querySelector('link[rel="canonical"]');
@@ -63,10 +96,13 @@ export function applyLandingPageSeo() {
     linkCanonical.setAttribute('href', canonicalUrl);
   }
 
+  if (origin) setHreflangAlternates(origin.replace(/\/$/, ''), '/');
+
   const existing = document.getElementById('landing-jsonld');
   if (existing) existing.remove();
 
   if (origin) {
+    const inLanguage = locale === 'de' ? 'de-DE' : locale === 'en' ? 'en-GB' : 'es-ES';
     const script = document.createElement('script');
     script.id = 'landing-jsonld';
     script.type = 'application/ld+json';
@@ -76,10 +112,12 @@ export function applyLandingPageSeo() {
       name: 'Slot Database',
       alternateName: ['Scalextric Collection'],
       url: canonicalUrl || `${origin}/`,
-      description: LANDING_PAGE_DESCRIPTION,
-      inLanguage: 'es-ES',
+      description,
+      inLanguage,
       keywords: KEYWORDS,
     });
     document.head.appendChild(script);
   }
 }
+
+export { catalogBasePath, localizePath };

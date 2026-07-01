@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation, Trans } from 'react-i18next';
 import { Trophy, Clock, Car, Package, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -21,10 +22,12 @@ const BlockCard = ({ icon: Icon, title, children, footer }) => (
 );
 
 const DashboardActionBlocks = ({ data, loadError }) => {
+  const { t } = useTranslation('dashboard');
+
   if (loadError) {
     return (
       <p className="text-sm text-muted-foreground" role="status">
-        No se pudieron cargar las acciones sugeridas. Intenta recargar la página.
+        {t('actionBlocks.loadError')}
       </p>
     );
   }
@@ -45,26 +48,32 @@ const DashboardActionBlocks = ({ data, loadError }) => {
   return (
     <section className="space-y-3" aria-labelledby="dash-action-blocks-heading">
       <h2 id="dash-action-blocks-heading" className="text-lg font-semibold tracking-tight">
-        Pendientes y alertas
+        {t('actionBlocks.title')}
       </h2>
       <p className="text-sm text-muted-foreground -mt-1">
-        Accesos rápidos a lo que suele necesitar tu atención. El bloque de circuito habitual considera
-        “sin sesión reciente” si llevas más de{' '}
-        <span className="font-medium text-foreground">{staleDaysThreshold} días</span> sin rodar ahí
-        (ajústalo en{' '}
-        <Link to="/settings" className="text-foreground underline underline-offset-2 hover:no-underline">
-          Configuración
-        </Link>
-        ).
+        <Trans
+          i18nKey="actionBlocks.desc"
+          ns="dashboard"
+          values={{ days: staleDaysThreshold }}
+          components={{
+            1: <span className="font-medium text-foreground" />,
+            2: (
+              <Link
+                to="/settings"
+                className="text-foreground underline underline-offset-2 hover:no-underline"
+              />
+            ),
+          }}
+        />
       </p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <BlockCard
           icon={Trophy}
-          title="Próxima competición"
+          title={t('actionBlocks.nextCompetition')}
           footer={
             <Button variant="ghost" size="sm" className="w-full justify-between px-2" asChild>
               <Link to="/competitions">
-                Ir a competiciones
+                {t('actionBlocks.goToCompetitions')}
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             </Button>
@@ -78,25 +87,30 @@ const DashboardActionBlocks = ({ data, loadError }) => {
               ) : null}
               <p>
                 {nextCompetition.times_remaining > 0
-                  ? `${nextCompetition.times_remaining} tiempo${nextCompetition.times_remaining !== 1 ? 's' : ''} por registrar · ${nextCompetition.progress_percentage}%`
-                  : 'En curso'}
+                  ? t('actionBlocks.timesRemaining', {
+                      count: nextCompetition.times_remaining,
+                      pct: nextCompetition.progress_percentage,
+                    })
+                  : t('actionBlocks.inProgress')}
               </p>
               <Button size="sm" className="mt-1" asChild>
-                <Link to={`/competitions/${nextCompetition.id}/timings`}>Registrar tiempos</Link>
+                <Link to={`/competitions/${nextCompetition.id}/timings`}>
+                  {t('actionBlocks.registerTimings')}
+                </Link>
               </Button>
             </div>
           ) : (
-            <p>No hay competiciones con tiempos pendientes (con participantes).</p>
+            <p>{t('actionBlocks.noPendingCompetitions')}</p>
           )}
         </BlockCard>
 
         <BlockCard
           icon={Clock}
-          title="Tiempos sin cerrar"
+          title={t('actionBlocks.openTimings')}
           footer={
             <Button variant="ghost" size="sm" className="w-full justify-between px-2" asChild>
               <Link to="/competitions">
-                Ver todas
+                {t('actionBlocks.viewAll')}
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             </Button>
@@ -113,37 +127,43 @@ const DashboardActionBlocks = ({ data, loadError }) => {
                     {c.name}
                   </Link>
                   <p className="text-xs mt-0.5">
-                    Faltan {c.times_remaining} de {c.total_required_times} · {c.progress_percentage}%
+                    {t('actionBlocks.missingTimes', {
+                      remaining: c.times_remaining,
+                      total: c.total_required_times,
+                      pct: c.progress_percentage,
+                    })}
                   </p>
                 </li>
               ))}
             </ul>
           ) : (
-            <p>Todas las competiciones con participantes tienen los tiempos completos.</p>
+            <p>{t('actionBlocks.allTimingsComplete')}</p>
           )}
         </BlockCard>
 
         <BlockCard
           icon={Car}
-          title="Circuito habitual"
+          title={t('actionBlocks.usualCircuit')}
           footer={
             <Button variant="ghost" size="sm" className="w-full justify-between px-2" asChild>
               <Link to="/timings">
-                Ver tiempos
+                {t('actionBlocks.viewTimings')}
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             </Button>
           }
         >
           {!usualCircuit ? (
-            <p>
-              Añade sesiones en Tiempos para detectar automáticamente el circuito que más usas.
-            </p>
+            <p>{t('actionBlocks.addTimingsHint')}</p>
           ) : staleVehiclesAtUsualCircuit?.length ? (
             <div className="space-y-2">
               <p className="text-foreground">
-                En <span className="font-medium">{usualCircuit.name}</span> llevan más de{' '}
-                {staleDaysThreshold} días sin sesión:
+                <Trans
+                  i18nKey="actionBlocks.staleAtCircuit"
+                  ns="dashboard"
+                  values={{ name: usualCircuit.name, days: staleDaysThreshold }}
+                  components={{ 1: <span className="font-medium" /> }}
+                />
               </p>
               <ul className="space-y-1.5 list-none p-0 m-0">
                 {staleVehiclesAtUsualCircuit.map((v) => (
@@ -152,10 +172,11 @@ const DashboardActionBlocks = ({ data, loadError }) => {
                       to={`/vehicles/${v.id}`}
                       className="text-foreground hover:underline font-medium"
                     >
-                      {[v.manufacturer, v.model].filter(Boolean).join(' ') || 'Vehículo'}
+                      {[v.manufacturer, v.model].filter(Boolean).join(' ') ||
+                        t('actionBlocks.vehicleFallback')}
                     </Link>
                     <span className="text-muted-foreground text-xs ml-1">
-                      (hace {v.days_since} días)
+                      {t('actionBlocks.daysAgo', { days: v.days_since })}
                     </span>
                   </li>
                 ))}
@@ -163,19 +184,23 @@ const DashboardActionBlocks = ({ data, loadError }) => {
             </div>
           ) : (
             <p>
-              En <span className="font-medium text-foreground">{usualCircuit.name}</span> todos los
-              coches que ya rodaron ahí tienen sesión reciente (últimos {staleDaysThreshold} días).
+              <Trans
+                i18nKey="actionBlocks.allRecentAtCircuit"
+                ns="dashboard"
+                values={{ name: usualCircuit.name, days: staleDaysThreshold }}
+                components={{ 1: <span className="font-medium text-foreground" /> }}
+              />
             </p>
           )}
         </BlockCard>
 
         <BlockCard
           icon={Package}
-          title="Inventario crítico bajo"
+          title={t('actionBlocks.lowStock')}
           footer={
             <Button variant="ghost" size="sm" className="w-full justify-between px-2" asChild>
               <Link to="/inventory">
-                Abrir inventario
+                {t('actionBlocks.openInventory')}
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             </Button>
@@ -194,7 +219,7 @@ const DashboardActionBlocks = ({ data, loadError }) => {
               ))}
             </ul>
           ) : (
-            <p>No hay repuestos críticos por debajo del mínimo (motor, guía, piñonería, ruedas…).</p>
+            <p>{t('actionBlocks.noLowStock')}</p>
           )}
         </BlockCard>
       </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { I18nextProvider } from 'react-i18next';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -66,6 +67,10 @@ import GlobalCommandPalette from './components/GlobalCommandPalette';
 import HomeRoute from './components/HomeRoute';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { getDocumentTitle, isPublicCatalogDetailPath } from './utils/documentTitle';
+import i18n from './i18n';
+import { useTranslation } from 'react-i18next';
+import { stripLocalePrefix } from './i18n/localeUtils';
+import LocalePrefixRedirect from './components/LocalePrefixRedirect';
 
 const PageLayout = ({ children }) => (
   <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
@@ -84,6 +89,7 @@ const AuthedShell = ({ children }) => (
 
 const AppContent = () => {
   const { user, loading } = useAuth();
+  const { t, i18n: i18nInstance } = useTranslation('common');
   const location = useLocation();
   const noNavbarRoutes = [
     '/',
@@ -104,7 +110,10 @@ const AppContent = () => {
     '/catalogo',
     '/politicas',
   ];
-  const hasNavbar = user && !noNavbarRoutes.some(r => location.pathname === r || location.pathname.startsWith(r + '/'));
+  const hasNavbar = user && !noNavbarRoutes.some((r) => {
+    const p = stripLocalePrefix(location.pathname);
+    return p === r || p.startsWith(`${r}/`);
+  });
 
   React.useEffect(() => {
     document.body.style.paddingTop = hasNavbar ? '4rem' : '0';
@@ -113,11 +122,11 @@ const AppContent = () => {
 
   React.useEffect(() => {
     // La ficha pública del catálogo fija título y metadescripción en `applyCatalogItemPageSeo`.
+    const pathNorm = stripLocalePrefix(location.pathname);
     if (isPublicCatalogDetailPath(location.pathname)) return;
-    // Listados SEO /catalogo/marca/... fijan título en `applyPublicCatalogListSeo` (evita <title> idéntico en todas las marcas).
-    if (location.pathname !== '/catalogo' && location.pathname.startsWith('/catalogo/')) return;
+    if (pathNorm !== '/catalogo' && pathNorm.startsWith('/catalogo/')) return;
     document.title = getDocumentTitle(location.pathname);
-  }, [location.pathname]);
+  }, [location.pathname, i18nInstance.language]);
 
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -137,7 +146,7 @@ const AppContent = () => {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Spinner className="size-8" />
-        <span className="sr-only">Cargando...</span>
+        <span className="sr-only">{t('loading')}</span>
       </div>
     );
   }
@@ -147,6 +156,8 @@ const AppContent = () => {
       <PendingInviteConsumer />
       <Routes>
         <Route path="/" element={<HomeRoute />} />
+        <Route path="/en" element={<HomeRoute />} />
+        <Route path="/de" element={<HomeRoute />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacidad" element={<PrivacyPolicy />} />
@@ -165,6 +176,10 @@ const AppContent = () => {
         {/* Catálogo: índice + splat; PublicCatalogEntry distingue UUID (ficha) vs slugs SEO (listado). */}
         <Route path="/catalogo" element={<PublicCatalogList />} />
         <Route path="/catalogo/*" element={<PublicCatalogEntry />} />
+        <Route path="/en/catalog" element={<PublicCatalogList />} />
+        <Route path="/en/catalog/*" element={<PublicCatalogEntry />} />
+        <Route path="/de/katalog" element={<PublicCatalogList />} />
+        <Route path="/de/katalog/*" element={<PublicCatalogEntry />} />
 
         <Route
           path="/mis-sugerencias-catalogo"
@@ -515,6 +530,10 @@ const AppContent = () => {
             </PrivateRoute>
           }
         />
+
+        {/* /en/profile, /de/dashboard, etc. → ruta sin prefijo (solo landing/catálogo usan prefijo URL) */}
+        <Route path="/en/*" element={<LocalePrefixRedirect />} />
+        <Route path="/de/*" element={<LocalePrefixRedirect />} />
       </Routes>
     </div>
   );
@@ -533,18 +552,20 @@ const ConsentAwareVercelMetrics = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div>
-          <CookieBanner />
-          <CookieSettingsDialog />
-          <InstallPWAButton />
-          <AppContent />
-          <Toaster richColors position="top-right" />
-          <ConsentAwareVercelMetrics />
-        </div>
-      </Router>
-    </AuthProvider>
+    <I18nextProvider i18n={i18n}>
+      <AuthProvider>
+        <Router>
+          <div>
+            <CookieBanner />
+            <CookieSettingsDialog />
+            <InstallPWAButton />
+            <AppContent />
+            <Toaster richColors position="top-right" />
+            <ConsentAwareVercelMetrics />
+          </div>
+        </Router>
+      </AuthProvider>
+    </I18nextProvider>
   );
 }
 

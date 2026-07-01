@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
@@ -20,23 +21,13 @@ import {
   SelectValue,
 } from './ui/select';
 
-const imageFields = [
-  { name: 'front', label: 'Delantera' },
-  { name: 'left', label: 'Perfil Izquierdo' },
-  { name: 'right', label: 'Perfil Derecho' },
-  { name: 'rear', label: 'Trasera' },
-  { name: 'top', label: 'Superior' },
-  { name: 'chassis', label: 'Chasis' },
-  { name: 'three_quarters', label: 'Vista 3/4' },
-];
+const IMAGE_FIELD_NAMES = ['front', 'left', 'right', 'rear', 'top', 'chassis', 'three_quarters'];
 
-const requiredFields = [
-  { key: 'model', label: 'Modelo' },
-  { key: 'manufacturer', label: 'Fabricante' },
-  { key: 'type', label: 'Tipo' },
-];
+const REQUIRED_FIELD_KEYS = ['model', 'manufacturer', 'type'];
 
 const AddVehicle = () => {
+  const { t } = useTranslation('vehicles');
+  const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -76,14 +67,14 @@ const AddVehicle = () => {
   const [draggingOver, setDraggingOver] = useState(null);
 
   const searchCatalog = useCallback(async (q) => {
-    const t = q.trim();
-    if (t.length < 1) {
+    const trimmed = q.trim();
+    if (trimmed.length < 1) {
       setCatalogResults([]);
       return;
     }
     setCatalogLoading(true);
     try {
-      const { data } = await api.get('/catalog/search', { params: { q: t } });
+      const { data } = await api.get('/catalog/search', { params: { q: trimmed } });
       setCatalogResults(data.items ?? []);
     } catch {
       setCatalogResults([]);
@@ -94,8 +85,8 @@ const AddVehicle = () => {
 
   useEffect(() => {
     if (!user || entryMode !== 'catalog') return;
-    const t = setTimeout(() => searchCatalog(catalogQuery), 350);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => searchCatalog(catalogQuery), 350);
+    return () => clearTimeout(timer);
   }, [catalogQuery, entryMode, user, searchCatalog]);
 
   const applyCatalogItem = (item) => {
@@ -123,7 +114,7 @@ const AddVehicle = () => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setVehicle((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-    if (error && requiredFields.some((f) => f.key === name)) setError(null);
+    if (error && REQUIRED_FIELD_KEYS.includes(name)) setError(null);
   };
 
   const handleFileForField = (file, field) => {
@@ -169,8 +160,7 @@ const AddVehicle = () => {
   };
 
   const validateRequired = () => {
-    const missing = requiredFields.filter(({ key }) => !vehicle[key]?.toString().trim());
-    return missing;
+    return REQUIRED_FIELD_KEYS.filter((key) => !vehicle[key]?.toString().trim());
   };
 
   const handleSubmit = async (e) => {
@@ -179,8 +169,8 @@ const AddVehicle = () => {
 
     const missing = validateRequired();
     if (missing.length > 0) {
-      const fieldNames = missing.map(({ label }) => label).join(', ');
-      setError(`Por favor, rellena los siguientes campos obligatorios: ${fieldNames}`);
+      const fieldNames = missing.map((key) => t(`edit.fields.${key}`)).join(', ');
+      setError(t('addPage.requiredFieldsError', { fields: fieldNames }));
       return;
     }
 
@@ -202,7 +192,7 @@ const AddVehicle = () => {
           : '',
       );
       if (catalogItemId) formData.append('catalog_item_id', catalogItemId);
-      imageFields.forEach(({ name }) => {
+      IMAGE_FIELD_NAMES.forEach((name) => {
         if (images[name]) formData.append('images', images[name], name);
       });
       await api.post('/vehicles', formData);
@@ -212,9 +202,9 @@ const AddVehicle = () => {
       const userMessage =
         apiError && typeof apiError === 'string'
           ? apiError.includes('numeric')
-            ? 'El valor del precio no es válido. Deja el campo vacío o introduce un número.'
+            ? t('addPage.invalidPriceError')
             : apiError
-          : 'Error al crear el vehículo';
+          : t('addPage.createError');
       setError(userMessage);
     } finally {
       setSaving(false);
@@ -226,11 +216,11 @@ const AddVehicle = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Datos del vehículo</CardTitle>
+            <CardTitle>{t('addPage.vehicleData')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Modelo</Label>
+              <Label>{t('edit.fields.model')}</Label>
               <Input
                 name="model"
                 value={vehicle.model}
@@ -239,11 +229,11 @@ const AddVehicle = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Referencia</Label>
+              <Label>{t('edit.fields.reference')}</Label>
               <Input name="reference" value={vehicle.reference ?? ''} onChange={handleChange} />
             </div>
             <div className="space-y-2">
-              <Label>Fabricante</Label>
+              <Label>{t('edit.fields.manufacturer')}</Label>
               <Input
                 name="manufacturer"
                 value={vehicle.manufacturer}
@@ -252,21 +242,21 @@ const AddVehicle = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Año de comercialización (catálogo)</Label>
+              <Label>{t('addPage.commercialReleaseYear')}</Label>
               <Input
                 name="commercial_release_year"
                 type="number"
                 inputMode="numeric"
                 min={1900}
                 max={2100}
-                placeholder="ej. 2020"
+                placeholder={t('addPage.commercialReleaseYearPlaceholder')}
                 value={vehicle.commercial_release_year ?? ''}
                 onChange={handleChange}
               />
-              <p className="text-xs text-muted-foreground">Solo el año de comercialización del modelo (opcional). Distinto de la fecha de compra.</p>
+              <p className="text-xs text-muted-foreground">{t('addPage.commercialReleaseYearHint')}</p>
             </div>
             <div className="space-y-2">
-              <Label>Tipo</Label>
+              <Label>{t('edit.fields.type')}</Label>
               <select
                 className={`flex h-9 w-full rounded-md border px-3 py-2 text-sm ${
                   error && !vehicle.type?.trim() ? 'border-destructive bg-background' : 'border-input bg-background'
@@ -275,18 +265,18 @@ const AddVehicle = () => {
                 value={vehicle.type}
                 onChange={handleChange}
               >
-                <option value="">Selecciona tipo</option>
-                {VEHICLE_TYPES.map(t => (
-                  <option key={t} value={t}>{t}</option>
+                <option value="">{t('edit.selectType')}</option>
+                {VEHICLE_TYPES.map((typeName) => (
+                  <option key={typeName} value={typeName}>{typeName}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
-              <Label>Tracción</Label>
+              <Label>{t('edit.fields.traction')}</Label>
               <Input name="traction" value={vehicle.traction} onChange={handleChange} />
             </div>
             <div className="space-y-2">
-              <Label>Posición del motor</Label>
+              <Label>{t('edit.fields.motorPosition')}</Label>
               <Select
                 value={vehicle.motor_position || '__none__'}
                 onValueChange={(v) =>
@@ -294,10 +284,10 @@ const AddVehicle = () => {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Opcional" />
+                  <SelectValue placeholder={t('edit.optional')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                  <SelectItem value="__none__">{t('edit.notSpecified')}</SelectItem>
                   {MOTOR_POSITION_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
                       {o.label}
@@ -307,20 +297,20 @@ const AddVehicle = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Precio original (€)</Label>
+              <Label>{t('edit.fields.originalPrice')}</Label>
               <Input name="price" type="number" step="0.01" value={vehicle.price} onChange={handleChange} />
             </div>
             <div className="space-y-2">
-              <Label>Fecha de compra</Label>
+              <Label>{t('edit.fields.purchaseDate')}</Label>
               <Input name="purchase_date" type="date" value={vehicle.purchase_date} onChange={handleChange} />
             </div>
             <div className="space-y-2">
-              <Label>Lugar de compra</Label>
+              <Label>{t('edit.fields.purchasePlace')}</Label>
               <Input name="purchase_place" value={vehicle.purchase_place ?? ''} onChange={handleChange} />
             </div>
             <div className="space-y-2">
-              <Label>Dorsal</Label>
-              <Input name="dorsal" value={vehicle.dorsal ?? ''} onChange={handleChange} placeholder="Opcional" />
+              <Label>{t('edit.fields.dorsal')}</Label>
+              <Input name="dorsal" value={vehicle.dorsal ?? ''} onChange={handleChange} placeholder={t('edit.optional')} />
             </div>
             <div className="flex items-center gap-2">
               <Switch
@@ -333,11 +323,11 @@ const AddVehicle = () => {
                   }))
                 }
               />
-              <Label>Edición limitada</Label>
+              <Label>{t('edit.fields.limitedEdition')}</Label>
             </div>
             {vehicle.limited_edition && (
               <div className="space-y-2">
-                <Label>Nº de unidad (tu ejemplar)</Label>
+                <Label>{t('edit.fields.unitNumber')}</Label>
                 <Input
                   name="limited_edition_unit_number"
                   type="number"
@@ -348,7 +338,7 @@ const AddVehicle = () => {
                     const v = e.target.value;
                     setVehicle((prev) => ({ ...prev, limited_edition_unit_number: v }));
                   }}
-                  placeholder="ej. 45"
+                  placeholder={t('edit.fields.unitNumberPlaceholder')}
                 />
               </div>
             )}
@@ -359,7 +349,7 @@ const AddVehicle = () => {
                   checked={vehicle.modified}
                   onCheckedChange={v => setVehicle(prev => ({ ...prev, modified: v }))}
                 />
-                <Label>Modificado</Label>
+                <Label>{t('edit.fields.modified')}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
@@ -367,7 +357,7 @@ const AddVehicle = () => {
                   checked={vehicle.digital}
                   onCheckedChange={v => setVehicle(prev => ({ ...prev, digital: v }))}
                 />
-                <Label>Digital</Label>
+                <Label>{t('edit.fields.digital')}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
@@ -375,7 +365,7 @@ const AddVehicle = () => {
                   checked={vehicle.museo}
                   onCheckedChange={v => setVehicle(prev => ({ ...prev, museo: v }))}
                 />
-                <Label>Museo</Label>
+                <Label>{t('edit.fields.museum')}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
@@ -383,22 +373,22 @@ const AddVehicle = () => {
                   checked={vehicle.taller}
                   onCheckedChange={v => setVehicle(prev => ({ ...prev, taller: v }))}
                 />
-                <Label>Taller</Label>
+                <Label>{t('edit.fields.workshop')}</Label>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="anotaciones">Anotaciones</Label>
+              <Label htmlFor="anotaciones">{t('edit.cards.notes')}</Label>
               <Textarea
                 id="anotaciones"
                 name="anotaciones"
                 value={vehicle.anotaciones ?? ''}
                 onChange={e => setVehicle(prev => ({ ...prev, anotaciones: e.target.value }))}
-                placeholder="Añade tus comentarios..."
+                placeholder={t('edit.fields.notesPlaceholder')}
                 rows={3}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="scale_factor">Escala (1:X)</Label>
+              <Label htmlFor="scale_factor">{t('edit.fields.scaleFactor')}</Label>
               <Input
                 id="scale_factor"
                 name="scale_factor"
@@ -409,23 +399,25 @@ const AddVehicle = () => {
                 onChange={handleChange}
                 placeholder="32"
               />
-              <p className="text-xs text-muted-foreground">Escala del coche para velocidad equivalente (32 = 1:32, 43 = 1:43)</p>
+              <p className="text-xs text-muted-foreground">{t('addPage.scaleHintShort')}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Fotografías</CardTitle>
+            <CardTitle>{t('edit.images.title')}</CardTitle>
           </CardHeader>
           <CardContent>
             {catalogThumb && (
               <div className="mb-4 rounded-md border p-2 bg-muted/30">
-                <p className="text-xs text-muted-foreground mb-1">Imagen del catálogo (se usará como delantera si no subes una)</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('addPage.catalogImageHint')}</p>
                 <img src={catalogThumb} alt="" className="max-h-24 object-contain" />
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
-              {imageFields.map(({ name, label }) => (
+              {IMAGE_FIELD_NAMES.map((name) => {
+                const label = t(`edit.images.${name}`);
+                return (
                 <div key={name} className="space-y-2">
                   <Label>{label}</Label>
                   <div
@@ -442,13 +434,13 @@ const AddVehicle = () => {
                       <img src={previews[name]} alt={label} className="max-w-full max-h-[90px] object-contain pointer-events-none" />
                     ) : (
                       <span className="text-muted-foreground text-sm">
-                        {draggingOver === name ? 'Suelta la imagen aquí' : 'Arrastra o haz clic'}
+                        {draggingOver === name ? t('edit.images.dropHere') : t('edit.images.dragOrClick')}
                       </span>
                     )}
                     <input id={`img-${name}`} type="file" accept="image/*" className="hidden" onChange={e => handleImageChange(e, name)} />
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
           </CardContent>
         </Card>
@@ -458,30 +450,30 @@ const AddVehicle = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Añadir Vehículo</h2>
+      <h2 className="text-2xl font-bold">{t('addPage.title')}</h2>
 
       {user && (
         <Tabs value={entryMode} onValueChange={setEntryMode}>
           <TabsList>
-            <TabsTrigger value="manual">Introducir a mano</TabsTrigger>
-            <TabsTrigger value="catalog">Buscar en catálogo</TabsTrigger>
+            <TabsTrigger value="manual">{t('addPage.tabManual')}</TabsTrigger>
+            <TabsTrigger value="catalog">{t('addPage.tabCatalog')}</TabsTrigger>
           </TabsList>
           <TabsContent value="manual" className="mt-0" />
           <TabsContent value="catalog" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Buscar por referencia, marca o nombre</CardTitle>
+                <CardTitle className="text-base">{t('addPage.catalogSearchTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input
-                  placeholder="Ej. C1234"
+                  placeholder={t('addPage.catalogSearchPlaceholder')}
                   value={catalogQuery}
                   onChange={e => setCatalogQuery(e.target.value)}
                 />
-                {catalogLoading && <p className="text-sm text-muted-foreground">Buscando…</p>}
+                {catalogLoading && <p className="text-sm text-muted-foreground">{t('addPage.catalogSearching')}</p>}
                 <ul className="max-h-56 overflow-auto border rounded-md divide-y">
                   {catalogResults.length === 0 && catalogQuery.trim().length >= 1 && !catalogLoading && (
-                    <li className="p-3 text-sm text-muted-foreground">Sin resultados</li>
+                    <li className="p-3 text-sm text-muted-foreground">{t('addPage.catalogNoResults')}</li>
                   )}
                   {catalogResults.map(item => (
                     <li key={item.id}>
@@ -501,7 +493,7 @@ const AddVehicle = () => {
                   ))}
                 </ul>
                 {catalogItemId && (
-                  <p className="text-xs text-muted-foreground">Ítem de catálogo seleccionado. Puedes ajustar los campos abajo antes de guardar.</p>
+                  <p className="text-xs text-muted-foreground">{t('addPage.catalogSelectedHint')}</p>
                 )}
               </CardContent>
             </Card>
@@ -518,9 +510,11 @@ const AddVehicle = () => {
         )}
         <div className="flex justify-end gap-2 mt-4">
           <Button type="button" variant="secondary" onClick={() => navigate('/vehicles')}>
-            Cancelar
+            {tc('actions.cancel')}
           </Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Crear Vehículo'}</Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? t('edit.saving') : t('addPage.createButton')}
+          </Button>
         </div>
       </form>
     </div>

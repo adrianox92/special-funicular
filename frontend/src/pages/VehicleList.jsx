@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import VehicleCard from '../components/VehicleCard';
 import VehicleTable from '../components/VehicleTable';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -129,6 +130,7 @@ const applyFilters = (list, filters) => {
 };
 
 const VehicleList = () => {
+  const { t } = useTranslation('vehicles');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
@@ -351,7 +353,27 @@ const VehicleList = () => {
       const url = `/vehicles/export?${params.toString()}`;
       const response = await api.get(url);
       const vehiclesData = response.data.vehicles;
-      const headers = ['ID', 'Modelo', 'Referencia', 'Fabricante', 'Tipo', 'Tracción', 'Escala', 'Precio Original (€)', 'Precio Total (€)', 'Fecha de Compra', 'Lugar de Compra', 'Modificado', 'Digital', 'Museo', 'Taller', 'Odómetro', 'Anotaciones', 'Especificaciones Técnicas', 'Modificaciones'];
+      const headers = [
+        t('csvExport.id'),
+        t('csvExport.model'),
+        t('csvExport.reference'),
+        t('csvExport.manufacturer'),
+        t('csvExport.type'),
+        t('csvExport.traction'),
+        t('csvExport.scale'),
+        t('csvExport.originalPrice'),
+        t('csvExport.totalPrice'),
+        t('csvExport.purchaseDate'),
+        t('csvExport.purchasePlace'),
+        t('csvExport.modified'),
+        t('csvExport.digital'),
+        t('csvExport.museum'),
+        t('csvExport.workshop'),
+        t('csvExport.odometer'),
+        t('csvExport.notes'),
+        t('csvExport.specs'),
+        t('csvExport.modifications'),
+      ];
       const vehiclesWithDetails = await Promise.all(vehiclesData.map(async (vehicle) => {
         const [specsResponse, modsResponse] = await Promise.all([
           api.get(`/vehicles/${vehicle.id}/specs`),
@@ -393,10 +415,10 @@ const VehicleList = () => {
             vehicle.total_price ?? '',
             vehicle.purchase_date || '',
             escapeCsv(vehicle.purchase_place),
-            vehicle.modified ? 'Sí' : 'No',
-            vehicle.digital ? 'Sí' : 'No',
-            vehicle.museo ? 'Sí' : 'No',
-            vehicle.taller ? 'Sí' : 'No',
+            vehicle.modified ? t('yes') : t('no'),
+            vehicle.digital ? t('yes') : t('no'),
+            vehicle.museo ? t('yes') : t('no'),
+            vehicle.taller ? t('yes') : t('no'),
             escapeCsv(odometerStr),
             escapeCsv(anotaciones),
             escapeCsv(specs),
@@ -414,7 +436,7 @@ const VehicleList = () => {
       document.body.removeChild(link);
     } catch (error) {
       console.error('Error al exportar a CSV:', error);
-      toast.error('Error al exportar los datos a CSV');
+      toast.error(t('csvExport.error'));
     } finally {
       setExportingFormat(null);
     }
@@ -433,15 +455,15 @@ const VehicleList = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold">Mi Colección</h1>
+        <h1 className="text-2xl font-bold">{t('title')}</h1>
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex border rounded-md p-0.5" role="group" aria-label="Vista">
+          <div className="flex border rounded-md p-0.5" role="group" aria-label={t('viewAria')}>
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               size="sm"
               className="h-8 px-2"
               onClick={() => handleViewModeChange('grid')}
-              title="Vista cuadrícula"
+              title={t('gridViewTitle')}
             >
               <LayoutGrid className="size-4" />
             </Button>
@@ -450,7 +472,7 @@ const VehicleList = () => {
               size="sm"
               className="h-8 px-2"
               onClick={() => handleViewModeChange('table')}
-              title="Vista tabla"
+              title={t('tableViewTitle')}
             >
               <TableIcon className="size-4" />
             </Button>
@@ -460,10 +482,10 @@ const VehicleList = () => {
               <Button variant="outline" disabled={exportingFormat != null}>
                 <Download className="size-4 mr-2" />
                 {exportingFormat === 'csv'
-                  ? 'Exportando CSV…'
+                  ? t('exportingCsv')
                   : exportingFormat === 'pdf'
-                    ? 'Exportando PDF…'
-                    : 'Exportar'}
+                    ? t('exportingPdf')
+                    : t('export')}
                 <ChevronDown className="size-4 ml-1 opacity-70" aria-hidden />
               </Button>
             </DropdownMenuTrigger>
@@ -475,7 +497,7 @@ const VehicleList = () => {
                 }}
                 disabled={exportingFormat != null}
               >
-                Hoja de cálculo (CSV)
+                {t('exportCsv')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={(e) => {
@@ -484,17 +506,17 @@ const VehicleList = () => {
                 }}
                 disabled={exportingFormat != null}
               >
-                Documento PDF
+                {t('exportPdf')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="size-4 mr-2" />
-            Importar
+            {t('import')}
           </Button>
           <Button onClick={() => navigate('/vehicles/new')}>
             <Plus className="size-4 mr-2" />
-            Añadir Vehículo
+            {t('add')}
           </Button>
         </div>
       </div>
@@ -503,18 +525,17 @@ const VehicleList = () => {
       <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <SlidersHorizontal className="size-3.5" aria-hidden />
-          Filtros y ordenación
+          {t('filtersAndSort')}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
-          {/* Fabricante */}
           <div className="flex flex-col gap-1">
             <label htmlFor="filter-manufacturer" className="text-xs font-medium text-muted-foreground">
-              Fabricante
+              {t('manufacturer')}
             </label>
             <Input
               id="filter-manufacturer"
-              placeholder="Buscar fabricante..."
+              placeholder={t('manufacturerPlaceholder')}
               value={filters.manufacturer}
               onChange={e => setFilters({ ...filters, manufacturer: e.target.value })}
               className="h-9"
@@ -524,7 +545,7 @@ const VehicleList = () => {
           {/* Tipo */}
           <div className="flex flex-col gap-1">
             <label htmlFor="filter-type" className="text-xs font-medium text-muted-foreground">
-              Tipo
+              {t('type')}
             </label>
             <select
               id="filter-type"
@@ -532,9 +553,9 @@ const VehicleList = () => {
               value={filters.type}
               onChange={e => setFilters({ ...filters, type: e.target.value })}
             >
-              <option value="">Todos los tipos</option>
-              {VEHICLE_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              <option value="">{t('allTypes')}</option>
+              {VEHICLE_TYPES.map((typeName) => (
+                <option key={typeName} value={typeName}>{typeName}</option>
               ))}
             </select>
           </div>
@@ -542,7 +563,7 @@ const VehicleList = () => {
           {/* Escala */}
           <div className="flex flex-col gap-1">
             <label htmlFor="filter-scale" className="text-xs font-medium text-muted-foreground">
-              Escala
+              {t('scale')}
             </label>
             <select
               id="filter-scale"
@@ -550,7 +571,7 @@ const VehicleList = () => {
               value={filters.scale}
               onChange={(e) => setFilters({ ...filters, scale: e.target.value })}
             >
-              <option value="">Todas las escalas</option>
+              <option value="">{t('allScales')}</option>
               {scaleDenominatorOptions.map((d) => (
                 <option key={d} value={String(d)}>
                   {formatScaleLabel(d)}
@@ -562,7 +583,7 @@ const VehicleList = () => {
           {/* Estado */}
           <div className="flex flex-col gap-1">
             <label htmlFor="filter-modified" className="text-xs font-medium text-muted-foreground">
-              Estado
+              {t('status')}
             </label>
             <select
               id="filter-modified"
@@ -570,16 +591,15 @@ const VehicleList = () => {
               value={filters.modified}
               onChange={e => setFilters({ ...filters, modified: e.target.value })}
             >
-              <option value="">Todos</option>
-              <option value="Sí">Modificado</option>
-              <option value="No">Serie</option>
+              <option value="">{t('all')}</option>
+              <option value="Sí">{t('modifiedYes')}</option>
+              <option value="No">{t('modifiedNo')}</option>
             </select>
           </div>
 
-          {/* Sistema */}
           <div className="flex flex-col gap-1">
             <label htmlFor="filter-digital" className="text-xs font-medium text-muted-foreground">
-              Sistema
+              {t('system')}
             </label>
             <select
               id="filter-digital"
@@ -587,22 +607,21 @@ const VehicleList = () => {
               value={filters.digital}
               onChange={e => setFilters({ ...filters, digital: e.target.value })}
             >
-              <option value="">Todos</option>
-              <option value="Digital">Digital</option>
-              <option value="Analógico">Analógico</option>
+              <option value="">{t('all')}</option>
+              <option value="Digital">{t('digital')}</option>
+              <option value="Analógico">{t('analog')}</option>
             </select>
           </div>
 
-          {/* Estado museo/taller */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Estado (museo/taller)</span>
+            <span className="text-xs font-medium text-muted-foreground">{t('museumWorkshop')}</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-9 w-full justify-between px-3 text-sm font-normal">
                   <span className="truncate text-left">
                     {!filters.filterMuseo && !filters.filterTaller
-                      ? 'Todos'
-                      : [filters.filterMuseo && 'Museo', filters.filterTaller && 'Taller'].filter(Boolean).join(', ')}
+                      ? t('all')
+                      : [filters.filterMuseo && t('museum'), filters.filterTaller && t('workshop')].filter(Boolean).join(', ')}
                   </span>
                   <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
                 </Button>
@@ -612,13 +631,13 @@ const VehicleList = () => {
                   checked={filters.filterMuseo}
                   onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterMuseo: !!checked }))}
                 >
-                  Museo
+                  {t('museum')}
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
                   checked={filters.filterTaller}
                   onCheckedChange={(checked) => setFilters(prev => ({ ...prev, filterTaller: !!checked }))}
                 >
-                  Taller
+                  {t('workshop')}
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -628,7 +647,7 @@ const VehicleList = () => {
           <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-1 xl:col-span-2">
             <label htmlFor="vehicle-list-sort" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <ArrowDownUp className="size-3.5" aria-hidden />
-              Ordenar por
+              {t('sortBy')}
             </label>
             <select
               id="vehicle-list-sort"
@@ -642,16 +661,16 @@ const VehicleList = () => {
                 setCurrentPage(1);
               }}
             >
-              <option value="model|asc">Alfabético — A-Z (modelo, fabricante)</option>
-              <option value="model|desc">Alfabético — Z-A (modelo, fabricante)</option>
-              <option value="purchase_date|desc">Fecha de compra — reciente primero</option>
-              <option value="purchase_date|asc">Fecha de compra — antigua primero</option>
-              <option value="created_at|desc">Fecha de creación — reciente primero</option>
-              <option value="created_at|asc">Fecha de creación — antigua primero</option>
-              <option value="total_distance_meters|asc">Odómetro — menor a mayor</option>
-              <option value="total_distance_meters|desc">Odómetro — mayor a menor</option>
-              <option value="updated_at|desc">Última modificación — reciente primero</option>
-              <option value="updated_at|asc">Última modificación — antigua primero</option>
+              <option value="model|asc">{t('sort.modelAsc')}</option>
+              <option value="model|desc">{t('sort.modelDesc')}</option>
+              <option value="purchase_date|desc">{t('sort.purchaseDesc')}</option>
+              <option value="purchase_date|asc">{t('sort.purchaseAsc')}</option>
+              <option value="created_at|desc">{t('sort.createdDesc')}</option>
+              <option value="created_at|asc">{t('sort.createdAsc')}</option>
+              <option value="total_distance_meters|asc">{t('sort.odometerAsc')}</option>
+              <option value="total_distance_meters|desc">{t('sort.odometerDesc')}</option>
+              <option value="updated_at|desc">{t('sort.updatedDesc')}</option>
+              <option value="updated_at|asc">{t('sort.updatedAsc')}</option>
             </select>
           </div>
 
@@ -673,26 +692,26 @@ const VehicleList = () => {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
         <div className="text-sm text-muted-foreground order-2 sm:order-1">
           {filteredTotal > 0 ? (
-            <>Mostrando {rangeStart}–{rangeEnd} de {filteredTotal} vehículos</>
+            <>{t('showingRange', { start: rangeStart, end: rangeEnd, total: filteredTotal })}</>
           ) : (
-            <>No hay vehículos</>
+            <>{hasActiveFilters ? t('noVehiclesFiltered') : t('noVehicles')}</>
           )}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 order-1 sm:order-2">
           {filteredTotalPages > 1 && (
             <>
-              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Anterior</Button>
+              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>{t('previous')}</Button>
               {startPage > 1 && <Button variant="outline" size="sm" onClick={() => handlePageChange(1)}>1</Button>}
               {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(n => (
                 <Button key={n} variant={n === currentPage ? 'default' : 'outline'} size="sm" onClick={() => handlePageChange(n)}>{n}</Button>
               ))}
               {endPage < filteredTotalPages && <Button variant="outline" size="sm" onClick={() => handlePageChange(filteredTotalPages)}>{filteredTotalPages}</Button>}
-              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === filteredTotalPages}>Siguiente</Button>
+              <Button variant="outline" size="sm" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === filteredTotalPages}>{t('next')}</Button>
             </>
           )}
         </div>
         <div className="flex items-center gap-2 order-3">
-          <label htmlFor="page-size" className="text-sm text-muted-foreground whitespace-nowrap">Por página:</label>
+          <label htmlFor="page-size" className="text-sm text-muted-foreground whitespace-nowrap">{t('perPage')}</label>
           <select
             id="page-size"
             value={pageSize}

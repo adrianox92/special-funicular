@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Building2, CalendarDays, FileText, Link as LinkIcon, MapPin, Globe, Megaphone, Users } from 'lucide-react';
+import { Building2, CalendarDays, FileText, Link as LinkIcon, MapPin, Globe, Megaphone, Users, Flag } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -17,6 +17,7 @@ import { Spinner } from '../components/ui/spinner';
 import Footer from '../components/Footer';
 import { cn } from '../lib/utils';
 import { clubEventCategoryMeta } from '../constants/clubEventCategories';
+import ClubCircuitLeaderboard from '../components/ClubCircuitLeaderboard';
 
 function formatClubDate(iso) {
   if (!iso) return null;
@@ -47,6 +48,7 @@ export default function PublicClubProfile() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [publicCircuitId, setPublicCircuitId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +59,10 @@ export default function PublicClubProfile() {
         if (!cancelled) {
           setData(res.data);
           setError(null);
+          const circuits = res.data?.circuits || [];
+          if (circuits.length > 0) {
+            setPublicCircuitId(circuits[0].id);
+          }
         }
       } catch (e) {
         if (!cancelled) {
@@ -98,7 +104,7 @@ export default function PublicClubProfile() {
     );
   }
 
-  const { club, upcoming_events: upcomingEvents, board_items: boardItems = [] } = data;
+  const { club, upcoming_events: upcomingEvents, board_items: boardItems = [], circuits = [] } = data;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -139,6 +145,39 @@ export default function PublicClubProfile() {
             </Button>
           </CardContent>
         </Card>
+
+        {club.leaderboard_public && circuits.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Flag className="size-5" />
+                Circuitos y rankings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {circuits.map((c) => (
+                  <Button
+                    key={c.id}
+                    type="button"
+                    size="sm"
+                    variant={publicCircuitId === c.id ? 'default' : 'outline'}
+                    onClick={() => setPublicCircuitId(c.id)}
+                  >
+                    {c.name}
+                  </Button>
+                ))}
+              </div>
+              {publicCircuitId ? (
+                <ClubCircuitLeaderboard
+                  publicSlug={club.slug}
+                  circuitId={publicCircuitId}
+                  circuits={circuits}
+                />
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {boardItems.length > 0 ? (
           <Card>

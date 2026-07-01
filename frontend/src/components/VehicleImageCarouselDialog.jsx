@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ export default function VehicleImageCarouselDialog({
   slides = [],
   initialIndex = 0,
 }) {
+  const { t } = useTranslation('vehicles');
   const [api, setApi] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -64,7 +66,7 @@ export default function VehicleImageCarouselDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="left-1/2 top-1/2 w-[calc(100vw-1rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 border-0 bg-black/95 p-3 sm:p-6 text-white shadow-2xl [&>button]:text-white [&>button]:opacity-80 [&>button]:hover:opacity-100">
-        <DialogTitle className="sr-only">Fotografías del vehículo</DialogTitle>
+        <DialogTitle className="sr-only">{t('edit.images.carouselTitle')}</DialogTitle>
         <Carousel
           setApi={setApi}
           className="mx-auto w-full"

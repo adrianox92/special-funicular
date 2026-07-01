@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Car,
   TrendingUp,
@@ -32,43 +33,8 @@ import { Badge } from '../components/ui/badge';
 import { Card, CardContent } from '../components/ui/card';
 import { cn } from '../lib/utils';
 import { applyLandingPageSeo } from '../utils/landingSeo';
-
-const heroHighlights = [
-  { label: 'PWA instalable', variant: 'secondary' },
-  { label: 'PDF exportable', variant: 'secondary' },
-  { label: 'API de sincronización', variant: 'secondary' },
-];
-
-const heroCards = [
-  {
-    icon: Car,
-    title: 'Colección',
-    blurb: 'Fichas, fotos y reglajes en un solo lugar.',
-    className: 'border-primary/20 bg-card/80',
-    iconClass: 'text-primary',
-  },
-  {
-    icon: Gauge,
-    title: 'Tiempos',
-    blurb: 'Vueltas al milisegundo y análisis por sesión.',
-    className: 'border-border bg-card/80',
-    iconClass: 'text-primary',
-  },
-  {
-    icon: Trophy,
-    title: 'Competiciones',
-    blurb: 'Inscripciones, reglas y ranking en vivo.',
-    className: 'border-border bg-card/80',
-    iconClass: 'text-primary',
-  },
-  {
-    icon: Package,
-    title: 'Inventario',
-    blurb: 'Stock de piezas, alertas y montaje en coches.',
-    className: 'border-border bg-card/80',
-    iconClass: 'text-primary',
-  },
-];
+import LanguageSelector from '../components/LanguageSelector';
+import useLocale from '../hooks/useLocale';
 
 const keyStats = [
   {
@@ -234,6 +200,8 @@ const FeatureSection = ({ block }) => {
 };
 
 const LandingPage = () => {
+  const { t } = useTranslation('landing');
+  const { locale } = useLocale();
   const { theme, toggleTheme } = useTheme();
 
   const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
@@ -244,9 +212,22 @@ const LandingPage = () => {
     theme === 'dark' ? 'logo-hero-dark.png' : 'logo-hero-light.png'
   }`;
 
-  React.useEffect(() => {
-    applyLandingPageSeo();
-  }, []);
+  const heroHighlights = [
+    { label: t('highlights.pwa'), variant: 'secondary' },
+    { label: t('highlights.pdf'), variant: 'secondary' },
+    { label: t('highlights.api'), variant: 'secondary' },
+  ];
+
+  const heroCards = [
+    { icon: Car, title: t('cards.collection.title'), blurb: t('cards.collection.blurb'), className: 'border-primary/20 bg-card/80', iconClass: 'text-primary' },
+    { icon: Gauge, title: t('cards.timings.title'), blurb: t('cards.timings.blurb'), className: 'border-border bg-card/80', iconClass: 'text-primary' },
+    { icon: Trophy, title: t('cards.competitions.title'), blurb: t('cards.competitions.blurb'), className: 'border-border bg-card/80', iconClass: 'text-primary' },
+    { icon: Package, title: t('cards.inventory.title'), blurb: t('cards.inventory.blurb'), className: 'border-border bg-card/80', iconClass: 'text-primary' },
+  ];
+
+  useEffect(() => {
+    applyLandingPageSeo(locale);
+  }, [locale]);
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-muted/50 to-background">
@@ -265,6 +246,7 @@ const LandingPage = () => {
             />
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSelector size="compact" />
             <Button
               type="button"
               variant="outline"

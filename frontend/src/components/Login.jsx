@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -8,11 +9,13 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
+import LanguageSelector from './LanguageSelector';
 
 const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login, loginWithGoogle, requestPasswordReset } = useAuth();
+  const { t } = useTranslation('auth');
   const [activeTab, setActiveTab] = useState('login');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -22,7 +25,7 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
 
   useEffect(() => {
@@ -33,7 +36,7 @@ const Login = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleForgotSubmit = async (e) => {
@@ -43,11 +46,9 @@ const Login = () => {
     setLoading(true);
     try {
       await requestPasswordReset(formData.email);
-      setInfoMessage(
-        'Si existe una cuenta con ese correo, recibirás un enlace para elegir una contraseña nueva.'
-      );
+      setInfoMessage(t('resetEmailSent'));
     } catch (err) {
-      setError(err.message ?? 'No se pudo enviar el correo');
+      setError(err.message ?? t('resetEmailError'));
     } finally {
       setLoading(false);
     }
@@ -65,15 +66,15 @@ const Login = () => {
         navigate('/vehicles');
       } else {
         if (formData.password !== formData.confirmPassword) {
-          throw new Error('Las contraseñas no coinciden');
+          throw new Error(t('passwordMismatch'));
         }
-        const { data, error } = await supabase.auth.signUp({
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
-          password: formData.password
+          password: formData.password,
         });
-        if (error) throw error;
+        if (signUpError) throw signUpError;
         if (data?.user) {
-          setError('Por favor, verifica tu correo electrónico para completar el registro');
+          setError(t('verifyEmail'));
         }
       }
     } catch (err) {
@@ -89,7 +90,7 @@ const Login = () => {
     try {
       await loginWithGoogle();
     } catch (err) {
-      setError(err.message ?? 'No se pudo iniciar sesión con Google');
+      setError(err.message ?? t('googleError'));
       setGoogleLoading(false);
     }
   };
@@ -103,11 +104,16 @@ const Login = () => {
     }
   };
 
+  const googleLabel = googleLoading ? t('connectingGoogle') : t('continueWithGoogle');
+
   return (
     <div className="flex justify-center items-center min-h-screen py-12 px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md relative">
+        <div className="absolute top-4 right-4">
+          <LanguageSelector size="compact" />
+        </div>
         <CardHeader>
-          <CardTitle className="text-center">Slot Collection</CardTitle>
+          <CardTitle className="text-center">{t('title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs
@@ -121,18 +127,16 @@ const Login = () => {
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
-              <TabsTrigger value="register">Registrarse</TabsTrigger>
+              <TabsTrigger value="login">{t('loginTab')}</TabsTrigger>
+              <TabsTrigger value="register">{t('registerTab')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
               {showForgotPassword ? (
                 <form onSubmit={handleForgotSubmit} className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Introduce tu correo y te enviaremos un enlace para establecer una contraseña nueva.
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t('forgotIntro')}</p>
                   <div className="space-y-2">
-                    <Label htmlFor="forgot-email">Email</Label>
+                    <Label htmlFor="forgot-email">{t('email')}</Label>
                     <Input
                       id="forgot-email"
                       type="email"
@@ -144,7 +148,7 @@ const Login = () => {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading || googleLoading}>
-                    {loading ? 'Enviando…' : 'Enviar enlace'}
+                    {loading ? t('sending') : t('sendLink')}
                   </Button>
                   <p className="text-center text-sm">
                     <button
@@ -156,7 +160,7 @@ const Login = () => {
                         setInfoMessage(null);
                       }}
                     >
-                      Volver a iniciar sesión
+                      {t('backToLogin')}
                     </button>
                   </p>
                 </form>
@@ -170,23 +174,23 @@ const Login = () => {
                       onClick={handleGoogleSignIn}
                       onKeyDown={handleGoogleKeyDown}
                       disabled={loading || googleLoading}
-                      aria-label="Iniciar sesión con Google"
+                      aria-label={t('signInWithGoogle')}
                       tabIndex={0}
                     >
-                      {googleLoading ? 'Conectando con Google…' : 'Continuar con Google'}
+                      {googleLabel}
                     </Button>
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
                         <span className="w-full border-t" />
                       </div>
                       <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-2 text-muted-foreground">o con email</span>
+                        <span className="bg-card px-2 text-muted-foreground">{t('orWithEmail')}</span>
                       </div>
                     </div>
                   </div>
                   <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
+                      <Label htmlFor="email">{t('email')}</Label>
                       <Input
                         id="email"
                         type="email"
@@ -199,7 +203,7 @@ const Login = () => {
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <Label htmlFor="password">Contraseña</Label>
+                        <Label htmlFor="password">{t('password')}</Label>
                         <button
                           type="button"
                           className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground shrink-0"
@@ -209,7 +213,7 @@ const Login = () => {
                             setInfoMessage(null);
                           }}
                         >
-                          ¿Olvidaste la contraseña?
+                          {t('forgotPassword')}
                         </button>
                       </div>
                       <Input
@@ -223,7 +227,7 @@ const Login = () => {
                       />
                     </div>
                     <Button type="submit" className="w-full" disabled={loading || googleLoading}>
-                      {loading ? 'Cargando...' : 'Iniciar Sesión'}
+                      {loading ? t('loggingIn') : t('loginButton')}
                     </Button>
                   </form>
                 </>
@@ -239,23 +243,23 @@ const Login = () => {
                   onClick={handleGoogleSignIn}
                   onKeyDown={handleGoogleKeyDown}
                   disabled={loading || googleLoading}
-                  aria-label="Registrarse con Google"
+                  aria-label={t('registerWithGoogle')}
                   tabIndex={0}
                 >
-                  {googleLoading ? 'Conectando con Google…' : 'Continuar con Google'}
+                  {googleLabel}
                 </Button>
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">o con email</span>
+                    <span className="bg-card px-2 text-muted-foreground">{t('orWithEmail')}</span>
                   </div>
                 </div>
               </div>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reg-email">Email</Label>
+                  <Label htmlFor="reg-email">{t('email')}</Label>
                   <Input
                     id="reg-email"
                     type="email"
@@ -266,7 +270,7 @@ const Login = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="reg-password">Contraseña</Label>
+                  <Label htmlFor="reg-password">{t('password')}</Label>
                   <Input
                     id="reg-password"
                     type="password"
@@ -277,7 +281,7 @@ const Login = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+                  <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
@@ -288,7 +292,7 @@ const Login = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading || googleLoading}>
-                  {loading ? 'Cargando...' : 'Registrarse'}
+                  {loading ? t('registering') : t('registerButton')}
                 </Button>
               </form>
             </TabsContent>

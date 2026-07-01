@@ -1,0 +1,14 @@
+{
+  "title": "Competitions",
+  "create": "New competition",
+  "loadError": "Could not load competitions",
+  "favorites": "Favorite pilots",
+  "participants": "Participants",
+  "timings": "Timings",
+  "signup": "Registration",
+  "status": "Competition status",
+  "presentation": "Presentation",
+  "publicStatus": "Live status",
+  "classification": "Standings",
+  "round": "Round {{n}}"
+}

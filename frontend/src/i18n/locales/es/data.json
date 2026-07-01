@@ -1,0 +1,55 @@
+{
+  "componentTypes": {
+    "pinion": "Piñón",
+    "crown": "Corona",
+    "front_wheel": "Neumático Delantero",
+    "rear_wheel": "Neumático Trasero",
+    "front_rim": "Llanta Delantera",
+    "rear_rim": "Llanta Trasera",
+    "axle": "Ejes",
+    "chassis": "Chasis",
+    "other": "Otros",
+    "guide": "Guía",
+    "motor": "Motor",
+    "trencillas": "Trencillas",
+    "tornillos": "Tornillos",
+    "stoppers": "Stoppers",
+    "topes_y_centradores": "Topes y centradores",
+    "cojinetes": "Cojinetes"
+  },
+  "clubEvents": {
+    "meeting": "Reunión",
+    "competition": "Competición",
+    "training": "Entrenamiento",
+    "social": "Evento social",
+    "maintenance": "Mantenimiento",
+    "other": "Otro"
+  },
+  "maintenanceKinds": {
+    "limpieza_general": "Limpieza general",
+    "guias": "Guías",
+    "escobillas": "Escobillas",
+    "engrase": "Engrase",
+    "iman": "Imán",
+    "contactos": "Contactos",
+    "neumaticos": "Neumáticos",
+    "cables": "Cables",
+    "suspension": "Suspensión",
+    "otro": "Otro"
+  },
+  "inventoryExtra": {
+    "aceite": "Aceite / lubricante",
+    "limpiador": "Limpiador",
+    "electronica": "Electrónica",
+    "herramienta": "Herramienta",
+    "neumaticos": "Neumáticos",
+    "cables": "Cables",
+    "suspension": "Suspensión",
+    "trencillas": "Trencillas",
+    "tornillos": "Tornillos",
+    "stoppers": "Stoppers",
+    "topes_y_centradores": "Topes y centradores",
+    "cojinetes": "Cojinetes",
+    "otro": "Otro"
+  }
+}

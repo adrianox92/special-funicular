@@ -20,6 +20,7 @@ const {
   requireManageCompetition,
 } = require('../lib/competitionPermissions');
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
+const { resolveCircuitForClubCompetition } = require('../lib/clubCircuits');
 const {
   normalizeStatus,
   timingForbiddenReason,
@@ -287,17 +288,24 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       }
     }
 
-    // Si circuit_id se proporciona, verificar que existe y pertenece al usuario
+    // Si circuit_id se proporciona, verificar acceso (personal o circuito del club)
     let circuitNameToStore = circuit_name ? circuit_name.trim() : null;
+    let circuitIdToStore = circuit_id || null;
     if (circuit_id) {
-      const { data: circuit, error: circuitError } = await supabase
-        .from('circuits')
-        .select('name')
-        .eq('id', circuit_id)
-        .eq('user_id', req.user.id)
-        .single();
-      if (!circuitError && circuit) {
-        circuitNameToStore = circuit.name;
+      const resolved = await resolveCircuitForClubCompetition(
+        supabase,
+        req.user.id,
+        club_id || null,
+        circuit_id,
+      );
+      if (!resolved.ok) {
+        return res.status(resolved.status).json({ error: resolved.error });
+      }
+      if (resolved.circuit) {
+        circuitNameToStore = resolved.circuitName;
+        circuitIdToStore = resolved.circuit.id;
+      } else {
+        circuitIdToStore = null;
       }
     }
 
@@ -316,7 +324,7 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       num_slots: num_slots,
       rounds: rounds,
       circuit_name: circuitNameToStore,
-      circuit_id: circuit_id || null,
+      circuit_id: circuitIdToStore,
       club_id: club_id || null,
       status: 'draft',
       registration_deadline: parsedDeadline,
@@ -640,15 +648,18 @@ router.put('/:id', async (req, res) => {
     if (circuit_name !== undefined) updateData.circuit_name = circuit_name ? circuit_name.trim() : null;
     if (circuit_id !== undefined) {
       if (circuit_id) {
-        const { data: circuit, error: circuitError } = await supabase
-          .from('circuits')
-          .select('name')
-          .eq('id', circuit_id)
-          .eq('user_id', existingComp.organizer)
-          .single();
-        if (!circuitError && circuit) {
-          updateData.circuit_id = circuit_id;
-          updateData.circuit_name = circuit.name;
+        const resolved = await resolveCircuitForClubCompetition(
+          supabase,
+          req.user.id,
+          existingComp.club_id || null,
+          circuit_id,
+        );
+        if (!resolved.ok) {
+          return res.status(resolved.status).json({ error: resolved.error });
+        }
+        if (resolved.circuit) {
+          updateData.circuit_id = resolved.circuit.id;
+          updateData.circuit_name = resolved.circuitName;
         } else {
           updateData.circuit_id = null;
           updateData.circuit_name = null;

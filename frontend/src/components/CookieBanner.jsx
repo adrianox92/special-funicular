@@ -1,12 +1,24 @@
 import React from "react";
+import { useLocation } from "react-router-dom";
 import { useCookieConsent } from "../context/CookieConsentContext";
+import { stripLocalePrefix } from "../i18n/localeUtils";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 
+/** Pantallas públicas de directo / OBS: sin banner de cookies. */
+function isBroadcastRoute(pathname) {
+  const path = stripLocalePrefix(pathname);
+  return (
+    path.startsWith("/competitions/presentation/") ||
+    path.startsWith("/competitions/status/")
+  );
+}
+
 const CookieBanner = () => {
+  const location = useLocation();
   const { hasDecided, saveConsent, openSettings } = useCookieConsent();
 
-  if (hasDecided) return null;
+  if (hasDecided || isBroadcastRoute(location.pathname)) return null;
 
   return (
     <div

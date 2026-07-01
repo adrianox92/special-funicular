@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3, Trash2 } from 'lucide-react';
 import api from '../lib/axios';
 import TimingSpecsModal from './TimingSpecsModal';
@@ -44,6 +45,7 @@ import { formatDistance } from '../utils/formatUtils';
 import { cn } from '../lib/utils';
 import { isLapTimerSession, getRecordedFromLabel } from '../utils/recordedFromLabel';
 import LapTimerTrainingCard from './LapTimerTrainingCard';
+import SessionTimeline from './SessionTimeline';
 
 /** Igual que VehicleList: GET /vehicles está paginado (25 por defecto). */
 const TIMINGS_VEHICLES_PAGE_LIMIT = 10000;
@@ -104,10 +106,12 @@ function getTotalSeconds(timeStr) {
   return parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
 }
 
-function groupTimings(timings) {
+function groupTimings(timings, labels = {}) {
+  const noCircuit = labels.noCircuit ?? 'Sin circuito';
+  const noLane = labels.noLane ?? 'Sin carril';
   const groups = {};
   timings.forEach((timing) => {
-    const circuitName = timing.circuit || timing.circuits?.name || 'Sin circuito';
+    const circuitName = timing.circuit || timing.circuits?.name || noCircuit;
     const key = `${timing.vehicle_id}-${circuitName}-${timing.lane || 'sin-carril'}-${timing.laps || 'sin-vueltas'}`;
     if (!groups[key]) {
       groups[key] = {
@@ -117,7 +121,7 @@ function groupTimings(timings) {
         vehicle_model: timing.vehicle_model,
         circuit: circuitName,
         circuit_id: timing.circuit_id || timing.circuits?.id,
-        lane: timing.lane || 'Sin carril',
+        lane: timing.lane || noLane,
         sessions: [],
         best_time: null,
         last_session: null,
@@ -215,7 +219,10 @@ function TimingMobileGroupCard({
   getSeconds,
   getTotalSeconds,
 }) {
+  const { t } = useTranslation('timings');
   const expanded = expandedGroups.has(group.key);
+  const formatSpeed = (real, scale) =>
+    t('speedFormat', { real: Number(real).toFixed(1), scale: Number(scale).toFixed(0) });
   return (
     <Card>
       <CardContent className="space-y-3 pt-4">
@@ -226,7 +233,7 @@ function TimingMobileGroupCard({
               size="icon"
               className="h-8 w-8 shrink-0"
               onClick={() => toggleGroup(group.key)}
-              title={expanded ? 'Ocultar historial' : 'Ver historial'}
+              title={expanded ? t('hideHistory') : t('showHistory')}
             >
               {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
             </Button>
@@ -239,14 +246,14 @@ function TimingMobileGroupCard({
             </Link>
             <p className="text-sm text-muted-foreground break-words">{group.circuit}</p>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={getLaneBadgeVariant(group.lane)}>Carril {group.lane}</Badge>
-              <Badge variant="secondary">{group.best_time.laps || 'N/A'} vueltas</Badge>
+              <Badge variant={getLaneBadgeVariant(group.lane)}>{t('lane', { lane: group.lane })}</Badge>
+              <Badge variant="secondary">{group.best_time.laps ? t('laps', { count: group.best_time.laps }) : t('lapsNa')}</Badge>
               {group.circuit_ranking ? (
                 <Badge variant={group.circuit_ranking.position === 1 ? 'default' : 'secondary'}>
-                  P{group.circuit_ranking.position}
+                  {t('positionShort', { pos: group.circuit_ranking.position })}
                 </Badge>
               ) : null}
-              <Badge>{group.total_sessions} ses.</Badge>
+              <Badge>{t('sessionsShort', { count: group.total_sessions })}</Badge>
               {group.circuit_id && (
                 <LapTimerTrainingCard
                   compact
@@ -262,36 +269,36 @@ function TimingMobileGroupCard({
 
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
-            <span className="text-muted-foreground block text-xs">Distancia</span>
+            <span className="text-muted-foreground block text-xs">{t('distance')}</span>
             {formatDistance(group.best_time.total_distance_meters)}
           </div>
           <div>
-            <span className="text-muted-foreground block text-xs">Velocidad</span>
+            <span className="text-muted-foreground block text-xs">{t('speed')}</span>
             {group.best_time.avg_speed_kmh != null && group.best_time.avg_speed_scale_kmh != null
-              ? `${Number(group.best_time.avg_speed_kmh).toFixed(1)} km/h (${Number(group.best_time.avg_speed_scale_kmh).toFixed(0)} eq.)`
+              ? formatSpeed(group.best_time.avg_speed_kmh, group.best_time.avg_speed_scale_kmh)
               : '—'}
           </div>
           <div>
-            <span className="text-muted-foreground block text-xs">Mejor vuelta</span>
+            <span className="text-muted-foreground block text-xs">{t('bestLap')}</span>
             <span className="font-mono font-medium">{group.best_time.best_lap_time}</span>
             {group.circuit_ranking && group.circuit_ranking.position > 1 && (
               <div className="mt-1 text-xs text-muted-foreground">
-                <span className="text-destructive">+{group.circuit_ranking.gap_to_leader}s líder</span>
+                <span className="text-destructive">{t('gapLeader', { gap: group.circuit_ranking.gap_to_leader })}</span>
                 <br />
-                <span className="text-amber-600">+{group.circuit_ranking.gap_to_previous}s ant.</span>
+                <span className="text-amber-600">{t('gapPrevious', { gap: group.circuit_ranking.gap_to_previous })}</span>
               </div>
             )}
           </div>
           <div>
-            <span className="text-muted-foreground block text-xs">Total</span>
+            <span className="text-muted-foreground block text-xs">{t('total')}</span>
             <span className="font-mono font-medium">{group.best_time.total_time}</span>
           </div>
           <div className="col-span-2">
-            <span className="text-muted-foreground block text-xs">Voltaje</span>
+            <span className="text-muted-foreground block text-xs">{t('voltage')}</span>
             <span>{formatVoltageVolts(group.best_time.supply_voltage_volts)}</span>
           </div>
           <div className="col-span-2">
-            <span className="text-muted-foreground block text-xs">Última sesión</span>
+            <span className="text-muted-foreground block text-xs">{t('lastSession')}</span>
             {new Date(group.last_session.timing_date).toLocaleDateString()}
           </div>
         </div>
@@ -307,7 +314,7 @@ function TimingMobileGroupCard({
               }}
             >
               <Wrench className="size-4 mr-1" />
-              Config.
+              {t('config')}
             </Button>
           )}
           {showPerformanceAnalysisButton(group.best_time) && (
@@ -320,7 +327,7 @@ function TimingMobileGroupCard({
               }}
             >
               <BarChart3 className="size-4 mr-1" />
-              Rendimiento
+              {t('performance')}
             </Button>
           )}
           {group.sessions.length >= 2 && (
@@ -333,7 +340,7 @@ function TimingMobileGroupCard({
               }}
             >
               <GitCompare className="size-4 mr-1" />
-              Comparar
+              {t('compare')}
             </Button>
           )}
           {group.sessions.length === 1 && group.sessions[0]?.id != null && (
@@ -341,17 +348,17 @@ function TimingMobileGroupCard({
               variant="destructive"
               size="sm"
               onClick={() => onRequestDeleteSession(group.vehicle_id, group.sessions[0].id)}
-              title="Eliminar esta sesión"
+              title={t('deleteSession')}
             >
               <Trash2 className="size-4 mr-1" />
-              Eliminar
+              {t('delete')}
             </Button>
           )}
         </div>
 
         {expanded && group.sessions.length > 1 && (
           <div className="space-y-2 border-t pt-3">
-            <p className="text-xs font-medium text-muted-foreground">Historial de sesiones</p>
+            <p className="text-xs font-medium text-muted-foreground">{t('sessionHistory')}</p>
             {group.sessions
               .map((s) => ({ ...s, lapSeconds: getSeconds(s.best_lap_time), totalSeconds: getTotalSeconds(s.total_time) }))
               .sort((a, b) => (a.lapSeconds !== b.lapSeconds ? a.lapSeconds - b.lapSeconds : a.totalSeconds - b.totalSeconds))
@@ -359,22 +366,22 @@ function TimingMobileGroupCard({
                 <div key={`${session.id}-${index}`} className="rounded-md border p-3 text-sm space-y-2 bg-muted/20">
                   <div className="flex flex-wrap justify-between gap-2">
                     <span className="text-muted-foreground">{new Date(session.timing_date).toLocaleDateString()}</span>
-                    <Badge variant={getLaneBadgeVariant(session.lane)}>Carril {session.lane}</Badge>
+                    <Badge variant={getLaneBadgeVariant(session.lane)}>{t('lane', { lane: session.lane })}</Badge>
                     <RecordedFromBadge recordedFrom={session.recorded_from} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 font-mono text-xs">
                     <div>
-                      Mejor: {session.best_lap_time}
-                      {index === 0 && <Badge variant="secondary" className="ml-1 text-[10px]">MV</Badge>}
+                      {t('bestShort')} {session.best_lap_time}
+                      {index === 0 && <Badge variant="secondary" className="ml-1 text-[10px]">{t('badges.bestLap')}</Badge>}
                     </div>
                     <div>
-                      Total: {session.total_time}
+                      {t('totalShort')} {session.total_time}
                       {session.totalSeconds === group.improvement?.best_total_session?.totalSeconds && (
-                        <Badge variant="secondary" className="ml-1 text-[10px]">MT</Badge>
+                        <Badge variant="secondary" className="ml-1 text-[10px]">{t('badges.bestTotal')}</Badge>
                       )}
                     </div>
                     <div className="col-span-2">
-                      <span className="text-muted-foreground">V: </span>
+                      <span className="text-muted-foreground">{t('voltageShort')} </span>
                       {formatVoltageVolts(session.supply_voltage_volts)}
                     </div>
                   </div>
@@ -388,7 +395,7 @@ function TimingMobileGroupCard({
                           setSelectedTiming(session);
                           setShowSpecsModal(true);
                         }}
-                        title="Especificaciones"
+                        title={t('specs')}
                       >
                         <Wrench className="size-4" />
                       </Button>
@@ -402,7 +409,7 @@ function TimingMobileGroupCard({
                           setPerformanceTiming(session);
                           setShowPerformanceModal(true);
                         }}
-                        title="Rendimiento"
+                        title={t('performance')}
                       >
                         <BarChart3 className="size-4" />
                       </Button>
@@ -413,7 +420,7 @@ function TimingMobileGroupCard({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => onRequestDeleteSession(group.vehicle_id, session.id)}
-                        title="Eliminar esta sesión"
+                        title={t('deleteSession')}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -429,6 +436,8 @@ function TimingMobileGroupCard({
 }
 
 const TimingsList = () => {
+  const { t } = useTranslation('timings');
+  const { t: tCommon } = useTranslation('common');
   const [timings, setTimings] = useState([]);
   const [vehicles, setVehicles] = useState({});
   const [circuits, setCircuits] = useState([]);
@@ -480,7 +489,7 @@ const TimingsList = () => {
       setCircuits(circuitsResponse.status === 'fulfilled' ? (circuitsResponse.value.data || []) : []);
     } catch (err) {
       console.error('Error al cargar datos:', err);
-      setError(err.response?.data?.error || 'Error al cargar los tiempos');
+      setError(err.response?.data?.error || t('loadError'));
     } finally {
       setLoading(false);
     }
@@ -499,12 +508,12 @@ const TimingsList = () => {
   }, [vehicles]);
 
   const vehicleFilterLabel = useMemo(() => {
-    if (!filter.vehicle) return 'Todos los vehículos';
+    if (!filter.vehicle) return t('allVehicles');
     const v = vehicles[filter.vehicle];
-    if (!v) return 'Vehículo';
+    if (!v) return t('vehicle');
     const label = `${v.manufacturer ?? ''} ${v.model ?? ''}`.trim();
     return label || v.id;
-  }, [filter.vehicle, vehicles]);
+  }, [filter.vehicle, vehicles, t]);
 
   const filteredVehicleOptions = useMemo(() => {
     const q = vehicleSearch.trim().toLocaleLowerCase();
@@ -550,7 +559,7 @@ const TimingsList = () => {
       setTimings(data);
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.error || 'Error al actualizar la lista de tiempos');
+      toast.error(err.response?.data?.error || t('refreshError'));
     }
   };
 
@@ -566,14 +575,12 @@ const TimingsList = () => {
     try {
       const response = await api.delete(`/vehicles/${vehicleId}/timings/${timingId}`);
       if (response.data?.position_updated) {
-        toast.success(
-          `Tiempo eliminado y posiciones recalculadas en: ${response.data.circuit}`,
-        );
+        toast.success(t('deleteSuccess', { circuit: response.data.circuit }));
       }
       await reloadTimings();
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.error || 'Error al eliminar el registro de tiempo');
+      toast.error(err.response?.data?.error || t('deleteError'));
     }
   };
 
@@ -591,7 +598,10 @@ const TimingsList = () => {
     });
   };
 
-  const groupedTimings = useMemo(() => groupTimings(timings), [timings]);
+  const groupedTimings = useMemo(
+    () => groupTimings(timings, { noCircuit: t('noCircuit'), noLane: t('noLane') }),
+    [timings, t],
+  );
 
   const circuitRankings = useMemo(() => calculateCircuitRanking(groupedTimings), [groupedTimings]);
 
@@ -649,10 +659,10 @@ const TimingsList = () => {
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          <p className="font-semibold">Error</p>
+          <p className="font-semibold">{tCommon('actions.error')}</p>
           <p>{error}</p>
           <Button variant="outline" size="sm" onClick={loadData} className="mt-2">
-            Reintentar
+            {tCommon('actions.retry')}
           </Button>
         </AlertDescription>
       </Alert>
@@ -662,15 +672,15 @@ const TimingsList = () => {
   return (
     <div className="space-y-6 py-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold">Tabla de Tiempos</h1>
+        <h1 className="text-2xl font-bold">{t('title')}</h1>
         <Button type="button" variant="outline" onClick={() => setShowImportModal(true)}>
-          Importar sesiones
+          {t('import')}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div ref={vehiclePickerRef} className="relative space-y-2">
-          <Label>Filtrar por Vehículo</Label>
+          <Label>{t('filterVehicle')}</Label>
           <Button
             variant="outline"
             role="combobox"
@@ -687,13 +697,13 @@ const TimingsList = () => {
             <div
               className="pointer-events-auto absolute left-0 right-0 top-full z-[200] mt-1 flex flex-col rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
               role="listbox"
-              aria-label="Lista de vehículos"
+              aria-label={t('vehicleListAria')}
               onMouseDown={(e) => e.stopPropagation()}
             >
               <div className="border-b px-3 py-2">
                 <Input
                   ref={vehicleSearchInputRef}
-                  placeholder="Buscar por marca o modelo…"
+                  placeholder={t('searchVehiclePlaceholder')}
                   value={vehicleSearch}
                   onChange={(e) => setVehicleSearch(e.target.value)}
                   className="h-9"
@@ -720,10 +730,10 @@ const TimingsList = () => {
                     setVehiclePickerOpen(false);
                   }}
                 >
-                  Todos los vehículos
+                  {t('allVehicles')}
                 </button>
                 {filteredVehicleOptions.length === 0 ? (
-                  <p className="px-2 py-4 text-center text-sm text-muted-foreground">Sin coincidencias</p>
+                  <p className="px-2 py-4 text-center text-sm text-muted-foreground">{t('noMatches')}</p>
                 ) : (
                   filteredVehicleOptions.map((vehicle) => {
                     const label = `${vehicle.manufacturer ?? ''} ${vehicle.model ?? ''}`.trim() || String(vehicle.id);
@@ -760,21 +770,21 @@ const TimingsList = () => {
           ) : null}
         </div>
         <div className="space-y-2">
-          <Label>Fecha Desde</Label>
+          <Label>{t('filterDateFrom')}</Label>
           <Input type="date" name="dateFrom" value={filter.dateFrom} onChange={(e) => setFilter(prev => ({ ...prev, dateFrom: e.target.value }))} />
         </div>
         <div className="space-y-2">
-          <Label>Fecha Hasta</Label>
+          <Label>{t('filterDateTo')}</Label>
           <Input type="date" name="dateTo" value={filter.dateTo} onChange={(e) => setFilter(prev => ({ ...prev, dateTo: e.target.value }))} />
         </div>
         <div className="space-y-2">
-          <Label>Filtrar por Circuito</Label>
+          <Label>{t('filterCircuit')}</Label>
           <Select value={filter.circuit_id || '__all__'} onValueChange={(v) => setFilter(prev => ({ ...prev, circuit_id: v === '__all__' ? '' : v }))}>
             <SelectTrigger>
-              <SelectValue placeholder="Todos los circuitos" />
+              <SelectValue placeholder={t('allCircuits')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos los circuitos</SelectItem>
+              <SelectItem value="__all__">{t('allCircuits')}</SelectItem>
               {circuits.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
@@ -782,24 +792,24 @@ const TimingsList = () => {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Filtrar por Carril</Label>
-          <Input type="text" name="lane" value={filter.lane} onChange={(e) => setFilter(prev => ({ ...prev, lane: e.target.value }))} placeholder="Número de carril" />
+          <Label>{t('filterLane')}</Label>
+          <Input type="text" name="lane" value={filter.lane} onChange={(e) => setFilter(prev => ({ ...prev, lane: e.target.value }))} placeholder={t('lanePlaceholder')} />
         </div>
       </div>
 
       {timings.length > 0 && (
         <div className="rounded-lg border p-4 bg-muted/50">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div><strong>Total de registros:</strong> {timings.length}</div>
-            <div><strong>Combinaciones únicas:</strong> {Object.keys(groupedTimings).length}</div>
-            <div><strong>Circuitos únicos:</strong> {Object.keys(circuitRankings).length}</div>
+            <div><strong>{t('statsTotal')}</strong> {timings.length}</div>
+            <div><strong>{t('statsCombinations')}</strong> {Object.keys(groupedTimings).length}</div>
+            <div><strong>{t('statsCircuits')}</strong> {Object.keys(circuitRankings).length}</div>
           </div>
         </div>
       )}
 
       <div className="md:hidden space-y-3">
         {filteredGroups.length === 0 ? (
-          <p className="text-center py-8 text-muted-foreground rounded-md border">No hay registros de tiempo</p>
+          <p className="text-center py-8 text-muted-foreground rounded-md border">{t('empty')}</p>
         ) : (
           filteredGroups.map((group) => (
             <TimingMobileGroupCard
@@ -827,26 +837,26 @@ const TimingsList = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Vehículo</TableHead>
-              <TableHead>Circuito</TableHead>
-              <TableHead>Carril</TableHead>
-              <TableHead>Vueltas</TableHead>
-              <TableHead>Dist.</TableHead>
-              <TableHead>Vel.</TableHead>
-              <TableHead>Pos.</TableHead>
-              <TableHead>Mejor</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>V (V)</TableHead>
-              <TableHead>Ses.</TableHead>
-              <TableHead>Última</TableHead>
-              <TableHead className="text-center min-w-[112px]">Acciones</TableHead>
+              <TableHead>{t('table.vehicle')}</TableHead>
+              <TableHead>{t('table.circuit')}</TableHead>
+              <TableHead>{t('table.lane')}</TableHead>
+              <TableHead>{t('table.laps')}</TableHead>
+              <TableHead>{t('table.distance')}</TableHead>
+              <TableHead>{t('table.speed')}</TableHead>
+              <TableHead>{t('table.position')}</TableHead>
+              <TableHead>{t('table.best')}</TableHead>
+              <TableHead>{t('table.total')}</TableHead>
+              <TableHead>{t('table.voltage')}</TableHead>
+              <TableHead>{t('table.sessions')}</TableHead>
+              <TableHead>{t('table.last')}</TableHead>
+              <TableHead className="text-center min-w-[112px]">{t('table.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredGroups.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
-                  No hay registros de tiempo
+                  {t('empty')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -856,7 +866,7 @@ const TimingsList = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {group.sessions.length > 1 && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleGroup(group.key)} title={expandedGroups.has(group.key) ? 'Ocultar historial' : 'Ver historial'}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleGroup(group.key)} title={expandedGroups.has(group.key) ? t('hideHistory') : t('showHistory')}>
                             {expandedGroups.has(group.key) ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                           </Button>
                         )}
@@ -867,7 +877,7 @@ const TimingsList = () => {
                     </TableCell>
                     <TableCell>{group.circuit}</TableCell>
                     <TableCell><Badge variant={getLaneBadgeVariant(group.lane)}>{group.lane}</Badge></TableCell>
-                    <TableCell><Badge variant="secondary">{group.best_time.laps || 'N/A'}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary">{group.best_time.laps || t('lapsNa')}</Badge></TableCell>
                     <TableCell>
                       {formatDistance(group.best_time.total_distance_meters)}
                     </TableCell>
@@ -878,7 +888,7 @@ const TimingsList = () => {
                     </TableCell>
                     <TableCell>
                       {group.circuit_ranking ? (
-                        <Badge variant={group.circuit_ranking.position === 1 ? 'default' : 'secondary'}>P{group.circuit_ranking.position}</Badge>
+                        <Badge variant={group.circuit_ranking.position === 1 ? 'default' : 'secondary'}>{t('positionShort', { pos: group.circuit_ranking.position })}</Badge>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -887,9 +897,9 @@ const TimingsList = () => {
                       {group.best_time.best_lap_time}
                       {group.circuit_ranking && group.circuit_ranking.position > 1 && (
                         <div className="mt-1 text-xs text-muted-foreground">
-                          <span className="text-destructive">+{group.circuit_ranking.gap_to_leader}s al líder</span>
+                          <span className="text-destructive">{t('gapLeaderTable', { gap: group.circuit_ranking.gap_to_leader })}</span>
                           <br />
-                          <span className="text-amber-600">+{group.circuit_ranking.gap_to_previous}s al anterior</span>
+                          <span className="text-amber-600">{t('gapPreviousTable', { gap: group.circuit_ranking.gap_to_previous })}</span>
                         </div>
                       )}
                     </TableCell>
@@ -900,7 +910,7 @@ const TimingsList = () => {
                     <TableCell className="text-center min-w-[112px]">
                       <div className="flex items-center justify-center gap-1 flex-wrap">
                         {showSessionDetailButton(group.best_time) && (
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(group.best_time); setShowSpecsModal(true); }} title="Ver especificaciones">
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(group.best_time); setShowSpecsModal(true); }} title={t('viewSpecs')}>
                             <Wrench className="size-4" />
                           </Button>
                         )}
@@ -910,7 +920,7 @@ const TimingsList = () => {
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => { setPerformanceTiming(group.best_time); setShowPerformanceModal(true); }}
-                            title="Ver análisis de rendimiento"
+                            title={t('viewPerformance')}
                           >
                             <BarChart3 className="size-4" />
                           </Button>
@@ -924,7 +934,7 @@ const TimingsList = () => {
                               setComparisonSessions(group.sessions);
                               setShowComparisonModal(true);
                             }}
-                            title="Comparar sesiones"
+                            title={t('compareSessions')}
                           >
                             <GitCompare className="size-4" />
                           </Button>
@@ -935,7 +945,7 @@ const TimingsList = () => {
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => requestDeleteSession(group.vehicle_id, group.sessions[0].id)}
-                            title="Eliminar esta sesión"
+                            title={t('deleteSession')}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -953,7 +963,7 @@ const TimingsList = () => {
                             {new Date(session.timing_date).toLocaleDateString()}
                           </TableCell>
                           <TableCell><Badge variant={getLaneBadgeVariant(session.lane)}>{session.lane}</Badge></TableCell>
-                          <TableCell><Badge variant="secondary">{session.laps || 'N/A'}</Badge></TableCell>
+                          <TableCell><Badge variant="secondary">{session.laps || t('lapsNa')}</Badge></TableCell>
                           <TableCell>
                             {formatDistance(session.total_distance_meters)}
                           </TableCell>
@@ -970,13 +980,13 @@ const TimingsList = () => {
                           <TableCell></TableCell>
                           <TableCell className="font-mono">
                             {session.best_lap_time}
-                            {index === 0 && <Badge variant="secondary" className="ml-2">Mejor Vuelta</Badge>}
+                            {index === 0 && <Badge variant="secondary" className="ml-2">{t('bestLapBadge')}</Badge>}
                             <RecordedFromBadge recordedFrom={session.recorded_from} />
                           </TableCell>
                           <TableCell className="font-mono">
                             {session.total_time}
                             {session.totalSeconds === group.improvement?.best_total_session?.totalSeconds && (
-                              <Badge variant="secondary" className="ml-2">Mejor Total</Badge>
+                              <Badge variant="secondary" className="ml-2">{t('bestTotalBadge')}</Badge>
                             )}
                           </TableCell>
                           <TableCell className="font-mono text-xs">{formatVoltageVolts(session.supply_voltage_volts)}</TableCell>
@@ -985,7 +995,7 @@ const TimingsList = () => {
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-1">
                               {showSessionDetailButton(session) && (
-                                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(session); setShowSpecsModal(true); }} title="Ver especificaciones">
+                                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { setSelectedTiming(session); setShowSpecsModal(true); }} title={t('viewSpecs')}>
                                   <Wrench className="size-4" />
                                 </Button>
                               )}
@@ -995,7 +1005,7 @@ const TimingsList = () => {
                                   size="icon"
                                   className="h-8 w-8"
                                   onClick={() => { setPerformanceTiming(session); setShowPerformanceModal(true); }}
-                                  title="Ver análisis de rendimiento"
+                                  title={t('viewPerformance')}
                                 >
                                   <BarChart3 className="size-4" />
                                 </Button>
@@ -1006,7 +1016,7 @@ const TimingsList = () => {
                                   size="icon"
                                   className="h-8 w-8"
                                   onClick={() => requestDeleteSession(group.vehicle_id, session.id)}
-                                  title="Eliminar esta sesión"
+                                  title={t('deleteSession')}
                                 >
                                   <Trash2 className="size-4" />
                                 </Button>
@@ -1022,6 +1032,8 @@ const TimingsList = () => {
           </TableBody>
         </Table>
       </div>
+
+      {timings.length > 0 && <SessionTimeline sessions={timings} />}
 
       <TimingSpecsModal show={showSpecsModal} onHide={() => setShowSpecsModal(false)} setupSnapshot={selectedTiming?.setup_snapshot} timing={selectedTiming} />
       <SessionComparisonModal show={showComparisonModal} onHide={() => setShowComparisonModal(false)} sessions={comparisonSessions} />
@@ -1042,19 +1054,19 @@ const TimingsList = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar registro de tiempo?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro de que quieres eliminar este registro de tiempo? Esta acción no se puede deshacer.
+              {t('deleteConfirmBody')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel type="button">{tCommon('actions.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               type="button"
               onClick={confirmDeleteSession}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Eliminar
+              {t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

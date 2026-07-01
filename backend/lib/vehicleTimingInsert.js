@@ -1,4 +1,5 @@
 const { findOrCreateCircuit } = require('./circuitResolver');
+const { resolveCircuitForTiming } = require('./clubCircuits');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('./distanceCalculator');
 const { getPreviousBestLapSeconds } = require('./personalBest');
 const { updatePositionsAfterNewTiming } = require('./positionTracker');
@@ -64,15 +65,11 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body, options =
   let circuitLaneLengths = [];
 
   if (circuit_id) {
-    const { data: circuitRow, error: circuitError } = await supabase
-      .from('circuits')
-      .select('id, name, lane_lengths')
-      .eq('id', circuit_id)
-      .eq('user_id', userId)
-      .single();
-    if (circuitError || !circuitRow) {
-      return { success: false, error: 'Circuito no encontrado o no pertenece al usuario', status: 404 };
+    const resolved = await resolveCircuitForTiming(supabase, userId, circuit_id);
+    if (!resolved.ok) {
+      return { success: false, error: resolved.error, status: resolved.status };
     }
+    const circuitRow = resolved.circuit;
     circuitIdToStore = circuitRow.id;
     circuitNameToStore = circuitRow.name;
     circuitLaneLengths = Array.isArray(circuitRow.lane_lengths) ? circuitRow.lane_lengths : [];

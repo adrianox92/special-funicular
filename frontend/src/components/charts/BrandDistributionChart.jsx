@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart,
   Bar,
@@ -14,44 +15,45 @@ const COLORS = {
   bar: '#4e79a7'
 };
 
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="custom-tooltip" style={{
-        backgroundColor: 'white',
-        padding: '10px',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
-        <p className="mb-1" style={{ color: payload[0].color }}>
-          <strong>{data.name}</strong>
-        </p>
-        <p className="mb-0">
-          {data.value} vehículos ({data.percentage}%)
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
 const BrandDistributionChart = ({ data }) => {
+  const { t } = useTranslation('dashboard');
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const item = payload[0].payload;
+      return (
+        <div className="custom-tooltip" style={{
+          backgroundColor: 'white',
+          padding: '10px',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <p className="mb-1" style={{ color: payload[0].color }}>
+            <strong>{item.name}</strong>
+          </p>
+          <p className="mb-0">
+            {t('charts.common.vehiclesTooltip', { value: item.value, percentage: item.percentage })}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (!Array.isArray(data) || data.length === 0) {
     return (
       <Card className="h-full">
-        <CardHeader><h5 className="font-semibold">Distribución por Marca</h5></CardHeader>
+        <CardHeader><h5 className="font-semibold">{t('charts.brand.title')}</h5></CardHeader>
         <CardContent>
           <div className="text-center text-muted-foreground py-8">
-            No hay datos disponibles para mostrar la distribución de marcas
+            {t('charts.brand.empty')}
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Calcular porcentajes y ordenar por cantidad
   const total = data.reduce((sum, item) => sum + item.value, 0);
   const chartData = data
     .map(item => ({
@@ -67,7 +69,7 @@ const BrandDistributionChart = ({ data }) => {
 
   return (
     <Card className="h-full">
-      <CardHeader><h5 className="font-semibold">Distribución por Marca</h5></CardHeader>
+      <CardHeader><h5 className="font-semibold">{t('charts.brand.title')}</h5></CardHeader>
       <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
@@ -108,4 +110,4 @@ const BrandDistributionChart = ({ data }) => {
   );
 };
 
-export default BrandDistributionChart; 
+export default BrandDistributionChart;

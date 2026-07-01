@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,7 @@ export default function ImportTimingsModal({
   fixedVehicleId,
   onImported,
 }) {
+  const { t } = useTranslation('timings');
   const [vehicleId, setVehicleId] = useState(defaultVehicleId || '');
   const [importCircuitId, setImportCircuitId] = useState('');
   const [importLane, setImportLane] = useState('');
@@ -168,7 +170,7 @@ export default function ImportTimingsModal({
     if (!content.trim()) return;
     const effectiveVehicleId = fixedVehicleId || vehicleId;
     if (!effectiveVehicleId) {
-      setError('Selecciona un vehículo para asociar las sesiones importadas.');
+      setError(t('importModal.vehicleRequired'));
       return;
     }
 
@@ -193,7 +195,7 @@ export default function ImportTimingsModal({
       if (previewFresh && showSmartracePicker && previewInfo.format === 'smartrace') {
         const meta = previewInfo.smartraceMeta || {};
         if ((meta.needsCircuitPick && !importCircuitId) || (meta.needsLanePick && !importLane)) {
-          setError('Selecciona circuito y carril obligatorios para este CSV.');
+          setError(t('importModal.selectCircuitLane'));
           return;
         }
         const valid = selectedRowIndices.filter((i) => {
@@ -201,7 +203,7 @@ export default function ImportTimingsModal({
           return row && !row.error;
         });
         if (valid.length === 0) {
-          setError('Selecciona al menos una fila válida para importar.');
+          setError(t('importModal.selectRows'));
           return;
         }
         const { data } = await api.post('/timings/import', {
@@ -230,7 +232,7 @@ export default function ImportTimingsModal({
           }
           if (prev.rows.length === 1) {
             if ((meta.needsCircuitPick && !importCircuitId) || (meta.needsLanePick && !importLane)) {
-              setError('Selecciona circuito y/o carril obligatorios (el CSV no los incluye).');
+              setError(t('importModal.selectCircuitLaneOptional'));
               return;
             }
             const { data } = await api.post('/timings/import', {
@@ -260,7 +262,7 @@ export default function ImportTimingsModal({
       if (previewFresh && previewInfo.format === 'smartrace' && previewInfo.rows.length === 1) {
         const meta = previewInfo.smartraceMeta || {};
         if ((meta.needsCircuitPick && !importCircuitId) || (meta.needsLanePick && !importLane)) {
-          setError('Selecciona circuito y/o carril obligatorios (el CSV no los incluye).');
+          setError(t('importModal.selectCircuitLaneOptional'));
           return;
         }
         const { data } = await api.post('/timings/import', {
@@ -286,14 +288,16 @@ export default function ImportTimingsModal({
         return;
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Error al importar');
+      setError(err.response?.data?.error || err.message || t('importModal.importError'));
     } finally {
       setLoading(false);
     }
   };
 
   const importButtonLabel =
-    showSmartracePicker && previewInfo?.format === 'smartrace' ? 'Importar selección' : 'Importar';
+    showSmartracePicker && previewInfo?.format === 'smartrace'
+      ? t('importModal.importSelection')
+      : t('importModal.importBtn');
 
   const importDisabled =
     loading ||
@@ -306,41 +310,39 @@ export default function ImportTimingsModal({
         return row && !row.error;
       }).length === 0);
 
+  const fixedVehicle = vehicles.find((v) => v.id === fixedVehicleId);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Importar sesiones de cronometraje</DialogTitle>
+          <DialogTitle>{t('importModal.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
             {fixedVehicleId ? (
               <>
-                <Label>Vehículo</Label>
+                <Label>{t('importModal.vehicle')}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Sesiones asignadas a:{' '}
+                  {t('importModal.sessionsAssignedTo')}{' '}
                   <strong>
-                    {vehicles.find((v) => v.id === fixedVehicleId)?.manufacturer}{' '}
-                    {vehicles.find((v) => v.id === fixedVehicleId)?.model}
+                    {fixedVehicle?.manufacturer} {fixedVehicle?.model}
                   </strong>
                 </p>
                 {previewInfo?.format === 'smartrace' && (
-                  <p className="text-xs text-muted-foreground">
-                    Formato SmartRace detectado: el coche de la sesión es el de esta ficha (no se usa la columna «Coche» del
-                    CSV).
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t('importModal.smartraceFixedHint')}</p>
                 )}
               </>
             ) : (
               <>
-                <Label>Vehículo (obligatorio si el CSV/JSON no incluye vehicle_id por fila)</Label>
+                <Label>{t('importModal.vehicleRequiredLabel')}</Label>
                 <Select value={vehicleId || '__none__'} onValueChange={(v) => setVehicleId(v === '__none__' ? '' : v)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona vehículo" />
+                    <SelectValue placeholder={t('importModal.vehiclePlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">— Sin seleccionar —</SelectItem>
+                    <SelectItem value="__none__">{t('importModal.vehicleNone')}</SelectItem>
                     {vehicles.map((v) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.manufacturer} {v.model}
@@ -349,10 +351,7 @@ export default function ImportTimingsModal({
                   </SelectContent>
                 </Select>
                 {previewInfo?.format === 'smartrace' && (
-                  <p className="text-xs text-muted-foreground">
-                    Formato SmartRace detectado: el coche de la sesión es el que elijas aquí (no se usa la columna «Coche» del
-                    CSV).
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t('importModal.smartraceSelectHint')}</p>
                 )}
               </>
             )}
@@ -360,20 +359,17 @@ export default function ImportTimingsModal({
 
           {showSmartraceCircuitLane && (
             <div className="space-y-3 rounded-md border border-border p-3">
-              <p className="text-sm font-medium">Circuito y carril</p>
-              <p className="text-xs text-muted-foreground">
-                El CSV no incluye circuito o carril (o vienen vacíos). Elige un circuito y un carril de tu colección para
-                guardar la sesión correctamente.
-              </p>
+              <p className="text-sm font-medium">{t('importModal.circuitLaneTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('importModal.circuitLaneHint')}</p>
               {smartraceMeta?.needsCircuitPick && circuits.length > 0 && (
                 <div className="space-y-2">
-                  <Label htmlFor="import-circuit">Circuito</Label>
+                  <Label htmlFor="import-circuit">{t('table.circuit')}</Label>
                   <Select value={importCircuitId || '__none__'} onValueChange={(v) => setImportCircuitId(v === '__none__' ? '' : v)}>
                     <SelectTrigger id="import-circuit">
-                      <SelectValue placeholder="Selecciona circuito" />
+                      <SelectValue placeholder={t('importModal.circuitPlaceholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">— Selecciona —</SelectItem>
+                      <SelectItem value="__none__">{t('importModal.selectPlaceholder')}</SelectItem>
                       {circuits.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name || c.id}
@@ -385,15 +381,12 @@ export default function ImportTimingsModal({
               )}
               {smartraceMeta?.needsCircuitPick && circuits.length === 0 && (
                 <Alert variant="destructive">
-                  <AlertDescription className="text-sm">
-                    El CSV no incluye circuito. Añade al menos un circuito en la aplicación para poder indicar dónde se
-                    rodó la sesión.
-                  </AlertDescription>
+                  <AlertDescription className="text-sm">{t('importModal.noCircuitsAlert')}</AlertDescription>
                 </Alert>
               )}
               {smartraceMeta?.needsLanePick && (
                 <div className="space-y-2">
-                  <Label htmlFor="import-lane">Carril</Label>
+                  <Label htmlFor="import-lane">{t('table.lane')}</Label>
                   <Select
                     value={importLane || '__none__'}
                     onValueChange={(v) => setImportLane(v === '__none__' ? '' : v)}
@@ -402,12 +395,14 @@ export default function ImportTimingsModal({
                     <SelectTrigger id="import-lane">
                       <SelectValue
                         placeholder={
-                          smartraceMeta?.needsCircuitPick && !importCircuitId ? 'Primero elige circuito' : 'Carril'
+                          smartraceMeta?.needsCircuitPick && !importCircuitId
+                            ? t('importModal.chooseCircuitFirst')
+                            : t('table.lane')
                         }
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">— Selecciona —</SelectItem>
+                      <SelectItem value="__none__">{t('importModal.selectPlaceholder')}</SelectItem>
                       {laneOptions.map((n) => (
                         <SelectItem key={n} value={n}>
                           {n}
@@ -417,12 +412,14 @@ export default function ImportTimingsModal({
                   </Select>
                   {importCircuitId ? (
                     <p className="text-xs text-muted-foreground">
-                      Carril 1–{smartraceLaneCount} según el circuito seleccionado.
+                      {t('importModal.laneRangeHint', { count: smartraceLaneCount })}
                     </p>
                   ) : smartraceMeta?.needsCircuitPick ? (
-                    <p className="text-xs text-muted-foreground">Tras elegir circuito, se ajustan los carriles disponibles.</p>
+                    <p className="text-xs text-muted-foreground">{t('importModal.laneAfterCircuitHint')}</p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">Elige el número de carril (1–{smartraceLaneCount}).</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('importModal.lanePickHint', { count: smartraceLaneCount })}
+                    </p>
                   )}
                 </div>
               )}
@@ -430,14 +427,14 @@ export default function ImportTimingsModal({
           )}
 
           <div className="space-y-2">
-            <Label>Formato</Label>
+            <Label>{t('importModal.format')}</Label>
             <Select value={format} onValueChange={setFormat}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="csv">CSV (Excel)</SelectItem>
-                <SelectItem value="json">JSON</SelectItem>
+                <SelectItem value="csv">{t('importModal.formatCsv')}</SelectItem>
+                <SelectItem value="json">{t('importModal.formatJson')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -445,7 +442,7 @@ export default function ImportTimingsModal({
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
               <Download className="size-4 mr-2" />
-              Descargar plantilla
+              {t('importModal.downloadTemplate')}
             </Button>
             <input
               ref={fileInputRef}
@@ -456,26 +453,26 @@ export default function ImportTimingsModal({
             />
             <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
               <Upload className="size-4 mr-2" />
-              Elegir fichero
+              {t('importModal.pickFile')}
             </Button>
           </div>
 
           <div className="space-y-2">
-            <Label>Contenido</Label>
+            <Label>{t('importModal.content')}</Label>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder={format === 'csv' ? 'Pega aquí el CSV o carga un fichero…' : 'Pega aquí el JSON o carga un fichero…'}
+              placeholder={
+                format === 'csv' ? t('importModal.contentPlaceholderCsv') : t('importModal.contentPlaceholderJson')
+              }
               className="min-h-[200px] font-mono text-sm"
             />
           </div>
 
           {showSmartracePicker && previewInfo?.format === 'smartrace' && previewInfo.rows.length > 1 && (
             <div className="space-y-2 rounded-md border border-border p-3">
-              <p className="text-sm font-medium">Varios pilotos en el archivo</p>
-              <p className="text-xs text-muted-foreground">
-                Marca las filas que quieres registrar como sesiones (cada una con el vehículo seleccionado arriba).
-              </p>
+              <p className="text-sm font-medium">{t('importModal.multiPilotTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('importModal.multiPilotHint')}</p>
               <ul className="max-h-48 space-y-2 overflow-y-auto text-sm">
                 {previewInfo.rows.map((row) => {
                   const id = `import-row-${row.index}`;
@@ -492,10 +489,21 @@ export default function ImportTimingsModal({
                       <label htmlFor={id} className={`cursor-pointer ${row.error ? 'text-muted-foreground' : ''}`}>
                         <span className="font-medium">{row.pilotLabel}</span>
                         {row.lapsExpected != null && (
-                          <span className="text-muted-foreground"> · {row.lapsExpected} vueltas</span>
+                          <span className="text-muted-foreground">
+                            {' '}
+                            {t('importModal.lapsExpected', { count: row.lapsExpected })}
+                          </span>
                         )}
-                        {row.error && <span className="block text-destructive">Error: {row.error}</span>}
-                        {row.warning && <span className="block text-amber-600 dark:text-amber-500">Aviso: {row.warning}</span>}
+                        {row.error && (
+                          <span className="block text-destructive">
+                            {t('importModal.rowError', { error: row.error })}
+                          </span>
+                        )}
+                        {row.warning && (
+                          <span className="block text-amber-600 dark:text-amber-500">
+                            {t('importModal.rowWarning', { warning: row.warning })}
+                          </span>
+                        )}
                       </label>
                     </li>
                   );
@@ -514,14 +522,12 @@ export default function ImportTimingsModal({
             <Alert>
               <AlertDescription>
                 <p className="font-medium">
-                  Importadas: {result.imported} de {result.total}
+                  {t('importModal.importedSummary', { imported: result.imported, total: result.total })}
                 </p>
                 {result.errors?.length > 0 && (
                   <ul className="mt-2 text-sm list-disc pl-4 max-h-40 overflow-y-auto">
                     {result.errors.map((e, i) => (
-                      <li key={i}>
-                        Fila {e.row}: {e.error}
-                      </li>
+                      <li key={i}>{t('importModal.rowErrorLine', { row: e.row, error: e.error })}</li>
                     ))}
                   </ul>
                 )}
@@ -532,7 +538,7 @@ export default function ImportTimingsModal({
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cerrar
+            {t('importModal.close')}
           </Button>
           <Button onClick={handleImport} disabled={importDisabled}>
             {loading ? <Spinner className="size-4 mr-2" /> : null}

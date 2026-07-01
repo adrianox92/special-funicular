@@ -11,6 +11,13 @@ const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { uploadClubPdf, removeClubDocument } = require('../lib/clubDocumentUpload');
 const { ALLOWED_CLUB_EVENT_CATEGORIES, normalizeClubEventCategory } = require('../lib/clubEventCategories');
+const {
+  normalizeLaneLengths,
+  getClubCircuit,
+  listLinkablePersonalCircuits,
+  linkPersonalCircuitToClub,
+} = require('../lib/clubCircuits');
+const { buildClubCircuitLeaderboard } = require('../lib/clubCircuitLeaderboard');
 
 const router = express.Router();
 
@@ -503,6 +510,282 @@ router.delete(
   },
 );
 
+router.get('/:id/circuits', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ok = await userIsClubMember(req.user.id, id);
+    if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
+
+    const { data, error } = await supabaseAdmin
+      .from('circuits')
+      .select('id, club_id, user_id, name, description, num_lanes, lane_lengths, created_at')
+      .eq('club_id', id)
+      .order('name', { ascending: true });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch (e) {
+    console.error('GET /clubs/:id/circuits', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post(
+  '/:id/circuits',
+  param('id').isUUID(),
+  body('name').trim().notEmpty().isLength({ max: 200 }),
+  body('description').optional({ nullable: true }).trim().isLength({ max: 2000 }),
+  body('num_lanes').optional().isInt({ min: 1, max: 8 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const { num_lanes, lane_lengths } = normalizeLaneLengths(
+        req.body.num_lanes,
+        req.body.lane_lengths,
+      );
+
+      const { data: row, error } = await supabaseAdmin
+        .from('circuits')
+        .insert({
+          club_id: id,
+          user_id: req.user.id,
+          name: req.body.name.trim(),
+          description:
+            req.body.description != null && String(req.body.description).trim() !== ''
+              ? String(req.body.description).trim()
+              : null,
+          num_lanes,
+          lane_lengths,
+        })
+        .select('id, club_id, user_id, name, description, num_lanes, lane_lengths, created_at')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'Ya existe un circuito del club con ese nombre' });
+        }
+        return res.status(500).json({ error: error.message });
+      }
+      res.status(201).json(row);
+    } catch (e) {
+      console.error('POST /clubs/:id/circuits', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.put(
+  '/:id/circuits/:circuitId',
+  param('id').isUUID(),
+  param('circuitId').isUUID(),
+  body('name').optional().trim().notEmpty().isLength({ max: 200 }),
+  body('description').optional({ nullable: true }).trim().isLength({ max: 2000 }),
+  body('num_lanes').optional().isInt({ min: 1, max: 8 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, circuitId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const existing = await getClubCircuit(supabaseAdmin, id, circuitId);
+      if (!existing) return res.status(404).json({ error: 'Circuito no encontrado' });
+
+      const patch = {};
+      if (req.body.name != null) patch.name = String(req.body.name).trim();
+      if (Object.prototype.hasOwnProperty.call(req.body, 'description')) {
+        patch.description =
+          req.body.description != null && String(req.body.description).trim() !== ''
+            ? String(req.body.description).trim()
+            : null;
+      }
+      if (req.body.num_lanes != null || req.body.lane_lengths != null) {
+        const { num_lanes, lane_lengths } = normalizeLaneLengths(
+          req.body.num_lanes ?? existing.num_lanes,
+          req.body.lane_lengths,
+          existing.lane_lengths,
+        );
+        patch.num_lanes = num_lanes;
+        patch.lane_lengths = lane_lengths;
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'Nada que actualizar' });
+      }
+
+      const { data: row, error } = await supabaseAdmin
+        .from('circuits')
+        .update(patch)
+        .eq('id', circuitId)
+        .eq('club_id', id)
+        .select('id, club_id, user_id, name, description, num_lanes, lane_lengths, created_at')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'Ya existe un circuito del club con ese nombre' });
+        }
+        return res.status(500).json({ error: error.message });
+      }
+      res.json(row);
+    } catch (e) {
+      console.error('PUT /clubs/:id/circuits/:circuitId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.delete(
+  '/:id/circuits/:circuitId',
+  param('id').isUUID(),
+  param('circuitId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, circuitId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const existing = await getClubCircuit(supabaseAdmin, id, circuitId);
+      if (!existing) return res.status(404).json({ error: 'Circuito no encontrado' });
+
+      const [
+        { count: compCount },
+        { count: vtCount },
+        { count: ctCount },
+      ] = await Promise.all([
+        supabaseAdmin.from('competitions').select('*', { count: 'exact', head: true }).eq('circuit_id', circuitId),
+        supabaseAdmin.from('vehicle_timings').select('*', { count: 'exact', head: true }).eq('circuit_id', circuitId),
+        supabaseAdmin.from('competition_timings').select('*', { count: 'exact', head: true }).eq('circuit_id', circuitId),
+      ]);
+
+      const usedBy = [];
+      if (compCount > 0) usedBy.push(`${compCount} competición(es)`);
+      if (vtCount > 0) usedBy.push(`${vtCount} tiempo(s) de vehículo`);
+      if (ctCount > 0) usedBy.push(`${ctCount} tiempo(s) de competición`);
+      if (usedBy.length > 0) {
+        return res.status(400).json({
+          error: 'No se puede eliminar: el circuito está en uso',
+          usedBy,
+        });
+      }
+
+      const { error } = await supabaseAdmin.from('circuits').delete().eq('id', circuitId).eq('club_id', id);
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(204).send();
+    } catch (e) {
+      console.error('DELETE /clubs/:id/circuits/:circuitId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/circuits/:circuitId/linkable-personal',
+  param('id').isUUID(),
+  param('circuitId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, circuitId } = req.params;
+      const result = await listLinkablePersonalCircuits(
+        supabaseAdmin,
+        req.user.id,
+        id,
+        circuitId,
+      );
+      if (!result.ok) {
+        return res.status(result.status).json({ error: result.error });
+      }
+      res.json({
+        club_circuit: result.club_circuit,
+        personal_circuits: result.personal_circuits,
+      });
+    } catch (e) {
+      console.error('GET /clubs/:id/circuits/:circuitId/linkable-personal', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/circuits/:circuitId/link-personal/:personalCircuitId',
+  param('id').isUUID(),
+  param('circuitId').isUUID(),
+  param('personalCircuitId').isUUID(),
+  body('delete_personal').optional().isBoolean(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, circuitId, personalCircuitId } = req.params;
+      const result = await linkPersonalCircuitToClub(supabaseAdmin, {
+        userId: req.user.id,
+        clubId: id,
+        clubCircuitId: circuitId,
+        personalCircuitId,
+        deletePersonal: Boolean(req.body?.delete_personal),
+      });
+      if (!result.ok) {
+        const payload = { error: result.error };
+        if (result.migrated_timings != null) {
+          payload.migrated_timings = result.migrated_timings;
+        }
+        return res.status(result.status).json(payload);
+      }
+      res.json({
+        migrated_timings: result.migrated_timings,
+        deleted_personal: result.deleted_personal,
+        club_circuit: result.club_circuit,
+        personal_circuit: result.personal_circuit,
+      });
+    } catch (e) {
+      console.error('POST /clubs/:id/circuits/:circuitId/link-personal/:personalCircuitId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/circuits/:circuitId/leaderboard',
+  param('id').isUUID(),
+  param('circuitId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, circuitId } = req.params;
+      const ok = await userIsClubMember(req.user.id, id);
+      if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
+
+      const circuit = await getClubCircuit(supabaseAdmin, id, circuitId);
+      if (!circuit) return res.status(404).json({ error: 'Circuito no encontrado' });
+
+      const result = await buildClubCircuitLeaderboard(supabaseAdmin, {
+        clubId: id,
+        circuitId,
+        lane: req.query.lane,
+        period: req.query.period,
+        vehicleType: req.query.vehicle_type,
+      });
+
+      res.json({
+        circuit: {
+          id: circuit.id,
+          name: circuit.name,
+          num_lanes: circuit.num_lanes,
+        },
+        ...result,
+      });
+    } catch (e) {
+      console.error('GET /clubs/:id/circuits/:circuitId/leaderboard', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
 router.get('/:id/competitions', param('id').isUUID(), handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
@@ -894,6 +1177,7 @@ router.patch(
   body('description').optional({ nullable: true }).isLength({ max: 10000 }),
   body('city').optional({ nullable: true }).isLength({ max: 200 }),
   body('website_url').optional({ nullable: true }).isLength({ max: 500 }),
+  body('leaderboard_public').optional().isBoolean(),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -928,6 +1212,9 @@ router.patch(
         } else {
           patch.website_url = null;
         }
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'leaderboard_public')) {
+        patch.leaderboard_public = Boolean(req.body.leaderboard_public);
       }
 
       if (Object.keys(patch).length === 0) {

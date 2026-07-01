@@ -47,6 +47,7 @@ router.get('/', async (req, res) => {
       .from('circuits')
       .select('*')
       .eq('user_id', ownerId)
+      .is('club_id', null)
       .order('name', { ascending: true });
 
     if (error) {

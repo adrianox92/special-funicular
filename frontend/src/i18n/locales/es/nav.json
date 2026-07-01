@@ -1,0 +1,31 @@
+{
+  "search": {
+    "aria": "Abrir búsqueda rápida",
+    "placeholder": "Buscar vehículos, circuitos, inventario…"
+  },
+  "menu": "Menú",
+  "home": "Inicio",
+  "vehicles": "Vehículos",
+  "timings": "Tiempos",
+  "circuits": "Circuitos",
+  "inventory": "Inventario",
+  "competitions": "Competiciones",
+  "myCompetitions": "Mis competiciones",
+  "leagues": "Ligas",
+  "favoritePilots": "Pilotos favoritos",
+  "clubs": "Clubes",
+  "myListings": "Mis listados",
+  "help": "Ayuda",
+  "user": "Usuario",
+  "myProfile": "Mi Perfil",
+  "changelog": "Novedades",
+  "administration": "Administración",
+  "metrics": "Métricas",
+  "lapTimerLicenses": "Licencias Lap Timer",
+  "srmLicenses": "Licencias SRM",
+  "slotCatalog": "Catálogo slot",
+  "settings": "Configuración",
+  "logout": "Cerrar Sesión",
+  "toggleTheme": "Cambiar tema",
+  "openMenu": "Abrir menú"
+}

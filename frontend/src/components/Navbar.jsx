@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -54,8 +55,10 @@ import {
 } from './ui/sheet';
 import { cn } from '../lib/utils';
 import { useCommandPalette } from '../context/CommandPaletteContext';
+import LanguageSelector from './LanguageSelector';
 
 function NavbarSearchTrigger({ className, onOpen }) {
+  const { t } = useTranslation('nav');
   const [modKey, setModKey] = React.useState('Ctrl');
 
   useEffect(() => {
@@ -70,11 +73,11 @@ function NavbarSearchTrigger({ className, onOpen }) {
         'flex h-9 w-full max-w-full min-w-0 items-center gap-2 rounded-md border border-input bg-background/90 px-3 text-left text-sm text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-accent/60 hover:text-accent-foreground',
         className,
       )}
-      aria-label="Abrir búsqueda rápida"
+      aria-label={t('search.aria')}
     >
       <Search className="size-4 shrink-0 opacity-60" aria-hidden />
       <span className="min-w-0 flex-1 truncate">
-        Buscar vehículos, circuitos, inventario…
+        {t('search.placeholder')}
       </span>
       <span className="pointer-events-none hidden shrink-0 items-center gap-0.5 sm:inline-flex" aria-hidden>
         <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
@@ -133,6 +136,7 @@ function MobileNavItem({ item, isItemActive, isActive, NavLink }) {
 }
 
 const Navbar = () => {
+  const { t } = useTranslation('nav');
   const { user, logout } = useAuth();
   const { setOpen: openCommandPalette } = useCommandPalette();
   const { theme, toggleTheme } = useTheme();
@@ -201,11 +205,11 @@ const Navbar = () => {
   const showLicenseAdmin = isLicenseAdminUser(user);
 
   const licenseAdminMenuItems = [
-    { to: '/admin/dashboard', label: 'Métricas', icon: LayoutDashboard },
-    { to: '/admin/lap-timer-licenses', label: 'Licencias Lap Timer', icon: Smartphone },
-    { to: '/admin/slot-race-licenses', label: 'Licencias SRM', icon: Shield },
-    { to: '/admin/slot-catalog', label: 'Catálogo slot', icon: Database },
-    { to: '/admin/changelog', label: 'Changelog', icon: Megaphone },
+    { to: '/admin/dashboard', label: t('metrics'), icon: LayoutDashboard },
+    { to: '/admin/lap-timer-licenses', label: t('lapTimerLicenses'), icon: Smartphone },
+    { to: '/admin/slot-race-licenses', label: t('srmLicenses'), icon: Shield },
+    { to: '/admin/slot-catalog', label: t('slotCatalog'), icon: Database },
+    { to: '/admin/changelog', label: t('changelog'), icon: Megaphone },
   ];
 
   const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
@@ -213,26 +217,26 @@ const Navbar = () => {
   }`;
 
   const navItems = [
-    { path: '/dashboard', label: 'Inicio', icon: Home },
-    { path: '/vehicles', label: 'Vehículos', icon: Car },
-    { path: '/timings', label: 'Tiempos', icon: Clock },
-    { path: '/circuits', label: 'Circuitos', icon: Flag },
-    { path: '/inventory', label: 'Inventario', icon: Package },
+    { path: '/dashboard', label: t('home'), icon: Home },
+    { path: '/vehicles', label: t('vehicles'), icon: Car },
+    { path: '/timings', label: t('timings'), icon: Clock },
+    { path: '/circuits', label: t('circuits'), icon: Flag },
+    { path: '/inventory', label: t('inventory'), icon: Package },
     {
       path: '/competitions',
-      label: 'Competiciones',
+      label: t('competitions'),
       icon: Trophy,
       children: [
-        { path: '/competitions', label: 'Mis competiciones', icon: Trophy },
-        { path: '/leagues', label: 'Ligas', icon: Trophy },
-        { path: '/pilots/favorites', label: 'Pilotos favoritos', icon: Star },
+        { path: '/competitions', label: t('myCompetitions'), icon: Trophy },
+        { path: '/leagues', label: t('leagues'), icon: Trophy },
+        { path: '/pilots/favorites', label: t('favoritePilots'), icon: Star },
       ],
     },
-    { path: '/clubs', label: 'Clubes', icon: Building2 },
+    { path: '/clubs', label: t('clubs'), icon: Building2 },
     ...(hasSellerProfile
-      ? [{ path: '/seller', label: 'Mis listados', icon: Store }]
+      ? [{ path: '/seller', label: t('myListings'), icon: Store }]
       : []),
-    { path: '/help', label: 'Ayuda', icon: CircleHelp },
+    { path: '/help', label: t('help'), icon: CircleHelp },
   ];
 
   const isItemActive = (item) => {
@@ -341,11 +345,12 @@ const Navbar = () => {
             size="icon"
             className="md:hidden"
             onClick={() => openCommandPalette(true)}
-            aria-label="Abrir búsqueda rápida"
+            aria-label={t('search.aria')}
           >
             <Search className="size-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+          <LanguageSelector className="hidden sm:inline-flex" size="compact" />
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={t('toggleTheme')}>
             {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
 
@@ -365,7 +370,7 @@ const Navbar = () => {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">Usuario</p>
+                      <p className="text-sm font-medium">{t('user')}</p>
                       <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>
@@ -373,20 +378,20 @@ const Navbar = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
                       <User className="size-4" />
-                      Mi Perfil
+                      {t('myProfile')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/changelog" className="flex items-center gap-2 cursor-pointer">
                       <ScrollText className="size-4" />
-                      Novedades
+                      {t('changelog')}
                     </Link>
                   </DropdownMenuItem>
                   {hasSellerProfile && (
                     <DropdownMenuItem asChild>
                       <Link to="/seller" className="flex items-center gap-2 cursor-pointer">
                         <Store className="size-4" />
-                        Mis listados
+                        {t('myListings')}
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -394,7 +399,7 @@ const Navbar = () => {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger className="gap-2">
                         <Shield className="size-4" />
-                        Administración
+                        {t('administration')}
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent className="w-52">
@@ -413,13 +418,13 @@ const Navbar = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
                       <Settings className="size-4" />
-                      Configuración
+                      {t('settings')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">
                     <LogOut className="size-4" />
-                    Cerrar Sesión
+                    {t('logout')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -429,14 +434,17 @@ const Navbar = () => {
           {/* Mobile menu */}
           <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon" aria-label="Abrir menú">
+              <Button variant="ghost" size="icon" aria-label={t('openMenu')}>
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px]">
               <SheetHeader>
-                <SheetTitle>Menú</SheetTitle>
+                <SheetTitle>{t('menu')}</SheetTitle>
               </SheetHeader>
+              <div className="mt-4 px-1">
+                <LanguageSelector size="compact" />
+              </div>
               <nav className="flex flex-col gap-2 mt-6">
                 {navItems.map((item) => (
                   <MobileNavItem
@@ -451,7 +459,7 @@ const Navbar = () => {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground">
                       <Shield className="size-4" />
-                      Administración
+                      {t('administration')}
                     </div>
                     <div className="ml-4 flex flex-col gap-1 border-l pl-2">
                       {licenseAdminMenuItems.map(({ to, label, icon: Icon }) => (
@@ -477,7 +485,7 @@ const Navbar = () => {
                   className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 >
                   <ScrollText className="size-4" />
-                  Novedades
+                  {t('changelog')}
                 </Link>
               </nav>
             </SheetContent>

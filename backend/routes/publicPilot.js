@@ -1,9 +1,11 @@
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { normalizePilotSlug } = require('../lib/pilotProfileUtils');
+const { calculatePoints } = require('../lib/pointsCalculator');
 
 const router = express.Router();
 const supabase = getAnonClient();
+const supabaseAdmin = getServiceClient() || supabase;
 
 function bestLapSecondsFromRow(row) {
   const t = row.best_lap_timestamp;
@@ -16,6 +18,103 @@ function bestLapSecondsFromRow(row) {
   if (!m) return Infinity;
   return parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + parseInt(m[3], 10) / 1000;
 }
+
+/**
+ * GET /api/public/pilot/:slug/compare/:otherSlug — head-to-head MVP en circuitos comunes.
+ * Debe ir ANTES de /:slug.
+ */
+router.get('/:slug/compare/:otherSlug', async (req, res) => {
+  try {
+    const slugA = normalizePilotSlug(req.params.slug);
+    const slugB = normalizePilotSlug(req.params.otherSlug);
+    if (!slugA || !slugB) {
+      return res.status(404).json({ error: 'Perfil no encontrado', code: 'NOT_FOUND' });
+    }
+
+    const loadProfile = async (slug) => {
+      const { data } = await supabase
+        .from('pilot_public_profiles')
+        .select('user_id, slug, display_name')
+        .ilike('slug', slug)
+        .eq('enabled', true)
+        .maybeSingle();
+      return data;
+    };
+
+    const [profileA, profileB] = await Promise.all([loadProfile(slugA), loadProfile(slugB)]);
+    if (!profileA || !profileB) {
+      return res.status(404).json({ error: 'Perfil no encontrado', code: 'NOT_FOUND' });
+    }
+
+    const bestByUserCircuit = async (userId) => {
+      const { data: vehicles } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('user_id', userId);
+      const vehicleIds = (vehicles || []).map((v) => v.id);
+      if (vehicleIds.length === 0) return new Map();
+
+      const { data: timings } = await supabase
+        .from('vehicle_timings')
+        .select('circuit_id, circuit, best_lap_time, best_lap_timestamp, circuits(name)')
+        .in('vehicle_id', vehicleIds);
+
+      const map = new Map();
+      for (const row of timings || []) {
+        const label = row.circuits?.name || row.circuit || 'Sin circuito';
+        const key = row.circuit_id || `text:${label}`;
+        const sec = bestLapSecondsFromRow(row);
+        if (!Number.isFinite(sec)) continue;
+        const prev = map.get(key);
+        if (!prev || sec < prev.best_lap_seconds) {
+          map.set(key, {
+            circuit_name: label,
+            best_lap_time: row.best_lap_time,
+            best_lap_seconds: sec,
+          });
+        }
+      }
+      return map;
+    };
+
+    const [mapA, mapB] = await Promise.all([
+      bestByUserCircuit(profileA.user_id),
+      bestByUserCircuit(profileB.user_id),
+    ]);
+
+    const shared = [];
+    for (const [key, a] of mapA.entries()) {
+      const b = mapB.get(key);
+      if (!b) continue;
+      shared.push({
+        circuit_key: key,
+        circuit_name: a.circuit_name,
+        pilot_a: { best_lap_time: a.best_lap_time, best_lap_seconds: a.best_lap_seconds },
+        pilot_b: { best_lap_time: b.best_lap_time, best_lap_seconds: b.best_lap_seconds },
+        delta_seconds: a.best_lap_seconds - b.best_lap_seconds,
+        leader: a.best_lap_seconds < b.best_lap_seconds ? 'a' : a.best_lap_seconds > b.best_lap_seconds ? 'b' : 'tie',
+      });
+    }
+
+    shared.sort((x, y) => x.circuit_name.localeCompare(y.circuit_name, 'es'));
+
+    const winsA = shared.filter((s) => s.leader === 'a').length;
+    const winsB = shared.filter((s) => s.leader === 'b').length;
+
+    res.json({
+      pilot_a: { slug: profileA.slug, display_name: profileA.display_name },
+      pilot_b: { slug: profileB.slug, display_name: profileB.display_name },
+      circuits_compared: shared.length,
+      wins_a: winsA,
+      wins_b: winsB,
+      ties: shared.length - winsA - winsB,
+      circuits: shared,
+    });
+  } catch (e) {
+    console.error('GET /public/pilot/:slug/compare/:otherSlug:', e);
+    res.status(500).json({ error: 'Error interno del servidor', code: 'INTERNAL_ERROR' });
+  }
+});
 
 /**
  * GET /api/public/pilot/:slug
@@ -216,18 +315,111 @@ router.get('/:slug', async (req, res) => {
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
 
+    const palmares = await buildVerifiedPalmares(userId, partRows);
+
     res.json({
       slug: profile.slug,
       display_name: profile.display_name,
+      user_id: userId,
       vehicles: vehiclesOut,
       best_times_by_circuit,
       competitions_organized,
       competitions_participated,
+      palmares,
     });
   } catch (e) {
     console.error('GET /public/pilot/:slug:', e);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
+
+/**
+ * Palmarés verificado desde competiciones completadas (posición final calculada).
+ * @param {string} userId
+ * @param {object[]} partRows
+ */
+async function buildVerifiedPalmares(userId, partRows) {
+  const seenComp = new Set();
+  const compIds = [];
+  const partByComp = new Map();
+
+  for (const p of partRows || []) {
+    const c = p.competitions;
+    if (!c?.id || seenComp.has(c.id)) continue;
+    seenComp.add(c.id);
+    compIds.push(c.id);
+    partByComp.set(c.id, p);
+  }
+
+  if (compIds.length === 0) return [];
+
+  const { data: competitions } = await supabaseAdmin
+    .from('competitions')
+    .select('id, name, public_slug, status, rounds, circuit_name, created_at')
+    .in('id', compIds);
+
+  const palmares = [];
+
+  for (const comp of competitions || []) {
+    if (comp.status !== 'finished' && comp.status !== 'closed') continue;
+
+    const participant = partByComp.get(comp.id);
+    if (!participant?.id) continue;
+
+    const { data: participants } = await supabaseAdmin
+      .from('competition_participants')
+      .select('id, driver_name, category_id, vehicles(model, manufacturer)')
+      .eq('competition_id', comp.id);
+
+    const participantIds = (participants || []).map((p) => p.id).filter(Boolean);
+    let timings = [];
+    if (participantIds.length > 0) {
+      const { data: timingRows } = await supabaseAdmin
+        .from('competition_timings')
+        .select('*')
+        .in('participant_id', participantIds);
+      timings = timingRows || [];
+    }
+
+    const { data: rules } = await supabaseAdmin
+      .from('competition_rules')
+      .select('*')
+      .eq('competition_id', comp.id);
+
+    const { data: categories } = await supabaseAdmin
+      .from('competition_categories')
+      .select('id, name')
+      .eq('competition_id', comp.id);
+
+    const { sortedParticipants } = calculatePoints({
+      competition: comp,
+      participants: participants || [],
+      timings,
+      rules: rules || [],
+      categories: categories || [],
+    });
+
+    const idx = sortedParticipants.findIndex(
+      (row) => (row.participant_id || row.id) === participant.id,
+    );
+    if (idx < 0) continue;
+
+    const row = sortedParticipants[idx];
+    palmares.push({
+      competition_id: comp.id,
+      competition_name: comp.name,
+      public_slug: comp.public_slug,
+      circuit_name: comp.circuit_name,
+      created_at: comp.created_at,
+      position: idx + 1,
+      total_participants: sortedParticipants.length,
+      points: row.total_points ?? null,
+      driver_name: participant.driver_name,
+    });
+  }
+
+  palmares.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return palmares;
+}
 
 module.exports = router;

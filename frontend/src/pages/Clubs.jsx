@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Plus, Link2, LogOut, Loader2, Users, CalendarDays, Megaphone } from 'lucide-react';
 import axios from '../lib/axios';
@@ -21,6 +22,7 @@ import { toast } from 'sonner';
 import { PENDING_CLUB_INVITE_KEY } from '../components/PendingInviteConsumer';
 
 const Clubs = () => {
+  const { t } = useTranslation('clubs');
   const { user } = useAuth();
   const [clubs, setClubs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +160,7 @@ const Clubs = () => {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Building2 className="size-7" />
-            Clubes
+            {t('title')}
           </h1>
           <p className="text-muted-foreground">
             Crea un club, invita miembros y asocia competiciones. Desde cada tarjeta entras al tablón (avisos y

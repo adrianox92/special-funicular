@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LineChart,
   Line,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { formatMaintenanceKind } from '../../utils/formatUtils';
+import { formatMaintenanceKind, getIntlLocale } from '../../utils/formatUtils';
 
 function calendarDayKey(iso) {
   return String(iso).slice(0, 10);
@@ -27,7 +28,7 @@ function calendarDayKey(iso) {
 function dayKeyToAxisLabel(dayKey) {
   const [y, m, d] = dayKey.split('-').map(Number);
   if (!y || !m || !d) return dayKey;
-  return new Date(y, m - 1, d).toLocaleDateString('es-ES', {
+  return new Date(y, m - 1, d).toLocaleDateString(getIntlLocale(), {
     day: '2-digit',
     month: '2-digit',
     year: '2-digit',
@@ -52,7 +53,7 @@ function groupTimingsByCircuitLane(timings) {
           key,
           circuit: timing.circuit,
           lane: timing.lane,
-          laps: timing.laps || 'N/A',
+          laps: timing.laps ?? null,
           timings: [],
         };
       }
@@ -69,10 +70,8 @@ const formatTime = (seconds) => {
   return `${String(minutes).padStart(2, '0')}:${remainingSeconds.padStart(6, '0')}`;
 };
 
-/**
- * Mejor vuelta en el tiempo + líneas verticales en días de mantenimiento que coinciden con una sesión.
- */
 const MaintenanceCorrelationChart = ({ timings, maintenanceLogs }) => {
+  const { t } = useTranslation('vehicles');
   const groups = useMemo(() => groupTimingsByCircuitLane(timings || []), [timings]);
   const [selectedKey, setSelectedKey] = useState(null);
 
@@ -114,17 +113,22 @@ const MaintenanceCorrelationChart = ({ timings, maintenanceLogs }) => {
     return { chartData: chartDataInner, refLines: refLinesInner };
   }, [group, maintenanceLogs]);
 
+  const formatGroupOption = (g) => {
+    const lapsDisplay = g.laps ?? 'N/A';
+    if (g.laps == null) {
+      return t('maintenance.chart.groupOptionLapsNA', { circuit: g.circuit, lane: g.lane });
+    }
+    return t('maintenance.chart.groupOption', { circuit: g.circuit, lane: g.lane, laps: lapsDisplay });
+  };
+
   if (groups.length === 0) {
     return (
       <Card className="mb-6">
         <CardHeader>
-          <h5 className="font-semibold">Mantenimiento y telemetría</h5>
+          <h5 className="font-semibold">{t('maintenance.chart.emptyTitle')}</h5>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Necesitas al menos dos sesiones con el mismo circuito y carril para ver la correlación con el historial de
-            mantenimiento.
-          </p>
+          <p className="text-sm text-muted-foreground">{t('maintenance.chart.emptyDescription')}</p>
         </CardContent>
       </Card>
     );
@@ -135,9 +139,11 @@ const MaintenanceCorrelationChart = ({ timings, maintenanceLogs }) => {
       const row = payload[0]?.payload;
       return (
         <div className="rounded-md border bg-popover p-3 shadow-md">
-          <p className="font-semibold mb-2">Fecha: {label}</p>
-          <p className="mb-1 text-sm">Mejor vuelta: {formatTime(payload[0].value)}</p>
-          {row?.laps != null && <p className="mb-0 text-xs text-muted-foreground">Vueltas: {row.laps}</p>}
+          <p className="font-semibold mb-2">{t('maintenance.chart.tooltipDate', { date: label })}</p>
+          <p className="mb-1 text-sm">{t('maintenance.chart.tooltipBestLap', { time: formatTime(payload[0].value) })}</p>
+          {row?.laps != null && (
+            <p className="mb-0 text-xs text-muted-foreground">{t('maintenance.chart.tooltipLaps', { laps: row.laps })}</p>
+          )}
         </div>
       );
     }
@@ -147,17 +153,17 @@ const MaintenanceCorrelationChart = ({ timings, maintenanceLogs }) => {
   return (
     <Card className="mb-6">
       <CardHeader className="space-y-3">
-        <h5 className="font-semibold">Mantenimiento y evolución de mejor vuelta</h5>
+        <h5 className="font-semibold">{t('maintenance.chart.title')}</h5>
         <div className="flex flex-col gap-2 max-w-md">
-          <Label htmlFor="maint-corr-group">Circuito / carril / vueltas</Label>
+          <Label htmlFor="maint-corr-group">{t('maintenance.chart.groupLabel')}</Label>
           <Select value={activeKey || ''} onValueChange={setSelectedKey}>
             <SelectTrigger id="maint-corr-group">
-              <SelectValue placeholder="Seleccionar grupo" />
+              <SelectValue placeholder={t('maintenance.chart.groupPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
               {groups.map((g) => (
                 <SelectItem key={g.key} value={g.key}>
-                  {g.circuit} — Carril {g.lane} — {g.laps} vuelta(s)
+                  {formatGroupOption(g)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -166,7 +172,7 @@ const MaintenanceCorrelationChart = ({ timings, maintenanceLogs }) => {
       </CardHeader>
       <CardContent>
         {chartData.length < 2 ? (
-          <p className="text-sm text-muted-foreground">No hay suficientes puntos en este grupo.</p>
+          <p className="text-sm text-muted-foreground">{t('maintenance.chart.insufficientPoints')}</p>
         ) : (
           <>
             <div style={{ width: '100%', height: 280 }}>
@@ -187,7 +193,7 @@ const MaintenanceCorrelationChart = ({ timings, maintenanceLogs }) => {
                     strokeWidth={2}
                     dot={{ r: 4 }}
                     activeDot={{ r: 6 }}
-                    name="Mejor vuelta"
+                    name={t('maintenance.chart.lineName')}
                   />
                   {refLines.map((rl) => (
                     <ReferenceLine
@@ -206,10 +212,7 @@ const MaintenanceCorrelationChart = ({ timings, maintenanceLogs }) => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              Las líneas naranjas marcan mantenimientos en días en los que hay una sesión registrada en este circuito,
-              carril y número de vueltas. Es una correlación visual aproximada, no causal.
-            </p>
+            <p className="text-xs text-muted-foreground mt-3">{t('maintenance.chart.footnote')}</p>
           </>
         )}
       </CardContent>

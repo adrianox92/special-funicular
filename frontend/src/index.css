@@ -114,6 +114,15 @@ html.presentation-mode.presentation-mode-tv body {
   max-height: 100dvh;
 }
 
+/* OBS overlay: fondo transparente para Browser Source */
+html.presentation-mode-overlay {
+  background: transparent !important;
+}
+
+html.presentation-mode-overlay body {
+  background: transparent !important;
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -1,6 +1,8 @@
 /**
  * Meta description y Open Graph para fichas del catálogo público (SEO).
  */
+import i18n from '../i18n';
+import { SUPPORTED_LOCALES, localizePath, toOgLocale, getOgLocaleAlternates } from '../i18n/localeUtils';
 import { LANDING_PAGE_DESCRIPTION, LANDING_PAGE_TITLE } from './landingSeo';
 import { BRAND } from './documentTitle';
 import { catalogSlugify } from './catalogSlug';
@@ -285,12 +287,36 @@ export function applyPublicCatalogListSeo(filters = {}) {
   }
 }
 
+function removeHreflangLinks() {
+  document.querySelectorAll('link[rel="alternate"][hreflang]').forEach((el) => el.remove());
+}
+
+function setCatalogHreflang(itemId, slug) {
+  const origin = getOrigin();
+  if (!origin || !itemId) return;
+  removeHreflangLinks();
+  const suffix = `/${itemId}/${slug}`;
+  SUPPORTED_LOCALES.forEach((loc) => {
+    const link = document.createElement('link');
+    link.rel = 'alternate';
+    link.hreflang = loc === 'es' ? 'es' : loc;
+    link.href = `${origin}${localizePath(loc, `/catalogo${suffix}`)}`;
+    document.head.appendChild(link);
+  });
+  const xDefault = document.createElement('link');
+  xDefault.rel = 'alternate';
+  xDefault.hreflang = 'x-default';
+  xDefault.href = `${origin}/catalogo${suffix}`;
+  document.head.appendChild(xDefault);
+}
+
 /**
  * @param {Record<string, unknown>} item — fila de slot_catalog_items / vista con rating_avg, etc.
  */
 export function applyCatalogItemPageSeo(item) {
   if (!item?.id) return;
 
+  const locale = i18n.language?.split('-')[0] || 'es';
   const slug = catalogSlugify(item.model_name || item.reference);
   const title = buildCatalogItemPageTitle(item);
   document.title = title;
@@ -298,7 +324,7 @@ export function applyCatalogItemPageSeo(item) {
   const description = buildCatalogItemMetaDescription(item);
   const keywords = buildCatalogItemKeywords(item);
   const origin = getOrigin();
-  const canonicalUrl = origin ? `${origin}/catalogo/${item.id}/${slug}` : '';
+  const canonicalUrl = origin ? `${origin}${localizePath(locale, `/catalogo/${item.id}/${slug}`)}` : '';
   const imageAlt = buildCatalogItemImageAlt(item);
   const modifiedIso = toIsoDateModified(item.updated_at);
 
@@ -307,7 +333,8 @@ export function applyCatalogItemPageSeo(item) {
   setMeta('robots', 'index, follow, max-image-preview:large', false);
 
   setMeta('og:type', 'website', true);
-  setMeta('og:locale', 'es_ES', true);
+  setMeta('og:locale', toOgLocale(locale), true);
+  getOgLocaleAlternates(locale).forEach((alt) => setMeta('og:locale:alternate', alt, true));
   setMeta('og:site_name', BRAND, true);
   setMeta('og:title', title, true);
   setMeta('og:description', description, true);
@@ -346,6 +373,8 @@ export function applyCatalogItemPageSeo(item) {
     }
     linkCanonical.setAttribute('href', canonicalUrl);
   }
+
+  setCatalogHreflang(item.id, slug);
 
   const existing = document.getElementById('catalog-item-jsonld');
   if (existing) existing.remove();

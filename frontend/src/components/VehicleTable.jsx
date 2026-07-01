@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Table,
   TableBody,
@@ -12,7 +13,7 @@ import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import { CopyPlus, Download, Trash2 } from 'lucide-react';
 import api from '../lib/axios';
-import { formatDistance, safeVehicleFileBasename } from '../utils/formatUtils';
+import { formatDistance, getIntlLocale, safeVehicleFileBasename } from '../utils/formatUtils';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -34,6 +35,8 @@ import placeholderImage from '../assets/images/placeholder.png';
 import DuplicateVehicleDialog from './DuplicateVehicleDialog';
 
 const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
+  const { t } = useTranslation('vehicles');
+  const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
@@ -49,7 +52,7 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
       if (onDelete) onDelete(vehicle.id);
     } catch (error) {
       console.error('Error al eliminar vehículo:', error);
-      toast.error('Error al eliminar el vehículo');
+      toast.error(t('card.deleteError'));
     }
   };
 
@@ -71,7 +74,7 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
       link.remove();
     } catch (error) {
       console.error('Error al descargar la ficha técnica:', error);
-      toast.error('Error al descargar la ficha técnica');
+      toast.error(t('card.downloadSpecsError'));
     }
   };
 
@@ -100,15 +103,13 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
       <AlertDialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar vehículo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que quieres eliminar este vehículo? Esta acción no se puede deshacer.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('card.deleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('card.deleteBody')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{tc('actions.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
+              {tc('actions.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -153,15 +154,15 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
         </TableCell>
         <TableCell>
           <div className="flex flex-wrap gap-1">
-            {vehicle.modified && <Badge variant="outline" className="text-xs">Mod.</Badge>}
-            {vehicle.digital && <Badge variant="outline" className="text-xs">Dig.</Badge>}
-            {vehicle.museo && <Badge variant="outline" className="text-xs">Museo</Badge>}
-            {vehicle.taller && <Badge variant="outline" className="text-xs">Taller</Badge>}
+            {vehicle.modified && <Badge variant="outline" className="text-xs">{t('table.modifiedShort')}</Badge>}
+            {vehicle.digital && <Badge variant="outline" className="text-xs">{t('table.digitalShort')}</Badge>}
+            {vehicle.museo && <Badge variant="outline" className="text-xs">{t('museum')}</Badge>}
+            {vehicle.taller && <Badge variant="outline" className="text-xs">{t('workshop')}</Badge>}
           </div>
         </TableCell>
         <TableCell className="text-sm whitespace-nowrap">{formatPrice()}</TableCell>
         <TableCell className="text-xs text-muted-foreground">
-          {vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString() : '-'}
+          {vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString(getIntlLocale()) : '-'}
           {vehicle.purchase_place != null && vehicle.purchase_place !== '' && String(vehicle.purchase_place) !== 'null' && (
             <div className="truncate max-w-[100px]" title={vehicle.purchase_place}>{vehicle.purchase_place}</div>
           )}
@@ -173,13 +174,13 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
         </TableCell>
         <TableCell className="min-w-[7.5rem] p-2" onClick={(e) => e.stopPropagation()}>
           <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="size-8" onClick={handleDuplicate} title="Duplicar vehículo">
+            <Button size="icon" variant="ghost" className="size-8" onClick={handleDuplicate} title={t('card.duplicateTitle')}>
               <CopyPlus className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-8" onClick={handleDownloadSpecs} title="Descargar ficha técnica">
+            <Button size="icon" variant="ghost" className="size-8" onClick={handleDownloadSpecs} title={t('card.downloadSpecsTitle')}>
               <Download className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-8 text-destructive hover:text-destructive" onClick={handleDelete} title="Eliminar vehículo">
+            <Button size="icon" variant="ghost" className="size-8 text-destructive hover:text-destructive" onClick={handleDelete} title={t('card.deleteButtonTitle')}>
               <Trash2 className="size-4" />
             </Button>
           </div>
@@ -190,6 +191,7 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
 };
 
 const VehicleTable = ({ vehicles, onDelete, onDuplicateSuccess }) => {
+  const { t } = useTranslation('vehicles');
   const [duplicateVehicle, setDuplicateVehicle] = useState(null);
 
   return (
@@ -206,13 +208,13 @@ const VehicleTable = ({ vehicles, onDelete, onDuplicateSuccess }) => {
         <TableHeader>
           <TableRow>
             <TableHead className="w-12"></TableHead>
-            <TableHead>Modelo</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Precio</TableHead>
-            <TableHead>Compra</TableHead>
-            <TableHead>Odómetro</TableHead>
-            <TableHead className="min-w-[7.5rem] text-right">Acciones</TableHead>
+            <TableHead>{t('table.model')}</TableHead>
+            <TableHead>{t('table.type')}</TableHead>
+            <TableHead>{t('table.status')}</TableHead>
+            <TableHead>{t('table.price')}</TableHead>
+            <TableHead>{t('table.purchase')}</TableHead>
+            <TableHead>{t('table.odometer')}</TableHead>
+            <TableHead className="min-w-[7.5rem] text-right">{t('table.actions')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

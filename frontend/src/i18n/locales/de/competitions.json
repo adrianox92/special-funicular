@@ -1,0 +1,14 @@
+{
+  "title": "Wettkämpfe",
+  "create": "Neuer Wettkampf",
+  "loadError": "Wettkämpfe konnten nicht geladen werden",
+  "favorites": "Lieblingsfahrer",
+  "participants": "Teilnehmer",
+  "timings": "Zeiten",
+  "signup": "Anmeldung",
+  "status": "Wettkampfstatus",
+  "presentation": "Präsentation",
+  "publicStatus": "Live-Status",
+  "classification": "Gesamtwertung",
+  "round": "Lauf {{n}}"
+}

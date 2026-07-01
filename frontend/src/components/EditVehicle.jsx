@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ExternalLink,
@@ -90,15 +91,7 @@ import {
 import { VEHICLE_TYPES as vehicleTypes } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS } from '../data/motorPosition';
 
-const imageFields = [
-  { name: 'front', label: 'Delantera' },
-  { name: 'left', label: 'Perfil Izquierdo' },
-  { name: 'right', label: 'Perfil Derecho' },
-  { name: 'rear', label: 'Trasera' },
-  { name: 'top', label: 'Superior' },
-  { name: 'chassis', label: 'Chasis' },
-  { name: 'three_quarters', label: 'Vista 3/4' },
-];
+const IMAGE_FIELD_NAMES = ['front', 'left', 'right', 'rear', 'top', 'chassis', 'three_quarters'];
 
 const viewTypeMap = {
   'Delantera': 'front',
@@ -178,6 +171,9 @@ function getModificationSaveDialogInfo(baseline, editing) {
 }
 
 const EditVehicle = () => {
+  const { t } = useTranslation('vehicles');
+  const { t: tTimings } = useTranslation('timings');
+  const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -293,7 +289,7 @@ const EditVehicle = () => {
       });
       setQrDataUrl(dataUrl);
     } catch {
-      setQrError('No se pudo generar el código QR');
+      setQrError(t('edit.errors.qrGenerate'));
     } finally {
       setQrLoading(false);
     }
@@ -320,7 +316,7 @@ const EditVehicle = () => {
       })
       .catch(error => {
         console.error('Error al cargar vehículo:', error);
-        setError('Error al cargar el vehículo');
+        setError(t('edit.errors.loadVehicle'));
         setLoading(false);
       });
   }, [id]);
@@ -363,6 +359,11 @@ const EditVehicle = () => {
     };
   }, [previews, images]);
 
+  const imageFields = useMemo(
+    () => IMAGE_FIELD_NAMES.map((name) => ({ name, label: t(`edit.images.${name}`) })),
+    [t],
+  );
+
   const gallerySlides = useMemo(
     () =>
       imageFields
@@ -372,7 +373,20 @@ const EditVehicle = () => {
           label,
           url: previews[name] || URL.createObjectURL(images[name]),
         })),
-    [previews, images],
+    [previews, images, imageFields],
+  );
+
+  const vehicleTabOptions = useMemo(
+    () => [
+      { value: 'general', label: t('edit.tabs.general') },
+      { value: 'technical', label: t('edit.tabs.technical') },
+      { value: 'modifications', label: t('edit.tabs.modifications') },
+      { value: 'timings', label: t('edit.tabs.timings') },
+      ...(hasMultipleConfigs(timings) ? [{ value: 'config-analysis', label: t('edit.tabs.configAnalysis') }] : []),
+      { value: 'maintenance', label: t('edit.tabs.maintenance') },
+      { value: 'palmares', label: t('edit.tabs.palmares') },
+    ],
+    [t, timings],
   );
 
   const gallerySlideIndexByName = useMemo(() => {
@@ -409,7 +423,7 @@ const EditVehicle = () => {
         setTechnicalSpecs(specs);
       } catch (error) {
         console.error('Error al cargar especificaciones técnicas:', error);
-        setError('Error al cargar las especificaciones técnicas');
+        setError(t('edit.errors.loadSpecs'));
       } finally {
         setLoadingSpecs(false);
       }
@@ -667,7 +681,7 @@ const EditVehicle = () => {
     } else if (editingSpec) {
       const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
       if (!currentSpec?.id) {
-        setError('No se encontró la especificación técnica');
+        setError(t('edit.errors.specNotFound'));
         return;
       }
       const putBody = { ...specData };
@@ -679,13 +693,11 @@ const EditVehicle = () => {
         putBody,
       );
       if (res.data?.inventory_return_error) {
-        toast.warning(`Cambios guardados, pero no se pudo añadir al inventario: ${res.data.inventory_return_error}`);
+        toast.warning(t('edit.toasts.inventoryReturnError', { error: res.data.inventory_return_error }));
       } else if (isModificationTab && returnRemovedToInventory) {
-        toast.success('Modificación actualizada y pieza retirada añadida al inventario');
+        toast.success(t('edit.toasts.modUpdatedInventory'));
       } else if (isModificationTab && res.data?.inventory_deducted_qty) {
-        toast.success(
-          `Modificación guardada; se descontaron ${res.data.inventory_deducted_qty} ud(s) del inventario`,
-        );
+        toast.success(t('edit.toasts.modSavedDeducted', { qty: res.data.inventory_deducted_qty }));
       }
     } else {
       await api.post(`/vehicles/${id}/technical-specs`, specData);
@@ -727,7 +739,7 @@ const EditVehicle = () => {
       });
     } catch (error) {
       console.error('Error al guardar especificación:', error);
-      setError(error.response?.data?.error || 'Error al guardar la especificación técnica');
+      setError(error.response?.data?.error || t('edit.errors.saveSpec'));
     }
   };
 
@@ -835,7 +847,7 @@ const EditVehicle = () => {
       }
     } catch (error) {
       console.error('Error al guardar especificación:', error);
-      setError(error.response?.data?.error || 'Error al guardar la especificación técnica');
+      setError(error.response?.data?.error || t('edit.errors.saveSpec'));
     }
   };
 
@@ -870,11 +882,11 @@ const EditVehicle = () => {
       };
       setTechnicalSpecs(updatedSpecs);
       if (returnInv) {
-        toast.success('Modificación eliminada y pieza añadida al inventario');
+        toast.success(t('edit.toasts.modDeletedInventory'));
       }
     } catch (error) {
       console.error('Error al eliminar especificación:', error);
-      setError(error.response?.data?.error || 'Error al eliminar la especificación técnica');
+      setError(error.response?.data?.error || t('edit.errors.deleteSpec'));
     }
   };
 
@@ -916,7 +928,7 @@ const EditVehicle = () => {
       navigate('/vehicles');
     } catch (error) {
       console.error('Error al actualizar vehículo:', error);
-      setError(error.response?.data?.error || 'Error al actualizar el vehículo');
+      setError(error.response?.data?.error || t('edit.errors.updateVehicle'));
     } finally {
       setSaving(false);
     }
@@ -942,7 +954,12 @@ const EditVehicle = () => {
       const minimumTime = `${String(Math.floor(minimumTotalSeconds / 60)).padStart(2, '0')}:${String(Math.floor(minimumTotalSeconds % 60)).padStart(2, '0')}.${String(Math.floor((minimumTotalSeconds % 1) * 1000)).padStart(3, '0')}`;
       setTimingNotice({
         variant: 'warning',
-        message: `El tiempo total (${totalTime}) es menor que el mínimo posible (${minimumTime}) para ${laps} vueltas con mejor vuelta de ${bestLapTime}`,
+        message: t('edit.errors.totalTimeTooLow', {
+          total: totalTime,
+          minimum: minimumTime,
+          laps,
+          bestLap: bestLapTime,
+        }),
       });
     } else {
       setTimingNotice(null);
@@ -1090,7 +1107,7 @@ const EditVehicle = () => {
         ? { supply_voltage_volts: null }
         : { supply_voltage_volts: parseFloat(trimmed.replace(',', '.')) };
     if (trimmed !== '' && !Number.isFinite(payload.supply_voltage_volts)) {
-      setTimingNotice({ variant: 'warning', message: 'Voltaje no válido' });
+      setTimingNotice({ variant: 'warning', message: t('edit.errors.invalidVoltage') });
       setTimeout(() => setTimingNotice(null), 3000);
       return;
     }
@@ -1101,7 +1118,7 @@ const EditVehicle = () => {
       console.error(err);
       setTimingNotice({
         variant: 'warning',
-        message: err.response?.data?.error || 'No se pudo guardar el voltaje',
+        message: err.response?.data?.error || t('edit.errors.saveVoltage'),
       });
       setTimeout(() => setTimingNotice(null), 4000);
     }
@@ -1124,7 +1141,7 @@ const EditVehicle = () => {
             const circuitNames = successfulUpdates.map(u => u.circuit).join(', ');
             setTimingNotice({
               variant: 'success',
-              message: `Posiciones actualizadas automáticamente en: ${circuitNames}`,
+              message: t('edit.notices.positionsUpdated', { circuits: circuitNames }),
             });
             setTimeout(() => {
               setTimingNotice(null);
@@ -1139,7 +1156,7 @@ const EditVehicle = () => {
         if (response.data.position_updated) {
           setTimingNotice({
             variant: 'success',
-            message: 'Nuevo tiempo registrado y posiciones actualizadas automáticamente',
+            message: t('edit.notices.newTimingPositions'),
           });
           setTimeout(() => {
             setTimingNotice(null);
@@ -1155,7 +1172,7 @@ const EditVehicle = () => {
       const backendError = error.response?.data?.error;
       const status = error.response?.status;
       if (status === 404 && editingTiming) {
-        setError(backendError || 'El registro no fue encontrado (puede haber sido eliminado). Los datos se han conservado para que puedas añadirlo como nuevo.');
+        setError(backendError || t('edit.errors.timingNotFound'));
         const { id: _id, ...timingWithoutId } = editingTiming;
         setNewTiming({ ...timingWithoutId, circuit_id: editingTiming.circuit_id || '' });
         setEditingTiming(null);
@@ -1225,7 +1242,13 @@ const EditVehicle = () => {
       <div className="mt-4 space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h4 className="text-lg font-semibold">
-            {editingSpec ? 'Editar' : 'Añadir'} {isModificationTab ? 'Modificación' : 'Especificación Técnica'}
+            {editingSpec
+              ? isModificationTab
+                ? t('edit.specs.editModification')
+                : t('edit.specs.editSpec')
+              : isModificationTab
+                ? t('edit.specs.addModification')
+                : t('edit.specs.addSpec')}
           </h4>
           {!editingSpec && isModificationTab && (
             <Button
@@ -1239,7 +1262,7 @@ const EditVehicle = () => {
               }}
             >
               <Package className="size-4 mr-2" aria-hidden />
-              Desde inventario
+              {t('edit.specs.fromInventory')}
             </Button>
           )}
         </div>
@@ -1249,24 +1272,30 @@ const EditVehicle = () => {
             <AlertDescription className="flex flex-col gap-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <span>
-                  Usando ítem de inventario «{selectedInventoryItemName}». El tipo, nombre, referencia, enlace y precio los toma del ítem.
-                  Al guardar se descontarán{' '}
-                  {(() => {
-                    const n = Math.min(
-                      Math.max(1, parseInt(selectedInventoryMountQty, 10) || 1),
-                      selectedInventoryMaxQty ?? 1,
-                    );
-                    return `${n} ${n === 1 ? 'unidad' : 'unidades'}`;
-                  })()}{' '}
-                  del stock (máx. {selectedInventoryMaxQty ?? '—'}).
+                  {t('edit.specs.usingInventory', {
+                    name: selectedInventoryItemName,
+                    count: (() => {
+                      const n = Math.min(
+                        Math.max(1, parseInt(selectedInventoryMountQty, 10) || 1),
+                        selectedInventoryMaxQty ?? 1,
+                      );
+                      return n;
+                    })(),
+                    unit: (() => {
+                      const n = Math.min(
+                        Math.max(1, parseInt(selectedInventoryMountQty, 10) || 1),
+                        selectedInventoryMaxQty ?? 1,
+                      );
+                      return n === 1 ? t('modals.unit') : t('modals.units');
+                    })(),
+                    max: selectedInventoryMaxQty ?? '—',
+                  })}
                 </span>
                 <Button type="button" variant="ghost" size="sm" className="shrink-0 self-start" onClick={clearInventoryLink}>
-                  Quitar enlace
+                  {t('edit.specs.removeLink')}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                La cantidad se indica en el campo «Unidades» del formulario (debajo de marca). Ahí eliges cuántas se descuentan del stock y cuántas representa la pieza montada.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('edit.specs.unitsHint')}</p>
             </AlertDescription>
           </Alert>
         )}
@@ -1275,12 +1304,10 @@ const EditVehicle = () => {
             <>
               <Alert className="mb-4">
                 <Info className="size-4 shrink-0" aria-hidden />
-                <AlertDescription>
-                  Al guardar, el componente actual quedará registrado en el historial con la fecha indicada (si cambias algún dato respecto al que había). Puedes revisar los valores anteriores en esta misma pestaña y en el detalle del vehículo.
-                </AlertDescription>
+                <AlertDescription>{t('edit.specs.modHistoryHint')}</AlertDescription>
               </Alert>
               <div className="space-y-2 mb-4 max-w-xs">
-                <Label htmlFor="change_effective_date">Fecha del cambio</Label>
+                <Label htmlFor="change_effective_date">{t('edit.specs.changeDate')}</Label>
                 <Input
                   id="change_effective_date"
                   name="change_effective_date"
@@ -1293,7 +1320,7 @@ const EditVehicle = () => {
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="component_type">Tipo de Componente</Label>
+              <Label htmlFor="component_type">{t('edit.specs.componentType')}</Label>
               {fromInventory ? (
                 <Input
                   id="component_type"
@@ -1313,10 +1340,10 @@ const EditVehicle = () => {
                   required
                 >
                   <SelectTrigger id="component_type">
-                    <SelectValue placeholder="Seleccionar tipo" />
+                    <SelectValue placeholder={t('edit.specs.selectComponentType')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Seleccionar tipo</SelectItem>
+                    <SelectItem value="none">{t('edit.specs.selectComponentType')}</SelectItem>
                     {componentTypes.map(type => (
                       <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                     ))}
@@ -1325,7 +1352,7 @@ const EditVehicle = () => {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="element">Elemento</Label>
+              <Label htmlFor="element">{t('edit.specs.element')}</Label>
               <Input
                 id="element"
                 name="element"
@@ -1336,7 +1363,7 @@ const EditVehicle = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="manufacturer">Marca</Label>
+              <Label htmlFor="manufacturer">{t('edit.specs.brand')}</Label>
               <Input
                 id="manufacturer"
                 name="manufacturer"
@@ -1349,7 +1376,7 @@ const EditVehicle = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2 max-w-xs">
               <Label htmlFor={fromInventory ? 'inv-units-qty' : 'mounted_qty'}>
-                {fromInventory ? 'Unidades (stock y montaje)' : 'Unidades montadas'}
+                {fromInventory ? t('edit.specs.unitsStockMount') : t('edit.specs.mountedUnits')}
               </Label>
               {fromInventory ? (
                 <Input
@@ -1372,29 +1399,29 @@ const EditVehicle = () => {
               )}
               <p className="text-xs text-muted-foreground">
                 {fromInventory
-                  ? `Se descontarán del inventario (máx. ${selectedInventoryMaxQty ?? '—'}) y quedarán como piezas montadas en esta línea.`
-                  : 'Cuántas piezas iguales representa esta línea (p. ej. 2 para un par de neumáticos).'}
+                  ? t('edit.specs.inventoryDeductHint', { max: selectedInventoryMaxQty ?? '—' })
+                  : t('edit.specs.mountedQtyHint')}
               </p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="material">Material</Label>
+              <Label htmlFor="material">{t('edit.specs.material')}</Label>
               <Input id="material" name="material" value={specValue.material} onChange={handleSpecChange} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="size">Tamaño</Label>
+              <Label htmlFor="size">{t('edit.specs.size')}</Label>
               <Input id="size" name="size" value={specValue.size} onChange={handleSpecChange} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="color">Color</Label>
+              <Label htmlFor="color">{t('edit.specs.color')}</Label>
               <Input id="color" name="color" value={specValue.color} onChange={handleSpecChange} />
             </div>
           </div>
           {['pinion', 'crown'].includes(specValue.component_type) && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="teeth">Dientes</Label>
+                <Label htmlFor="teeth">{t('edit.specs.teeth')}</Label>
                 <Input id="teeth" name="teeth" type="number" value={specValue.teeth} onChange={handleSpecChange} required />
               </div>
             </div>
@@ -1413,12 +1440,10 @@ const EditVehicle = () => {
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="price">{isModificationTab ? 'Precio unitario (€)' : 'Precio (€)'}</Label>
+              <Label htmlFor="price">{isModificationTab ? t('edit.specs.priceMod') : t('edit.specs.priceSpec')}</Label>
               <Input id="price" name="price" type="number" step="0.01" value={specValue.price} onChange={handleSpecChange} disabled={fromInventory} />
               {isModificationTab && (
-                <p className="text-xs text-muted-foreground">
-                  Por unidad; el coste en el coche es precio × unidades montadas.
-                </p>
+                <p className="text-xs text-muted-foreground">{t('edit.specs.priceModHint')}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -1431,7 +1456,7 @@ const EditVehicle = () => {
             </div>
           </div>
           <div className="mt-4 space-y-2">
-            <Label htmlFor="description">Descripción</Label>
+            <Label htmlFor="description">{t('edit.specs.description')}</Label>
             <Textarea id="description" name="description" rows={3} value={specValue.description} onChange={handleSpecChange} />
           </div>
           {!isModificationTab && (
@@ -1441,18 +1466,24 @@ const EditVehicle = () => {
                 checked={specValue.is_modification}
                 onCheckedChange={(checked) => handleSpecChange({ target: { name: 'is_modification', value: '', type: 'checkbox', checked } })}
               />
-              <Label htmlFor="is_modification">Es una modificación</Label>
+              <Label htmlFor="is_modification">{t('edit.specs.isModification')}</Label>
             </div>
           )}
           <div className="flex gap-2 mt-4">
             <Button type="submit">
               {fromInventory
-                ? 'Montar y descontar stock'
-                : `${editingSpec ? 'Actualizar' : 'Añadir'} ${isModificationTab ? 'Modificación' : 'Especificación'}`}
+                ? t('edit.specs.mountAndDeduct')
+                : editingSpec
+                  ? isModificationTab
+                    ? t('edit.specs.updateModification')
+                    : t('edit.specs.updateSpec')
+                  : isModificationTab
+                    ? t('edit.specs.addModificationBtn')
+                    : t('edit.specs.addSpecBtn')}
             </Button>
             {editingSpec && (
               <Button type="button" variant="secondary" onClick={handleCancelEdit}>
-                Cancelar
+                {tCommon('actions.cancel')}
               </Button>
             )}
           </div>
@@ -1461,10 +1492,8 @@ const EditVehicle = () => {
           <Dialog open={inventoryPickerOpen} onOpenChange={(open) => setInventoryPickerOpen(open)}>
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Elegir ítem de inventario</DialogTitle>
-                <DialogDescription>
-                  Solo se muestran piezas con stock. Si eliges un tipo de componente arriba, la lista se filtra por esa categoría.
-                </DialogDescription>
+                <DialogTitle>{t('modals.inventoryPickerTitle')}</DialogTitle>
+                <DialogDescription>{t('modals.inventoryPickerDesc')}</DialogDescription>
               </DialogHeader>
               <div className="space-y-2 max-h-[50vh] overflow-y-auto py-2">
                 {inventoryPickerLoading ? (
@@ -1473,7 +1502,9 @@ const EditVehicle = () => {
                   </div>
                 ) : inventoryPickerItems.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">
-                    No hay ítems con stock{newSpec.component_type ? ' para esta categoría' : ''}.
+                    {t('modals.noInventoryItems', {
+                      categorySuffix: newSpec.component_type ? t('modals.categorySuffix') : '',
+                    })}
                   </p>
                 ) : (
                   inventoryPickerItems.map((item) => (
@@ -1484,16 +1515,16 @@ const EditVehicle = () => {
                       <div className="min-w-0">
                         <p className="font-medium truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatInventoryCategory(item.category)} · Stock: {item.quantity}
+                          {formatInventoryCategory(item.category)} · {t('modals.stock')}: {item.quantity}
                           {item.purchase_price != null &&
-                            ` · ${Number(item.purchase_price).toFixed(2)} €/ud (precio unitario)`}
+                            ` · ${Number(item.purchase_price).toFixed(2)} ${t('modals.unitPrice')}`}
                         </p>
                         {Array.isArray(item.mounted_vehicles) && item.mounted_vehicles.length > 0 && (
                           <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
-                            Montado en{' '}
+                            {t('modals.mountedOn')}{' '}
                             {item.mounted_vehicles.map((v, idx) => (
                               <span key={v.id}>
-                                {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? ' y ' : ', ') : ''}
+                                {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? t('edit.and') : ', ') : ''}
                                 <Link to={`/vehicles/${v.id}`} className="text-primary hover:underline font-medium">
                                   {v.manufacturer} {v.model}
                                 </Link>
@@ -1503,7 +1534,7 @@ const EditVehicle = () => {
                         )}
                       </div>
                       <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
-                        Usar este
+                        {t('modals.useThis')}
                       </Button>
                     </div>
                   ))
@@ -1511,14 +1542,16 @@ const EditVehicle = () => {
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setInventoryPickerOpen(false)}>
-                  Cerrar
+                  {t('modals.close')}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         )}
         <div className="mt-6">
-          <h4 className="text-lg font-semibold mb-4">{isModificationTab ? 'Modificaciones Actuales' : 'Especificaciones Técnicas Actuales'}</h4>
+          <h4 className="text-lg font-semibold mb-4">
+            {isModificationTab ? t('edit.specs.currentModifications') : t('edit.specs.currentSpecs')}
+          </h4>
           {loadingSpecs ? (
             <Spinner className="size-6" />
           ) : (
@@ -1526,24 +1559,24 @@ const EditVehicle = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Elemento</TableHead>
-                    <TableHead>Cant.</TableHead>
-                    <TableHead>Marca</TableHead>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Tamaño</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>P. unit.</TableHead>
-                    <TableHead>Total línea</TableHead>
+                    <TableHead>{t('edit.specs.tableType')}</TableHead>
+                    <TableHead>{t('edit.specs.element')}</TableHead>
+                    <TableHead>{t('edit.specs.tableQty')}</TableHead>
+                    <TableHead>{t('edit.specs.brand')}</TableHead>
+                    <TableHead>{t('edit.specs.material')}</TableHead>
+                    <TableHead>{t('edit.specs.size')}</TableHead>
+                    <TableHead>{t('edit.specs.color')}</TableHead>
+                    <TableHead>{t('edit.specs.tableUnitPrice')}</TableHead>
+                    <TableHead>{t('edit.specs.tableLineTotal')}</TableHead>
                     <TableHead>URL</TableHead>
-                    <TableHead>Acciones</TableHead>
+                    <TableHead>{t('edit.specs.tableActions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {components.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={11} className="text-center text-muted-foreground">
-                        No hay {isModificationTab ? 'modificaciones' : 'especificaciones técnicas'}
+                        {isModificationTab ? t('edit.specs.noModifications') : t('edit.specs.noSpecs')}
                       </TableCell>
                     </TableRow>
                   )}
@@ -1565,7 +1598,7 @@ const EditVehicle = () => {
                         </TableCell>
                         <TableCell>
                           {comp.url ? (
-                            <a href={comp.url} target="_blank" rel="noopener noreferrer" title="Abrir enlace" className="text-primary hover:underline">
+                            <a href={comp.url} target="_blank" rel="noopener noreferrer" title={t('edit.openLink')} className="text-primary hover:underline">
                               <ExternalLink className="size-4 inline" />
                             </a>
                           ) : (
@@ -1574,10 +1607,10 @@ const EditVehicle = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="default" size="sm" onClick={() => handleEditSpec(currentSpec, comp)} title="Editar">
+                            <Button variant="default" size="sm" onClick={() => handleEditSpec(currentSpec, comp)} title={tCommon('actions.edit')}>
                               <Pencil className="size-4" />
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSpec(currentSpec.id, comp.id)} title="Eliminar">
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSpec(currentSpec.id, comp.id)} title={tCommon('actions.delete')}>
                               <Trash2 className="size-4" />
                             </Button>
                           </div>
@@ -1586,11 +1619,11 @@ const EditVehicle = () => {
                       {isModificationTab && comp.change_history?.length > 0 && (
                         <TableRow>
                           <TableCell colSpan={11} className="bg-muted/40 align-top py-3">
-                            <p className="text-xs font-medium text-muted-foreground mb-2">Historial (componente anterior)</p>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">{t('edit.specs.historyTitle')}</p>
                             <ul className="text-sm space-y-1 list-disc list-inside">
                               {comp.change_history.map((h) => (
                                 <li key={h.id}>
-                                  <span className="text-muted-foreground">Desde el {formatHistoryDate(h.effective_date)}: </span>
+                                  <span className="text-muted-foreground">{t('edit.specs.historySince', { date: formatHistoryDate(h.effective_date) })} </span>
                                   {formatModificationSnapshot(h.previous_snapshot)}
                                 </li>
                               ))}
@@ -1603,7 +1636,7 @@ const EditVehicle = () => {
                   {isModificationTab && components.length > 0 && (
                     <TableRow>
                       <TableCell colSpan={8} className="text-right font-bold">
-                        Total modificaciones
+                        {t('edit.specs.totalModifications')}
                       </TableCell>
                       <TableCell className="font-bold">—</TableCell>
                       <TableCell className="font-bold">
@@ -1631,7 +1664,7 @@ const EditVehicle = () => {
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" onClick={() => setShowImportModal(true)}>
             <Upload className="size-4 mr-2" />
-            Importar sesiones
+            {tTimings('import')}
           </Button>
         </div>
         <ImportTimingsModal
@@ -1647,7 +1680,9 @@ const EditVehicle = () => {
           onImported={loadTimings}
         />
         <LapTimerTrainingCard vehicleId={id} circuits={circuits} />
-        <h4 className="text-lg font-semibold">{editingTiming ? 'Editar' : 'Añadir'} Registro de Tiempo</h4>
+        <h4 className="text-lg font-semibold">
+          {editingTiming ? t('edit.timings.editRecord') : t('edit.timings.addRecord')}
+        </h4>
         {timingNotice && (
           <Alert
             className={cn(
@@ -1669,7 +1704,7 @@ const EditVehicle = () => {
           <TimeInputHint className="mb-3" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="best_lap_time">Mejor Vuelta (mm:ss.mmm)</Label>
+              <Label htmlFor="best_lap_time">{t('edit.timings.bestLap')}</Label>
               <TimeInput
                 id="best_lap_time"
                 name="best_lap_time"
@@ -1681,7 +1716,7 @@ const EditVehicle = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="total_time">Tiempo Total (mm:ss.mmm)</Label>
+              <Label htmlFor="total_time">{t('edit.timings.totalTime')}</Label>
               <TimeInput
                 id="total_time"
                 name="total_time"
@@ -1693,7 +1728,7 @@ const EditVehicle = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="laps">Vueltas</Label>
+              <Label htmlFor="laps">{t('edit.timings.laps')}</Label>
               <Input
                 id="laps"
                 name="laps"
@@ -1707,7 +1742,7 @@ const EditVehicle = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="average_time">Tiempo Promedio (mm:ss.ms)</Label>
+              <Label htmlFor="average_time">{t('edit.timings.averageTime')}</Label>
               <Input
                 id="average_time"
                 name="average_time"
@@ -1715,14 +1750,14 @@ const EditVehicle = () => {
                 readOnly
                 className="bg-muted"
               />
-              <p className="text-xs text-muted-foreground">Calculado automáticamente</p>
+              <p className="text-xs text-muted-foreground">{t('edit.timings.autoCalculated')}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lane">Carril</Label>
+              <Label htmlFor="lane">{t('edit.timings.lane')}</Label>
               <Input id="lane" name="lane" value={editingTiming?.lane || newTiming.lane} onChange={handleTimingChange} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="timing_date">Fecha</Label>
+              <Label htmlFor="timing_date">{t('edit.timings.date')}</Label>
               <Input
                 id="timing_date"
                 name="timing_date"
@@ -1735,20 +1770,20 @@ const EditVehicle = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="circuit_id">Circuito</Label>
+              <Label htmlFor="circuit_id">{t('edit.timings.circuit')}</Label>
               <Select
                 value={(editingTiming?.circuit_id || newTiming.circuit_id) || 'none'}
                 onValueChange={(v) => {
-                  const t = editingTiming || newTiming;
+                  const timingRow = editingTiming || newTiming;
                   const fn = editingTiming ? setEditingTiming : setNewTiming;
-                  fn({ ...t, circuit_id: v === 'none' ? '' : v });
+                  fn({ ...timingRow, circuit_id: v === 'none' ? '' : v });
                 }}
               >
                 <SelectTrigger id="circuit_id">
-                  <SelectValue placeholder="Seleccionar circuito (opcional)" />
+                  <SelectValue placeholder={t('edit.timings.selectCircuitOptional')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Ninguno</SelectItem>
+                  <SelectItem value="none">{t('edit.none')}</SelectItem>
                   {circuits.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
@@ -1756,31 +1791,31 @@ const EditVehicle = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="supply_voltage_volts">Voltaje pista (V)</Label>
+              <Label htmlFor="supply_voltage_volts">{t('edit.timings.trackVoltage')}</Label>
               <Input
                 id="supply_voltage_volts"
                 name="supply_voltage_volts"
                 value={editingTiming?.supply_voltage_volts ?? newTiming.supply_voltage_volts ?? ''}
                 onChange={handleTimingChange}
-                placeholder="Opcional, 0–30"
+                placeholder={t('edit.timings.voltagePlaceholder')}
                 inputMode="decimal"
               />
-              <p className="text-xs text-muted-foreground">También puedes editarlo en la tabla de registros.</p>
+              <p className="text-xs text-muted-foreground">{t('edit.timings.voltageTableHint')}</p>
             </div>
           </div>
           <div className="flex gap-2 mt-4">
             <Button type="submit">
-              {editingTiming ? 'Actualizar' : 'Añadir'} Registro
+              {editingTiming ? t('edit.timings.updateRecord') : t('edit.timings.addRecordBtn')}
             </Button>
             {editingTiming && (
               <Button type="button" variant="secondary" onClick={handleCancelEditTiming}>
-                Cancelar
+                {tCommon('actions.cancel')}
               </Button>
             )}
           </div>
         </form>
         <div className="mt-6">
-          <h4 className="text-lg font-semibold mb-4">Registros de Tiempo</h4>
+          <h4 className="text-lg font-semibold mb-4">{t('edit.timings.recordsTitle')}</h4>
           {loadingTimings ? (
             <Spinner className="size-6" />
           ) : (
@@ -1789,24 +1824,24 @@ const EditVehicle = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Mejor Vuelta</TableHead>
-                      <TableHead>Tiempo Total</TableHead>
-                      <TableHead>Vueltas</TableHead>
-                      <TableHead>Tiempo Promedio</TableHead>
-                      <TableHead>Distancia</TableHead>
-                      <TableHead>Velocidad</TableHead>
-                      <TableHead>Carril</TableHead>
-                      <TableHead>Circuito</TableHead>
+                      <TableHead>{t('edit.timings.tableDate')}</TableHead>
+                      <TableHead>{t('edit.timings.tableBestLap')}</TableHead>
+                      <TableHead>{t('edit.timings.tableTotalTime')}</TableHead>
+                      <TableHead>{t('edit.timings.laps')}</TableHead>
+                      <TableHead>{t('edit.timings.tableAverage')}</TableHead>
+                      <TableHead>{t('edit.timings.tableDistance')}</TableHead>
+                      <TableHead>{t('edit.timings.tableSpeed')}</TableHead>
+                      <TableHead>{t('edit.timings.lane')}</TableHead>
+                      <TableHead>{t('edit.timings.circuit')}</TableHead>
                       <TableHead className="w-[100px]">V (V)</TableHead>
-                      <TableHead className="text-center">Configuración</TableHead>
-                      <TableHead>Acciones</TableHead>
+                      <TableHead className="text-center">{t('edit.timings.tableConfig')}</TableHead>
+                      <TableHead>{t('edit.specs.tableActions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {timings.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center text-muted-foreground">No hay registros de tiempo</TableCell>
+                        <TableCell colSpan={12} className="text-center text-muted-foreground">{t('edit.timings.noRecords')}</TableCell>
                       </TableRow>
                     )}
                     {timings.map((timing) => (
@@ -1828,7 +1863,10 @@ const EditVehicle = () => {
                         </TableCell>
                         <TableCell>
                           {timing.avg_speed_kmh != null && timing.avg_speed_scale_kmh != null
-                            ? `${Number(timing.avg_speed_kmh).toFixed(1)} km/h (${Number(timing.avg_speed_scale_kmh).toFixed(0)} eq.)`
+                            ? t('edit.timings.speedFormat', {
+                                real: Number(timing.avg_speed_kmh).toFixed(1),
+                                scale: Number(timing.avg_speed_scale_kmh).toFixed(0),
+                              })
                             : '-'}
                         </TableCell>
                         <TableCell>{timing.lane || '-'}</TableCell>
@@ -1841,7 +1879,7 @@ const EditVehicle = () => {
                             placeholder="—"
                             inputMode="decimal"
                             onBlur={(e) => handleTimingVoltageBlur(timing.id, e.target.value)}
-                            aria-label="Voltaje de la sesión en voltios"
+                            aria-label={t('edit.timings.voltageAria')}
                           />
                         </TableCell>
                         <TableCell className="text-center">
@@ -1853,13 +1891,13 @@ const EditVehicle = () => {
                                 setSelectedTiming(timing);
                                 setShowSpecsModal(true);
                               }}
-                              title="Ver especificaciones técnicas"
+                              title={tTimings('viewSpecs')}
                             >
                               <Wrench className="size-4 mr-1" />
                               Ver Config
                             </Button>
                           ) : (
-                            <span className="text-muted-foreground text-sm">Sin config</span>
+                            <span className="text-muted-foreground text-sm">{t('edit.timings.noConfig')}</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -1869,15 +1907,15 @@ const EditVehicle = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => { setPerformanceTiming(timing); setShowPerformanceModal(true); }}
-                                title="Ver análisis de rendimiento"
+                                title={tTimings('viewPerformance')}
                               >
                                 <BarChart3 className="size-4" />
                               </Button>
                             )}
-                            <Button variant="default" size="sm" onClick={() => handleEditTiming(timing)} title="Editar">
+                            <Button variant="default" size="sm" onClick={() => handleEditTiming(timing)} title={tCommon('actions.edit')}>
                               <Pencil className="size-4" />
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTiming(timing.id)} title="Eliminar">
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTiming(timing.id)} title={tCommon('actions.delete')}>
                               <Trash2 className="size-4" />
                             </Button>
                           </div>
@@ -1890,7 +1928,7 @@ const EditVehicle = () => {
 
               {timings.length > 0 && (
                 <div className="mt-8">
-                  <h4 className="text-lg font-semibold mb-4">Evolución de Tiempos por Circuito y Carril</h4>
+                  <h4 className="text-lg font-semibold mb-4">{t('edit.timings.evolutionTitle')}</h4>
                   <p className="text-muted-foreground mb-4">
                     Se muestran gráficas de evolución para circuitos y carriles con múltiples registros de tiempo.
                   </p>
@@ -1900,8 +1938,8 @@ const EditVehicle = () => {
                     if (groupedTimings.length === 0) {
                       return (
                         <div className="text-center text-muted-foreground py-8">
-                          <p>No hay suficientes registros de tiempo para mostrar evolución.</p>
-                          <p className="text-sm mt-1">Se necesitan al menos 2 registros del mismo circuito y carril.</p>
+                          <p>{t('edit.timings.evolutionInsufficient')}</p>
+                          <p className="text-sm mt-1">{t('edit.timings.evolutionNeedTwo')}</p>
                         </div>
                       );
                     }
@@ -1948,34 +1986,26 @@ const EditVehicle = () => {
     );
   }
 
-  const vehicleTabOptions = [
-    { value: 'general', label: 'Información General' },
-    { value: 'technical', label: 'Especificaciones Técnicas' },
-    { value: 'modifications', label: 'Modificaciones' },
-    { value: 'timings', label: 'Tabla de Tiempos' },
-    ...(hasMultipleConfigs(timings) ? [{ value: 'config-analysis', label: 'Análisis Config.' }] : []),
-    { value: 'maintenance', label: 'Mantenimiento' },
-    { value: 'palmares', label: 'Palmarés' },
-  ];
-
   const vehicleTabsTriggerClass = 'sm:px-3 sm:text-sm';
 
   const getConfirmDialogContent = () => {
     if (!deleteConfirm) return null;
     if (deleteConfirm.type === 'image') {
       return {
-        title: '¿Eliminar imagen?',
-        description: '¿Estás seguro de que quieres eliminar esta imagen? Esta acción no se puede deshacer.',
+        title: t('modals.deleteImageTitle'),
+        description: t('modals.deleteImageBody'),
         extra: null,
         onConfirm: confirmDeleteImage,
       };
     }
     if (deleteConfirm.type === 'spec') {
       return {
-        title: deleteConfirm.isModification ? '¿Eliminar modificación?' : '¿Eliminar especificación?',
+        title: deleteConfirm.isModification ? t('modals.deleteModificationTitle') : t('modals.deleteSpecTitle'),
         description: deleteConfirm.isModification
-          ? `¿Eliminar «${deleteConfirm.elementLabel || 'esta pieza'}»? La línea desaparecerá del listado.`
-          : '¿Estás seguro de que quieres eliminar esta especificación? Esta acción no se puede deshacer.',
+          ? t('modals.deleteModificationBody', {
+              label: deleteConfirm.elementLabel || t('modals.thisPiece'),
+            })
+          : t('modals.deleteSpecBody'),
         extra: deleteConfirm.isModification ? (
           <div className="flex items-start gap-2 pt-4">
             <Switch
@@ -1984,8 +2014,10 @@ const EditVehicle = () => {
               onCheckedChange={setSpecDeleteReturnToInventory}
             />
             <Label htmlFor="spec-del-inv" className="text-sm font-normal leading-snug cursor-pointer">
-              Añadir al inventario la pieza retirada ({deleteConfirm.mountedQty}{' '}
-              {deleteConfirm.mountedQty === 1 ? 'unidad' : 'unidades'})
+              {t('modals.returnToInventoryOnDelete', {
+                count: deleteConfirm.mountedQty,
+                unit: deleteConfirm.mountedQty === 1 ? t('modals.unit') : t('modals.units'),
+              })}
             </Label>
           </div>
         ) : null,
@@ -1994,8 +2026,8 @@ const EditVehicle = () => {
     }
     if (deleteConfirm.type === 'timing') {
       return {
-        title: '¿Eliminar registro de tiempo?',
-        description: '¿Estás seguro de que quieres eliminar este registro de tiempo? Esta acción no se puede deshacer.',
+        title: tTimings('deleteConfirmTitle'),
+        description: tTimings('deleteConfirmBody'),
         extra: null,
         onConfirm: confirmDeleteTiming,
       };
@@ -2015,27 +2047,28 @@ const EditVehicle = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Añadir al inventario la pieza retirada?</AlertDialogTitle>
+            <AlertDialogTitle>{t('modals.returnToInventoryTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Has modificado esta línea de modificación; la configuración anterior queda registrada en el historial.
+              {t('modals.returnToInventoryBody1')}
               {pendingSpecSave != null && (
                 <>
                   {' '}
-                  ¿Quieres crear un ítem en inventario por las{' '}
-                  <strong>{pendingSpecSave.removedQty}</strong>{' '}
-                  {pendingSpecSave.removedQty === 1 ? 'unidad retirada' : 'unidades retiradas'} (estado previo al
-                  cambio)?
+                  {t('modals.returnToInventoryBody2', {
+                    count: pendingSpecSave.removedQty,
+                    unit:
+                      pendingSpecSave.removedQty === 1 ? t('modals.removedUnit') : t('modals.removedUnits'),
+                  })}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-            <AlertDialogCancel type="button">Cancelar edición</AlertDialogCancel>
+            <AlertDialogCancel type="button">{t('modals.cancelEdit')}</AlertDialogCancel>
             <Button type="button" variant="secondary" onClick={() => resolveModificationReturnChoice(false)}>
-              No, solo guardar
+              {t('modals.saveOnly')}
             </Button>
             <Button type="button" onClick={() => resolveModificationReturnChoice(true)}>
-              Sí, al inventario
+              {t('modals.yesToInventory')}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2050,9 +2083,9 @@ const EditVehicle = () => {
             </AlertDialogHeader>
             {confirmContent.extra}
             <AlertDialogFooter>
-              <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+              <AlertDialogCancel type="button">{t('modals.cancel')}</AlertDialogCancel>
               <AlertDialogAction type="button" onClick={confirmContent.onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Eliminar
+                {t('modals.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -2079,10 +2112,8 @@ const EditVehicle = () => {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Código QR — ficha técnica</DialogTitle>
-            <DialogDescription>
-            Pégalo en la urna y consulta sus características al instante. Descarga el PNG (512×512 px) para imprimirlo.
-            </DialogDescription>
+            <DialogTitle>{t('modals.qrTitle')}</DialogTitle>
+            <DialogDescription>{t('modals.qrDesc')}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-3 py-2">
             {qrLoading && <Spinner className="size-8" />}
@@ -2092,7 +2123,7 @@ const EditVehicle = () => {
                 <div className="flex flex-col items-center gap-2">
                   <img
                     src={qrDataUrl}
-                    alt="Código QR para abrir la ficha técnica en PDF"
+                    alt={t('modals.qrAlt')}
                     className="w-48 h-48 sm:w-56 sm:h-56 object-contain rounded border bg-white p-1"
                   />
                 </div>
@@ -2114,10 +2145,10 @@ const EditVehicle = () => {
                 a.remove();
               }}
             >
-              Descargar PNG
+              {t('modals.downloadPng')}
             </Button>
             <Button type="button" variant="default" onClick={closeQrDialog}>
-              Cerrar
+              {t('modals.close')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2125,10 +2156,12 @@ const EditVehicle = () => {
 
       <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
         <div className="flex items-center gap-4 min-w-0">
-          <h2 className="text-2xl font-bold">Editar Vehículo{vehicle.model ? `: ${vehicle.model}` : ''}</h2>
+          <h2 className="text-2xl font-bold">
+            {vehicle.model ? t('edit.titleWithModel', { model: vehicle.model }) : t('edit.title')}
+          </h2>
           {vehicle.total_distance_meters != null && vehicle.total_distance_meters > 0 && (
             <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-              Odómetro: {formatDistance(vehicle.total_distance_meters)}
+              {t('edit.odometer')} {formatDistance(vehicle.total_distance_meters)}
             </span>
           )}
         </div>
@@ -2137,13 +2170,13 @@ const EditVehicle = () => {
             type="button"
             variant="outline"
             onClick={openQrDialog}
-            title="Generar QR de ficha técnica pública (visible en cualquier pestaña)"
+            title={t('modals.qrButtonTitle')}
           >
             <QrCode className="size-4 mr-2" />
-            QR ficha
+            {t('modals.qrButton')}
           </Button>
           <Button variant="secondary" onClick={() => navigate('/vehicles')}>
-            Volver al listado
+            {t('edit.backToList')}
           </Button>
         </div>
       </div>
@@ -2161,20 +2194,20 @@ const EditVehicle = () => {
               </span>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Navegación
+                  {t('edit.navigation')}
                 </p>
-                <p className="text-sm font-medium leading-tight text-foreground">Sección del vehículo</p>
+                <p className="text-sm font-medium leading-tight text-foreground">{t('edit.sectionLabel')}</p>
               </div>
             </div>
             <Label htmlFor="vehicle-edit-section" className="sr-only">
-              Sección del vehículo
+              {t('edit.sectionLabel')}
             </Label>
             <Select value={activeTab} onValueChange={setActiveTab}>
               <SelectTrigger
                 id="vehicle-edit-section"
                 className="h-11 w-full border-2 border-input bg-background text-base font-medium shadow-sm"
               >
-                <SelectValue placeholder="Elige una sección" />
+                <SelectValue placeholder={t('edit.chooseSection')} />
               </SelectTrigger>
               <SelectContent position="popper" className="max-h-[min(24rem,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)]">
                 {vehicleTabOptions.map((opt) => (
@@ -2195,27 +2228,27 @@ const EditVehicle = () => {
           )}
         >
           <TabsTrigger value="general" className={vehicleTabsTriggerClass}>
-            Información General
+            {t('edit.tabs.general')}
           </TabsTrigger>
           <TabsTrigger value="technical" className={vehicleTabsTriggerClass}>
-            Especificaciones Técnicas
+            {t('edit.tabs.technical')}
           </TabsTrigger>
           <TabsTrigger value="modifications" className={vehicleTabsTriggerClass}>
-            Modificaciones
+            {t('edit.tabs.modifications')}
           </TabsTrigger>
           <TabsTrigger value="timings" className={vehicleTabsTriggerClass}>
-            Tabla de Tiempos
+            {t('edit.tabs.timings')}
           </TabsTrigger>
           {hasMultipleConfigs(timings) && (
             <TabsTrigger value="config-analysis" className={vehicleTabsTriggerClass}>
-              Análisis Config.
+              {t('edit.tabs.configAnalysis')}
             </TabsTrigger>
           )}
           <TabsTrigger value="maintenance" className={vehicleTabsTriggerClass}>
-            Mantenimiento
+            {t('edit.tabs.maintenance')}
           </TabsTrigger>
           <TabsTrigger value="palmares" className={vehicleTabsTriggerClass}>
-            Palmarés
+            {t('edit.tabs.palmares')}
           </TabsTrigger>
         </TabsList>
 
@@ -2225,23 +2258,23 @@ const EditVehicle = () => {
               <div className="space-y-6 min-w-0 order-2 lg:order-1">
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Identificación</CardTitle>
+                    <CardTitle className="text-base">{t('edit.cards.identification')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="model">Modelo</Label>
+                      <Label htmlFor="model">{t('edit.fields.model')}</Label>
                       <Input id="model" name="model" value={vehicle.model || ''} onChange={handleChange} required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reference">Referencia</Label>
+                      <Label htmlFor="reference">{t('edit.fields.reference')}</Label>
                       <Input id="reference" name="reference" value={vehicle.reference ?? ''} onChange={handleChange} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="manufacturer">Fabricante</Label>
+                      <Label htmlFor="manufacturer">{t('edit.fields.manufacturer')}</Label>
                       <Input id="manufacturer" name="manufacturer" value={vehicle.manufacturer || ''} onChange={handleChange} required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="type">Tipo</Label>
+                      <Label htmlFor="type">{t('edit.fields.type')}</Label>
                       <Select
                         value={vehicle.type || 'none'}
                         onValueChange={(v) =>
@@ -2252,10 +2285,10 @@ const EditVehicle = () => {
                         required
                       >
                         <SelectTrigger id="type">
-                          <SelectValue placeholder="Selecciona tipo" />
+                          <SelectValue placeholder={t('edit.selectType')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Selecciona tipo</SelectItem>
+                          <SelectItem value="none">{t('edit.selectType')}</SelectItem>
                           {vehicleTypes.map((t) => (
                             <SelectItem key={t} value={t}>
                               {t}
@@ -2269,15 +2302,15 @@ const EditVehicle = () => {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Datos técnicos</CardTitle>
+                    <CardTitle className="text-base">{t('edit.cards.technicalData')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="traction">Tracción</Label>
+                      <Label htmlFor="traction">{t('edit.fields.traction')}</Label>
                       <Input id="traction" name="traction" value={vehicle.traction || ''} onChange={handleChange} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="motor_position">Posición del motor</Label>
+                      <Label htmlFor="motor_position">{t('edit.fields.motorPosition')}</Label>
                       <Select
                         value={vehicle.motor_position || '__none__'}
                         onValueChange={(v) =>
@@ -2292,10 +2325,10 @@ const EditVehicle = () => {
                         }
                       >
                         <SelectTrigger id="motor_position">
-                          <SelectValue placeholder="Opcional" />
+                          <SelectValue placeholder={t('edit.optional')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                          <SelectItem value="__none__">{t('edit.notSpecified')}</SelectItem>
                           {MOTOR_POSITION_OPTIONS.map((o) => (
                             <SelectItem key={o.value} value={o.value}>
                               {o.label}
@@ -2309,12 +2342,12 @@ const EditVehicle = () => {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Competición y edición limitada</CardTitle>
+                    <CardTitle className="text-base">{t('edit.cards.competition')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="dorsal">Dorsal</Label>
-                      <Input id="dorsal" name="dorsal" value={vehicle.dorsal ?? ''} onChange={handleChange} placeholder="Opcional" />
+                      <Label htmlFor="dorsal">{t('edit.fields.dorsal')}</Label>
+                      <Input id="dorsal" name="dorsal" value={vehicle.dorsal ?? ''} onChange={handleChange} placeholder={t('edit.optional')} />
                     </div>
                     <div className="flex items-center gap-2">
                       <Switch
@@ -2329,12 +2362,12 @@ const EditVehicle = () => {
                         }
                       />
                       <Label htmlFor="limited_edition" className="font-normal">
-                        Edición limitada
+                        {t('edit.fields.limitedEdition')}
                       </Label>
                     </div>
                     {vehicle.limited_edition && (
                       <div className="space-y-2">
-                        <Label htmlFor="limited_edition_unit_number">Nº de unidad (tu ejemplar)</Label>
+                        <Label htmlFor="limited_edition_unit_number">{t('edit.fields.unitNumber')}</Label>
                         <Input
                           id="limited_edition_unit_number"
                           name="limited_edition_unit_number"
@@ -2349,11 +2382,11 @@ const EditVehicle = () => {
                               limited_edition_unit_number: v === '' ? null : parseInt(v, 10),
                             }));
                           }}
-                          placeholder="ej. 45"
+                          placeholder={t('edit.fields.unitNumberPlaceholder')}
                         />
                         {vehicle.catalog_item?.limited_edition_total != null && (
                           <p className="text-xs text-muted-foreground">
-                            Tirada en catálogo: {vehicle.catalog_item.limited_edition_total} unidades
+                            {t('edit.fields.catalogRun', { total: vehicle.catalog_item.limited_edition_total })}
                           </p>
                         )}
                       </div>
@@ -2363,15 +2396,15 @@ const EditVehicle = () => {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Compra y precios</CardTitle>
+                    <CardTitle className="text-base">{t('edit.cards.purchase')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="price">Precio original (€)</Label>
+                      <Label htmlFor="price">{t('edit.fields.originalPrice')}</Label>
                       <Input id="price" name="price" type="number" step="0.01" value={vehicle.price || ''} onChange={handleChange} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="purchase_date">Fecha de compra</Label>
+                      <Label htmlFor="purchase_date">{t('edit.fields.purchaseDate')}</Label>
                       <Input
                         id="purchase_date"
                         name="purchase_date"
@@ -2381,7 +2414,7 @@ const EditVehicle = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="purchase_place">Lugar de compra</Label>
+                      <Label htmlFor="purchase_place">{t('edit.fields.purchasePlace')}</Label>
                       <Input id="purchase_place" name="purchase_place" value={vehicle.purchase_place ?? ''} onChange={handleChange} />
                     </div>
                   </CardContent>
@@ -2389,7 +2422,7 @@ const EditVehicle = () => {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Estado del ejemplar</CardTitle>
+                    <CardTitle className="text-base">{t('edit.cards.condition')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
@@ -2402,7 +2435,7 @@ const EditVehicle = () => {
                           }
                         />
                         <Label htmlFor="modified" className="font-normal">
-                          Modificado
+                          {t('edit.fields.modified')}
                         </Label>
                       </div>
                       <div className="flex items-center gap-2 min-h-9">
@@ -2414,7 +2447,7 @@ const EditVehicle = () => {
                           }
                         />
                         <Label htmlFor="digital" className="font-normal">
-                          Digital
+                          {t('edit.fields.digital')}
                         </Label>
                       </div>
                       <div className="flex items-center gap-2 min-h-9">
@@ -2426,7 +2459,7 @@ const EditVehicle = () => {
                           }
                         />
                         <Label htmlFor="museo" className="font-normal">
-                          Museo
+                          {t('edit.fields.museum')}
                         </Label>
                       </div>
                       <div className="flex items-center gap-2 min-h-9">
@@ -2438,7 +2471,7 @@ const EditVehicle = () => {
                           }
                         />
                         <Label htmlFor="taller" className="font-normal">
-                          Taller
+                          {t('edit.fields.workshop')}
                         </Label>
                       </div>
                     </div>
@@ -2447,10 +2480,10 @@ const EditVehicle = () => {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Escala y tiempos</CardTitle>
+                    <CardTitle className="text-base">{t('edit.cards.scale')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <Label htmlFor="scale_factor">Escala (1:X)</Label>
+                    <Label htmlFor="scale_factor">{t('edit.fields.scaleFactor')}</Label>
                     <Input
                       id="scale_factor"
                       name="scale_factor"
@@ -2461,15 +2494,13 @@ const EditVehicle = () => {
                       onChange={handleChange}
                       placeholder="32"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Escala del coche para calcular velocidad equivalente (ej: 32 = 1:32, 43 = 1:43)
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t('edit.fields.scaleHint')}</p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Anotaciones</CardTitle>
+                    <CardTitle className="text-base">{t('edit.cards.notes')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Textarea
@@ -2478,7 +2509,7 @@ const EditVehicle = () => {
                       rows={3}
                       value={vehicle.anotaciones ?? ''}
                       onChange={handleChange}
-                      placeholder="Añade tus comentarios..."
+                      placeholder={t('edit.fields.notesPlaceholder')}
                     />
                   </CardContent>
                 </Card>
@@ -2486,7 +2517,7 @@ const EditVehicle = () => {
 
               <Card className="order-1 lg:order-2 lg:sticky lg:top-4 self-start shadow-sm min-w-0">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Fotografías</CardTitle>
+                  <CardTitle className="text-base">{t('edit.images.title')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -2552,12 +2583,12 @@ const EditVehicle = () => {
                                 }}
                               >
                                 <Upload className="size-3.5" />
-                                Cambiar foto
+                                {t('edit.images.changePhoto')}
                               </Button>
                             </>
                           ) : (
                             <span className="text-muted-foreground text-xs sm:text-sm text-center px-1">
-                              {draggingOver === name ? 'Suelta la imagen aquí' : 'Arrastra o haz clic'}
+                              {draggingOver === name ? t('edit.images.dropHere') : t('edit.images.dragOrClick')}
                             </span>
                           )}
                           <input
@@ -2581,16 +2612,16 @@ const EditVehicle = () => {
             )}
             <div className="flex justify-end gap-2 mt-6">
               <Button variant="secondary" type="button" onClick={() => navigate('/vehicles')}>
-                Cancelar
+                {tCommon('actions.cancel')}
               </Button>
               <Button type="submit" name="save-vehicle" disabled={saving}>
                 {saving ? (
                   <>
                     <Spinner className="size-4 mr-2" />
-                    Guardando...
+                    {t('edit.saving')}
                   </>
                 ) : (
-                  'Actualizar'
+                  t('edit.update')
                 )}
               </Button>
             </div>

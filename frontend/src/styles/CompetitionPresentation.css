@@ -1275,4 +1275,105 @@ html.presentation-mode-tv .grid-body {
   .best-lap-col {
     display: none;
   }
-} 
+}
+
+/* --- Live Event Hub: modo overlay OBS --- */
+.presentation-overlay-mode {
+  background: transparent !important;
+  min-height: auto;
+}
+
+.presentation-overlay-mode .presentation-content {
+  min-height: auto;
+  padding: 0.5rem;
+}
+
+.presentation-overlay-mode .presentation-content:has(.presentation-scene--ranking) {
+  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.presentation-overlay-mode .presentation-scene--ranking {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  width: 100%;
+}
+
+.presentation-overlay-mode .presentation-scene--ranking .live-ranking-table--auto-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.presentation-overlay-mode .presentation-scene--ranking .table-container--auto-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.presentation-overlay-mode .presentation-scene--ranking .table-container--auto-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.presentation-overlay-mode::before {
+  display: none;
+}
+
+.presentation-scene {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.presentation-scene--ranking .live-ranking-table,
+.presentation-scene--bestlap .best-lap-highlight,
+.presentation-scene--nextpilot .next-pilot-highlight {
+  background: color-mix(in oklch, var(--card) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px color-mix(in oklch, var(--foreground) 12%, transparent);
+}
+
+.presentation-loading--overlay,
+.presentation-error--overlay {
+  background: transparent;
+  min-height: auto;
+}
+
+.presentation-loading--overlay::before,
+.presentation-error--overlay::before {
+  display: none;
+}
+
+/* Próximo piloto (reutiliza tokens de best-lap-highlight) */
+.next-pilot-highlight {
+  padding: 1.25rem 1.5rem;
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.next-pilot-highlight--active {
+  border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}
+
+.next-pilot-hero-name {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 0.75rem;
+  color: var(--foreground);
+}

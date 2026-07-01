@@ -5,6 +5,7 @@ const express = require('express');
 const { param, query } = require('express-validator');
 const { getServiceClient } = require('../lib/supabaseClients');
 const { buildClubEventsIcs } = require('../lib/clubIcs');
+const { buildClubCircuitLeaderboard } = require('../lib/clubCircuitLeaderboard');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 
 const router = express.Router();
@@ -30,7 +31,7 @@ router.get(
       const slug = String(req.params.slug || '').trim();
       const { data: club, error: cErr } = await supabaseAdmin
         .from('clubs')
-        .select('id, name, slug, description, city, website_url')
+        .select('id, name, slug, description, city, website_url, leaderboard_public')
         .eq('slug', slug)
         .maybeSingle();
       if (cErr || !club) {
@@ -68,6 +69,16 @@ router.get(
         return res.status(500).json({ error: 'Error al cargar el tablón público' });
       }
 
+      let publicCircuits = [];
+      if (club.leaderboard_public) {
+        const { data: circuits } = await supabaseAdmin
+          .from('circuits')
+          .select('id, name, num_lanes, description')
+          .eq('club_id', club.id)
+          .order('name', { ascending: true });
+        publicCircuits = circuits || [];
+      }
+
       res.json({
         club: {
           name: club.name,
@@ -75,12 +86,65 @@ router.get(
           description: club.description,
           city: club.city,
           website_url: club.website_url,
+          leaderboard_public: Boolean(club.leaderboard_public),
         },
         upcoming_events: events || [],
         board_items: boardItems || [],
+        circuits: publicCircuits,
       });
     } catch (e) {
       console.error('GET by-slug profile', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.get(
+  '/by-slug/:slug/circuits/:circuitId/leaderboard',
+  param('slug').trim().notEmpty(),
+  param('circuitId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      if (!supabaseAdmin) {
+        return res.status(503).json({ error: 'Servicio no configurado' });
+      }
+      const slug = String(req.params.slug || '').trim();
+      const { circuitId } = req.params;
+
+      const { data: club, error: cErr } = await supabaseAdmin
+        .from('clubs')
+        .select('id, name, slug, leaderboard_public')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (cErr || !club) return res.status(404).json({ error: 'Club no encontrado' });
+      if (!club.leaderboard_public) {
+        return res.status(404).json({ error: 'Leaderboard no público' });
+      }
+
+      const { data: circuit, error: circErr } = await supabaseAdmin
+        .from('circuits')
+        .select('id, name, num_lanes, club_id')
+        .eq('id', circuitId)
+        .eq('club_id', club.id)
+        .maybeSingle();
+      if (circErr || !circuit) return res.status(404).json({ error: 'Circuito no encontrado' });
+
+      const result = await buildClubCircuitLeaderboard(supabaseAdmin, {
+        clubId: club.id,
+        circuitId,
+        lane: req.query.lane,
+        period: req.query.period,
+        vehicleType: req.query.vehicle_type,
+      });
+
+      res.json({
+        club: { name: club.name, slug: club.slug },
+        circuit: { id: circuit.id, name: circuit.name, num_lanes: circuit.num_lanes },
+        ...result,
+      });
+    } catch (e) {
+      console.error('GET public leaderboard', e);
       res.status(500).json({ error: e.message });
     }
   },

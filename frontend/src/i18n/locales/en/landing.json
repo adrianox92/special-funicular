@@ -1,0 +1,24 @@
+{
+  "hero": {
+    "title": "Take your slot collection management to the next level",
+    "subtitle": "Technical sheets, millisecond timing, competitions and cloud sync for Scalextric, Ninco and Avant Slot.",
+    "ctaLogin": "Log in",
+    "ctaRegister": "Create free account",
+    "ctaCatalog": "Browse catalog"
+  },
+  "highlights": {
+    "pwa": "Installable PWA",
+    "pdf": "Exportable PDF",
+    "api": "Sync API"
+  },
+  "cards": {
+    "collection": { "title": "Collection", "blurb": "Sheets, photos and setups in one place." },
+    "timings": { "title": "Timings", "blurb": "Millisecond laps and per-session analysis." },
+    "competitions": { "title": "Competitions", "blurb": "Sign-ups, rules and live ranking." },
+    "inventory": { "title": "Inventory", "blurb": "Parts stock, alerts and car fitment." }
+  },
+  "seo": {
+    "title": "Slot Database | Take your slot collection to the next level",
+    "description": "Slot Database: manage Scalextric, Ninco and Avant Slot cars. Technical sheets, millisecond timing, competitions and cloud sync."
+  }
+}

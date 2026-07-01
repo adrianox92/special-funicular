@@ -1,10 +1,14 @@
 /**
- * Sitemap XML para el sitio público (catálogo). Debe alinearse con
- * `frontend/src/utils/catalogSlug.js` (slug canónico por ítem).
+ * Sitemap XML multilingüe para el sitio público (catálogo).
  */
 const { getAnonClient } = require('../lib/supabaseClients');
 
 const PAGE_SIZE = 1000;
+const LOCALES = [
+  { code: 'es', home: '/', catalog: '/catalogo' },
+  { code: 'en', home: '/en', catalog: '/en/catalog' },
+  { code: 'de', home: '/de', catalog: '/de/katalog' },
+];
 
 function catalogSlugify(text) {
   const s = String(text || '')
@@ -44,6 +48,13 @@ function getPublicSiteOrigin() {
   return '';
 }
 
+function catalogItemPaths(itemId, slug) {
+  return LOCALES.map((loc) => {
+    const base = loc.catalog.replace(/\/$/, '');
+    return `${base}/${itemId}/${slug}`;
+  });
+}
+
 /**
  * @param {import('express').Request} _req
  * @param {import('express').Response} res
@@ -65,11 +76,13 @@ function sitemapHandler(_req, res) {
 
     const supabase = getAnonClient();
 
-    /** @type {{ loc: string, lastmod: string }[]} */
-    const urls = [
-      { loc: `${origin}/`, lastmod: '' },
-      { loc: `${origin}/catalogo`, lastmod: '' },
-    ];
+    /** @type {{ loc: string, lastmod: string, alternates?: { hreflang: string, href: string }[] }[]} */
+    const urls = [];
+
+    for (const loc of LOCALES) {
+      urls.push({ loc: `${origin}${loc.home}`, lastmod: '' });
+      urls.push({ loc: `${origin}${loc.catalog}`, lastmod: '' });
+    }
 
     let from = 0;
     for (;;) {
@@ -90,9 +103,19 @@ function sitemapHandler(_req, res) {
 
       for (const row of data) {
         const slug = catalogSlugify(row.model_name || row.reference);
-        const path = `/catalogo/${row.id}/${slug}`;
+        const paths = catalogItemPaths(row.id, slug);
         const lastmod = toLastmodW3cDate(row.updated_at);
-        urls.push({ loc: `${origin}${path}`, lastmod });
+        const alternates = paths.map((path, idx) => ({
+          hreflang: LOCALES[idx].code,
+          href: `${origin}${path}`,
+        }));
+        alternates.push({
+          hreflang: 'x-default',
+          href: `${origin}${paths[0]}`,
+        });
+        paths.forEach((path) => {
+          urls.push({ loc: `${origin}${path}`, lastmod, alternates });
+        });
       }
 
       if (data.length < PAGE_SIZE) break;
@@ -101,11 +124,16 @@ function sitemapHandler(_req, res) {
 
     const body =
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' +
       urls
         .map((u) => {
           const lm = u.lastmod ? `\n    <lastmod>${escapeXml(u.lastmod)}</lastmod>` : '';
-          return `  <url>\n    <loc>${escapeXml(u.loc)}</loc>${lm}\n  </url>`;
+          const alt =
+            u.alternates?.map(
+              (a) =>
+                `\n    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" href="${escapeXml(a.href)}" />`,
+            ).join('') || '';
+          return `  <url>\n    <loc>${escapeXml(u.loc)}</loc>${lm}${alt}\n  </url>`;
         })
         .join('\n') +
       '\n</urlset>';

@@ -74,6 +74,7 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
+import LiveEventHubLinks from '../components/LiveEventHubLinks';
 
 /** Promedio por vuelta = tiempo total / vueltas (formato mm:ss.mmm). */
 function averageTimeFromTotalAndLaps(totalTimeStr, lapsStr) {
@@ -1086,6 +1087,10 @@ const CompetitionTimings = () => {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {canUseOrganizerTools && competition?.public_slug && (
+          <LiveEventHubLinks publicSlug={competition.public_slug} />
         )}
 
         {/* Progreso de la competición */}

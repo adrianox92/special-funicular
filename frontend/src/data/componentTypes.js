@@ -1,4 +1,6 @@
 /** Tipos de componente para especificaciones y modificaciones (etiquetas UI). */
+import i18n from '../i18n';
+
 export const vehicleComponentTypes = [
   { value: 'pinion', label: 'Piñón' },
   { value: 'crown', label: 'Corona' },
@@ -29,10 +31,11 @@ export const vehicleComponentTypeLabelMap = Object.fromEntries(
  */
 export function getVehicleComponentTypeLabel(componentType) {
   if (componentType == null || componentType === '') return '—';
-  if (componentType === 'front_axle' || componentType === 'rear_axle') {
-    return vehicleComponentTypeLabelMap.axle;
-  }
-  return vehicleComponentTypeLabelMap[componentType] ?? String(componentType);
+  const normalized =
+    componentType === 'front_axle' || componentType === 'rear_axle' ? 'axle' : componentType;
+  const key = `componentTypes.${normalized}`;
+  if (i18n.exists(key, { ns: 'data' })) return i18n.t(key, { ns: 'data' });
+  return vehicleComponentTypeLabelMap[normalized] ?? String(componentType);
 }
 
 /** Convierte tipos de eje antiguos al tipo unificado `axle` (BD/UI). */

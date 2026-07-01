@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
@@ -11,6 +12,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { SlidersHorizontal, Bell, CircleHelp, KeyRound } from 'lucide-react';
+import LanguageSelector from '../components/LanguageSelector';
 
 const STALE_DAYS_MIN = 1;
 const STALE_DAYS_MAX = 365;
@@ -28,6 +30,7 @@ const VALID_TABS = new Set(['dashboard', 'notifications', 'cuenta']);
 const PASSWORD_MIN_LEN = 6;
 
 const SettingsPage = () => {
+  const { t } = useTranslation('settings');
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -84,12 +87,10 @@ const SettingsPage = () => {
         },
       });
       if (error) throw error;
-      setNotifSuccess(
-        'Notificaciones guardadas. Tras un sync se enviará resumen por Discord (webhook propio) y/o Telegram si el servidor tiene bot configurado y has indicado tu Chat ID.',
-      );
+      setNotifSuccess(t('notifications.saved'));
       setTimeout(() => setNotifSuccess(null), 6000);
     } catch (err) {
-      setNotifError(err.message || 'No se pudo guardar');
+      setNotifError(err.message || t('notifications.saveError'));
     } finally {
       setNotifSaving(false);
     }
@@ -101,10 +102,10 @@ const SettingsPage = () => {
     setNotifSuccess(null);
     try {
       await api.post('/sync/test-notification');
-      setNotifSuccess('Mensaje de prueba enviado (revisa Discord y/o Telegram).');
+      setNotifSuccess(t('notifications.testSent'));
       setTimeout(() => setNotifSuccess(null), 5000);
     } catch (err) {
-      setNotifError(err.response?.data?.error || err.message || 'Error al enviar la prueba');
+      setNotifError(err.response?.data?.error || err.message || t('notifications.testError'));
     } finally {
       setNotifTestLoading(false);
     }
@@ -117,7 +118,7 @@ const SettingsPage = () => {
     try {
       const parsed = parseInt(String(staleDaysInput).trim(), 10);
       if (!Number.isFinite(parsed) || Number.isNaN(parsed)) {
-        setSettingsError('Introduce un número válido de días.');
+        setSettingsError(t('staleDays.invalidDays'));
         return;
       }
       const clamped = Math.min(STALE_DAYS_MAX, Math.max(STALE_DAYS_MIN, Math.round(parsed)));
@@ -126,10 +127,10 @@ const SettingsPage = () => {
       });
       if (error) throw error;
       setStaleDaysInput(String(clamped));
-      setSettingsSuccess('Preferencia guardada. El dashboard usará este umbral en la próxima carga.');
+      setSettingsSuccess(t('staleDays.savedDetail'));
       setTimeout(() => setSettingsSuccess(null), 5000);
     } catch (err) {
-      setSettingsError(err.message || 'No se pudo guardar la configuración');
+      setSettingsError(err.message || t('staleDays.saveError'));
     } finally {
       setSettingsSaving(false);
     }
@@ -149,25 +150,25 @@ const SettingsPage = () => {
     setPwdSuccess(null);
     try {
       if (!user) {
-        setPwdError('No hay sesión activa.');
+        setPwdError(t('account.noSession'));
         return;
       }
       if (newPassword.length < PASSWORD_MIN_LEN) {
-        setPwdError(`La nueva contraseña debe tener al menos ${PASSWORD_MIN_LEN} caracteres.`);
+        setPwdError(t('account.passwordTooShort', { min: PASSWORD_MIN_LEN }));
         return;
       }
       if (newPassword !== confirmNewPassword) {
-        setPwdError('La confirmación no coincide con la nueva contraseña.');
+        setPwdError(t('account.passwordMismatch'));
         return;
       }
       const { error: updErr } = await supabase.auth.updateUser({ password: newPassword });
       if (updErr) throw updErr;
       setNewPassword('');
       setConfirmNewPassword('');
-      setPwdSuccess('Contraseña actualizada correctamente.');
+      setPwdSuccess(t('account.passwordUpdated'));
       setTimeout(() => setPwdSuccess(null), 6000);
     } catch (err) {
-      setPwdError(err.message || 'No se pudo cambiar la contraseña.');
+      setPwdError(err.message || t('account.passwordError'));
     } finally {
       setPwdSaving(false);
     }
@@ -176,35 +177,42 @@ const SettingsPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
         <p className="text-muted-foreground">
-          Preferencias del dashboard, notificaciones y seguridad de la cuenta
+          {t('subtitle')}
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full max-w-2xl grid-cols-3">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
-          <TabsTrigger value="cuenta">Cuenta</TabsTrigger>
+          <TabsTrigger value="dashboard">{t('tabs.dashboard')}</TabsTrigger>
+          <TabsTrigger value="notifications">{t('tabs.notifications')}</TabsTrigger>
+          <TabsTrigger value="cuenta">{t('tabs.account')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
+              <CardTitle>{t('language')}</CardTitle>
+              <CardDescription>{t('languageHint')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LanguageSelector variant="outline" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <SlidersHorizontal className="size-5" />
-                Dashboard: circuito habitual
+                {t('staleDays.title')}
               </CardTitle>
               <CardDescription>
-                Número de días sin una sesión en tu circuito más usado para marcar coches como pendientes de
-                rodar ahí. Por defecto: {STALE_DAYS_DEFAULT} días. Rango permitido: {STALE_DAYS_MIN}–
-                {STALE_DAYS_MAX}.
+                {t('staleDays.description', { default: STALE_DAYS_DEFAULT, min: STALE_DAYS_MIN, max: STALE_DAYS_MAX })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col gap-2 max-w-xs">
-                <Label htmlFor="stale-days">Días sin sesión (umbral)</Label>
+                <Label htmlFor="stale-days">{t('staleDays.label')}</Label>
                 <Input
                   id="stale-days"
                   type="number"
@@ -216,13 +224,12 @@ const SettingsPage = () => {
                   aria-describedby="stale-days-hint"
                 />
                 <p id="stale-days-hint" className="text-xs text-muted-foreground">
-                  Tras guardar, recarga el dashboard o vuelve a la página de inicio para ver el bloque
-                  “Pendientes y alertas” con el nuevo criterio.
+                  {t('staleDays.hint')}
                 </p>
               </div>
               <Button type="button" onClick={handleSaveDashboardSettings} disabled={settingsSaving}>
                 {settingsSaving ? <Spinner className="size-4 mr-2" /> : null}
-                Guardar preferencia
+                {t('staleDays.save')}
               </Button>
               {settingsError && (
                 <Alert variant="destructive">
@@ -243,19 +250,15 @@ const SettingsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="size-5" />
-                Discord y Telegram
+                {t('notifications.title')}
               </CardTitle>
               <CardDescription>
-                Tras cada <code className="rounded bg-muted px-1 py-0.5 text-xs">POST /api/sync/timings</code> se envía un
-                resumen (mejor vuelta, delta vs PB, consistencia) si configuras al menos un canal. El webhook de Discord es
-                tuyo (se guarda en tu cuenta). Telegram usa un bot común definido por el administrador en el servidor (
-                <code className="rounded bg-muted px-1 py-0.5 text-xs">TELEGRAM_BOT_TOKEN</code> en{' '}
-                <code className="rounded bg-muted px-1 py-0.5 text-xs">backend/.env</code>); aquí solo indicas tu Chat ID.
+                {t('notifications.cardDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="discord-webhook">URL del webhook de Discord</Label>
+                <Label htmlFor="discord-webhook">{t('notifications.discordLabel')}</Label>
                 <Input
                   id="discord-webhook"
                   type="url"
@@ -266,11 +269,11 @@ const SettingsPage = () => {
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Crear en Discord: Ajustes del canal → Integraciones → Webhooks.
+                  {t('notifications.discordHint')}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tg-chat">Chat ID de Telegram</Label>
+                <Label htmlFor="tg-chat">{t('notifications.telegramLabel')}</Label>
                 <Input
                   id="tg-chat"
                   className="font-mono text-sm"
@@ -280,8 +283,7 @@ const SettingsPage = () => {
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
-                  El token del bot lo configura quien despliega la app. Tú: abre {TELEGRAM_APP_BOT.handle}, pulsa Iniciar (o
-                  añádelo a un grupo) y pega aquí el chat_id donde quieres los avisos.
+                  {t('notifications.telegramHint', { botHandle: TELEGRAM_APP_BOT.handle })}
                 </p>
               </div>
 
@@ -291,22 +293,21 @@ const SettingsPage = () => {
               >
                 <h3 id="telegram-help-heading" className="font-semibold flex items-center gap-2 text-base">
                   <CircleHelp className="size-5 shrink-0 text-muted-foreground" />
-                  Ayuda: conectar con el bot y obtener tu Chat ID
+                  {t('notifications.telegramHelpTitle')}
                 </h3>
 
                 <div className="space-y-2">
-                  <p className="font-medium text-foreground">1. Conectar con el bot de la aplicación</p>
+                  <p className="font-medium text-foreground">{t('notifications.telegramHelp1Title')}</p>
                   <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
                     <li>
-                      Abre el bot{' '}
-                      <strong>{TELEGRAM_APP_BOT.handle}</strong>:{' '}
+                      {t('notifications.telegramHelp1a', { botHandle: TELEGRAM_APP_BOT.handle })}{' '}
                       <a
                         href={TELEGRAM_APP_BOT.tMeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary font-medium underline-offset-4 hover:underline"
                       >
-                        abrir en Telegram (móvil / app)
+                        {t('notifications.telegramOpenApp')}
                       </a>
                       {' · '}
                       <a
@@ -315,84 +316,44 @@ const SettingsPage = () => {
                         rel="noopener noreferrer"
                         className="text-primary font-medium underline-offset-4 hover:underline"
                       >
-                        abrir en Telegram Web
+                        {t('notifications.telegramOpenWeb')}
                       </a>
                       .
                     </li>
-                    <li>
-                      Pulsa <strong>Iniciar</strong> o envía cualquier mensaje al bot. Sin este paso, Telegram no entregará
-                      mensajes a tu cuenta.
-                    </li>
-                    <li>
-                      Si quieres avisos en un <strong>grupo</strong>, añade{' '}
-                      <strong>{TELEGRAM_APP_BOT.handle}</strong> al grupo (permisos de lectura de mensajes si Telegram lo
-                      pide) y escribe algo en el grupo para que exista conversación.
-                    </li>
+                    <li>{t('notifications.telegramHelp1b')}</li>
+                    <li>{t('notifications.telegramHelp1c', { botHandle: TELEGRAM_APP_BOT.handle })}</li>
                   </ul>
                 </div>
 
                 <div className="space-y-2">
-                  <p className="font-medium text-foreground">2. Saber tu Chat ID (mensajes privados contigo)</p>
+                  <p className="font-medium text-foreground">{t('notifications.telegramHelp2Title')}</p>
                   <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                    <li>
-                      Escribe a{' '}
-                      <a
-                        href="https://t.me/userinfobot"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary font-medium underline-offset-4 hover:underline"
-                      >
-                        @userinfobot
-                      </a>{' '}
-                      en Telegram y pulsa <strong>Iniciar</strong>. Te mostrará un <strong>Id</strong> numérico (ej.{' '}
-                      <code className="rounded bg-background px-1 py-0.5 text-xs">123456789</code>).
-                    </li>
-                    <li>
-                      En un chat <strong>privado</strong> entre tú y {TELEGRAM_APP_BOT.handle}, ese Id suele ser el mismo
-                      que el <strong>Chat ID</strong> que debes pegar aquí arriba.
-                    </li>
+                    <li>{t('notifications.telegramHelp2a')}</li>
+                    <li>{t('notifications.telegramHelp2b', { botHandle: TELEGRAM_APP_BOT.handle })}</li>
                   </ul>
                 </div>
 
                 <div className="space-y-2">
-                  <p className="font-medium text-foreground">3. Chat ID de un grupo</p>
+                  <p className="font-medium text-foreground">{t('notifications.telegramHelp3Title')}</p>
                   <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                    <li>
-                      Los grupos suelen tener un Id <strong>negativo</strong> (ej.{' '}
-                      <code className="rounded bg-background px-1 py-0.5 text-xs">-1001234567890</code>). Puedes añadir al
-                      grupo un bot como{' '}
-                      <a
-                        href="https://t.me/getidsbot"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary font-medium underline-offset-4 hover:underline"
-                      >
-                        @getidsbot
-                      </a>
-                      , enviar un mensaje en el grupo y copiar el Id que indique.
-                    </li>
-                    <li>
-                      Asegúrate de que <strong>{TELEGRAM_APP_BOT.handle}</strong> sigue dentro del grupo; si no, no podrá
-                      enviar avisos ahí.
-                    </li>
+                    <li>{t('notifications.telegramHelp3a')}</li>
+                    <li>{t('notifications.telegramHelp3b', { botHandle: TELEGRAM_APP_BOT.handle })}</li>
                   </ul>
                 </div>
 
                 <p className="text-xs text-muted-foreground pt-1 border-t border-border/60">
-                  Después de guardar tu Chat ID, usa <strong>Probar envío</strong> para comprobar que llega el mensaje. Si
-                  falla, revisa que hayas hablado con {TELEGRAM_APP_BOT.handle} y que el servidor tenga{' '}
-                  <code className="rounded bg-background px-1 py-0.5 text-[0.7rem]">TELEGRAM_BOT_TOKEN</code> configurado.
+                  {t('notifications.telegramHelpFooter', { botHandle: TELEGRAM_APP_BOT.handle })}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={handleSaveNotifications} disabled={notifSaving}>
                   {notifSaving ? <Spinner className="size-4 mr-2" /> : null}
-                  Guardar
+                  {t('notifications.save')}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleTestNotification} disabled={notifTestLoading}>
                   {notifTestLoading ? <Spinner className="size-4 mr-2" /> : null}
-                  Probar envío
+                  {t('notifications.test')}
                 </Button>
               </div>
               {notifError && (
@@ -414,17 +375,15 @@ const SettingsPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <KeyRound className="size-5" />
-                Contraseña
+                {t('account.passwordTitle')}
               </CardTitle>
               <CardDescription>
-                Con la sesión iniciada puedes establecer una nueva contraseña (también si antes usabas solo Google). Quien
-                tenga acceso a tu sesión abierta podría cambiarla desde aquí; cierra sesión en dispositivos que no sean
-                tuyos.
+                {t('account.passwordDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-2">
-                <Label htmlFor="new-password">Nueva contraseña</Label>
+                <Label htmlFor="new-password">{t('account.newPassword')}</Label>
                 <Input
                   id="new-password"
                   type="password"
@@ -433,11 +392,11 @@ const SettingsPage = () => {
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Mínimo {PASSWORD_MIN_LEN} caracteres (límite de Supabase).
+                  {t('account.passwordMinHint', { min: PASSWORD_MIN_LEN })}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-new-password">Confirmar nueva contraseña</Label>
+                <Label htmlFor="confirm-new-password">{t('account.confirmPassword')}</Label>
                 <Input
                   id="confirm-new-password"
                   type="password"
@@ -448,7 +407,7 @@ const SettingsPage = () => {
               </div>
               <Button type="button" onClick={handleChangePassword} disabled={pwdSaving}>
                 {pwdSaving ? <Spinner className="size-4 mr-2" /> : null}
-                Guardar contraseña
+                {t('account.savePassword')}
               </Button>
               {pwdError && (
                 <Alert variant="destructive">
@@ -465,15 +424,14 @@ const SettingsPage = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Depuración</CardTitle>
+              <CardTitle>{t('account.debugTitle')}</CardTitle>
               <CardDescription>
-                Comprueba la URL de la API en este build, el estado del servidor y los conteos en Supabase (anon vs
-                JWT) sin exponer claves secretas.
+                {t('account.debugDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="outline" asChild>
-                <Link to="/settings/debug-data">Abrir diagnóstico de API y datos</Link>
+                <Link to="/settings/debug-data">{t('account.debugLink')}</Link>
               </Button>
             </CardContent>
           </Card>

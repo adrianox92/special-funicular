@@ -3,6 +3,10 @@
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('./distanceCalculator');
 const { deriveCompetitionAverageFromTotalAndLaps } = require('./competitionTimingDerivation');
 const { normalizeStatus, timingForbiddenReason } = require('./competitionLifecycle');
+const {
+  loadCompetitionStandingsContext,
+  notifyCompetitionLiveEventsAfterTimingChange,
+} = require('./competitionLiveNotifier');
 
 function formatAdjustedTime(seconds) {
   if (typeof seconds !== 'number' || isNaN(seconds)) return null;
@@ -126,7 +130,7 @@ async function createCompetitionTiming(supabase, competitionId, competition, bod
 
   const { data: participant, error: partError } = await supabase
     .from('competition_participants')
-    .select('id, vehicle_id')
+    .select('id, vehicle_id, driver_name')
     .eq('id', participant_id)
     .eq('competition_id', competitionId)
     .single();
@@ -134,6 +138,10 @@ async function createCompetitionTiming(supabase, competitionId, competition, bod
   if (partError || !participant) {
     return { error: { status: 404, message: 'Participante no encontrado en esta competición' } };
   }
+
+  const standingsBeforeCtx = !isDnp
+    ? await loadCompetitionStandingsContext(supabase, competitionId)
+    : null;
 
   let scaleFactor = DEFAULT_SCALE_FACTOR;
   if (participant.vehicle_id) {
@@ -287,6 +295,13 @@ async function createCompetitionTiming(supabase, competitionId, competition, bod
     }
   }
 
+  if (!isDnp) {
+    notifyCompetitionLiveEventsAfterTimingChange(supabase, competitionId, competition, {
+      beforeCtx: standingsBeforeCtx,
+      triggerDriverName: participant.driver_name || driver || null,
+    }).catch(() => {});
+  }
+
   return { data, status: 201 };
 }
 
@@ -319,6 +334,10 @@ async function updateCompetitionTiming(supabase, competitionId, competition, tim
   const verified = await verifyTimingInCompetition(supabase, competitionId, timingId);
   if (verified.error) return verified;
   const { existingTiming, participant } = verified;
+
+  const standingsBeforeCtx = !isDnp
+    ? await loadCompetitionStandingsContext(supabase, competitionId)
+    : null;
 
   let scaleFactor = DEFAULT_SCALE_FACTOR;
   if (participant.vehicle_id) {
@@ -459,6 +478,18 @@ async function updateCompetitionTiming(supabase, competitionId, competition, tim
     } catch (odometerError) {
       console.warn('Error al actualizar odómetro:', odometerError);
     }
+  }
+
+  if (!isDnp) {
+    const { data: participantRow } = await supabase
+      .from('competition_participants')
+      .select('driver_name')
+      .eq('id', participant.id)
+      .maybeSingle();
+    notifyCompetitionLiveEventsAfterTimingChange(supabase, competitionId, competition, {
+      beforeCtx: standingsBeforeCtx,
+      triggerDriverName: participantRow?.driver_name || driver || null,
+    }).catch(() => {});
   }
 
   return { data };

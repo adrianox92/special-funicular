@@ -1,0 +1,13 @@
+{
+  "live": "Live",
+  "reconnecting": "On air",
+  "updated": "Aktualisiert {{time}}",
+  "pilots_one": "{{count}} Fahrer",
+  "pilots_other": "{{count}} Fahrer",
+  "generalRanking": "Gesamtwertung",
+  "categoryRanking": "Wertung — {{category}}",
+  "bestLapTitle": "Beste Runde",
+  "nextPilotTitle": "Nächster Fahrer",
+  "loading": "Wettkampf wird geladen…",
+  "notFound": "Wettkampf nicht gefunden"
+}

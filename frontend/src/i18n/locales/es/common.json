@@ -1,0 +1,63 @@
+{
+  "language": {
+    "label": "Idioma"
+  },
+  "actions": {
+    "cancel": "Cancelar",
+    "retry": "Reintentar",
+    "error": "Error",
+    "save": "Guardar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "add": "Añadir",
+    "back": "Volver"
+  },
+  "loading": "Cargando…",
+  "footer": {
+    "copyright": "© {{year}} Adrian Palomera Sanz. Todos los derechos reservados.",
+    "privacy": "Política de privacidad",
+    "terms": "Términos de servicio",
+    "contact": "Contacto",
+    "catalog": "Catálogo de referencias",
+    "cookies": "Gestionar cookies",
+    "legalNav": "Legal"
+  },
+  "recordedFrom": {
+    "web": "Web",
+    "lap_timer": "App móvil",
+    "slot_race_manager": "Slot Race Manager",
+    "import": "Importación"
+  },
+  "setupIntelligence": {
+    "insightsTitle": "Insights de reglaje",
+    "insightsHint": "Correlación heurística entre cambios de componentes y tiempos por carril.",
+    "improved": "Tras {{change}}, mejor vuelta en carril {{lane}} ({{circuit}}): {{delta}} s más rápida ({{before}} → {{after}}).",
+    "worsened": "Tras {{change}}, mejor vuelta en carril {{lane}} ({{circuit}}): {{delta}} s más lenta ({{before}} → {{after}}).",
+    "neutral": "Tras {{change}}, sin cambio claro en carril {{lane}} ({{circuit}})."
+  },
+  "training": {
+    "suggestedTarget": "Objetivo guiado sugerido: {{time}} ({{delta}} s bajo tu PB)",
+    "suggestedTargetConsistency": "Objetivo guiado sugerido: {{time}} — consistencia {{consistency}}%, apunta a {{delta}} s bajo PB",
+    "suggestedTargetNoPb": "Sin PB previo: la app usará tu primera sesión como referencia.",
+    "cardTitle": "Entrenamiento con Lap Timer",
+    "cardHint": "Función en prueba para administradores. La app aún no está publicada en las tiendas.",
+    "compactTitle": "Entrenamiento guiado con Slot Lap Timer. Solo administradores.",
+    "compactTitlePremium": "Entrenamiento guiado con Slot Lap Timer (Premium). Solo administradores.",
+    "lapTimerBtn": "Lap Timer",
+    "circuit": "Circuito",
+    "circuitPlaceholder": "Selecciona circuito",
+    "lane": "Carril",
+    "loadError": "No se pudo cargar la referencia",
+    "bestLapPb": "Mejor vuelta (PB):",
+    "noExactLane": "(sin carril exacto)",
+    "openInApp": "Abrir en Slot Lap Timer",
+    "loadingBaseline": "Cargando referencia…",
+    "referenceSessions": "{{count}} sesión(es) de referencia",
+    "noBaseline": "Sin referencia previa en este circuito/carril. La app usará tu primera sesión como baseline.",
+    "startTiming": "Cronometrar con Lap Timer",
+    "targetDelta": "Objetivo guiado sugerido: bajar {{delta}} s",
+    "consistencyParen": "(consistencia {{score}}%)"
+  }
+}

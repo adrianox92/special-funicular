@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 import axios from '../lib/axios';
@@ -51,6 +52,7 @@ function isUuidString(s) {
 }
 
 const Competitions = () => {
+  const { t } = useTranslation('competitions');
   const { user } = useAuth();
   const isLicenseAdmin = isLicenseAdminUser(user);
   const [competitions, setCompetitions] = useState([]);
@@ -58,6 +60,7 @@ const Competitions = () => {
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [circuits, setCircuits] = useState([]);
+  const [clubCircuits, setClubCircuits] = useState([]);
   const [clubs, setClubs] = useState([]);
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -158,6 +161,31 @@ const Competitions = () => {
     loadClubs();
     loadFavorites();
   }, []);
+
+  const loadClubCircuits = async (clubId) => {
+    if (!clubId) {
+      setClubCircuits([]);
+      return;
+    }
+    try {
+      const response = await axios.get(`/clubs/${clubId}/circuits`);
+      setClubCircuits(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error('Error al cargar circuitos del club:', err);
+      setClubCircuits([]);
+    }
+  };
+
+  useEffect(() => {
+    loadClubCircuits(createForm.club_id || null);
+  }, [createForm.club_id]);
+
+  const circuitOptions = createForm.club_id
+    ? [
+        ...clubCircuits.map((c) => ({ ...c, source: 'club' })),
+        ...circuits.map((c) => ({ ...c, source: 'personal' })),
+      ]
+    : circuits.map((c) => ({ ...c, source: 'personal' }));
 
   const toggleFavoriteSelection = (favId) => {
     setSelectedFavorites((prev) => {
@@ -376,7 +404,7 @@ const Competitions = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Mis Competiciones</h1>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="text-muted-foreground">
             {isLicenseAdmin && debugOrganizerId
               ? `Modo depuración: competiciones del organizador ${debugOrganizerId}`
@@ -491,12 +519,18 @@ const Competitions = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Ninguno</SelectItem>
-                      {circuits.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      {circuitOptions.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.source === 'club' ? `[Club] ${c.name}` : c.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-sm text-muted-foreground">Opcional. Crea circuitos en el apartado Circuitos</p>
+                  <p className="text-sm text-muted-foreground">
+                    {createForm.club_id
+                      ? 'Incluye circuitos del club y tus circuitos personales.'
+                      : 'Opcional. Crea circuitos en el apartado Circuitos o en tu club.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">

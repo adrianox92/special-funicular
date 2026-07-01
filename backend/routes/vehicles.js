@@ -26,6 +26,7 @@ const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCata
 const { resolveBaselineTimings, sortTimingsByBestLap } = require('../lib/syncTimingsQuery');
 const { bestLapSecondsFromTimingRow } = require('../lib/personalBest');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
+const { resolveCircuitForTiming } = require('../lib/clubCircuits');
 
 
 /** Columnas permitidas para GET /vehicles y /vehicles/export (ordenación). */
@@ -1887,20 +1888,15 @@ router.get('/:id/training-baseline', async (req, res) => {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
 
-    const { data: circuitRow, error: circuitError } = await req.supabase
-      .from('circuits')
-      .select('id, name')
-      .eq('id', circuit_id)
-      .eq('user_id', req.user.id)
-      .single();
-
-    if (circuitError || !circuitRow) {
-      return res.status(404).json({ error: 'Circuito no encontrado' });
+    const resolved = await resolveCircuitForTiming(req.supabase, req.user.id, circuit_id);
+    if (!resolved.ok) {
+      return res.status(resolved.status).json({ error: resolved.error });
     }
+    const circuitRow = resolved.circuit;
 
     const { data: rawTimings, error: timingsError } = await req.supabase
       .from('vehicle_timings')
-      .select('id, vehicle_id, circuit_id, circuit, lane, best_lap_time, best_lap_timestamp, laps')
+      .select('id, vehicle_id, circuit_id, circuit, lane, best_lap_time, best_lap_timestamp, laps, consistency_score, average_time_timestamp')
       .eq('vehicle_id', id)
       .order('timing_date', { ascending: false })
       .limit(100);
@@ -1919,11 +1915,29 @@ router.get('/:id/training-baseline', async (req, res) => {
     const best = sorted[0];
     const bestLapSeconds = best ? bestLapSecondsFromTimingRow(best) : null;
 
+    const consistencyScores = filtered
+      .map((t) => (t.consistency_score != null ? Number(t.consistency_score) : null))
+      .filter((v) => v != null && !Number.isNaN(v));
+    const avgConsistency =
+      consistencyScores.length > 0
+        ? consistencyScores.reduce((a, b) => a + b, 0) / consistencyScores.length
+        : null;
+
+    const avgLapSeconds =
+      filtered.length > 0
+        ? filtered
+            .map((t) => bestLapSecondsFromTimingRow(t))
+            .filter((s) => Number.isFinite(s))
+            .reduce((a, b, _, arr) => a + b / arr.length, 0)
+        : null;
+
     res.json({
       best_lap_seconds: bestLapSeconds,
       best_lap_time: bestLapSeconds != null ? formatSecondsToLapTime(bestLapSeconds) : null,
       timings_count: filtered.length,
       lane_fallback: laneFallback,
+      consistency_score: best?.consistency_score ?? avgConsistency,
+      average_lap_seconds: avgLapSeconds,
     });
   } catch (err) {
     console.error('Error en GET /vehicles/:id/training-baseline:', err);
@@ -2028,14 +2042,10 @@ router.post('/:id/timings', async (req, res) => {
     let circuitIdToStore = null;
     let circuitLaneLengths = [];
     if (circuit_id) {
-      const { data: circuitRow, error: circuitError } = await req.supabase
-        .from('circuits')
-        .select('name, lane_lengths')
-        .eq('id', circuit_id)
-        .eq('user_id', req.user.id)
-        .single();
-      if (!circuitError && circuitRow) {
-        circuitIdToStore = circuit_id;
+      const resolved = await resolveCircuitForTiming(req.supabase, req.user.id, circuit_id);
+      if (resolved.ok) {
+        const circuitRow = resolved.circuit;
+        circuitIdToStore = circuitRow.id;
         circuitToStore = circuitRow.name;
         circuitLaneLengths = Array.isArray(circuitRow.lane_lengths) ? circuitRow.lane_lengths : [];
       }
@@ -2185,14 +2195,10 @@ router.put('/:id/timings/:timingId', async (req, res) => {
     let circuitLaneLengths = [];
     if (circuit_id !== undefined) {
       if (circuit_id) {
-        const { data: circuitRow, error: circuitError } = await req.supabase
-          .from('circuits')
-          .select('name, lane_lengths')
-          .eq('id', circuit_id)
-          .eq('user_id', req.user.id)
-          .single();
-        if (!circuitError && circuitRow) {
-          circuitIdToStore = circuit_id;
+        const resolved = await resolveCircuitForTiming(req.supabase, req.user.id, circuit_id);
+        if (resolved.ok) {
+          const circuitRow = resolved.circuit;
+          circuitIdToStore = circuitRow.id;
           circuitToStore = circuitRow.name;
           circuitLaneLengths = Array.isArray(circuitRow.lane_lengths) ? circuitRow.lane_lengths : [];
         }

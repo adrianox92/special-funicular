@@ -1,0 +1,55 @@
+{
+  "componentTypes": {
+    "pinion": "Ritzel",
+    "crown": "Kronrad",
+    "front_wheel": "Vorderreifen",
+    "rear_wheel": "Hinterreifen",
+    "front_rim": "Vorderfelge",
+    "rear_rim": "Hinterfelge",
+    "axle": "Achsen",
+    "chassis": "Chassis",
+    "other": "Sonstiges",
+    "guide": "Führung",
+    "motor": "Motor",
+    "trencillas": "Bürsten",
+    "tornillos": "Schrauben",
+    "stoppers": "Stopper",
+    "topes_y_centradores": "Anschläge & Zentrierer",
+    "cojinetes": "Lager"
+  },
+  "clubEvents": {
+    "meeting": "Treffen",
+    "competition": "Wettkampf",
+    "training": "Training",
+    "social": "Soziales Event",
+    "maintenance": "Wartung",
+    "other": "Sonstiges"
+  },
+  "maintenanceKinds": {
+    "limpieza_general": "Allgemeine Reinigung",
+    "guias": "Führungen",
+    "escobillas": "Bürsten",
+    "engrase": "Schmierung",
+    "iman": "Magnet",
+    "contactos": "Kontakte",
+    "neumaticos": "Reifen",
+    "cables": "Kabel",
+    "suspension": "Federung",
+    "otro": "Sonstiges"
+  },
+  "inventoryExtra": {
+    "aceite": "Öl / Schmiermittel",
+    "limpiador": "Reiniger",
+    "electronica": "Elektronik",
+    "herramienta": "Werkzeug",
+    "neumaticos": "Reifen",
+    "cables": "Kabel",
+    "suspension": "Federung",
+    "trencillas": "Bürsten",
+    "tornillos": "Schrauben",
+    "stoppers": "Stopper",
+    "topes_y_centradores": "Anschläge & Zentrierer",
+    "cojinetes": "Lager",
+    "otro": "Sonstiges"
+  }
+}

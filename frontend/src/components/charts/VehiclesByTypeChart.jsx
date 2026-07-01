@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart,
   Bar,
@@ -19,7 +20,14 @@ const COLORS = {
 };
 
 const VehiclesByTypeChart = ({ data }) => {
-  // Ordenar los datos por total de vehículos
+  const { t } = useTranslation('dashboard');
+
+  const seriesLabel = (name) => {
+    if (name === 'modified') return t('charts.common.modified');
+    if (name === 'stock') return t('charts.common.stock');
+    return t('charts.common.total');
+  };
+
   const sortedData = [...data].sort((a, b) => b.total - a.total);
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -32,7 +40,7 @@ const VehiclesByTypeChart = ({ data }) => {
             const percentage = ((entry.value / total) * 100).toFixed(1);
             return (
               <p key={index} className="flex justify-between gap-4 text-sm my-1">
-                <span>{entry.name === 'modified' ? 'Modificados' : entry.name === 'stock' ? 'Serie' : 'Total'}:</span>
+                <span>{seriesLabel(entry.name)}:</span>
                 <span>{entry.value} ({percentage}%)</span>
               </p>
             );
@@ -45,7 +53,7 @@ const VehiclesByTypeChart = ({ data }) => {
 
   return (
     <Card className="h-full">
-      <CardHeader><h5 className="font-semibold">Vehículos por Tipo</h5></CardHeader>
+      <CardHeader><h5 className="font-semibold">{t('charts.byType.title')}</h5></CardHeader>
       <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
@@ -68,7 +76,7 @@ const VehiclesByTypeChart = ({ data }) => {
                 tick={{ fontSize: 12 }}
               >
                 <Label 
-                  value="Tipo de Vehículo" 
+                  value={t('charts.byType.axisType')} 
                   position="bottom" 
                   offset={50}
                   style={{ textAnchor: 'middle' }}
@@ -79,7 +87,7 @@ const VehiclesByTypeChart = ({ data }) => {
                 allowDecimals={false}
               >
                 <Label 
-                  value="Número de Vehículos" 
+                  value={t('charts.byType.axisCount')} 
                   angle={-90} 
                   position="insideLeft"
                   style={{ textAnchor: 'middle' }}
@@ -87,11 +95,7 @@ const VehiclesByTypeChart = ({ data }) => {
               </YAxis>
               <Tooltip content={<CustomTooltip />} />
               <Legend
-                formatter={(value) => {
-                  if (value === 'modified') return 'Modificados';
-                  if (value === 'stock') return 'Serie';
-                  return 'Total';
-                }}
+                formatter={(value) => seriesLabel(value)}
                 verticalAlign="top"
                 height={36}
               />
@@ -127,4 +131,4 @@ const VehiclesByTypeChart = ({ data }) => {
   );
 };
 
-export default VehiclesByTypeChart; 
+export default VehiclesByTypeChart;

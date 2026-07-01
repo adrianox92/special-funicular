@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import {
   LineChart,
@@ -12,17 +13,7 @@ import {
 import { formatCurrencyEur } from '../../utils/formatUtils';
 
 const InvestmentTimelineChart = ({ data }) => {
-  if (!Array.isArray(data) || data.length === 0) {
-    return (
-      <Card className="h-full">
-        <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            No hay datos suficientes para mostrar la evolución de la colección
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const { t } = useTranslation('dashboard');
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
@@ -35,15 +26,19 @@ const InvestmentTimelineChart = ({ data }) => {
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const item = payload[0].payload;
       return (
         <div className="rounded-md border bg-popover p-3 shadow-md">
-          <p className="font-semibold mb-1">{formatDate(data.date)} - {formatDate(data.endDate)}</p>
-          <p className="mb-1 text-sm">Valor total: {formatCurrency(data.value)}</p>
+          <p className="font-semibold mb-1">{formatDate(item.date)} - {formatDate(item.endDate)}</p>
+          <p className="mb-1 text-sm">
+            {t('charts.investmentTimeline.totalValue', { value: formatCurrency(item.value) })}
+          </p>
           <div className="mt-2">
-            <p className="font-semibold mb-1 text-sm">Vehículos en este trimestre:</p>
-            {data.vehicles.map((vehicle, index) => (
-              <p key={index} className="mb-1 text-xs">{vehicle.manufacturer} {vehicle.model}: {formatCurrency(vehicle.price)}</p>
+            <p className="font-semibold mb-1 text-sm">{t('charts.investmentTimeline.vehiclesInQuarter')}</p>
+            {item.vehicles.map((vehicle, index) => (
+              <p key={index} className="mb-1 text-xs">
+                {vehicle.manufacturer} {vehicle.model}: {formatCurrency(vehicle.price)}
+              </p>
             ))}
           </div>
         </div>
@@ -52,9 +47,21 @@ const InvestmentTimelineChart = ({ data }) => {
     return null;
   };
 
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <Card className="h-full">
+        <CardContent className="py-8">
+          <div className="text-center text-muted-foreground">
+            {t('charts.investmentTimeline.empty')}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="h-full">
-      <CardHeader><h5 className="font-semibold">Evolución de la Colección</h5></CardHeader>
+      <CardHeader><h5 className="font-semibold">{t('charts.investmentTimeline.title')}</h5></CardHeader>
       <CardContent>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
@@ -95,4 +102,4 @@ const InvestmentTimelineChart = ({ data }) => {
   );
 };
 
-export default InvestmentTimelineChart; 
+export default InvestmentTimelineChart;

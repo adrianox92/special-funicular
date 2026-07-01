@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ExternalLink, Pencil, Plus, Trash2, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../lib/axios';
-import { formatHistoryDate } from '../utils/formatUtils';
+import { formatHistoryDate, getIntlLocale } from '../utils/formatUtils';
 import CompetitionStatusBadge from './CompetitionStatusBadge';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -47,14 +48,9 @@ const emptyForm = () => ({
   competition_id: '',
 });
 
-function formatPosition(position) {
-  if (position == null || position === '') return null;
-  const n = Number(position);
-  if (!Number.isFinite(n) || n < 1) return null;
-  return `${n}º`;
-}
-
 const VehiclePalmares = ({ vehicleId }) => {
+  const { t } = useTranslation('vehicles');
+  const { t: tc } = useTranslation('common');
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,6 +59,16 @@ const VehiclePalmares = ({ vehicleId }) => {
   const [deleteEntry, setDeleteEntry] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [competitionOptions, setCompetitionOptions] = useState([]);
+
+  const formatPosition = useCallback(
+    (position) => {
+      if (position == null || position === '') return null;
+      const n = Number(position);
+      if (!Number.isFinite(n) || n < 1) return null;
+      return t('palmares.positionSuffix', { n });
+    },
+    [t],
+  );
 
   const loadCompetitionOptions = useCallback(async () => {
     try {
@@ -81,12 +87,12 @@ const VehiclePalmares = ({ vehicleId }) => {
       setEntries(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
-      toast.error(e.response?.data?.error || 'No se pudo cargar el palmarés');
+      toast.error(e.response?.data?.error || t('palmares.loadError'));
       setEntries([]);
     } finally {
       setLoading(false);
     }
-  }, [vehicleId]);
+  }, [vehicleId, t]);
 
   useEffect(() => {
     load();
@@ -109,7 +115,7 @@ const VehiclePalmares = ({ vehicleId }) => {
         });
       }
     });
-    return [...byId.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'));
+    return [...byId.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), getIntlLocale()));
   }, [competitionOptions, entries]);
 
   const openCreateDialog = () => {
@@ -148,7 +154,7 @@ const VehiclePalmares = ({ vehicleId }) => {
     e.preventDefault();
     if (!vehicleId) return;
     if (!form.competition_name.trim()) {
-      toast.error('El nombre del evento es obligatorio');
+      toast.error(t('palmares.eventNameRequired'));
       return;
     }
 
@@ -165,10 +171,10 @@ const VehiclePalmares = ({ vehicleId }) => {
 
       if (editingEntry) {
         await api.put(`/vehicles/${vehicleId}/palmares/${editingEntry.id}`, payload);
-        toast.success('Entrada actualizada');
+        toast.success(t('palmares.updateSuccess'));
       } else {
         await api.post(`/vehicles/${vehicleId}/palmares`, payload);
-        toast.success('Evento añadido al palmarés');
+        toast.success(t('palmares.addSuccess'));
       }
 
       setDialogOpen(false);
@@ -176,7 +182,7 @@ const VehiclePalmares = ({ vehicleId }) => {
       setForm(emptyForm());
       await load();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al guardar');
+      toast.error(err.response?.data?.error || t('palmares.saveError'));
     } finally {
       setSaving(false);
     }
@@ -186,11 +192,11 @@ const VehiclePalmares = ({ vehicleId }) => {
     if (!deleteEntry || !vehicleId) return;
     try {
       await api.delete(`/vehicles/${vehicleId}/palmares/${deleteEntry.id}`);
-      toast.success('Entrada eliminada');
+      toast.success(t('palmares.deleteSuccess'));
       setDeleteEntry(null);
       await load();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'No se pudo eliminar');
+      toast.error(err.response?.data?.error || t('palmares.deleteError'));
     }
   };
 
@@ -208,16 +214,13 @@ const VehiclePalmares = ({ vehicleId }) => {
         <div>
           <h4 className="text-lg font-semibold flex items-center gap-2">
             <Trophy className="size-5" />
-            Palmarés
+            {t('palmares.title')}
           </h4>
-          <p className="text-sm text-muted-foreground mt-1">
-            Historial de competiciones y eventos en los que ha participado este vehículo. Las entradas del sistema se
-            generan automáticamente; puedes añadir eventos externos o completar datos a mano.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{t('palmares.description')}</p>
         </div>
         <Button type="button" onClick={openCreateDialog}>
           <Plus className="size-4 mr-2" />
-          Añadir evento
+          {t('palmares.addEvent')}
         </Button>
       </div>
 
@@ -225,17 +228,14 @@ const VehiclePalmares = ({ vehicleId }) => {
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             <Trophy className="size-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium text-foreground">Sin participaciones registradas</p>
-            <p className="text-sm mt-1">
-              Cuando el coche compita en una competición del sistema aparecerá aquí automáticamente. También puedes
-              registrar eventos externos manualmente.
-            </p>
+            <p className="font-medium text-foreground">{t('palmares.emptyTitle')}</p>
+            <p className="text-sm mt-1">{t('palmares.emptyDescription')}</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
           {entries.map((entry) => {
-            const posLabel = formatPosition(entry.position);
+            const posLabel = formatPosition(entry.position, t);
             const isManual = entry.source === 'manual';
 
             return (
@@ -268,7 +268,7 @@ const VehiclePalmares = ({ vehicleId }) => {
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <Badge variant={isManual ? 'secondary' : 'outline'}>
-                        {isManual ? 'Manual' : 'Sistema'}
+                        {isManual ? t('palmares.manual') : t('palmares.system')}
                       </Badge>
                       {!isManual && entry.competition_status && (
                         <CompetitionStatusBadge status={entry.competition_status} />
@@ -290,7 +290,7 @@ const VehiclePalmares = ({ vehicleId }) => {
                       <Button variant="outline" size="sm" asChild>
                         <Link to={`/competitions/${entry.competition_id}/participants`}>
                           <ExternalLink className="size-4 mr-2" />
-                          Ver competición
+                          {t('palmares.viewCompetition')}
                         </Link>
                       </Button>
                     )}
@@ -298,7 +298,7 @@ const VehiclePalmares = ({ vehicleId }) => {
                       <>
                         <Button type="button" variant="outline" size="sm" onClick={() => openEditDialog(entry)}>
                           <Pencil className="size-4 mr-2" />
-                          Editar
+                          {tc('actions.edit')}
                         </Button>
                         <Button
                           type="button"
@@ -308,7 +308,7 @@ const VehiclePalmares = ({ vehicleId }) => {
                           onClick={() => setDeleteEntry(entry)}
                         >
                           <Trash2 className="size-4 mr-2" />
-                          Eliminar
+                          {tc('actions.delete')}
                         </Button>
                       </>
                     )}
@@ -323,14 +323,12 @@ const VehiclePalmares = ({ vehicleId }) => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingEntry ? 'Editar evento' : 'Añadir evento al palmarés'}</DialogTitle>
-            <DialogDescription>
-              Registra una competición externa o completa los datos de un evento en el que participó este vehículo.
-            </DialogDescription>
+            <DialogTitle>{editingEntry ? t('palmares.dialogEditTitle') : t('palmares.dialogAddTitle')}</DialogTitle>
+            <DialogDescription>{t('palmares.dialogDescription')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="palmares-name">Nombre del evento / competición *</Label>
+              <Label htmlFor="palmares-name">{t('palmares.eventNameLabel')}</Label>
               <Input
                 id="palmares-name"
                 value={form.competition_name}
@@ -340,7 +338,7 @@ const VehiclePalmares = ({ vehicleId }) => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="palmares-date">Fecha</Label>
+                <Label htmlFor="palmares-date">{t('palmares.dateLabel')}</Label>
                 <Input
                   id="palmares-date"
                   type="date"
@@ -349,7 +347,7 @@ const VehiclePalmares = ({ vehicleId }) => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="palmares-position">Posición final</Label>
+                <Label htmlFor="palmares-position">{t('palmares.positionLabel')}</Label>
                 <Input
                   id="palmares-position"
                   type="number"
@@ -357,30 +355,30 @@ const VehiclePalmares = ({ vehicleId }) => {
                   step="1"
                   value={form.position}
                   onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
-                  placeholder="Ej. 1"
+                  placeholder={t('palmares.positionPlaceholder')}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="palmares-category">Categoría</Label>
+              <Label htmlFor="palmares-category">{t('palmares.categoryLabel')}</Label>
               <Input
                 id="palmares-category"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                placeholder="Ej. GT, Rally, Stock..."
+                placeholder={t('palmares.categoryPlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="palmares-link">Enlace a competición del sistema (opcional)</Label>
+              <Label htmlFor="palmares-link">{t('palmares.linkLabel')}</Label>
               <Select
                 value={form.competition_id || 'none'}
                 onValueChange={handleCompetitionLinkChange}
               >
                 <SelectTrigger id="palmares-link">
-                  <SelectValue placeholder="Ninguna (evento externo)" />
+                  <SelectValue placeholder={t('palmares.linkNone')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Ninguna (evento externo)</SelectItem>
+                  <SelectItem value="none">{t('palmares.linkNone')}</SelectItem>
                   {linkedCompetitionOptions.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
@@ -390,21 +388,21 @@ const VehiclePalmares = ({ vehicleId }) => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="palmares-notes">Notas</Label>
+              <Label htmlFor="palmares-notes">{t('palmares.notesLabel')}</Label>
               <Textarea
                 id="palmares-notes"
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 rows={3}
-                placeholder="Detalles del evento, resultado, observaciones..."
+                placeholder={t('palmares.notesPlaceholder')}
               />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancelar
+                {tc('actions.cancel')}
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving ? 'Guardando…' : editingEntry ? 'Guardar cambios' : 'Añadir evento'}
+                {saving ? t('edit.saving') : editingEntry ? t('palmares.saveChanges') : t('palmares.addEvent')}
               </Button>
             </DialogFooter>
           </form>
@@ -414,14 +412,14 @@ const VehiclePalmares = ({ vehicleId }) => {
       <AlertDialog open={!!deleteEntry} onOpenChange={(open) => !open && setDeleteEntry(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar entrada del palmarés?</AlertDialogTitle>
+            <AlertDialogTitle>{t('palmares.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará «{deleteEntry?.competition_name}». Esta acción no se puede deshacer.
+              {t('palmares.deleteBody', { name: deleteEntry?.competition_name })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+            <AlertDialogCancel>{tc('actions.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{tc('actions.delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

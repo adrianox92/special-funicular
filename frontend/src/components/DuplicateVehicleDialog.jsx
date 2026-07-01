@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../lib/axios';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -19,10 +20,6 @@ function normalizeReference(ref) {
   return String(ref);
 }
 
-/**
- * Construye el objeto plano para POST /vehicles (misma forma que AddVehicle),
- * sin imágenes ni campos de solo lectura del servidor.
- */
 function buildDuplicateVehicleRecord(source, overrides) {
   const commercialYear =
     source.commercial_release_year != null && source.commercial_release_year !== ''
@@ -57,10 +54,9 @@ function buildDuplicateVehicleRecord(source, overrides) {
   };
 }
 
-/**
- * @param {{ vehicle: object | null, open: boolean, onOpenChange: (open: boolean) => void, onSuccess?: () => void }} props
- */
 const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
+  const { t } = useTranslation('vehicles');
+  const { t: tc } = useTranslation('common');
   const [model, setModel] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [reference, setReference] = useState('');
@@ -90,7 +86,7 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
     const typeTrim = vehicle.type?.toString().trim() ?? '';
 
     if (!modelTrim || !manufacturerTrim || !typeTrim) {
-      setError('Modelo, fabricante y tipo son obligatorios. Si falta el tipo, edita el vehículo original.');
+      setError(t('duplicateModal.requiredError'));
       return;
     }
 
@@ -120,7 +116,7 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
       }
 
       await api.post('/vehicles', formData);
-      toast.success('Vehículo duplicado correctamente');
+      toast.success(t('duplicateModal.success'));
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
@@ -128,9 +124,9 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
       const userMessage =
         apiError && typeof apiError === 'string'
           ? apiError.includes('numeric')
-            ? 'El valor del precio no es válido. Deja el campo vacío o introduce un número.'
+            ? t('duplicateModal.invalidPriceError')
             : apiError
-          : 'Error al duplicar el vehículo';
+          : t('duplicateModal.error');
       setError(userMessage);
     } finally {
       setSaving(false);
@@ -142,16 +138,13 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Duplicar vehículo</DialogTitle>
-            <DialogDescription>
-              Se creará un vehículo nuevo con los mismos datos base (tipo, tracción, catálogo enlazado,
-              etc.). No se copian fotos propias ni cronometrajes.
-            </DialogDescription>
+            <DialogTitle>{t('duplicateModal.title')}</DialogTitle>
+            <DialogDescription>{t('duplicateModal.description')}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="dup-reference">Referencia</Label>
+              <Label htmlFor="dup-reference">{t('edit.fields.reference')}</Label>
               <Input
                 id="dup-reference"
                 value={reference}
@@ -160,7 +153,7 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dup-manufacturer">Fabricante</Label>
+              <Label htmlFor="dup-manufacturer">{t('edit.fields.manufacturer')}</Label>
               <Input
                 id="dup-manufacturer"
                 value={manufacturer}
@@ -169,22 +162,22 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dup-model">Modelo</Label>
+              <Label htmlFor="dup-model">{t('edit.fields.model')}</Label>
               <Input id="dup-model" value={model} onChange={(e) => setModel(e.target.value)} autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dup-price">Precio de compra (€)</Label>
+              <Label htmlFor="dup-price">{t('duplicateModal.purchasePrice')}</Label>
               <Input
                 id="dup-price"
                 type="number"
                 step="0.01"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder="Opcional"
+                placeholder={t('edit.optional')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dup-purchase-date">Fecha de compra</Label>
+              <Label htmlFor="dup-purchase-date">{t('edit.fields.purchaseDate')}</Label>
               <Input
                 id="dup-purchase-date"
                 type="date"
@@ -193,12 +186,12 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dup-purchase-place">Lugar de compra</Label>
+              <Label htmlFor="dup-purchase-place">{t('edit.fields.purchasePlace')}</Label>
               <Input
                 id="dup-purchase-place"
                 value={purchasePlace}
                 onChange={(e) => setPurchasePlace(e.target.value)}
-                placeholder="Opcional"
+                placeholder={t('edit.optional')}
               />
             </div>
           </div>
@@ -211,10 +204,10 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancelar
+              {tc('actions.cancel')}
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? 'Creando…' : 'Duplicar'}
+              {saving ? t('duplicateModal.creating') : t('duplicateModal.duplicate')}
             </Button>
           </DialogFooter>
         </form>

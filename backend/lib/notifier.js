@@ -158,6 +158,85 @@ async function sendTimingNotification(userId, timing, previousBestLapSeconds, su
   }
 }
 
+/**
+ * Notificaciones de evento en vivo de competición (líder / mejor vuelta).
+ * Usa webhooks Discord/Telegram del perfil del organizador si existen.
+ * @param {string} userId
+ * @param {{
+ *   type: 'leader_change' | 'new_pb',
+ *   competitionName: string,
+ *   driverName: string,
+ *   previousLeaderName?: string|null,
+ *   bestLapTime?: string|null,
+ *   previousBestLapTime?: string|null,
+ *   triggerDriverName?: string|null,
+ * }} payload
+ */
+async function sendCompetitionLiveNotification(userId, payload) {
+  try {
+    const meta = await fetchUserMetadata(userId);
+    const discordUrl = typeof meta.webhook_discord_url === 'string' ? meta.webhook_discord_url.trim() : '';
+    const tgToken = getTelegramBotTokenFromEnv();
+    const tgChat = meta.telegram_chat_id != null ? String(meta.telegram_chat_id).trim() : '';
+
+    if (!discordUrl && (!tgToken || !tgChat)) return;
+
+    const { type, competitionName, driverName } = payload;
+    const lines =
+      type === 'leader_change'
+        ? [
+            '🏆 **Cambio de liderato en competición**',
+            `Evento: ${competitionName}`,
+            `Nuevo líder: ${driverName}`,
+            payload.previousLeaderName
+              ? `Anterior líder: ${payload.previousLeaderName}`
+              : null,
+          ].filter(Boolean)
+        : [
+            '⚡ **Nueva mejor vuelta de la prueba**',
+            `Evento: ${competitionName}`,
+            `Piloto: ${driverName}`,
+            payload.bestLapTime ? `Marca: ${payload.bestLapTime}` : null,
+            payload.previousBestLapTime
+              ? `Anterior récord: ${payload.previousBestLapTime}`
+              : null,
+            payload.triggerDriverName && payload.triggerDriverName !== driverName
+              ? `Registrado por: ${payload.triggerDriverName}`
+              : null,
+          ].filter(Boolean);
+
+    const textPlain = lines.map((l) => l.replace(/\*\*/g, '')).join('\n');
+    const tasks = [];
+
+    if (discordUrl) {
+      tasks.push(
+        fetch(discordUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: textPlain.slice(0, 2000) }),
+        }).then((r) => {
+          if (!r.ok) console.warn('[notifier] Discord webhook HTTP', r.status);
+        }),
+      );
+    }
+    if (tgToken && tgChat) {
+      const url = `https://api.telegram.org/bot${tgToken}/sendMessage`;
+      tasks.push(
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: tgChat, text: textPlain.slice(0, 4096) }),
+        }).then((r) => {
+          if (!r.ok) console.warn('[notifier] Telegram HTTP', r.status);
+        }),
+      );
+    }
+    await Promise.all(tasks);
+  } catch (e) {
+    console.warn('[notifier] sendCompetitionLiveNotification:', e.message);
+  }
+}
+
 async function sendTestNotification(userId) {
   const meta = await fetchUserMetadata(userId);
   const discordUrl = typeof meta.webhook_discord_url === 'string' ? meta.webhook_discord_url.trim() : '';
@@ -209,6 +288,7 @@ async function sendTestNotification(userId) {
 
 module.exports = {
   sendTimingNotification,
+  sendCompetitionLiveNotification,
   sendTestNotification,
   fetchUserMetadata,
 };

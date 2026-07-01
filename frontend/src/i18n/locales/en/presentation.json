@@ -1,0 +1,13 @@
+{
+  "live": "Live",
+  "reconnecting": "On air",
+  "updated": "Updated {{time}}",
+  "pilots_one": "{{count}} pilot",
+  "pilots_other": "{{count}} pilots",
+  "generalRanking": "Overall standings",
+  "categoryRanking": "Standings — {{category}}",
+  "bestLapTitle": "Best lap",
+  "nextPilotTitle": "Next pilot",
+  "loading": "Loading competition…",
+  "notFound": "Competition not found"
+}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -34,11 +35,52 @@ const formatTime = (seconds) => {
 };
 
 const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
+  const { t } = useTranslation('timings');
   const [sessionA, setSessionA] = useState(null);
   const [sessionB, setSessionB] = useState(null);
   const [lapsA, setLapsA] = useState([]);
   const [lapsB, setLapsB] = useState([]);
   const [loadingLaps, setLoadingLaps] = useState(false);
+
+  const comparisonRows = useMemo(
+    () => [
+      { key: 'best_lap_time', label: t('compareModal.rows.bestLap'), fmt: (s) => s.best_lap_time },
+      { key: 'worst_lap_timestamp', label: t('compareModal.rows.worstLap'), fmt: (s) => formatTime(s.worst_lap_timestamp) },
+      { key: 'average_time', label: t('compareModal.rows.average'), fmt: (s) => s.average_time },
+      { key: 'total_time', label: t('compareModal.rows.totalTime'), fmt: (s) => s.total_time },
+      { key: 'laps', label: t('compareModal.rows.laps'), fmt: (s) => s.laps },
+      { key: 'total_distance_meters', label: t('compareModal.rows.distance'), fmt: (s) => formatDistance(s.total_distance_meters) },
+      {
+        key: 'avg_speed_kmh',
+        label: t('compareModal.rows.avgSpeed'),
+        fmt: (s) => (s.avg_speed_kmh != null ? Number(s.avg_speed_kmh).toFixed(1) : '—'),
+      },
+      {
+        key: 'avg_speed_scale_kmh',
+        label: t('compareModal.rows.avgSpeedScale'),
+        fmt: (s) => (s.avg_speed_scale_kmh != null ? Number(s.avg_speed_scale_kmh).toFixed(0) : '—'),
+      },
+      {
+        key: 'best_lap_speed_kmh',
+        label: t('compareModal.rows.bestLapSpeed'),
+        fmt: (s) => (s.best_lap_speed_kmh != null ? Number(s.best_lap_speed_kmh).toFixed(1) : '—'),
+      },
+      {
+        key: 'consistency_score',
+        label: t('compareModal.rows.consistency'),
+        fmt: (s) => (s.consistency_score != null ? `${Number(s.consistency_score).toFixed(2)}%` : '—'),
+      },
+      {
+        key: 'supply_voltage_volts',
+        label: t('compareModal.rows.voltage'),
+        fmt: (s) =>
+          s.supply_voltage_volts != null && s.supply_voltage_volts !== ''
+            ? `${Number(s.supply_voltage_volts).toFixed(2)} V`
+            : '—',
+      },
+    ],
+    [t]
+  );
 
   const sortedSessions = [...sessions].sort((a, b) => new Date(b.timing_date) - new Date(a.timing_date));
   const sessionsForA = sortedSessions.filter((s) => s.id !== sessionB?.id);
@@ -81,35 +123,17 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
       })).filter((d) => d.sessionA != null || d.sessionB != null)
     : [];
 
-  const comparisonRows = [
-    { key: 'best_lap_time', label: 'Mejor vuelta', fmt: (t) => t.best_lap_time },
-    { key: 'worst_lap_timestamp', label: 'Peor vuelta', fmt: (t) => formatTime(t.worst_lap_timestamp) },
-    { key: 'average_time', label: 'Promedio', fmt: (t) => t.average_time },
-    { key: 'total_time', label: 'Tiempo total', fmt: (t) => t.total_time },
-    { key: 'laps', label: 'Vueltas', fmt: (t) => t.laps },
-    { key: 'total_distance_meters', label: 'Distancia', fmt: (t) => formatDistance(t.total_distance_meters) },
-    { key: 'avg_speed_kmh', label: 'Velocidad media (km/h)', fmt: (t) => (t.avg_speed_kmh != null ? Number(t.avg_speed_kmh).toFixed(1) : '—') },
-    { key: 'avg_speed_scale_kmh', label: 'Velocidad media escala (km/h eq.)', fmt: (t) => (t.avg_speed_scale_kmh != null ? Number(t.avg_speed_scale_kmh).toFixed(0) : '—') },
-    { key: 'best_lap_speed_kmh', label: 'Velocidad mejor vuelta (km/h)', fmt: (t) => (t.best_lap_speed_kmh != null ? Number(t.best_lap_speed_kmh).toFixed(1) : '—') },
-    { key: 'consistency_score', label: 'Consistencia (%)', fmt: (t) => (t.consistency_score != null ? `${Number(t.consistency_score).toFixed(2)}%` : '—') },
-    {
-      key: 'supply_voltage_volts',
-      label: 'Voltaje (V)',
-      fmt: (t) => (t.supply_voltage_volts != null && t.supply_voltage_volts !== '' ? `${Number(t.supply_voltage_volts).toFixed(2)} V` : '—'),
-    },
-  ];
-
   return (
     <Dialog open={show} onOpenChange={(open) => !open && onHide()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Comparar sesiones</DialogTitle>
+          <DialogTitle>{t('compareModal.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Sesión A</label>
+              <label className="text-sm font-medium mb-2 block">{t('compareModal.sessionA')}</label>
               <Select
                 value={sessionA?.id || '__none__'}
                 onValueChange={(v) => {
@@ -119,7 +143,7 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar sesión" />
+                  <SelectValue placeholder={t('compareModal.selectSession')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">—</SelectItem>
@@ -132,7 +156,7 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Sesión B</label>
+              <label className="text-sm font-medium mb-2 block">{t('compareModal.sessionB')}</label>
               <Select
                 value={sessionB?.id || '__none__'}
                 onValueChange={(v) => {
@@ -142,7 +166,7 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar sesión" />
+                  <SelectValue placeholder={t('compareModal.selectSession')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">—</SelectItem>
@@ -162,9 +186,17 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Métrica</TableHead>
-                      <TableHead>Sesión A ({new Date(sessionA.timing_date).toLocaleDateString()})</TableHead>
-                      <TableHead>Sesión B ({new Date(sessionB.timing_date).toLocaleDateString()})</TableHead>
+                      <TableHead>{t('compareModal.metric')}</TableHead>
+                      <TableHead>
+                        {t('compareModal.sessionADate', {
+                          date: new Date(sessionA.timing_date).toLocaleDateString(),
+                        })}
+                      </TableHead>
+                      <TableHead>
+                        {t('compareModal.sessionBDate', {
+                          date: new Date(sessionB.timing_date).toLocaleDateString(),
+                        })}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -174,27 +206,25 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                         <TableRow key={row.key}>
                           <TableCell className="font-medium">{row.label}</TableCell>
                           <TableCell
-                            className={
-                              better === 'A'
-                                ? 'bg-green-100 dark:bg-green-950/50 font-medium'
-                                : ''
-                            }
+                            className={better === 'A' ? 'bg-green-100 dark:bg-green-950/50 font-medium' : ''}
                           >
                             {row.fmt(sessionA)}
                             {better === 'A' && (
-                              <Check className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              <Check
+                                className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400"
+                                aria-label={t('compareModal.better')}
+                              />
                             )}
                           </TableCell>
                           <TableCell
-                            className={
-                              better === 'B'
-                                ? 'bg-green-100 dark:bg-green-950/50 font-medium'
-                                : ''
-                            }
+                            className={better === 'B' ? 'bg-green-100 dark:bg-green-950/50 font-medium' : ''}
                           >
                             {row.fmt(sessionB)}
                             {better === 'B' && (
-                              <Check className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400" aria-label="Mejor" />
+                              <Check
+                                className="ml-1.5 inline size-4 align-middle text-green-600 dark:text-green-400"
+                                aria-label={t('compareModal.better')}
+                              />
                             )}
                           </TableCell>
                         </TableRow>
@@ -204,10 +234,10 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                 </Table>
               </div>
 
-              {loadingLaps && <p className="text-sm text-muted-foreground">Cargando vueltas...</p>}
+              {loadingLaps && <p className="text-sm text-muted-foreground">{t('compareModal.loadingLaps')}</p>}
               {hasLapComparison && lapChartData.length > 0 && (
                 <div className="mt-4">
-                  <h6 className="font-semibold mb-3">Comparativa vuelta a vuelta</h6>
+                  <h6 className="font-semibold mb-3">{t('compareModal.lapByLap')}</h6>
                   <div style={{ width: '100%', height: 220 }}>
                     <ResponsiveContainer>
                       <LineChart data={lapChartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
@@ -216,8 +246,22 @@ const SessionComparisonModal = ({ show, onHide, sessions = [] }) => {
                         <YAxis tickFormatter={(v) => formatTime(v)} width={70} />
                         <Tooltip formatter={(v) => (v != null ? formatTime(v) : '—')} />
                         <Legend />
-                        <Line type="monotone" dataKey="sessionA" stroke="#8884d8" strokeWidth={2} name="Sesión A" dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="sessionB" stroke="#82ca9d" strokeWidth={2} name="Sesión B" dot={{ r: 3 }} />
+                        <Line
+                          type="monotone"
+                          dataKey="sessionA"
+                          stroke="#8884d8"
+                          strokeWidth={2}
+                          name={t('compareModal.chartSessionA')}
+                          dot={{ r: 3 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="sessionB"
+                          stroke="#82ca9d"
+                          strokeWidth={2}
+                          name={t('compareModal.chartSessionB')}
+                          dot={{ r: 3 }}
+                        />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
