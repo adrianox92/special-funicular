@@ -1165,70 +1165,7 @@ html.presentation-mode .presentation-container {
   color: var(--foreground);
 }
 
-/* Modo proyector / TV (?tv=1): viewport fijo con scroll interno en paneles */
-html.presentation-mode-tv .presentation-container {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
-}
-
-html.presentation-mode-tv .presentation-content {
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  gap: 0;
-}
-
-html.presentation-mode-tv .presentation-main {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  flex-direction: row;
-  margin-top: 0.5rem;
-}
-
-html.presentation-mode-tv .presentation-left,
-html.presentation-mode-tv .presentation-right {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-html.presentation-mode-tv .presentation-left {
-  flex: 2 1 0;
-}
-
-html.presentation-mode-tv .live-ranking-table,
-html.presentation-mode-tv .round-progress-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-html.presentation-mode-tv .table-container {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-}
-
-html.presentation-mode-tv .grid-container {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-html.presentation-mode-tv .grid-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: min(360px, 38dvh);
-  overflow-y: auto;
-}
-
-/* Responsive Design */
+/* Modo proyector / TV (?tv=1): estilos legacy — ver BroadcastPresentation.css */
 @media (max-width: 1023px) {
   .gap-previous-col,
   .gap-leader-col {

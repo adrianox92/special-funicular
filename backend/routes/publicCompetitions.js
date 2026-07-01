@@ -24,11 +24,36 @@ function isDraftCompetitionPublic(competition) {
   return normalizeStatus(competition) === 'draft';
 }
 
+function findCurrentRoundFromPresentation(participants, totalRounds) {
+  if (!Array.isArray(participants) || participants.length === 0 || !totalRounds) {
+    return 1;
+  }
+
+  const getRoundStatus = (participant, roundNumber) => {
+    const round = participant.rounds?.find((r) => r.round_number === roundNumber);
+    if (!round) return 'pending';
+    if (round.did_not_participate) return 'dnp';
+    if (round.time_timestamp != null && round.time_timestamp > 0) return 'completed';
+    return 'pending';
+  };
+
+  for (let round = 1; round <= totalRounds; round += 1) {
+    const pending = participants.filter((p) => getRoundStatus(p, round) === 'pending');
+    if (pending.length > 0) return round;
+  }
+
+  return totalRounds;
+}
+
 function mapParticipantToPresentation(participant, competitionRounds) {
   const rounds = [];
   for (let i = 1; i <= competitionRounds; i++) {
     const roundTiming = (participant.timings || []).find((t) => t.round_number === i);
     const isDnp = Boolean(roundTiming?.did_not_participate);
+    let bestLapSeconds = null;
+    if (roundTiming && !isDnp && isUsableBestLapTimeString(roundTiming.best_lap_time)) {
+      bestLapSeconds = lapTimeStringToSeconds(roundTiming.best_lap_time);
+    }
     rounds.push({
       round_number: i,
       did_not_participate: isDnp,
@@ -38,6 +63,8 @@ function mapParticipantToPresentation(participant, competitionRounds) {
             parseFloat(roundTiming.total_time.split(':')[1])
           : null,
       penalty_seconds: roundTiming ? Number(roundTiming.penalty_seconds) || 0 : 0,
+      best_lap_seconds: bestLapSeconds,
+      laps: roundTiming ? Number(roundTiming.laps) || 0 : null,
     });
   }
 
@@ -62,6 +89,10 @@ function mapParticipantToPresentation(participant, competitionRounds) {
     position: participant.position,
     points: participant.points ?? 0,
     category_id: participant.category_id || null,
+    rounds_completed: participant.rounds_completed ?? 0,
+    rounds_remaining: participant.rounds_remaining ?? 0,
+    total_laps: participant.total_laps ?? 0,
+    power_stage_points: participant.power_stage_points ?? 0,
     rounds,
   };
 }
@@ -969,8 +1000,36 @@ router.get('/:slug/presentation', async (req, res) => {
     }));
 
     const totalRequiredTimes = participants.length * competition.rounds;
-    const isCompleted =
-      totalRequiredTimes > 0 && timings.length >= totalRequiredTimes;
+    const timesCount = timings.length;
+    const isCompleted = totalRequiredTimes > 0 && timesCount >= totalRequiredTimes;
+    const progressPercentage =
+      totalRequiredTimes > 0 ? Math.round((timesCount / totalRequiredTimes) * 100) : 0;
+    const currentRound = findCurrentRoundFromPresentation(
+      presentationParticipants,
+      competition.rounds,
+    );
+
+    let globalBestLap = null;
+    timings.forEach((timing) => {
+      if (timing.did_not_participate) return;
+      if (!isUsableBestLapTimeString(timing.best_lap_time)) return;
+      const sec = lapTimeStringToSeconds(timing.best_lap_time);
+      if (globalBestLap == null || sec < globalBestLap.time_seconds) {
+        const p = participants.find((part) => part.id === timing.participant_id);
+        const vehicleInfo = p?.vehicles
+          ? `${p.vehicles.manufacturer} ${p.vehicles.model}`
+          : p?.vehicle_model || '';
+        const vehicleParts = String(vehicleInfo).split(' ');
+        globalBestLap = {
+          time_seconds: sec,
+          driver_name: p?.driver_name || null,
+          team_name: p?.team_name || null,
+          vehicle_brand: vehicleParts[0] || '',
+          vehicle_name: vehicleParts.slice(1).join(' '),
+          round_number: timing.round_number,
+        };
+      }
+    });
 
     // Preparar respuesta
     const response = {
@@ -979,9 +1038,20 @@ router.get('/:slug/presentation', async (req, res) => {
         name: competition.name,
         circuit_name: circuitDisplayName,
         rounds: competition.rounds,
+        num_slots: competition.num_slots,
         created_at: competition.created_at,
         status: isCompleted ? 'finished' : 'active',
       },
+      status: {
+        progress_percentage: progressPercentage,
+        times_registered: timesCount,
+        total_required_times: totalRequiredTimes,
+        times_remaining: Math.max(0, totalRequiredTimes - timesCount),
+        current_round: currentRound,
+        is_completed: isCompleted,
+      },
+      global_best_lap: globalBestLap,
+      categories: (categories || []).map((c) => ({ id: c.id, name: c.name })),
       participants: presentationParticipants,
       category_participants: categoryParticipants,
       has_category_rules: (rules || []).some((r) => r.category_id != null),

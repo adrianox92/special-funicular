@@ -32,6 +32,11 @@ import {
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { ChangelogBell } from './ChangelogBell';
 import api from '../lib/axios';
+import {
+  getCachedSellerProfile,
+  invalidateSellerProfileCache,
+  setCachedSellerProfile,
+} from '../lib/sellerProfileCache';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import {
@@ -149,21 +154,33 @@ const Navbar = () => {
   const navbarRef = useRef(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user?.id) {
       setHasSellerProfile(false);
       return undefined;
     }
+
+    const cached = getCachedSellerProfile(user.id);
+    if (cached !== null) {
+      setHasSellerProfile(cached);
+      return undefined;
+    }
+
     let cancelled = false;
     const load = async () => {
       try {
         const { data } = await api.get('/store-listings/my/profile');
-        if (!cancelled) setHasSellerProfile(data != null && typeof data === 'object');
+        const hasProfile = data != null && typeof data === 'object';
+        setCachedSellerProfile(user.id, hasProfile);
+        if (!cancelled) setHasSellerProfile(hasProfile);
       } catch {
+        setCachedSellerProfile(user.id, false);
         if (!cancelled) setHasSellerProfile(false);
       }
     };
     load();
+
     const onSellerProfileChanged = () => {
+      invalidateSellerProfileCache();
       load();
     };
     window.addEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
@@ -171,7 +188,7 @@ const Navbar = () => {
       cancelled = true;
       window.removeEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
     };
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);

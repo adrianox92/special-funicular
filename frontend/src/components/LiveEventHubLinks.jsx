@@ -17,8 +17,10 @@ import { cn } from '../lib/utils';
 
 const SCENES = [
   { id: 'ranking', label: 'Clasificación OBS', scene: 'ranking', width: 960, height: 540 },
-  { id: 'bestlap', label: 'Mejor vuelta OBS', scene: 'bestlap', width: 720, height: 220 },
-  { id: 'nextpilot', label: 'Próximo piloto OBS', scene: 'nextpilot', width: 720, height: 220 },
+  { id: 'bestlap', label: 'Mejor vuelta OBS', scene: 'bestlap', width: 720, height: 280 },
+  { id: 'nextpilot', label: 'Próximo piloto OBS', scene: 'nextpilot', width: 720, height: 280 },
+  { id: 'round', label: 'Ronda actual OBS', scene: 'round', width: 960, height: 480 },
+  { id: 'progress', label: 'Progreso OBS', scene: 'progress', width: 1280, height: 720 },
 ];
 
 const OBS_BROWSER_CSS = `body { background-color: rgba(0,0,0,0); margin: 0; overflow: hidden; }`;
@@ -61,7 +63,7 @@ function ObsOverlayGuide({ onCopyCss }) {
           </li>
           <li>
             Copia uno de los enlaces OBS de abajo y pégalo en el campo <strong className="text-foreground">URL</strong>.
-            Cada enlace muestra una escena distinta (clasificación, mejor vuelta o próximo piloto).
+            Cada enlace muestra una escena distinta (clasificación, mejor vuelta, próximo piloto, ronda actual o progreso).
           </li>
           <li>
             Ajusta <strong className="text-foreground">Ancho</strong> y <strong className="text-foreground">Alto</strong>{' '}
@@ -253,7 +255,7 @@ const LiveEventHubLinks = ({ publicSlug, defaultExpanded = false }) => {
               {linkRow(
                 'Rotación automática OBS',
                 links.overlayRotate,
-                'Alterna clasificación, mejor vuelta y próximo piloto cada 12 s',
+                'Alterna clasificación, mejor vuelta, próximo piloto, ronda y progreso cada 12 s',
               )}
             </div>
             <div className="flex flex-wrap gap-2">

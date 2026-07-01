@@ -84,7 +84,7 @@ html.dark {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Presentación: scroll natural en móvil/PC; modo TV bloquea documento (ver ?tv=1) */
+/* Presentación / modo TV: scroll natural para ver todo el contenido */
 html.presentation-mode {
   overflow-y: auto;
   overscroll-behavior: auto;
@@ -98,20 +98,6 @@ html.presentation-mode body {
   min-height: 100dvh;
   height: auto;
   max-height: none;
-}
-
-html.presentation-mode.presentation-mode-tv {
-  overflow: hidden;
-  overscroll-behavior: none;
-  height: 100%;
-}
-
-html.presentation-mode.presentation-mode-tv body {
-  overflow: hidden;
-  overscroll-behavior: none;
-  min-height: 100dvh;
-  height: 100dvh;
-  max-height: 100dvh;
 }
 
 /* OBS overlay: fondo transparente para Browser Source */

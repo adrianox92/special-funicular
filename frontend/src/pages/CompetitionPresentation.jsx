@@ -1,29 +1,143 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Radio, Users, Clock3 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import axios from '../lib/axios';
-import CompetitionHeader from '../components/presentation/CompetitionHeader';
-import LiveRankingTable from '../components/presentation/LiveRankingTable';
-import RoundProgressGrid from '../components/presentation/RoundProgressGrid';
-import BestLapHighlight from '../components/presentation/BestLapHighlight';
-import NextPilotHighlight from '../components/presentation/NextPilotHighlight';
 import { Spinner } from '../components/ui/spinner';
 import { usePresentationLive } from '../hooks/usePresentationLive';
 import { findNextPilot } from '../utils/findNextPilot';
-import '../styles/CompetitionPresentation.css';
+import TvDashboard from '../components/presentation/broadcast/TvDashboard';
+import OverlayBroadcast from '../components/presentation/broadcast/OverlayBroadcast';
+import BroadcastShell from '../components/presentation/broadcast/BroadcastShell';
+import BroadcastHeader from '../components/presentation/broadcast/BroadcastHeader';
+import BroadcastStatsBar from '../components/presentation/broadcast/BroadcastStatsBar';
+import BroadcastLeaderboard from '../components/presentation/broadcast/BroadcastLeaderboard';
+import BroadcastRoundPanel from '../components/presentation/broadcast/BroadcastRoundPanel';
+import BroadcastSpotlight from '../components/presentation/broadcast/BroadcastSpotlight';
+import BroadcastProgressMatrix from '../components/presentation/broadcast/BroadcastProgressMatrix';
+import BroadcastPodium from '../components/presentation/broadcast/BroadcastPodium';
+import { Radio, Users, Clock3 } from 'lucide-react';
+import '../styles/BroadcastPresentation.css';
 
-const ROTATE_SCENES = ['ranking', 'bestlap', 'nextpilot'];
+const ROTATE_SCENES = ['ranking', 'bestlap', 'nextpilot', 'round', 'progress'];
 const DEFAULT_ROTATE_INTERVAL_S = 12;
 
 function parseSceneParam(raw) {
   const value = (raw || 'all').toLowerCase();
-  if (['ranking', 'bestlap', 'nextpilot', 'all'].includes(value)) return value;
+  if (['ranking', 'bestlap', 'nextpilot', 'round', 'progress', 'all'].includes(value)) return value;
   return 'all';
 }
+
+const StandardPresentation = ({
+  competition,
+  status,
+  globalBestLap,
+  participants,
+  displayedParticipants,
+  categoryParticipants,
+  hasCategoryRules,
+  activeCategory,
+  onCategoryChange,
+  isLive,
+  lastUpdated,
+  rankingTitle,
+  rankingSubtitle,
+}) => {
+  const { t } = useTranslation('presentation');
+
+  const nextPilotInfo = useMemo(
+    () => findNextPilot(participants, competition?.rounds),
+    [participants, competition?.rounds],
+  );
+
+  const currentRound = status?.current_round ?? nextPilotInfo?.roundNumber ?? 1;
+
+  const timeLabel = lastUpdated
+    ? lastUpdated.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : '—';
+
+  const showCategoryTabs = hasCategoryRules && categoryParticipants.length > 0;
+
+  return (
+    <BroadcastShell>
+      <div className="broadcast-live-bar" aria-live="polite">
+        <div className="broadcast-live-bar-left">
+          <span
+            className="broadcast-live-pill"
+            title={isLive ? t('liveConnected') : t('liveReconnecting')}
+          >
+            <Radio className="broadcast-live-pill-icon" aria-hidden />
+            <span className={`broadcast-live-dot${isLive ? '' : ' is-reconnecting'}`} aria-hidden />
+            <span>{isLive ? t('live') : t('reconnecting')}</span>
+          </span>
+          <span className="broadcast-live-meta">
+            <Users className="broadcast-live-meta-icon" aria-hidden />
+            {t('pilots', { count: participants.length })}
+          </span>
+        </div>
+        <div className="broadcast-live-bar-right">
+          <span className="broadcast-live-refresh">
+            <Clock3 className="broadcast-live-meta-icon" aria-hidden />
+            {t('updated', { time: timeLabel })}
+          </span>
+        </div>
+      </div>
+
+      <BroadcastHeader competition={competition} status={status} />
+      <BroadcastStatsBar participantsCount={participants.length} status={status} />
+
+      {showCategoryTabs && (
+        <div className="broadcast-category-tabs" role="tablist" aria-label={t('categoryTabs')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeCategory === 'general'}
+            className={`broadcast-category-tab${activeCategory === 'general' ? ' is-active' : ''}`}
+            onClick={() => onCategoryChange('general')}
+          >
+            {t('general')}
+          </button>
+          {categoryParticipants.map((group) => (
+            <button
+              key={group.category_id}
+              type="button"
+              role="tab"
+              aria-selected={activeCategory === group.category_id}
+              className={`broadcast-category-tab${activeCategory === group.category_id ? ' is-active' : ''}`}
+              onClick={() => onCategoryChange(group.category_id)}
+            >
+              {group.category_name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="broadcast-grid">
+        <div className="broadcast-grid-main">
+          <BroadcastPodium participants={displayedParticipants} />
+          <BroadcastLeaderboard
+            participants={displayedParticipants}
+            title={rankingTitle}
+            subtitle={rankingSubtitle}
+          />
+        </div>
+        <aside className="broadcast-grid-sidebar">
+          <BroadcastSpotlight globalBestLap={globalBestLap} nextPilotInfo={nextPilotInfo} />
+          <BroadcastRoundPanel participants={participants} roundNumber={currentRound} />
+          <BroadcastProgressMatrix competition={competition} participants={participants} />
+        </aside>
+      </div>
+    </BroadcastShell>
+  );
+};
 
 const CompetitionPresentation = () => {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation('presentation');
   const overlayMode = searchParams.get('overlay') === '1';
   const tvMode = searchParams.get('tv') === '1';
   const sceneParam = parseSceneParam(searchParams.get('scene'));
@@ -38,6 +152,8 @@ const CompetitionPresentation = () => {
     overlayMode && rotateMode ? ROTATE_SCENES[0] : sceneParam === 'all' ? 'all' : sceneParam,
   );
   const [competition, setCompetition] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [globalBestLap, setGlobalBestLap] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [categoryParticipants, setCategoryParticipants] = useState([]);
   const [hasCategoryRules, setHasCategoryRules] = useState(false);
@@ -50,6 +166,8 @@ const CompetitionPresentation = () => {
     try {
       const response = await axios.get(`/public-signup/${slug}/presentation`);
       setCompetition(response.data.competition);
+      setStatus(response.data.status || null);
+      setGlobalBestLap(response.data.global_best_lap || null);
       setParticipants(response.data.participants);
       setCategoryParticipants(response.data.category_participants || []);
       setHasCategoryRules(Boolean(response.data.has_category_rules));
@@ -57,11 +175,11 @@ const CompetitionPresentation = () => {
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching competition data:', err);
-      setError('Error al cargar los datos de la competición');
+      setError(t('errorLoading'));
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, t]);
 
   const { isLive } = usePresentationLive(slug, fetchData);
 
@@ -105,45 +223,23 @@ const CompetitionPresentation = () => {
 
   const rankingTitle = useMemo(() => {
     if (activeCategory === 'general' || !hasCategoryRules) {
-      return 'Clasificación general';
+      return t('generalRanking');
     }
     const group = categoryParticipants.find((g) => g.category_id === activeCategory);
-    return group?.category_name ? `Clasificación — ${group.category_name}` : 'Clasificación por categoría';
-  }, [activeCategory, categoryParticipants, hasCategoryRules]);
+    return group?.category_name
+      ? t('categoryRanking', { category: group.category_name })
+      : t('categoryRanking', { category: '' });
+  }, [activeCategory, categoryParticipants, hasCategoryRules, t]);
 
   const rankingSubtitle = useMemo(() => {
     if (activeCategory === 'general' && hasCategoryRules) {
-      return 'Orden por tiempo total · Se actualiza automáticamente';
+      return t('rankingSubtitleGeneral');
     }
     if (activeCategory !== 'general') {
-      return 'Orden por puntos y tiempo dentro de la categoría · Se actualiza automáticamente';
+      return t('rankingSubtitleCategory');
     }
-    return 'Orden por puntos y tiempo · Se actualiza automáticamente';
-  }, [activeCategory, hasCategoryRules]);
-
-  const bestLap = useMemo(
-    () =>
-      participants.reduce((best, participant) => {
-        const lap = participant.best_lap;
-        if (lap == null || Number.isNaN(Number(lap)) || lap <= 0) return best;
-        if (best == null || lap < best) return lap;
-        return best;
-      }, null),
-    [participants],
-  );
-
-  const bestLapParticipant = useMemo(
-    () =>
-      participants.find(
-        (p) => p.best_lap != null && p.best_lap > 0 && p.best_lap === bestLap,
-      ),
-    [participants, bestLap],
-  );
-
-  const nextPilotInfo = useMemo(
-    () => findNextPilot(participants, competition?.rounds),
-    [participants, competition?.rounds],
-  );
+    return t('rankingSubtitleDefault');
+  }, [activeCategory, hasCategoryRules, t]);
 
   const effectiveScene = overlayMode
     ? rotateMode
@@ -153,32 +249,36 @@ const CompetitionPresentation = () => {
         : sceneParam
     : 'all';
 
-  const showChrome = !overlayMode;
-  const showCategoryTabs = showChrome && hasCategoryRules && categoryParticipants.length > 0;
-  const showFullDashboard = !overlayMode && effectiveScene === 'all';
-
-  const timeLabel = lastUpdated
-    ? lastUpdated.toLocaleTimeString('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-    : '—';
+  const sharedProps = {
+    competition,
+    status,
+    globalBestLap,
+    participants,
+    displayedParticipants,
+    categoryParticipants,
+    hasCategoryRules,
+    activeCategory,
+    onCategoryChange: setActiveCategory,
+    isLive,
+    lastUpdated,
+    rankingTitle,
+    rankingSubtitle,
+  };
 
   if (loading) {
     return (
-      <div className={`presentation-loading${overlayMode ? ' presentation-loading--overlay' : ''}`}>
+      <div className={`broadcast-loading${overlayMode ? ' broadcast-shell--overlay' : ''}`}>
         <Spinner className="size-12 text-primary" />
-        {!overlayMode && <p className="mt-3 text-muted-foreground">Cargando competición...</p>}
+        {!overlayMode && <p className="mt-3 text-muted-foreground">{t('loading')}</p>}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={`presentation-error${overlayMode ? ' presentation-error--overlay' : ''}`}>
-        <div className="presentation-error-box">
-          <h4 className="text-destructive">Error</h4>
+      <div className={`broadcast-error${overlayMode ? ' broadcast-shell--overlay' : ''}`}>
+        <div className="broadcast-error-box">
+          <h4>{t('error')}</h4>
           <p>{error}</p>
         </div>
       </div>
@@ -187,130 +287,24 @@ const CompetitionPresentation = () => {
 
   if (!competition) {
     return (
-      <div className={`presentation-error${overlayMode ? ' presentation-error--overlay' : ''}`}>
-        <div className="presentation-error-box">
-          <h4 className="text-foreground font-semibold">Competición no encontrada</h4>
-          <p>La competición solicitada no existe o no está disponible.</p>
+      <div className={`broadcast-error${overlayMode ? ' broadcast-shell--overlay' : ''}`}>
+        <div className="broadcast-error-box">
+          <h4 className="font-semibold">{t('notFound')}</h4>
+          <p>{t('notFoundDesc')}</p>
         </div>
       </div>
     );
   }
 
-  const renderScene = () => {
-    if (effectiveScene === 'ranking') {
-      return (
-        <div className="presentation-scene presentation-scene--ranking">
-          <LiveRankingTable
-            participants={displayedParticipants}
-            title={rankingTitle}
-            subtitle={rankingSubtitle}
-            autoScroll={overlayMode}
-          />
-        </div>
-      );
-    }
-    if (effectiveScene === 'bestlap') {
-      return (
-        <div className="presentation-scene presentation-scene--bestlap">
-          <BestLapHighlight bestLap={bestLap} participant={bestLapParticipant} />
-        </div>
-      );
-    }
-    if (effectiveScene === 'nextpilot') {
-      return (
-        <div className="presentation-scene presentation-scene--nextpilot">
-          <NextPilotHighlight nextPilot={nextPilotInfo} roundNumber={nextPilotInfo?.roundNumber} />
-        </div>
-      );
-    }
-    return null;
-  };
+  if (overlayMode) {
+    return <OverlayBroadcast scene={effectiveScene} {...sharedProps} />;
+  }
 
-  return (
-    <div className={`presentation-container${overlayMode ? ' presentation-overlay-mode' : ''}`}>
-      <div className="presentation-content">
-        {showChrome && (
-          <div className="presentation-live-bar" aria-live="polite">
-            <div className="presentation-live-bar-left">
-              <span
-                className="presentation-live-pill"
-                title={
-                  isLive
-                    ? 'Conectado en tiempo real'
-                    : 'Reconectando… actualización periódica de respaldo'
-                }
-              >
-                <Radio className="presentation-live-pill-icon" aria-hidden />
-                <span className={`presentation-live-dot${isLive ? '' : ' is-reconnecting'}`} aria-hidden />
-                <span>{isLive ? 'En vivo' : 'En directo'}</span>
-              </span>
-              <span className="presentation-live-meta">
-                <Users className="presentation-live-meta-icon" aria-hidden />
-                {participants.length} {participants.length === 1 ? 'piloto' : 'pilotos'}
-              </span>
-            </div>
-            <div className="presentation-live-bar-right">
-              <span className="presentation-live-refresh" title="Última actualización de datos">
-                <Clock3 className="presentation-live-meta-icon" aria-hidden />
-                Actualizado {timeLabel}
-              </span>
-            </div>
-          </div>
-        )}
+  if (tvMode) {
+    return <TvDashboard {...sharedProps} />;
+  }
 
-        {showChrome && <CompetitionHeader competition={competition} />}
-
-        {showCategoryTabs && (
-          <div className="presentation-category-tabs" role="tablist" aria-label="Clasificación por categoría">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeCategory === 'general'}
-              className={`presentation-category-tab${activeCategory === 'general' ? ' is-active' : ''}`}
-              onClick={() => setActiveCategory('general')}
-            >
-              General
-            </button>
-            {categoryParticipants.map((group) => (
-              <button
-                key={group.category_id}
-                type="button"
-                role="tab"
-                aria-selected={activeCategory === group.category_id}
-                className={`presentation-category-tab${activeCategory === group.category_id ? ' is-active' : ''}`}
-                onClick={() => setActiveCategory(group.category_id)}
-              >
-                {group.category_name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {showFullDashboard ? (
-          <div className="presentation-main">
-            <div className="presentation-left">
-              <LiveRankingTable
-                participants={displayedParticipants}
-                title={rankingTitle}
-                subtitle={rankingSubtitle}
-              />
-            </div>
-
-            <div className="presentation-right">
-              <BestLapHighlight bestLap={bestLap} participant={bestLapParticipant} />
-              <NextPilotHighlight
-                nextPilot={nextPilotInfo}
-                roundNumber={nextPilotInfo?.roundNumber}
-              />
-              <RoundProgressGrid competition={competition} participants={participants} />
-            </div>
-          </div>
-        ) : (
-          renderScene()
-        )}
-      </div>
-    </div>
-  );
+  return <StandardPresentation {...sharedProps} />;
 };
 
 export default CompetitionPresentation;

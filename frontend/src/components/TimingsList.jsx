@@ -44,7 +44,7 @@ import './TimingsList.css';
 import { formatDistance } from '../utils/formatUtils';
 import { cn } from '../lib/utils';
 import { isLapTimerSession, getRecordedFromLabel } from '../utils/recordedFromLabel';
-import LapTimerTrainingCard from './LapTimerTrainingCard';
+import LapTimerTrainingLink from './LapTimerTrainingLink';
 import SessionTimeline from './SessionTimeline';
 
 /** Igual que VehicleList: GET /vehicles está paginado (25 por defecto). */
@@ -221,7 +221,6 @@ function calculateCircuitRanking(groupedTimings) {
 /** Vista móvil: una tarjeta por grupo (misma agrupación que la tabla desktop). */
 function TimingMobileGroupCard({
   group,
-  allCircuits,
   expandedGroups,
   toggleGroup,
   getLaneBadgeVariant,
@@ -271,12 +270,10 @@ function TimingMobileGroupCard({
               ) : null}
               <Badge>{t('sessionsShort', { count: group.total_sessions })}</Badge>
               {group.circuit_id && (
-                <LapTimerTrainingCard
-                  compact
+                <LapTimerTrainingLink
                   vehicleId={group.vehicle_id}
-                  circuits={allCircuits}
-                  initialCircuitId={group.circuit_id}
-                  initialLane={group.lane}
+                  circuitId={group.circuit_id}
+                  lane={group.lane}
                 />
               )}
             </div>
@@ -832,7 +829,6 @@ const TimingsList = () => {
             <TimingMobileGroupCard
               key={group.key}
               group={group}
-              allCircuits={circuits}
               expandedGroups={expandedGroups}
               toggleGroup={toggleGroup}
               getLaneBadgeVariant={getLaneBadgeVariant}

@@ -56,6 +56,7 @@ import CatalogMySuggestions from './pages/CatalogMySuggestions';
 import ProposeCatalogInsert from './pages/ProposeCatalogInsert';
 import PoliciesPage from './pages/PoliciesPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LapTimerPremiumProvider } from './context/LapTimerPremiumContext';
 import { useCookieConsent } from './context/CookieConsentContext';
 import CookieBanner from './components/CookieBanner';
 import CookieSettingsDialog from './components/CookieSettingsDialog';
@@ -554,16 +555,18 @@ function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <AuthProvider>
-        <Router>
-          <div>
-            <CookieBanner />
-            <CookieSettingsDialog />
-            <InstallPWAButton />
-            <AppContent />
-            <Toaster richColors position="top-right" />
-            <ConsentAwareVercelMetrics />
-          </div>
-        </Router>
+        <LapTimerPremiumProvider>
+          <Router>
+            <div>
+              <CookieBanner />
+              <CookieSettingsDialog />
+              <InstallPWAButton />
+              <AppContent />
+              <Toaster richColors position="top-right" />
+              <ConsentAwareVercelMetrics />
+            </div>
+          </Router>
+        </LapTimerPremiumProvider>
       </AuthProvider>
     </I18nextProvider>
   );
