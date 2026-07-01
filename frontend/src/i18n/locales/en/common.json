@@ -56,6 +56,15 @@
     "noBaseline": "No previous baseline for this circuit/lane. The app will use your first session as baseline.",
     "startTiming": "Time with Lap Timer",
     "targetDelta": "Suggested guided target: {{delta}} s faster",
-    "consistencyParen": "(consistency {{score}}%)"
+    "consistencyParen": "(consistency {{score}}%)",
+    "guidedHistoryTitle": "Recent guided sessions",
+    "guidedHistoryLine": "{{on}}/{{total}} on target · {{best}}",
+    "createGoalTitle": "Training goal",
+    "goalTargetLap": "Target (s)",
+    "createGoalBtn": "Create goal",
+    "goalSaving": "Saving…",
+    "goalCreated": "Goal created",
+    "goalError": "Could not create goal",
+    "activeGoals": "{{count}} active goal(s)"
   }
 }

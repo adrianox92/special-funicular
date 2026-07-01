@@ -204,5 +204,12 @@
     "noDataTitle": "Sin Datos",
     "noDataBody": "No hay tiempos registrados para el circuito <1>{{circuit}}</1>.",
     "noDataHint": "Registra sesiones en Tiempos para ver la comparativa por carril."
+  },
+  "trainingGoals": {
+    "title": "Metas de entrenamiento",
+    "desc": "Progreso hacia tus objetivos activos por circuito/carril.",
+    "lane": "carril {{lane}}",
+    "lapProgress": "PB actual {{current}} → objetivo {{target}}",
+    "consistencyProgress": "Consistencia {{current}}% → objetivo ≤ {{target}}"
   }
 }

@@ -7,6 +7,8 @@ const { calculateConsistencyFromLaps } = require('./timingUtils');
 const { parseSupplyVoltageVolts } = require('./pilotProfileUtils');
 const { resolveRecordedFrom, buildSyncMeta } = require('./clientApp');
 const { bestLapSecondsFromInput } = require('./personalBest');
+const { parseGuidedSessionFromBody } = require('./guidedSessionParse');
+const { checkAndAchieveGoalsAfterTimingInsert } = require('./trainingGoals');
 
 /**
  * Inserta una sesión de cronometraje (misma lógica que POST /api/sync/timings).
@@ -174,6 +176,14 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body, options =
     timingData.reaction_time_ms = Math.floor(n);
   }
 
+  const guidedParsed = parseGuidedSessionFromBody(body);
+  if (!guidedParsed.ok) {
+    return { success: false, error: guidedParsed.error, status: 400 };
+  }
+  if (guidedParsed.guidedSession) {
+    timingData.guided_session = guidedParsed.guidedSession;
+  }
+
   let previousBestLapSeconds = null;
   if (circuitIdToStore) {
     previousBestLapSeconds = await getPreviousBestLapSeconds(supabase, {
@@ -247,6 +257,12 @@ async function insertVehicleTimingFromSyncBody(supabase, userId, body, options =
     } catch (positionError) {
       console.warn('Error al actualizar posiciones:', positionError);
     }
+  }
+
+  try {
+    await checkAndAchieveGoalsAfterTimingInsert(supabase, userId, finalTiming);
+  } catch (goalErr) {
+    console.warn('Error al evaluar metas de entrenamiento:', goalErr);
   }
 
   const syncMeta = buildSyncMeta(

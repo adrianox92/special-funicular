@@ -58,6 +58,15 @@
     "noBaseline": "Sin referencia previa en este circuito/carril. La app usará tu primera sesión como baseline.",
     "startTiming": "Cronometrar con Lap Timer",
     "targetDelta": "Objetivo guiado sugerido: bajar {{delta}} s",
-    "consistencyParen": "(consistencia {{score}}%)"
+    "consistencyParen": "(consistencia {{score}}%)",
+    "guidedHistoryTitle": "Últimas sesiones guiadas",
+    "guidedHistoryLine": "{{on}}/{{total}} obj. · {{best}}",
+    "createGoalTitle": "Meta de entrenamiento",
+    "goalTargetLap": "Objetivo (s)",
+    "createGoalBtn": "Crear meta",
+    "goalSaving": "Guardando…",
+    "goalCreated": "Meta creada",
+    "goalError": "No se pudo crear la meta",
+    "activeGoals": "{{count}} meta(s) activa(s)"
   }
 }

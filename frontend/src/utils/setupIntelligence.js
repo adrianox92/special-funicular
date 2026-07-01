@@ -109,4 +109,186 @@ export function computeSuggestedTrainingTarget(baseline) {
   return { targetSeconds, deltaSeconds: delta, consistency: consistency ?? null };
 }
 
+const parseSnapshot = (snapshot) => {
+  if (!snapshot) return [];
+  try {
+    return typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot;
+  } catch {
+    return [];
+  }
+};
+
+const snapshotFingerprint = (snapshot) => {
+  const specs = parseSnapshot(snapshot);
+  if (!Array.isArray(specs) || specs.length === 0) return null;
+  const sorted = [...specs].sort((a, b) => String(a.component_type).localeCompare(String(b.component_type)));
+  return JSON.stringify(sorted.map((c) => ({
+    component_type: c.component_type,
+    element: c.element,
+    teeth: c.teeth,
+    rpm: c.rpm,
+  })));
+};
+
+const componentDiffs = (prevSnap, currSnap) => {
+  const prev = parseSnapshot(prevSnap);
+  const curr = parseSnapshot(currSnap);
+  const prevByType = {};
+  const currByType = {};
+  prev.forEach((c) => {
+    const t = c.component_type || 'other';
+    if (!prevByType[t]) prevByType[t] = [];
+    prevByType[t].push(c);
+  });
+  curr.forEach((c) => {
+    const t = c.component_type || 'other';
+    if (!currByType[t]) currByType[t] = [];
+    currByType[t].push(c);
+  });
+  const types = new Set([...Object.keys(prevByType), ...Object.keys(currByType)]);
+  const diffs = [];
+  types.forEach((type) => {
+    const pStr = (prevByType[type] || []).map((x) => `${x.element}|${x.teeth}|${x.rpm}`).sort().join(';');
+    const cStr = (currByType[type] || []).map((x) => `${x.element}|${x.teeth}|${x.rpm}`).sort().join(';');
+    if (pStr !== cStr) diffs.push({ component_type: type, summary: `${type}: ${pStr || '—'} → ${cStr || '—'}` });
+  });
+  return diffs;
+};
+
+const laneKeyFromTiming = (t) => `${t.circuit_id || t.circuit || ''}::${t.lane}`;
+
+/**
+ * Ranking histórico de impacto por component_type (transiciones consecutivas).
+ * @param {object[]} timings — con setup_snapshot, orden cronológico irrelevante (se ordena)
+ */
+export function computeComponentImpactRankings(timings = [], opts = {}) {
+  const minTransitions = opts.minTransitions ?? 3;
+  const withSnap = (timings || []).filter((t) => t.setup_snapshot);
+  if (withSnap.length < 2) return [];
+
+  const sorted = [...withSnap].sort((a, b) => new Date(a.timing_date) - new Date(b.timing_date));
+  const accum = {};
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    const fpPrev = snapshotFingerprint(prev.setup_snapshot);
+    const fpCurr = snapshotFingerprint(curr.setup_snapshot);
+    if (!fpPrev || !fpCurr || fpPrev === fpCurr) continue;
+
+    const prevSec = prev.best_lap_timestamp ?? timeToSeconds(prev.best_lap_time);
+    const currSec = curr.best_lap_timestamp ?? timeToSeconds(curr.best_lap_time);
+    if (prevSec == null || currSec == null) continue;
+    if (String(prev.lane ?? '') !== String(curr.lane ?? '')) continue;
+    if (laneKeyFromTiming(prev) !== laneKeyFromTiming(curr)) continue;
+
+    const delta = currSec - prevSec;
+    const diffs = componentDiffs(prev.setup_snapshot, curr.setup_snapshot);
+    diffs.forEach((d) => {
+      if (!accum[d.component_type]) {
+        accum[d.component_type] = { component_type: d.component_type, totalDelta: 0, count: 0, evidence: [] };
+      }
+      accum[d.component_type].totalDelta += delta;
+      accum[d.component_type].count += 1;
+      accum[d.component_type].evidence.push({
+        timingDate: curr.timing_date,
+        lane: curr.lane,
+        deltaSec: delta,
+        summary: d.summary,
+      });
+    });
+  }
+
+  return Object.values(accum)
+    .filter((r) => r.count >= minTransitions)
+    .map((r) => ({
+      ...r,
+      avgDeltaSec: r.totalDelta / r.count,
+    }))
+    .sort((a, b) => a.avgDeltaSec - b.avgDeltaSec);
+}
+
+/**
+ * Configs estancadas: ≥ minSessions sin mejora PB > threshold en minDays.
+ */
+export function detectStagnantConfigs(configGroups = [], opts = {}) {
+  const minSessions = opts.minSessions ?? 3;
+  const minDays = opts.minDays ?? 30;
+  const pbThreshold = opts.pbThreshold ?? 0.02;
+  const stagnant = [];
+
+  (configGroups || []).forEach((cg) => {
+    const sessions = cg.sessions || cg.timings || [];
+    if (sessions.length < minSessions) return;
+    const sorted = [...sessions].sort((a, b) => new Date(a.timing_date) - new Date(b.timing_date));
+    const firstDate = new Date(sorted[0].timing_date);
+    const lastDate = new Date(sorted[sorted.length - 1].timing_date);
+    const spanDays = (lastDate - firstDate) / (86400000);
+    if (spanDays < minDays) return;
+
+    const bestLaps = sorted
+      .map((s) => s.best_lap_timestamp ?? timeToSeconds(s.best_lap_time))
+      .filter((v) => v != null);
+    if (bestLaps.length < 2) return;
+    const firstBest = bestLaps[0];
+    const overallBest = Math.min(...bestLaps);
+    if (firstBest - overallBest < pbThreshold) {
+      stagnant.push({
+        label: cg.label,
+        sessionCount: sessions.length,
+        spanDays: Math.round(spanDays),
+        pbImprovementSec: firstBest - overallBest,
+        lastDate: sorted[sorted.length - 1].timing_date,
+      });
+    }
+  });
+
+  return stagnant;
+}
+
+/**
+ * Plantillas i18n para sugerencias accionables.
+ */
+export function buildSetupSuggestions(rankings = [], stagnant = []) {
+  const suggestions = [];
+
+  rankings.slice(0, 5).forEach((r) => {
+    if (r.avgDeltaSec < -0.02) {
+      suggestions.push({
+        type: 'component_positive',
+        key: 'analysis.suggestComponentImprove',
+        params: {
+          component: r.component_type,
+          delta: Math.abs(r.avgDeltaSec).toFixed(3),
+          sessions: r.count,
+        },
+      });
+    } else if (r.avgDeltaSec > 0.02) {
+      suggestions.push({
+        type: 'component_negative',
+        key: 'analysis.suggestComponentRevert',
+        params: {
+          component: r.component_type,
+          delta: r.avgDeltaSec.toFixed(3),
+          sessions: r.count,
+        },
+      });
+    }
+  });
+
+  stagnant.slice(0, 3).forEach((s) => {
+    suggestions.push({
+      type: 'stagnant',
+      key: 'analysis.suggestStagnant',
+      params: {
+        config: s.label,
+        sessions: s.sessionCount,
+        days: s.spanDays,
+      },
+    });
+  });
+
+  return suggestions;
+}
+
 export { formatTime as formatSetupInsightTime };

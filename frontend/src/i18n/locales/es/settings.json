@@ -46,7 +46,22 @@
     "saved": "Notificaciones guardadas. Tras un sync se enviará resumen por Discord y/o Telegram si está configurado.",
     "testSent": "Mensaje de prueba enviado (revisa Discord y/o Telegram).",
     "saveError": "No se pudo guardar",
-    "testError": "Error al enviar la prueba"
+    "testError": "Error al enviar la prueba",
+    "weeklyDigestLabel": "Resumen semanal por email/chat",
+    "weeklyDigestHint": "Recibe un informe semanal con sesiones, PBs nuevos y progreso de metas (Discord/Telegram).",
+    "weeklyDigestDay": "Día de envío (UTC)",
+    "weekday": {
+      "0": "Domingo",
+      "1": "Lunes",
+      "2": "Martes",
+      "3": "Miércoles",
+      "4": "Jueves",
+      "5": "Viernes",
+      "6": "Sábado"
+    },
+    "digestTest": "Enviar resumen de prueba",
+    "digestTestSent": "Resumen semanal de prueba enviado.",
+    "digestTestError": "Error al enviar el resumen de prueba"
   },
   "account": {
     "passwordTitle": "Contraseña",

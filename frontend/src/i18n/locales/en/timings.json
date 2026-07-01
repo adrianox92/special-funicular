@@ -226,6 +226,45 @@
     "deltaBestCol": "Delta vs best",
     "deltaMeanCol": "Delta vs mean",
     "badgeBest": "Best",
-    "badgeWorst": "Worst"
+    "badgeWorst": "Worst",
+    "tabPace": "Pace"
+  },
+  "guided": {
+    "badge": "Guided",
+    "badgeTitle": "{{on}}/{{total}} laps on target",
+    "summaryTitle": "Guided training",
+    "baseline": "Baseline: {{time}}",
+    "target": "Target: −{{ms}} ms",
+    "lapsOnTarget": "Laps on target: {{on}} / {{total}}",
+    "bestImprovement": "Best improvement: {{ms}} ms"
+  },
+  "pace": {
+    "insufficient": "At least 3 laps are required for pace analysis.",
+    "warmup": "Warm-up",
+    "firstNLaps": "First laps average",
+    "degradation": "Degradation",
+    "bestStreak": "Best streak",
+    "streakRange": "Laps {{start}}–{{end}} ({{k}} consecutive)",
+    "decayChartTitle": "Decay vs rolling average",
+    "decaySeries": "Δ vs rolling avg",
+    "outLapTable": "Out-lap",
+    "outLapFlag": "Out-lap",
+    "outLapYes": "Slow out-lap",
+    "trend": {
+      "improving": "Improving",
+      "degrading": "Degrading",
+      "stable": "Stable",
+      "insufficient": "Insufficient data"
+    }
+  },
+  "voltageChart": {
+    "title": "Voltage vs performance",
+    "hint": "Best lap per session by supply voltage.",
+    "insufficient": "At least 2 sessions with voltage are required.",
+    "noValidPoints": "No sessions with valid voltage and best lap.",
+    "groupLabel": "Circuit / lane",
+    "suggestedBand": "Suggested band ~{{min}}–{{max}} V (avg PB {{avg}}, {{count}} sessions)",
+    "slowLowVoltage": "Latest session is below PB with low voltage vs optimal band.",
+    "axisVoltage": "Voltage"
   }
 }

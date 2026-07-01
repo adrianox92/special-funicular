@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useMemo } from 'react';
+import React, { Suspense, lazy, useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,6 +30,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { cn } from '../lib/utils';
+import api from '../lib/axios';
 import {
   formatCurrencyEur,
   formatPercentEs,
@@ -56,6 +57,68 @@ const ChartFallback = () => (
     </CardContent>
   </Card>
 );
+
+function TrainingGoalsDashboardWidget() {
+  const { t } = useTranslation('dashboard');
+  const [goals, setGoals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/dashboard/training-goals-summary');
+        if (!cancelled) setGoals(data?.goals || []);
+      } catch {
+        if (!cancelled) setGoals([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading || goals.length === 0) return null;
+
+  return (
+    <Card className="border-border/80 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Gauge className="size-4" />
+          {t('trainingGoals.title')}
+        </CardTitle>
+        <CardDescription>{t('trainingGoals.desc')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {goals.map((g) => (
+          <div key={g.id} className="space-y-1.5">
+            <div className="flex justify-between gap-2 text-sm">
+              <span className="font-medium truncate">
+                {g.vehicle?.manufacturer} {g.vehicle?.model} — {g.circuit_name}
+                {g.lane ? ` (${t('trainingGoals.lane', { lane: g.lane })})` : ''}
+              </span>
+              <span className="text-muted-foreground shrink-0 tabular-nums">{g.progress_pct}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.min(100, g.progress_pct)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground font-mono">
+              {g.goal_type === 'lap_time'
+                ? t('trainingGoals.lapProgress', { current: g.current_display, target: g.target_display })
+                : t('trainingGoals.consistencyProgress', {
+                    current: g.current_value != null ? Number(g.current_value).toFixed(1) : '—',
+                    target: g.target_display,
+                  })}
+            </p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 /** Agrupa tarjetas de métricas con una etiqueta compacta */
 const MetricSubGroup = ({ label, children, className }) => (
@@ -254,6 +317,7 @@ const Dashboard = () => {
 
       <div className="space-y-6">
         <DashboardActionBlocks data={actionItems} loadError={actionItemsError} />
+        <TrainingGoalsDashboardWidget />
 
         {maintenanceSummary ? (
           <section aria-labelledby="dash-maintenance" className="space-y-4">

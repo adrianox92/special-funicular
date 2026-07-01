@@ -161,7 +161,7 @@ const LaneComparisonChart = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tTimings]);
 
   const laneData = useMemo(() => {
     if (!selectedCircuit || !Array.isArray(allTimings)) return {};

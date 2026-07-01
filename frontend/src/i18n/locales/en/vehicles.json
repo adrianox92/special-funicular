@@ -239,7 +239,16 @@
       "evolutionTitle": "Time Evolution by Circuit and Lane",
       "evolutionInsufficient": "Not enough timing records to show evolution.",
       "evolutionNeedTwo": "At least 2 records from the same circuit and lane are required.",
-      "speedFormat": "{{real}} km/h ({{scale}} eq.)"
+      "speedFormat": "{{real}} km/h ({{scale}} eq.)",
+      "trainingGoalsTitle": "Training goals",
+      "goalCircuit": "Circuit",
+      "goalType": "Type",
+      "goalTarget": "Target",
+      "goalProgress": "Progress",
+      "goalLapTime": "Best lap",
+      "goalConsistency": "Consistency",
+      "deactivateGoal": "Deactivate",
+      "goalAchieved": "Achieved"
     },
     "errors": {
       "loadVehicle": "Failed to load vehicle",
@@ -446,7 +455,18 @@
     "laneColumn": "Lane",
     "bestLapColumn": "Best lap",
     "averageColumn": "Average",
-    "avgSpeedColumn": "Avg. speed (km/h)"
+    "avgSpeedColumn": "Avg. speed (km/h)",
+    "suggestionsTitle": "Setup suggestions",
+    "stagnantTitle": "Stagnant configurations",
+    "stagnantItem": "{{config}}: {{sessions}} sessions over {{days}} days without clear PB gain",
+    "componentImpactTitle": "Historical component impact",
+    "componentCol": "Component",
+    "avgDeltaCol": "Avg PB Δ",
+    "evidenceCol": "Evidence",
+    "evidenceSessions": "{{count}} transitions",
+    "suggestComponentImprove": "Changing {{component}} correlated with −{{delta}} s ({{sessions}} sessions)",
+    "suggestComponentRevert": "Revert {{component}}: worsened +{{delta}} s over {{sessions}} sessions",
+    "suggestStagnant": "Try another setup: {{config}} has {{sessions}} sessions without progress ({{days}} days)"
   },
   "duplicateModal": {
     "title": "Duplicate vehicle",

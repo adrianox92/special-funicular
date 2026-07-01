@@ -204,5 +204,12 @@
     "noDataTitle": "Keine Daten",
     "noDataBody": "Keine Zeiten für Circuit <1>{{circuit}}</1> erfasst.",
     "noDataHint": "Sessions unter Zeiten erfassen, um den Spurvergleich zu sehen."
+  },
+  "trainingGoals": {
+    "title": "Trainingsziele",
+    "desc": "Fortschritt zu aktiven Zielen pro Strecke/Spur.",
+    "lane": "Spur {{lane}}",
+    "lapProgress": "Aktuelle PB {{current}} → Ziel {{target}}",
+    "consistencyProgress": "Konstanz {{current}}% → Ziel ≤ {{target}}"
   }
 }

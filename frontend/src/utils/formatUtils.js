@@ -224,3 +224,16 @@ export function safeVehicleFileBasename(model, opts = {}) {
   while (cleaned.endsWith('-')) cleaned = cleaned.slice(0, -1);
   return (cleaned || fb).toLowerCase().slice(0, 180);
 }
+
+/** Etiqueta para selectores: prefija club si es circuito compartido. */
+export function formatCircuitSelectLabel(circuit) {
+  if (!circuit?.name) return '—';
+  const clubName = circuit.clubs?.name;
+  if (circuit.club_id && clubName) {
+    return `[${clubName}] ${circuit.name}`;
+  }
+  if (circuit.club_id) {
+    return `[Club] ${circuit.name}`;
+  }
+  return circuit.name;
+}

@@ -67,13 +67,13 @@ const ClubCircuits = ({ clubId, canManage, club, onClubUpdated }) => {
       });
     } catch (e) {
       console.error(e);
-      toast.error(e.response?.data?.error || p('loadError'));
+      toast.error(e.response?.data?.error || t('circuitsPanel.loadError'));
       setCircuits([]);
       setSelectedCircuitId(null);
     } finally {
       setLoading(false);
     }
-  }, [clubId]);
+  }, [clubId, t]);
 
   useEffect(() => {
     load();

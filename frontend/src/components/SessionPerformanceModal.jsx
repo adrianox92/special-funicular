@@ -34,6 +34,8 @@ import { CircleHelp } from 'lucide-react';
 import api from '../lib/axios';
 import LapDeltaChart from './charts/LapDeltaChart';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Badge } from './ui/badge';
+import { analyzeStint, detectOutLap, computePaceDecay } from '../utils/stintAnalysis';
 
 const formatTime = (seconds) => {
   if (seconds == null || seconds === 0) return '—';
@@ -185,6 +187,10 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
   });
 
   const hasLaps = laps.length > 0;
+  const stint = hasLaps ? analyzeStint(laps) : null;
+  const lapsWithOut = hasLaps ? detectOutLap(laps) : [];
+  const paceDecay = hasLaps ? computePaceDecay(laps) : [];
+  const gs = timing.guided_session;
 
   return (
     <Dialog open={show} onOpenChange={(open) => !open && onHide()}>
@@ -206,10 +212,35 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
           <p className="text-muted-foreground py-8 text-center">{t('performanceModal.noLaps')}</p>
         ) : (
           <Tabs defaultValue="evolution" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="evolution">{t('performanceModal.tabEvolution')}</TabsTrigger>
+              <TabsTrigger value="pace">{t('performanceModal.tabPace')}</TabsTrigger>
               <TabsTrigger value="statistics">{t('performanceModal.tabStatistics')}</TabsTrigger>
             </TabsList>
+
+            {gs && (
+              <Card className="mt-4 border-primary/30 bg-primary/5">
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default">{t('guided.badge')}</Badge>
+                    <h5 className="font-semibold text-sm">{t('guided.summaryTitle')}</h5>
+                  </div>
+                </CardHeader>
+                <CardContent className="py-2 px-4 pb-4 text-sm space-y-1">
+                  <p>{t('guided.baseline', { time: formatTime(gs.baseline_lap_seconds) })}</p>
+                  <p>{t('guided.target', { ms: gs.target_improvement_ms })}</p>
+                  <p>
+                    {t('guided.lapsOnTarget', {
+                      on: gs.laps_on_target,
+                      total: gs.total_laps ?? timing.laps ?? '—',
+                    })}
+                  </p>
+                  {gs.best_improvement_ms != null && (
+                    <p>{t('guided.bestImprovement', { ms: gs.best_improvement_ms })}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <TabsContent value="evolution" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -400,6 +431,112 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
               </Card>
 
               <LapDeltaChart laps={laps} bestLapTimestamp={bestTime} />
+            </TabsContent>
+
+            <TabsContent value="pace" className="space-y-4 mt-4">
+              {!stint || stint.lapCount < 3 ? (
+                <p className="text-muted-foreground text-sm py-4 text-center">{t('pace.insufficient')}</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Card>
+                      <CardHeader className="py-2 px-3">
+                        <p className="text-xs text-muted-foreground">{t('pace.warmup')}</p>
+                      </CardHeader>
+                      <CardContent className="py-1 px-3 pb-3">
+                        <p className="font-mono font-semibold">{formatTime(stint.firstNMean)}</p>
+                        <p className="text-xs text-muted-foreground">{t('pace.firstNLaps')}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="py-2 px-3">
+                        <p className="text-xs text-muted-foreground">{t('pace.degradation')}</p>
+                      </CardHeader>
+                      <CardContent className="py-1 px-3 pb-3">
+                        <p className="font-mono font-semibold">{formatTime(stint.lastNMean)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t(`pace.trend.${stint.trend}`)} ({stint.deltaFirstLast >= 0 ? '+' : ''}
+                          {stint.deltaFirstLast?.toFixed(3)}s)
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="py-2 px-3">
+                        <p className="text-xs text-muted-foreground">{t('pace.bestStreak')}</p>
+                      </CardHeader>
+                      <CardContent className="py-1 px-3 pb-3">
+                        {stint.bestStreak ? (
+                          <>
+                            <p className="font-mono font-semibold">{formatTime(stint.bestStreak.average)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('pace.streakRange', {
+                                start: stint.bestStreak.startLap,
+                                end: stint.bestStreak.endLap,
+                                k: stint.bestStreak.k,
+                              })}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-muted-foreground">—</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <h5 className="font-semibold">{t('pace.decayChartTitle')}</h5>
+                    </CardHeader>
+                    <CardContent>
+                      <div style={{ width: '100%', height: 220 }}>
+                        <ResponsiveContainer>
+                          <BarChart data={paceDecay} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="lap" />
+                            <YAxis tickFormatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}s`} />
+                            <RechartsTooltip formatter={(v) => `${Number(v).toFixed(3)} s`} />
+                            <Bar dataKey="deltaVsRollingAvg" name={t('pace.decaySeries')} fill="hsl(var(--primary) / 0.7)" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <h5 className="font-semibold">{t('pace.outLapTable')}</h5>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border overflow-x-auto max-h-[240px] overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>{t('performanceModal.lapCol')}</TableHead>
+                              <TableHead>{t('performanceModal.timeCol')}</TableHead>
+                              <TableHead>{t('pace.outLapFlag')}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {lapsWithOut.map((lap) => (
+                              <TableRow key={lap.lap_number}>
+                                <TableCell>{lap.lap_number}</TableCell>
+                                <TableCell className="font-mono">{formatTime(lap.lap_time_seconds)}</TableCell>
+                                <TableCell>
+                                  {lap.isOutLap ? (
+                                    <Badge variant="outline">{t('pace.outLapYes')}</Badge>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="statistics" className="space-y-4 mt-4">

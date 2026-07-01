@@ -2,6 +2,7 @@ const express = require('express');
 const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
+const { listAccessibleCircuitsForUser } = require('../lib/clubCircuits');
 
 const router = express.Router();
 /** Service role si existe (omite RLS; el API valida user_id). Igual que competitions/clubs. */
@@ -20,7 +21,7 @@ function isUuid(id) {
  * @swagger
  * /api/circuits:
  *   get:
- *     summary: Lista todos los circuitos del usuario
+ *     summary: Lista circuitos personales y de club accesibles al usuario
  *     tags: [Circuits]
  *     security:
  *       - bearerAuth: []
@@ -43,19 +44,9 @@ router.get('/', async (req, res) => {
       ownerId = oid;
     }
 
-    const { data, error } = await supabase
-      .from('circuits')
-      .select('*')
-      .eq('user_id', ownerId)
-      .is('club_id', null)
-      .order('name', { ascending: true });
+    const data = await listAccessibleCircuitsForUser(supabase, ownerId);
 
-    if (error) {
-      console.error('Error al obtener circuitos:', error);
-      return res.status(500).json({ error: error.message });
-    }
-
-    res.json(data || []);
+    res.json(data);
   } catch (error) {
     console.error('Error en GET /circuits:', error);
     res.status(500).json({ error: error.message });

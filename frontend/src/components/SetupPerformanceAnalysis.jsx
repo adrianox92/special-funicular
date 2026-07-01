@@ -26,6 +26,11 @@ import {
 import { Check } from 'lucide-react';
 import { formatDistance, getIntlLocale } from '../utils/formatUtils';
 import { getVehicleComponentTypeLabel } from '../data/componentTypes';
+import {
+  computeComponentImpactRankings,
+  detectStagnantConfigs,
+  buildSetupSuggestions,
+} from '../utils/setupIntelligence';
 
 /** Heurística: correlación modificación ↔ delta de mejor vuelta tras cambio de config. */
 export function computeModLapCorrelations(timings = []) {
@@ -234,7 +239,7 @@ const getBetterBetween = (key, prevVal, currVal) => {
 };
 
 const SetupPerformanceAnalysis = ({ timings = [] }) => {
-  const { t, i18n } = useTranslation('vehicles');
+  const { t } = useTranslation('vehicles');
   const { configGroups, barChartData, timelineData, laneComparisons, modInsights } = useMemo(() => {
     const locale = getIntlLocale();
     const withSnapshot = timings.filter((t) => t.setup_snapshot);
@@ -368,7 +373,7 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
       .filter((c) => c.rows.length > 0);
 
     return { configGroups, barChartData, timelineData, laneComparisons, modInsights: computeModLapCorrelations(timings) };
-  }, [timings, t, i18n.language]);
+  }, [timings, t]);
 
   const includeReactionCompare = timings.some((timing) => timing.reaction_time_ms != null);
 
@@ -394,6 +399,13 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
     return rows;
   }, [t, includeReactionCompare]);
 
+  const { componentRankings, stagnantConfigs, setupSuggestions } = useMemo(() => {
+    const rankings = computeComponentImpactRankings(timings);
+    const stagnant = detectStagnantConfigs(configGroups);
+    const suggestions = buildSetupSuggestions(rankings, stagnant);
+    return { componentRankings: rankings, stagnantConfigs: stagnant, setupSuggestions: suggestions };
+  }, [timings, configGroups]);
+
   if (configGroups.length < 2) {
     return (
       <div className="text-center text-muted-foreground py-8">
@@ -410,6 +422,77 @@ const SetupPerformanceAnalysis = ({ timings = [] }) => {
 
   return (
     <div className="space-y-6">
+      {setupSuggestions.length > 0 && (
+        <Card className="border-primary/20">
+          <CardHeader className="pb-2">
+            <h5 className="font-semibold text-sm">{t('analysis.suggestionsTitle')}</h5>
+          </CardHeader>
+          <CardContent>
+            <ul className="text-sm space-y-1.5 text-muted-foreground">
+              {setupSuggestions.map((s, idx) => (
+                <li key={`${s.key}-${idx}`}>{t(s.key, s.params)}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {stagnantConfigs.length > 0 && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader className="pb-2">
+            <h5 className="font-semibold text-sm">{t('analysis.stagnantTitle')}</h5>
+          </CardHeader>
+          <CardContent>
+            <ul className="text-sm space-y-1.5">
+              {stagnantConfigs.map((s) => (
+                <li key={s.label}>
+                  {t('analysis.stagnantItem', {
+                    config: s.label,
+                    sessions: s.sessionCount,
+                    days: s.spanDays,
+                  })}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {componentRankings.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <h5 className="font-semibold text-sm">{t('analysis.componentImpactTitle')}</h5>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('analysis.componentCol')}</TableHead>
+                    <TableHead>{t('analysis.avgDeltaCol')}</TableHead>
+                    <TableHead>{t('analysis.evidenceCol')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {componentRankings.map((r) => (
+                    <TableRow key={r.component_type}>
+                      <TableCell>{getVehicleComponentTypeLabel(r.component_type)}</TableCell>
+                      <TableCell className="font-mono">
+                        {r.avgDeltaSec >= 0 ? '+' : ''}
+                        {r.avgDeltaSec.toFixed(3)}s
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {t('analysis.evidenceSessions', { count: r.count })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {modInsights?.length > 0 && (
         <Card>
           <CardHeader className="pb-2">

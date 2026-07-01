@@ -24,6 +24,7 @@ import SessionPerformanceModal from './SessionPerformanceModal';
 import SetupPerformanceAnalysis, { hasMultipleConfigs } from './SetupPerformanceAnalysis';
 import VehicleImageCarouselDialog from './VehicleImageCarouselDialog';
 import MaintenanceCorrelationChart from './charts/MaintenanceCorrelationChart';
+import VoltagePerformanceChart from './charts/VoltagePerformanceChart';
 import MaintenanceLog from './MaintenanceLog';
 import VehiclePalmares from './VehiclePalmares';
 import ImportTimingsModal from './ImportTimingsModal';
@@ -82,6 +83,7 @@ import {
   formatInventoryCategory,
   modificationLineTotal,
   safeVehicleFileBasename,
+  formatCircuitSelectLabel,
 } from '../utils/formatUtils';
 import {
   vehicleComponentTypes as componentTypes,
@@ -244,6 +246,7 @@ const EditVehicle = () => {
     supply_voltage_volts: '',
   });
   const [loadingTimings, setLoadingTimings] = useState(false);
+  const [trainingGoals, setTrainingGoals] = useState([]);
   const [timingNotice, setTimingNotice] = useState(null);
   const [showSpecsModal, setShowSpecsModal] = useState(false);
   const [selectedTiming, setSelectedTiming] = useState(null);
@@ -293,7 +296,7 @@ const EditVehicle = () => {
     } finally {
       setQrLoading(false);
     }
-  }, [getApiBaseUrl, id]);
+  }, [getApiBaseUrl, id, t]);
 
   const closeQrDialog = useCallback(() => {
     setShowQrDialog(false);
@@ -319,7 +322,7 @@ const EditVehicle = () => {
         setError(t('edit.errors.loadVehicle'));
         setLoading(false);
       });
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     const observers = new Map();
@@ -432,7 +435,7 @@ const EditVehicle = () => {
     if (id) {
       loadTechnicalSpecs();
     }
-  }, [id]);
+  }, [id, t]);
 
   // Derive has_laps from API response (GET /vehicles/:id/timings returns has_laps)
   useEffect(() => {
@@ -934,7 +937,7 @@ const EditVehicle = () => {
     }
   };
 
-  const calculateAverageTime = (totalTime, laps, bestLapTime) => {
+  const calculateAverageTime = useCallback((totalTime, laps, bestLapTime) => {
     if (!totalTime || !laps || laps <= 0 || !bestLapTime) return '';
 
     const getSeconds = (timeStr) => {
@@ -971,7 +974,7 @@ const EditVehicle = () => {
     const avgMilliseconds = Math.floor((averageSeconds % 1) * 1000);
 
     return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
-  };
+  }, [t]);
 
   const loadTimings = useCallback(async () => {
     if (!id) return;
@@ -995,13 +998,19 @@ const EditVehicle = () => {
         };
       });
       setTimings(timingsWithRecalculatedAverages);
+      try {
+        const goalsRes = await api.get(`/vehicles/${id}/training-goals`);
+        setTrainingGoals(goalsRes.data?.goals || []);
+      } catch {
+        setTrainingGoals([]);
+      }
     } catch (error) {
       console.error('Error al cargar tiempos:', error);
       setError('Error al cargar los tiempos');
     } finally {
       setLoadingTimings(false);
     }
-  }, [id]);
+  }, [id, calculateAverageTime]);
 
   useEffect(() => {
     if (id) loadTimings();
@@ -1785,7 +1794,7 @@ const EditVehicle = () => {
                 <SelectContent>
                   <SelectItem value="none">{t('edit.none')}</SelectItem>
                   {circuits.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{formatCircuitSelectLabel(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1961,6 +1970,61 @@ const EditVehicle = () => {
                       </React.Fragment>
                     ));
                   })()}
+                </div>
+              )}
+
+              {timings.filter((t) => t.supply_voltage_volts != null).length >= 2 && (
+                <div className="mt-8">
+                  <VoltagePerformanceChart timings={timings} />
+                </div>
+              )}
+
+              {trainingGoals.length > 0 && (
+                <div className="mt-8">
+                  <h4 className="text-lg font-semibold mb-4">{t('edit.timings.trainingGoalsTitle')}</h4>
+                  <div className="rounded-md border overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="p-2">{t('edit.timings.goalCircuit')}</th>
+                          <th className="p-2">{t('edit.timings.lane')}</th>
+                          <th className="p-2">{t('edit.timings.goalType')}</th>
+                          <th className="p-2">{t('edit.timings.goalTarget')}</th>
+                          <th className="p-2">{t('edit.timings.goalProgress')}</th>
+                          <th className="p-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trainingGoals.map((g) => (
+                          <tr key={g.id} className="border-b">
+                            <td className="p-2">{g.circuits?.name ?? '—'}</td>
+                            <td className="p-2">{g.lane ?? '—'}</td>
+                            <td className="p-2">{g.goal_type === 'lap_time' ? t('edit.timings.goalLapTime') : t('edit.timings.goalConsistency')}</td>
+                            <td className="p-2 font-mono">{Number(g.target_value).toFixed(g.goal_type === 'lap_time' ? 3 : 1)}</td>
+                            <td className="p-2">{g.progress?.progressPct ?? 0}%</td>
+                            <td className="p-2">
+                              {g.active && !g.achieved_at && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    await api.patch(`/vehicles/training-goals/${g.id}`, { active: false });
+                                    loadTimings();
+                                  }}
+                                >
+                                  {t('edit.timings.deactivateGoal')}
+                                </Button>
+                              )}
+                              {g.achieved_at && (
+                                <span className="text-green-600 text-xs">{t('edit.timings.goalAchieved')}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </>

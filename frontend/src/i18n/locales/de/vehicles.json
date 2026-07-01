@@ -239,7 +239,16 @@
       "evolutionTitle": "Zeitentwicklung nach Strecke und Spur",
       "evolutionInsufficient": "Nicht genug Zeiteinträge für die Entwicklung.",
       "evolutionNeedTwo": "Mindestens 2 Einträge derselben Strecke und Spur erforderlich.",
-      "speedFormat": "{{real}} km/h ({{scale}} eq.)"
+      "speedFormat": "{{real}} km/h ({{scale}} eq.)",
+      "trainingGoalsTitle": "Trainingsziele",
+      "goalCircuit": "Strecke",
+      "goalType": "Typ",
+      "goalTarget": "Ziel",
+      "goalProgress": "Fortschritt",
+      "goalLapTime": "Beste Runde",
+      "goalConsistency": "Konstanz",
+      "deactivateGoal": "Deaktivieren",
+      "goalAchieved": "Erreicht"
     },
     "errors": {
       "loadVehicle": "Fahrzeug konnte nicht geladen werden",
@@ -446,7 +455,18 @@
     "laneColumn": "Spur",
     "bestLapColumn": "Beste Runde",
     "averageColumn": "Durchschnitt",
-    "avgSpeedColumn": "Ø Geschw. (km/h)"
+    "avgSpeedColumn": "Ø Geschw. (km/h)",
+    "suggestionsTitle": "Setup-Vorschläge",
+    "stagnantTitle": "Stagnierende Konfigurationen",
+    "stagnantItem": "{{config}}: {{sessions}} Sitzungen in {{days}} Tagen ohne klare PB-Verbesserung",
+    "componentImpactTitle": "Historische Komponentenwirkung",
+    "componentCol": "Komponente",
+    "avgDeltaCol": "Ø PB-Δ",
+    "evidenceCol": "Belege",
+    "evidenceSessions": "{{count}} Übergänge",
+    "suggestComponentImprove": "{{component}} wechseln korrelierte mit −{{delta}} s ({{sessions}} Sitzungen)",
+    "suggestComponentRevert": "{{component}} zurücksetzen: +{{delta}} s in {{sessions}} Sitzungen",
+    "suggestStagnant": "Anderes Setup testen: {{config}} ohne Fortschritt ({{sessions}} Sitzungen, {{days}} Tage)"
   },
   "duplicateModal": {
     "title": "Fahrzeug duplizieren",

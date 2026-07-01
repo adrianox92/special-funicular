@@ -4,6 +4,8 @@ const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { modificationLineTotal } = require('../lib/componentPricing');
 const { resolveStaleDaysThreshold } = require('../lib/userPreferences');
+const { evaluateGoalProgress } = require('../lib/trainingGoals');
+const { formatSecondsToLapTime } = require('../lib/timingUtils');
 
 const supabase = getAnonClient();
 
@@ -1201,6 +1203,67 @@ router.get('/maintenance-summary', async (req, res) => {
   } catch (e) {
     console.error('maintenance-summary:', e);
     res.status(500).json({ error: 'Error al obtener resumen de mantenimiento' });
+  }
+});
+
+/**
+ * GET /api/dashboard/training-goals-summary
+ * Metas activas con progreso para el widget del dashboard.
+ */
+router.get('/training-goals-summary', async (req, res) => {
+  try {
+    const { data: goals, error } = await supabase
+      .from('training_goals')
+      .select('*, vehicles(id, model, manufacturer), circuits(name)')
+      .eq('user_id', req.user.id)
+      .eq('active', true)
+      .is('achieved_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const vehicleIds = [...new Set((goals || []).map((g) => g.vehicle_id))];
+    let timingsByVehicle = {};
+    if (vehicleIds.length > 0) {
+      const { data: timings } = await supabase
+        .from('vehicle_timings')
+        .select('id, vehicle_id, circuit_id, lane, best_lap_time, best_lap_timestamp, consistency_score, timing_date')
+        .in('vehicle_id', vehicleIds)
+        .order('timing_date', { ascending: false })
+        .limit(500);
+      for (const t of timings || []) {
+        if (!timingsByVehicle[t.vehicle_id]) timingsByVehicle[t.vehicle_id] = [];
+        timingsByVehicle[t.vehicle_id].push(t);
+      }
+    }
+
+    const summary = (goals || []).map((g) => {
+      const progress = evaluateGoalProgress(g, timingsByVehicle[g.vehicle_id] || []);
+      return {
+        id: g.id,
+        goal_type: g.goal_type,
+        target_value: Number(g.target_value),
+        lane: g.lane,
+        circuit_name: g.circuits?.name,
+        vehicle: g.vehicles,
+        progress_pct: progress.progressPct,
+        current_value: progress.currentValue,
+        current_display:
+          g.goal_type === 'lap_time' && progress.currentValue != null
+            ? formatSecondsToLapTime(progress.currentValue)
+            : progress.currentValue,
+        target_display:
+          g.goal_type === 'lap_time'
+            ? formatSecondsToLapTime(Number(g.target_value))
+            : `${Number(g.target_value).toFixed(1)}%`,
+      };
+    });
+
+    res.json({ goals: summary });
+  } catch (e) {
+    console.error('training-goals-summary:', e);
+    res.status(500).json({ error: 'Error al obtener metas de entrenamiento' });
   }
 });
 

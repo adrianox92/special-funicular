@@ -500,6 +500,51 @@ router.use((req, res, next) => {
   next();
 });
 
+const { evaluateGoalProgress } = require('../lib/trainingGoals');
+
+/** PATCH /api/vehicles/training-goals/:goalId — desactivar o editar meta */
+router.patch('/training-goals/:goalId', async (req, res) => {
+  try {
+    const { goalId } = req.params;
+    const { active, target_value } = req.body;
+
+    const { data: existing, error: fetchErr } = await req.supabase
+      .from('training_goals')
+      .select('*')
+      .eq('id', goalId)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return res.status(404).json({ error: 'Meta no encontrada' });
+    }
+
+    const patch = { updated_at: new Date().toISOString() };
+    if (active !== undefined) patch.active = Boolean(active);
+    if (target_value !== undefined) {
+      const n = Number(target_value);
+      if (!Number.isFinite(n) || n <= 0) {
+        return res.status(400).json({ error: 'target_value debe ser un número positivo' });
+      }
+      patch.target_value = n;
+    }
+
+    const { data, error } = await req.supabase
+      .from('training_goals')
+      .update(patch)
+      .eq('id', goalId)
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  } catch (err) {
+    console.error('PATCH /vehicles/training-goals/:goalId:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const COMPONENT_PAYLOAD_KEYS = [
   'component_type', 'element', 'manufacturer', 'material', 'size', 'teeth',
   'color', 'rpm', 'gaus', 'price', 'url', 'sku', 'description', 'mounted_qty'
@@ -1941,6 +1986,105 @@ router.get('/:id/training-baseline', async (req, res) => {
     });
   } catch (err) {
     console.error('Error en GET /vehicles/:id/training-baseline:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Metas de entrenamiento por vehículo
+router.get('/:id/training-goals', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: vehicle, error: vErr } = await req.supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .single();
+    if (vErr || !vehicle) return res.status(404).json({ error: 'Vehículo no encontrado' });
+
+    const { data: goals, error } = await req.supabase
+      .from('training_goals')
+      .select('*, circuits(name)')
+      .eq('vehicle_id', id)
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const { data: timings } = await req.supabase
+      .from('vehicle_timings')
+      .select('id, vehicle_id, circuit_id, lane, best_lap_time, best_lap_timestamp, consistency_score, timing_date')
+      .eq('vehicle_id', id)
+      .order('timing_date', { ascending: false })
+      .limit(100);
+
+    const enriched = (goals || []).map((g) => ({
+      ...g,
+      progress: evaluateGoalProgress(g, timings || []),
+    }));
+
+    res.json({ goals: enriched });
+  } catch (err) {
+    console.error('GET /vehicles/:id/training-goals:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/training-goals', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { circuit_id, lane, goal_type, target_value } = req.body;
+
+    if (!circuit_id || !goal_type || target_value == null) {
+      return res.status(400).json({ error: 'circuit_id, goal_type y target_value son requeridos' });
+    }
+    if (goal_type !== 'lap_time' && goal_type !== 'consistency') {
+      return res.status(400).json({ error: 'goal_type debe ser lap_time o consistency' });
+    }
+    const targetNum = Number(target_value);
+    if (!Number.isFinite(targetNum) || targetNum <= 0) {
+      return res.status(400).json({ error: 'target_value debe ser un número positivo' });
+    }
+
+    const { data: vehicle, error: vErr } = await req.supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .single();
+    if (vErr || !vehicle) return res.status(404).json({ error: 'Vehículo no encontrado' });
+
+    const resolved = await resolveCircuitForTiming(req.supabase, req.user.id, circuit_id);
+    if (!resolved.ok) {
+      return res.status(resolved.status).json({ error: resolved.error });
+    }
+
+    const row = {
+      user_id: req.user.id,
+      vehicle_id: id,
+      circuit_id,
+      lane: lane != null && String(lane).trim() !== '' ? String(lane).trim() : null,
+      goal_type,
+      target_value: targetNum,
+      active: true,
+    };
+
+    const { data, error } = await req.supabase
+      .from('training_goals')
+      .insert([row])
+      .select('*, circuits(name)')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'Ya existe una meta activa para este vehículo/circuito/carril/tipo' });
+      }
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(201).json(data);
+  } catch (err) {
+    console.error('POST /vehicles/:id/training-goals:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3, Trash2 } from 'lucide-react';
@@ -89,6 +89,22 @@ function RecordedFromBadge({ recordedFrom }) {
   return (
     <Badge variant={isLapTimerSession(recordedFrom) ? 'default' : 'outline'} className="text-[10px]">
       {label}
+    </Badge>
+  );
+}
+
+function GuidedSessionBadge({ guidedSession }) {
+  const { t } = useTranslation('timings');
+  if (!guidedSession || typeof guidedSession !== 'object') return null;
+  const on = guidedSession.laps_on_target;
+  const total = guidedSession.total_laps;
+  const title =
+    on != null && total != null
+      ? t('guided.badgeTitle', { on, total })
+      : t('guided.badge');
+  return (
+    <Badge variant="secondary" className="text-[10px]" title={title}>
+      {t('guided.badge')}
     </Badge>
   );
 }
@@ -368,6 +384,7 @@ function TimingMobileGroupCard({
                     <span className="text-muted-foreground">{new Date(session.timing_date).toLocaleDateString()}</span>
                     <Badge variant={getLaneBadgeVariant(session.lane)}>{t('lane', { lane: session.lane })}</Badge>
                     <RecordedFromBadge recordedFrom={session.recorded_from} />
+                    <GuidedSessionBadge guidedSession={session.guided_session} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 font-mono text-xs">
                     <div>
@@ -468,7 +485,7 @@ const TimingsList = () => {
   const vehiclePickerRef = useRef(null);
   const vehicleSearchInputRef = useRef(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -493,11 +510,11 @@ const TimingsList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const sortedVehicleOptions = useMemo(() => {
     return Object.values(vehicles).sort((a, b) => {
@@ -982,6 +999,7 @@ const TimingsList = () => {
                             {session.best_lap_time}
                             {index === 0 && <Badge variant="secondary" className="ml-2">{t('bestLapBadge')}</Badge>}
                             <RecordedFromBadge recordedFrom={session.recorded_from} />
+                    <GuidedSessionBadge guidedSession={session.guided_session} />
                           </TableCell>
                           <TableCell className="font-mono">
                             {session.total_time}

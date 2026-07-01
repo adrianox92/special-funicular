@@ -239,7 +239,16 @@
       "evolutionTitle": "Evolución de Tiempos por Circuito y Carril",
       "evolutionInsufficient": "No hay suficientes registros de tiempo para mostrar evolución.",
       "evolutionNeedTwo": "Se necesitan al menos 2 registros del mismo circuito y carril.",
-      "speedFormat": "{{real}} km/h ({{scale}} eq.)"
+      "speedFormat": "{{real}} km/h ({{scale}} eq.)",
+      "trainingGoalsTitle": "Metas de entrenamiento",
+      "goalCircuit": "Circuito",
+      "goalType": "Tipo",
+      "goalTarget": "Objetivo",
+      "goalProgress": "Progreso",
+      "goalLapTime": "Mejor vuelta",
+      "goalConsistency": "Consistencia",
+      "deactivateGoal": "Desactivar",
+      "goalAchieved": "Lograda"
     },
     "errors": {
       "loadVehicle": "Error al cargar el vehículo",
@@ -446,7 +455,18 @@
     "laneColumn": "Carril",
     "bestLapColumn": "Mejor vuelta",
     "averageColumn": "Promedio",
-    "avgSpeedColumn": "Vel. media (km/h)"
+    "avgSpeedColumn": "Vel. media (km/h)",
+    "suggestionsTitle": "Sugerencias de reglaje",
+    "stagnantTitle": "Configuraciones estancadas",
+    "stagnantItem": "{{config}}: {{sessions}} sesiones en {{days}} días sin mejora clara de PB",
+    "componentImpactTitle": "Impacto histórico por componente",
+    "componentCol": "Componente",
+    "avgDeltaCol": "Δ media PB",
+    "evidenceCol": "Evidencia",
+    "evidenceSessions": "{{count}} transiciones",
+    "suggestComponentImprove": "Cambiar {{component}} correlacionado con −{{delta}} s ({{sessions}} sesiones)",
+    "suggestComponentRevert": "Revertir {{component}}: empeoró +{{delta}} s en {{sessions}} sesiones",
+    "suggestStagnant": "Probar otro reglaje: {{config}} lleva {{sessions}} sesiones sin progreso ({{days}} días)"
   },
   "duplicateModal": {
     "title": "Duplicar vehículo",

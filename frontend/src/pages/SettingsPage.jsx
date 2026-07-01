@@ -11,6 +11,14 @@ import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Switch } from '../components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { SlidersHorizontal, Bell, CircleHelp, KeyRound } from 'lucide-react';
 import LanguageSelector from '../components/LanguageSelector';
 
@@ -48,6 +56,9 @@ const SettingsPage = () => {
   const [notifTestLoading, setNotifTestLoading] = useState(false);
   const [notifError, setNotifError] = useState(null);
   const [notifSuccess, setNotifSuccess] = useState(null);
+  const [weeklyDigestEnabled, setWeeklyDigestEnabled] = useState(false);
+  const [weeklyDigestDay, setWeeklyDigestDay] = useState('1');
+  const [digestTestLoading, setDigestTestLoading] = useState(false);
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -72,6 +83,9 @@ const SettingsPage = () => {
         ? String(user.user_metadata.telegram_chat_id)
         : '',
     );
+    setWeeklyDigestEnabled(user?.user_metadata?.weekly_digest_enabled === true);
+    const wd = user?.user_metadata?.weekly_digest_day;
+    setWeeklyDigestDay(wd != null && Number.isFinite(Number(wd)) ? String(wd) : '1');
   }, [user]);
 
   const handleSaveNotifications = async () => {
@@ -84,6 +98,8 @@ const SettingsPage = () => {
           webhook_discord_url: discordUrl.trim() || null,
           telegram_chat_id: tgChat.trim() || null,
           telegram_bot_token: null,
+          weekly_digest_enabled: weeklyDigestEnabled,
+          weekly_digest_day: parseInt(weeklyDigestDay, 10),
         },
       });
       if (error) throw error;
@@ -108,6 +124,21 @@ const SettingsPage = () => {
       setNotifError(err.response?.data?.error || err.message || t('notifications.testError'));
     } finally {
       setNotifTestLoading(false);
+    }
+  };
+
+  const handleTestDigest = async () => {
+    setDigestTestLoading(true);
+    setNotifError(null);
+    setNotifSuccess(null);
+    try {
+      await api.post('/cron/weekly-digest/test');
+      setNotifSuccess(t('notifications.digestTestSent'));
+      setTimeout(() => setNotifSuccess(null), 5000);
+    } catch (err) {
+      setNotifError(err.response?.data?.error || err.message || t('notifications.digestTestError'));
+    } finally {
+      setDigestTestLoading(false);
     }
   };
 
@@ -346,6 +377,37 @@ const SettingsPage = () => {
                 </p>
               </div>
 
+              <div className="rounded-lg border p-4 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="weekly-digest">{t('notifications.weeklyDigestLabel')}</Label>
+                    <p className="text-xs text-muted-foreground">{t('notifications.weeklyDigestHint')}</p>
+                  </div>
+                  <Switch
+                    id="weekly-digest"
+                    checked={weeklyDigestEnabled}
+                    onCheckedChange={setWeeklyDigestEnabled}
+                  />
+                </div>
+                {weeklyDigestEnabled && (
+                  <div className="space-y-2 max-w-xs">
+                    <Label>{t('notifications.weeklyDigestDay')}</Label>
+                    <Select value={weeklyDigestDay} onValueChange={setWeeklyDigestDay}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[0, 1, 2, 3, 4, 5, 6].map((d) => (
+                          <SelectItem key={d} value={String(d)}>
+                            {t(`notifications.weekday.${d}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={handleSaveNotifications} disabled={notifSaving}>
                   {notifSaving ? <Spinner className="size-4 mr-2" /> : null}
@@ -354,6 +416,10 @@ const SettingsPage = () => {
                 <Button type="button" variant="secondary" onClick={handleTestNotification} disabled={notifTestLoading}>
                   {notifTestLoading ? <Spinner className="size-4 mr-2" /> : null}
                   {t('notifications.test')}
+                </Button>
+                <Button type="button" variant="outline" onClick={handleTestDigest} disabled={digestTestLoading}>
+                  {digestTestLoading ? <Spinner className="size-4 mr-2" /> : null}
+                  {t('notifications.digestTest')}
                 </Button>
               </div>
               {notifError && (

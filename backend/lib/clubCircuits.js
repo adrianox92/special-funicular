@@ -52,6 +52,66 @@ async function userIsClubAdmin(supabase, userId, clubId) {
   return Boolean(mem);
 }
 
+/**
+ * Circuitos personales del usuario + circuitos de clubs donde es miembro o propietario.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} userId
+ * @returns {Promise<object[]>}
+ */
+async function listAccessibleCircuitsForUser(supabase, userId) {
+  const { data: personal, error: personalErr } = await supabase
+    .from('circuits')
+    .select('*, clubs(name)')
+    .eq('user_id', userId)
+    .is('club_id', null);
+
+  if (personalErr) throw personalErr;
+
+  const { data: ownedClubs, error: ownedErr } = await supabase
+    .from('clubs')
+    .select('id')
+    .eq('owner_user_id', userId);
+
+  if (ownedErr) throw ownedErr;
+
+  const { data: memberships, error: memErr } = await supabase
+    .from('club_members')
+    .select('club_id')
+    .eq('user_id', userId);
+
+  if (memErr) throw memErr;
+
+  const clubIds = [
+    ...new Set([
+      ...(ownedClubs || []).map((c) => c.id),
+      ...(memberships || []).map((m) => m.club_id),
+    ]),
+  ];
+
+  let clubCircuits = [];
+  if (clubIds.length > 0) {
+    const { data, error: clubCircuitsErr } = await supabase
+      .from('circuits')
+      .select('*, clubs(name)')
+      .in('club_id', clubIds);
+
+    if (clubCircuitsErr) throw clubCircuitsErr;
+    clubCircuits = data || [];
+  }
+
+  const byId = new Map();
+  for (const c of personal || []) {
+    byId.set(c.id, c);
+  }
+  for (const c of clubCircuits) {
+    byId.set(c.id, c);
+  }
+
+  return [...byId.values()].sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' }),
+  );
+}
+
 async function getClubCircuit(supabase, clubId, circuitId) {
   const { data, error } = await supabase
     .from('circuits')
@@ -344,6 +404,7 @@ module.exports = {
   normalizeLaneLengths,
   userIsClubMember,
   userIsClubAdmin,
+  listAccessibleCircuitsForUser,
   getClubCircuit,
   resolveCircuitForTiming,
   resolveCircuitForClubCompetition,

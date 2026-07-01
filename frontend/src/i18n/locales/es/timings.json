@@ -226,6 +226,45 @@
     "deltaBestCol": "Delta vs mejor",
     "deltaMeanCol": "Delta vs media",
     "badgeBest": "Mejor",
-    "badgeWorst": "Peor"
+    "badgeWorst": "Peor",
+    "tabPace": "Ritmo"
+  },
+  "guided": {
+    "badge": "Guiado",
+    "badgeTitle": "{{on}}/{{total}} vueltas en objetivo",
+    "summaryTitle": "Entrenamiento guiado",
+    "baseline": "Referencia: {{time}}",
+    "target": "Objetivo: −{{ms}} ms",
+    "lapsOnTarget": "Vueltas en objetivo: {{on}} / {{total}}",
+    "bestImprovement": "Mejor mejora: {{ms}} ms"
+  },
+  "pace": {
+    "insufficient": "Se necesitan al menos 3 vueltas para el análisis de ritmo.",
+    "warmup": "Calentamiento",
+    "firstNLaps": "Media primeras vueltas",
+    "degradation": "Degradación",
+    "bestStreak": "Mejor racha",
+    "streakRange": "Vueltas {{start}}–{{end}} ({{k}} consecutivas)",
+    "decayChartTitle": "Decay vs media móvil",
+    "decaySeries": "Δ vs media móvil",
+    "outLapTable": "Out-lap",
+    "outLapFlag": "Out-lap",
+    "outLapYes": "Salida lenta",
+    "trend": {
+      "improving": "Mejora progresiva",
+      "degrading": "Degradación",
+      "stable": "Estable",
+      "insufficient": "Datos insuficientes"
+    }
+  },
+  "voltageChart": {
+    "title": "Correlación voltaje ↔ rendimiento",
+    "hint": "Mejor vuelta por sesión según voltaje de alimentación.",
+    "insufficient": "Se necesitan al menos 2 sesiones con voltaje registrado.",
+    "noValidPoints": "No hay sesiones con voltaje y mejor vuelta válidos.",
+    "groupLabel": "Circuito / carril",
+    "suggestedBand": "Banda sugerida ~{{min}}–{{max}} V (media PB {{avg}}, {{count}} sesiones)",
+    "slowLowVoltage": "La última sesión está por debajo del PB con voltaje bajo respecto a la banda óptima.",
+    "axisVoltage": "Voltaje"
   }
 }

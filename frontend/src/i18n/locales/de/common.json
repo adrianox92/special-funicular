@@ -56,6 +56,15 @@
     "noBaseline": "Keine Referenz für diese Strecke/Spur. Die App nutzt die erste Session als Baseline.",
     "startTiming": "Mit Lap Timer messen",
     "targetDelta": "Vorgeschlagenes Ziel: {{delta}} s schneller",
-    "consistencyParen": "(Konstanz {{score}}%)"
+    "consistencyParen": "(Konstanz {{score}}%)",
+    "guidedHistoryTitle": "Letzte geführte Sitzungen",
+    "guidedHistoryLine": "{{on}}/{{total}} im Ziel · {{best}}",
+    "createGoalTitle": "Trainingsziel",
+    "goalTargetLap": "Ziel (s)",
+    "createGoalBtn": "Ziel erstellen",
+    "goalSaving": "Speichern…",
+    "goalCreated": "Ziel erstellt",
+    "goalError": "Ziel konnte nicht erstellt werden",
+    "activeGoals": "{{count}} aktive(s) Ziel(e)"
   }
 }

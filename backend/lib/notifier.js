@@ -124,6 +124,20 @@ async function sendTimingNotification(userId, timing, previousBestLapSeconds, su
     if (rankingLine) {
       lines.push(`🏆 ${rankingLine}`);
     }
+    const gs = timing.guided_session;
+    if (gs && typeof gs === 'object') {
+      const lapsOnTarget = gs.laps_on_target != null ? String(gs.laps_on_target) : '—';
+      const totalLaps = gs.total_laps != null ? String(gs.total_laps) : null;
+      const bestImp =
+        gs.best_improvement_ms != null && Number.isFinite(Number(gs.best_improvement_ms))
+          ? `${(Number(gs.best_improvement_ms) / 1000).toFixed(3)} s`
+          : '—';
+      const guidedLine =
+        totalLaps != null
+          ? `Entrenamiento guiado: ${lapsOnTarget}/${totalLaps} vueltas en objetivo · mejor mejora ${bestImp}`
+          : `Entrenamiento guiado: ${lapsOnTarget} vueltas en objetivo · mejor mejora ${bestImp}`;
+      lines.push(guidedLine);
+    }
     const textPlain = lines
       .map((l) => l.replace(/\*\*/g, ''))
       .join('\n');
@@ -286,9 +300,85 @@ async function sendTestNotification(userId) {
   await Promise.all(tasks);
 }
 
+/**
+ * Informe semanal (Discord/Telegram).
+ * @param {string} userId
+ * @param {object} digest
+ */
+async function sendWeeklyDigestNotification(userId, digest) {
+  const meta = await fetchUserMetadata(userId);
+  const discordUrl = typeof meta.webhook_discord_url === 'string' ? meta.webhook_discord_url.trim() : '';
+  const tgToken = getTelegramBotTokenFromEnv();
+  const tgChat = meta.telegram_chat_id != null ? String(meta.telegram_chat_id).trim() : '';
+
+  if (!discordUrl && (!tgToken || !tgChat)) {
+    const err = new Error(
+      'Configura al menos un webhook de Discord o tu Chat ID de Telegram para recibir el resumen.',
+    );
+    err.code = 'NO_CHANNELS';
+    throw err;
+  }
+
+  const lines = [
+    '📊 **Resumen semanal — Scalextric Collection**',
+    `Sesiones (7 días): ${digest.sessionCount ?? 0}`,
+  ];
+  if (digest.guidedCount > 0) {
+    lines.push(`Entrenamientos guiados: ${digest.guidedCount}`);
+  }
+  if (digest.newPbs?.length) {
+    lines.push('', '**Nuevos PB:**');
+    digest.newPbs.forEach((pb) => {
+      lines.push(`• ${pb.vehicle} — ${pb.circuit} (carril ${pb.lane ?? '—'}): ${pb.time} (−${pb.improvement}s)`);
+    });
+  }
+  if (digest.goals?.length) {
+    lines.push('', '**Metas de entrenamiento:**');
+    digest.goals.forEach((g) => {
+      const label =
+        g.goal_type === 'lap_time'
+          ? `PB objetivo ${Number(g.target_value).toFixed(3)}s`
+          : `Consistencia ≤ ${Number(g.target_value).toFixed(1)}%`;
+      const status = g.achieved ? '✅ lograda' : `${g.progressPct ?? 0}%`;
+      lines.push(`• ${g.vehicle?.manufacturer ?? ''} ${g.vehicle?.model ?? ''} — ${g.circuit ?? ''}: ${label} (${status})`);
+    });
+  }
+  if (digest.maintenancePending > 0) {
+    lines.push('', `⚠️ Mantenimiento pendiente en ${digest.maintenancePending} registro(s) antiguo(s).`);
+  }
+
+  const textPlain = lines.map((l) => l.replace(/\*\*/g, '')).join('\n').slice(0, 4096);
+  const tasks = [];
+  if (discordUrl) {
+    tasks.push(
+      fetch(discordUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: textPlain.slice(0, 2000) }),
+      }).then((r) => {
+        if (!r.ok) console.warn('[notifier] Discord digest HTTP', r.status);
+      }),
+    );
+  }
+  if (tgToken && tgChat) {
+    const url = `https://api.telegram.org/bot${tgToken}/sendMessage`;
+    tasks.push(
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: tgChat, text: textPlain }),
+      }).then((r) => {
+        if (!r.ok) console.warn('[notifier] Telegram digest HTTP', r.status);
+      }),
+    );
+  }
+  await Promise.all(tasks);
+}
+
 module.exports = {
   sendTimingNotification,
   sendCompetitionLiveNotification,
   sendTestNotification,
+  sendWeeklyDigestNotification,
   fetchUserMetadata,
 };

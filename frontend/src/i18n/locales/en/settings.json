@@ -46,7 +46,22 @@
     "saved": "Notifications saved. After sync, summary will be sent via Discord and/or Telegram if configured.",
     "testSent": "Test message sent (check Discord and/or Telegram).",
     "saveError": "Could not save",
-    "testError": "Failed to send test"
+    "testError": "Failed to send test",
+    "weeklyDigestLabel": "Weekly digest",
+    "weeklyDigestHint": "Receive a weekly report with sessions, new PBs and goal progress (Discord/Telegram).",
+    "weeklyDigestDay": "Send day (UTC)",
+    "weekday": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    },
+    "digestTest": "Send test digest",
+    "digestTestSent": "Test weekly digest sent.",
+    "digestTestError": "Failed to send test digest"
   },
   "account": {
     "passwordTitle": "Password",

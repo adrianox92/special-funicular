@@ -46,7 +46,22 @@
     "saved": "Benachrichtigungen gespeichert. Nach Sync Zusammenfassung per Discord und/oder Telegram.",
     "testSent": "Testnachricht gesendet (Discord und/oder Telegram prüfen).",
     "saveError": "Speichern fehlgeschlagen",
-    "testError": "Test konnte nicht gesendet werden"
+    "testError": "Test konnte nicht gesendet werden",
+    "weeklyDigestLabel": "Wöchentliche Zusammenfassung",
+    "weeklyDigestHint": "Wöchentlicher Bericht mit Sitzungen, neuen PBs und Zielfortschritt (Discord/Telegram).",
+    "weeklyDigestDay": "Versandtag (UTC)",
+    "weekday": {
+      "0": "Sonntag",
+      "1": "Montag",
+      "2": "Dienstag",
+      "3": "Mittwoch",
+      "4": "Donnerstag",
+      "5": "Freitag",
+      "6": "Samstag"
+    },
+    "digestTest": "Test-Zusammenfassung senden",
+    "digestTestSent": "Test-Zusammenfassung gesendet.",
+    "digestTestError": "Test-Zusammenfassung fehlgeschlagen"
   },
   "account": {
     "passwordTitle": "Passwort",

@@ -226,6 +226,45 @@
     "deltaBestCol": "Delta vs. beste",
     "deltaMeanCol": "Delta vs. Mittelwert",
     "badgeBest": "Beste",
-    "badgeWorst": "Schlechteste"
+    "badgeWorst": "Schlechteste",
+    "tabPace": "Tempo"
+  },
+  "guided": {
+    "badge": "Geführt",
+    "badgeTitle": "{{on}}/{{total}} Runden im Ziel",
+    "summaryTitle": "Geführtes Training",
+    "baseline": "Referenz: {{time}}",
+    "target": "Ziel: −{{ms}} ms",
+    "lapsOnTarget": "Runden im Ziel: {{on}} / {{total}}",
+    "bestImprovement": "Beste Verbesserung: {{ms}} ms"
+  },
+  "pace": {
+    "insufficient": "Mindestens 3 Runden für Tempo-Analyse erforderlich.",
+    "warmup": "Einlauf",
+    "firstNLaps": "Schnitt erste Runden",
+    "degradation": "Degradation",
+    "bestStreak": "Beste Serie",
+    "streakRange": "Runden {{start}}–{{end}} ({{k}} hintereinander)",
+    "decayChartTitle": "Abfall vs gleitender Mittelwert",
+    "decaySeries": "Δ vs gleitender Mittelwert",
+    "outLapTable": "Out-lap",
+    "outLapFlag": "Out-lap",
+    "outLapYes": "Langsame Out-lap",
+    "trend": {
+      "improving": "Verbessernd",
+      "degrading": "Degradierend",
+      "stable": "Stabil",
+      "insufficient": "Unzureichende Daten"
+    }
+  },
+  "voltageChart": {
+    "title": "Spannung vs Leistung",
+    "hint": "Beste Runde pro Sitzung nach Versorgungsspannung.",
+    "insufficient": "Mindestens 2 Sitzungen mit Spannung erforderlich.",
+    "noValidPoints": "Keine Sitzungen mit gültiger Spannung und bester Runde.",
+    "groupLabel": "Strecke / Spur",
+    "suggestedBand": "Empfohlener Bereich ~{{min}}–{{max}} V (PB-Schnitt {{avg}}, {{count}} Sitzungen)",
+    "slowLowVoltage": "Letzte Sitzung unter PB bei niedriger Spannung vs optimaler Bandbreite.",
+    "axisVoltage": "Spannung"
   }
 }

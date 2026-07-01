@@ -204,5 +204,12 @@
     "noDataTitle": "No Data",
     "noDataBody": "No timings recorded for circuit <1>{{circuit}}</1>.",
     "noDataHint": "Record sessions in Timings to see the lane comparison."
+  },
+  "trainingGoals": {
+    "title": "Training goals",
+    "desc": "Progress toward active goals by circuit/lane.",
+    "lane": "lane {{lane}}",
+    "lapProgress": "Current PB {{current}} → target {{target}}",
+    "consistencyProgress": "Consistency {{current}}% → target ≤ {{target}}"
   }
 }

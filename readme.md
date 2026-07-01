@@ -59,6 +59,19 @@ En el **backend**, define `DASHBOARD_PERF_LOG=1` en el entorno para registrar po
 
 En **desarrollo**, el hook del dashboard escribe en consola del navegador (nivel `debug`) el tiempo del bloque paralelo de peticiones a `/dashboard/*`.
 
+### Informe semanal (Render Cron)
+
+Para enviar resúmenes semanales por Discord/Telegram:
+
+1. Define `CRON_SECRET` en el **Web Service** de la API en Render (mismo valor en el Cron Job).
+2. Crea un **Render Cron Job** con schedule `0 8 * * 1` (lunes 08:00 UTC) que haga:
+   `POST https://special-funicular-3q60.onrender.com/api/cron/weekly-digest`
+   con header `Authorization: Bearer <CRON_SECRET>`.
+3. Los usuarios activan el digest en **Configuración → Notificaciones** (`weekly_digest_enabled`, día de la semana).
+4. Prueba manual: botón «Enviar resumen de prueba» (JWT) o `?force=1` en el cron.
+
+Tabla auxiliar `digest_send_log` evita reenvíos duplicados en la misma semana.
+
 ### Requisitos Técnicos PWA
 
 - **HTTPS obligatorio**: La PWA requiere conexión segura en producción
