@@ -1,3 +1,12 @@
+function compareByStartOrder(a, b) {
+  const ao = a.start_order;
+  const bo = b.start_order;
+  if (ao != null && bo != null) return ao - bo;
+  if (ao != null) return -1;
+  if (bo != null) return 1;
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+}
+
 /**
  * Próximo piloto en la tanda actual (primera ronda con huecos pendientes).
  * @param {Array} participants
@@ -18,7 +27,9 @@ export function findNextPilot(participants, totalRounds) {
   };
 
   for (let round = 1; round <= totalRounds; round += 1) {
-    const pending = participants.filter((p) => getRoundStatus(p, round) === 'pending');
+    const pending = participants
+      .filter((p) => getRoundStatus(p, round) === 'pending')
+      .sort(compareByStartOrder);
     if (pending.length > 0) {
       return { participant: pending[0], roundNumber: round };
     }
