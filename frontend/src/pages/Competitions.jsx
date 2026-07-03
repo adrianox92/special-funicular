@@ -26,6 +26,7 @@ import {
   DialogTrigger,
 } from '../components/ui/dialog';
 import { Spinner } from '../components/ui/spinner';
+import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -41,6 +42,10 @@ import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
 import { competitionPublicSignupUrl } from '../utils/clubEventCalendarExport';
+import {
+  buildCompetitionCircuitOptions,
+  competitionCircuitLabel,
+} from '../utils/competitionCircuits';
 
 const COMPETITIONS_DEBUG_ORG_KEY = 'scalextric_competitions_for_organizer';
 
@@ -69,6 +74,7 @@ const Competitions = () => {
     circuit_id: '',
     club_id: '',
     registration_deadline: '',
+    is_multi_stage: false,
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
@@ -180,12 +186,11 @@ const Competitions = () => {
     loadClubCircuits(createForm.club_id || null);
   }, [createForm.club_id]);
 
-  const circuitOptions = createForm.club_id
-    ? [
-        ...clubCircuits.map((c) => ({ ...c, source: 'club' })),
-        ...circuits.map((c) => ({ ...c, source: 'personal' })),
-      ]
-    : circuits.map((c) => ({ ...c, source: 'personal' }));
+  const circuitOptions = buildCompetitionCircuitOptions(
+    circuits,
+    clubCircuits,
+    createForm.club_id || null,
+  );
 
   const toggleFavoriteSelection = (favId) => {
     setSelectedFavorites((prev) => {
@@ -246,6 +251,7 @@ const Competitions = () => {
         rounds: parseInt(createForm.rounds),
         circuit_id: createForm.circuit_id || null,
         club_id: createForm.club_id || null,
+        is_multi_stage: Boolean(createForm.is_multi_stage),
         registration_deadline: createForm.registration_deadline
           ? new Date(createForm.registration_deadline).toISOString()
           : null,
@@ -288,7 +294,7 @@ const Competitions = () => {
       }
 
       setShowCreateModal(false);
-      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '', club_id: '', registration_deadline: '' });
+      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '', club_id: '', registration_deadline: '', is_multi_stage: false });
       setSelectedFavorites({});
       setFavoritesExpanded(false);
       setDefaultCategoryName('General');
@@ -495,6 +501,31 @@ const Competitions = () => {
                   <p className="text-sm text-muted-foreground">Número máximo de rondas permitidas</p>
                 </div>
 
+                <div className="flex items-center justify-between rounded-md border p-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="is_multi_stage">Competición multi-tramo</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Cada ronda puede usar un circuito distinto (ideal para rally).
+                    </p>
+                  </div>
+                  <Switch
+                    id="is_multi_stage"
+                    checked={createForm.is_multi_stage}
+                    onCheckedChange={(checked) =>
+                      setCreateForm({ ...createForm, is_multi_stage: checked })
+                    }
+                  />
+                </div>
+
+                {createForm.is_multi_stage && (
+                  <Alert>
+                    <AlertDescription>
+                      El circuito de cada tramo se configura en la gestión de la competición.
+                      El circuito seleccionado abajo actuará como circuito por defecto.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="registration_deadline">Fecha límite de inscripción (opcional)</Label>
                   <Input
@@ -509,7 +540,9 @@ const Competitions = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="circuit_id">Circuito</Label>
+                  <Label htmlFor="circuit_id">
+                    {createForm.is_multi_stage ? 'Circuito por defecto' : 'Circuito'}
+                  </Label>
                   <Select
                     value={createForm.circuit_id || 'none'}
                     onValueChange={(v) => setCreateForm({ ...createForm, circuit_id: v === 'none' ? '' : v })}
@@ -521,7 +554,7 @@ const Competitions = () => {
                       <SelectItem value="none">Ninguno</SelectItem>
                       {circuitOptions.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.source === 'club' ? `[Club] ${c.name}` : c.name}
+                          {competitionCircuitLabel(c)}
                         </SelectItem>
                       ))}
                     </SelectContent>

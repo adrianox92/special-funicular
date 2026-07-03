@@ -238,12 +238,27 @@ router.get('/competitions/:id', param('id').isUUID(), handleValidationErrors, as
       timings = t || [];
     }
 
+    let round_stages = [];
+    if (competition.is_multi_stage) {
+      const { data: stages, error: stagesErr } = await supabaseAdmin
+        .from('competition_round_stages')
+        .select('id, competition_id, round_number, circuit_id, circuit_name, created_at')
+        .eq('competition_id', id)
+        .order('round_number', { ascending: true });
+      if (stagesErr) {
+        console.error('GET /sync/competitions/:id round_stages', stagesErr);
+      } else {
+        round_stages = stages || [];
+      }
+    }
+
     res.json({
       ...competition,
       participants: participants || [],
       categories: categories || [],
       rules: rules || [],
       timings: timings || [],
+      round_stages,
     });
   } catch (err) {
     console.error('GET /sync/competitions/:id', err);

@@ -114,6 +114,36 @@ function parseRegistrationDeadline(value) {
   return parsed.toISOString();
 }
 
+async function loadRoundStagesForCompetition(competitionId) {
+  const { data, error } = await supabase
+    .from('competition_round_stages')
+    .select('id, competition_id, round_number, circuit_id, circuit_name, created_at')
+    .eq('competition_id', competitionId)
+    .order('round_number', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function deleteRoundStagesBeyond(competitionId, maxRound) {
+  const { error } = await supabase
+    .from('competition_round_stages')
+    .delete()
+    .eq('competition_id', competitionId)
+    .gt('round_number', maxRound);
+
+  if (error) throw error;
+}
+
+async function deleteAllRoundStages(competitionId) {
+  const { error } = await supabase
+    .from('competition_round_stages')
+    .delete()
+    .eq('competition_id', competitionId);
+
+  if (error) throw error;
+}
+
 // Aplicar middleware de autenticación SOLO a las rutas siguientes
 router.use(authMiddleware);
 
@@ -263,12 +293,25 @@ const competitionCreateValidators = [
     .optional({ values: 'falsy' })
     .isISO8601()
     .withMessage('registration_deadline inválido'),
+  body('is_multi_stage')
+    .optional()
+    .isBoolean()
+    .withMessage('is_multi_stage debe ser booleano'),
 ];
 
 // Crear una nueva competición
 router.post('/', competitionCreateValidators, handleValidationErrors, async (req, res) => {
   try {
-    const { name, num_slots, rounds, circuit_name, circuit_id, club_id, registration_deadline } = req.body;
+    const {
+      name,
+      num_slots,
+      rounds,
+      circuit_name,
+      circuit_id,
+      club_id,
+      registration_deadline,
+      is_multi_stage,
+    } = req.body;
 
     if (club_id) {
       const { data: mem } = await supabase
@@ -328,6 +371,7 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       club_id: club_id || null,
       status: 'draft',
       registration_deadline: parsedDeadline,
+      is_multi_stage: Boolean(is_multi_stage),
     };
 
     const { data, error } = await supabase
@@ -560,6 +604,15 @@ router.get('/:id', async (req, res) => {
       .eq('competition_id', id)
       .maybeSingle();
 
+    let round_stages = [];
+    if (competition.is_multi_stage) {
+      try {
+        round_stages = await loadRoundStagesForCompetition(id);
+      } catch (stageErr) {
+        console.error('Error al obtener tramos:', stageErr);
+      }
+    }
+
     res.json({
       ...appendRegulationFileUrl(supabase, competition),
       participants: participants || [],
@@ -567,6 +620,7 @@ router.get('/:id', async (req, res) => {
       signups_count: signupsPending || 0,
       waitlist_count: waitlistCount || 0,
       timings_count: timingsCount || 0,
+      round_stages,
       league: leagueLink?.leagues
         ? {
             id: leagueLink.leagues.id,
@@ -586,9 +640,9 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, num_slots, rounds, circuit_name, circuit_id, registration_deadline } = req.body;
+    const { name, num_slots, rounds, circuit_name, circuit_id, registration_deadline, is_multi_stage } = req.body;
 
-    const access = await requireManageCompetition(supabase, req.user, id, 'id, num_slots, rounds, organizer, club_id');
+    const access = await requireManageCompetition(supabase, req.user, id, 'id, num_slots, rounds, organizer, club_id, is_multi_stage');
     if (!access.ok) return access.respond(res);
     const existingComp = access.competition;
 
@@ -678,6 +732,10 @@ router.put('/:id', async (req, res) => {
       updateData.registration_deadline = parsedDeadline;
     }
 
+    if (is_multi_stage !== undefined) {
+      updateData.is_multi_stage = Boolean(is_multi_stage);
+    }
+
     const { data, error } = await supabase
       .from('competitions')
       .update(updateData)
@@ -690,12 +748,165 @@ router.put('/:id', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
+    const effectiveRounds = data.rounds;
+    const effectiveMultiStage = data.is_multi_stage;
+
+    try {
+      if (effectiveMultiStage === false) {
+        await deleteAllRoundStages(id);
+      } else if (rounds) {
+        await deleteRoundStagesBeyond(id, effectiveRounds);
+      }
+    } catch (stageCleanupErr) {
+      console.error('Error al limpiar tramos:', stageCleanupErr);
+      return res.status(500).json({ error: stageCleanupErr.message });
+    }
+
     res.json(data);
   } catch (error) {
     console.error('Error en PUT /competitions/:id:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
+router.get('/:id/round-stages', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: competition, error: compError } = await supabase
+      .from('competitions')
+      .select('id, organizer, club_id, is_multi_stage, rounds')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (compError || !competition) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    const canView = await canViewCompetition(supabase, req.user, competition);
+    if (!canView) {
+      return res.status(404).json({ error: 'Competición no encontrada' });
+    }
+
+    if (!competition.is_multi_stage) {
+      return res.json([]);
+    }
+
+    const round_stages = await loadRoundStagesForCompetition(id);
+    res.json(round_stages);
+  } catch (error) {
+    console.error('Error en GET /competitions/:id/round-stages:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put(
+  '/:id/round-stages',
+  param('id').isUUID(),
+  body('stages').isArray().withMessage('stages debe ser un array'),
+  body('stages.*.round_number').isInt({ min: 1 }).withMessage('round_number inválido'),
+  body('stages.*.circuit_id')
+    .optional({ values: 'falsy' })
+    .isUUID()
+    .withMessage('circuit_id inválido'),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { stages } = req.body;
+
+      const access = await requireManageCompetition(
+        supabase,
+        req.user,
+        id,
+        'id, organizer, club_id, is_multi_stage, rounds, status',
+      );
+      if (!access.ok) return access.respond(res);
+      const existingComp = access.competition;
+
+      if (!existingComp.is_multi_stage) {
+        return res.status(400).json({ error: 'Esta competición no es multi-tramo' });
+      }
+
+      const metaBlock = metadataEditForbiddenReason(existingComp.status);
+      if (metaBlock) {
+        return res.status(400).json({ error: metaBlock });
+      }
+
+      const maxRound = existingComp.rounds;
+      const seenRounds = new Set();
+      const rowsToUpsert = [];
+
+      for (const stage of stages) {
+        const roundNumber = parseInt(stage.round_number, 10);
+        if (roundNumber < 1 || roundNumber > maxRound) {
+          return res.status(400).json({
+            error: `La ronda ${roundNumber} está fuera del rango permitido (1-${maxRound})`,
+          });
+        }
+        if (seenRounds.has(roundNumber)) {
+          return res.status(400).json({ error: `Ronda duplicada: ${roundNumber}` });
+        }
+        seenRounds.add(roundNumber);
+
+        let circuitIdToStore = null;
+        let circuitNameToStore = null;
+
+        if (stage.circuit_id) {
+          const resolved = await resolveCircuitForClubCompetition(
+            supabase,
+            req.user.id,
+            existingComp.club_id || null,
+            stage.circuit_id,
+          );
+          if (!resolved.ok) {
+            return res.status(resolved.status).json({ error: resolved.error });
+          }
+          if (resolved.circuit) {
+            circuitIdToStore = resolved.circuit.id;
+            circuitNameToStore = resolved.circuitName;
+          }
+        }
+
+        if (circuitIdToStore) {
+          rowsToUpsert.push({
+            competition_id: id,
+            round_number: roundNumber,
+            circuit_id: circuitIdToStore,
+            circuit_name: circuitNameToStore,
+          });
+        }
+      }
+
+      const { error: deleteErr } = await supabase
+        .from('competition_round_stages')
+        .delete()
+        .eq('competition_id', id);
+
+      if (deleteErr) {
+        console.error('Error al limpiar tramos:', deleteErr);
+        return res.status(500).json({ error: deleteErr.message });
+      }
+
+      if (rowsToUpsert.length > 0) {
+        const { error: upsertErr } = await supabase
+          .from('competition_round_stages')
+          .insert(rowsToUpsert);
+
+        if (upsertErr) {
+          console.error('Error al guardar tramos:', upsertErr);
+          return res.status(500).json({ error: upsertErr.message });
+        }
+      }
+
+      const round_stages = await loadRoundStagesForCompetition(id);
+      res.json(round_stages);
+    } catch (error) {
+      console.error('Error en PUT /competitions/:id/round-stages:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 router.patch(
   '/:id/status',

@@ -95,7 +95,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
       case 'final':
         return 'Los puntos se asignan al final de la competición';
       case 'power_stage':
-        return 'Puntos extra en rondas específicas según la mejor vuelta (estilo WRC Power Stage)';
+        return 'Puntos extra en rondas específicas: se clasifica por tiempo total (1.º, 2.º, 3.º…)';
       default:
         return '';
     }
@@ -269,7 +269,8 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
                 <Label>Rondas objetivo *</Label>
                 <div className="rounded-lg border p-4">
                   <p className="text-sm text-muted-foreground mb-3">
-                    Selecciona las rondas en las que se aplicará la puntuación Power Stage.
+                    Selecciona las rondas Power Stage. En cada una, los puntos se otorgan por tiempo
+                    total (1.º posición, 2.º posición, etc.).
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {Array.from({ length: totalRounds }, (_, i) => i + 1).map((round) => {

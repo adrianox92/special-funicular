@@ -64,6 +64,62 @@ function sortByPointsThenTime(stats) {
   });
 }
 
+function getPointsForPosition(pointsStructure, position) {
+  if (!pointsStructure || position < 1) return 0;
+  const raw = pointsStructure[String(position)] ?? pointsStructure[position];
+  const pts = Number(raw);
+  return Number.isFinite(pts) ? pts : 0;
+}
+
+function timingTotalSecondsWithPenalty(timing) {
+  if (!timing?.total_time || timing.did_not_participate) return null;
+  const base = lapTimeStringToSeconds(timing.total_time);
+  if (base == null || base <= 0) return null;
+  return base + (Number(timing.penalty_seconds) || 0);
+}
+
+/** Ordena tiempos de ronda por tiempo total + penalización (ascendente). */
+function sortTimingsByTotalTime(timings) {
+  return timings.slice().sort((a, b) => {
+    const aTime = timingTotalSecondsWithPenalty(a);
+    const bTime = timingTotalSecondsWithPenalty(b);
+    if (aTime == null && bTime == null) return 0;
+    if (aTime == null) return 1;
+    if (bTime == null) return -1;
+    if (aTime !== bTime) return aTime - bTime;
+    return String(a.participant_id).localeCompare(String(b.participant_id));
+  });
+}
+
+function awardPowerStagePointsForRound({
+  participants,
+  timesByParticipant,
+  round,
+  powerStageRule,
+  pointsByParticipant,
+  powerStagePointsByParticipant,
+}) {
+  const roundTimings = participants
+    .map((p) => (timesByParticipant[p.id] || []).find((t) => t.round_number === round))
+    .filter(Boolean);
+
+  const eligible = roundTimings.filter(
+    (t) => !t.did_not_participate && timingTotalSecondsWithPenalty(t) != null,
+  );
+
+  if (eligible.length === 0) return;
+
+  const sorted = sortTimingsByTotalTime(eligible);
+
+  sorted.forEach((timing, index) => {
+    const position = index + 1;
+    const pts = getPointsForPosition(powerStageRule.points_structure, position);
+    if (pts <= 0) return;
+    powerStagePointsByParticipant[timing.participant_id] += pts;
+    pointsByParticipant[timing.participant_id] += pts;
+  });
+}
+
 /**
  * Núcleo del cálculo de puntos para un subconjunto de participantes y reglas.
  * @returns {{ pointsByParticipant: Object, participantStats: Array }}
@@ -139,28 +195,13 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
         : [];
 
       for (const round of targetRounds) {
-        const roundTimings = participants
-          .map((p) => (timesByParticipant[p.id] || []).find((t) => t.round_number === round))
-          .filter(Boolean);
-
-        if (roundTimings.length !== participants.length) {
-          continue;
-        }
-
-        const participatingTimings = roundTimings.filter((t) => !t.did_not_participate);
-        const sorted = participatingTimings.slice().sort((a, b) => {
-          const aLap = lapTimeStringToSeconds(a.best_lap_time);
-          const bLap = lapTimeStringToSeconds(b.best_lap_time);
-          const aTime = aLap != null ? aLap : Infinity;
-          const bTime = bLap != null ? bLap : Infinity;
-          return aTime - bTime;
-        });
-
-        Object.entries(powerStageRule.points_structure).forEach(([, pts], idx) => {
-          if (sorted[idx]) {
-            powerStagePointsByParticipant[sorted[idx].participant_id] += pts;
-            pointsByParticipant[sorted[idx].participant_id] += pts;
-          }
+        awardPowerStagePointsForRound({
+          participants,
+          timesByParticipant,
+          round,
+          powerStageRule,
+          pointsByParticipant,
+          powerStagePointsByParticipant,
         });
       }
     }
@@ -397,4 +438,8 @@ module.exports = {
   getRulesForCategory,
   lapTimeStringToSeconds,
   isUsableBestLapTimeString,
+  getPointsForPosition,
+  sortTimingsByTotalTime,
+  timingTotalSecondsWithPenalty,
+  awardPowerStagePointsForRound,
 };

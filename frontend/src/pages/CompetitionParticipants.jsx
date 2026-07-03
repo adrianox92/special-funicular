@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
+import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown, Calendar, Flag } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
 import CompetitionCategories from '../components/CompetitionCategories';
 import CompetitionRulesPanel from '../components/CompetitionRulesPanel';
+import CompetitionRoundStages from './CompetitionRoundStages';
 import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
 import LiveEventHubLinks from '../components/LiveEventHubLinks';
 import { Button } from '../components/ui/button';
@@ -145,6 +146,12 @@ const CompetitionParticipants = () => {
   const canUseOrganizerTools = Boolean(
     (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
   );
+  const showStagesTab = Boolean(canUseOrganizerTools && competition?.is_multi_stage);
+  const tabsGridClass = showStagesTab
+    ? 'grid-cols-2 lg:grid-cols-5'
+    : canUseOrganizerTools
+      ? 'grid-cols-2 lg:grid-cols-4'
+      : 'grid-cols-3';
   const effectiveCompetitionStatus = competition?.status || 'published';
   const registrationDeadlineExpired = Boolean(
     competition?.registration_deadline &&
@@ -210,7 +217,10 @@ const CompetitionParticipants = () => {
     if (competition && !canUseOrganizerTools && activeTab === 'signups') {
       setActiveTab('participants');
     }
-  }, [competition, canUseOrganizerTools, activeTab]);
+    if (competition && !showStagesTab && activeTab === 'stages') {
+      setActiveTab('participants');
+    }
+  }, [competition, canUseOrganizerTools, showStagesTab, activeTab]);
 
   const handleAddParticipant = useCallback(async (e) => {
     e.preventDefault();
@@ -911,9 +921,7 @@ const CompetitionParticipants = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList
-          className={`grid w-full gap-2 ${canUseOrganizerTools ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3'}`}
-        >
+        <TabsList className={`grid w-full gap-2 ${tabsGridClass}`}>
           <TabsTrigger value="participants" className="flex items-center gap-2">
             <Users className="size-4" />
             Participantes ({participants.length})
@@ -923,6 +931,12 @@ const CompetitionParticipants = () => {
               <Users className="size-4" />
               Inscripciones ({competition?.signups_count || 0}
               {competition?.waitlist_count > 0 ? ` · espera ${competition.waitlist_count}` : ''})
+            </TabsTrigger>
+          )}
+          {showStagesTab && (
+            <TabsTrigger value="stages" className="flex items-center gap-2">
+              <Flag className="size-4" />
+              Tramos
             </TabsTrigger>
           )}
           <TabsTrigger value="categories" className="flex items-center gap-2">
@@ -1195,6 +1209,16 @@ const CompetitionParticipants = () => {
         {canUseOrganizerTools && (
           <TabsContent value="signups" className="mt-4">
             <CompetitionSignups competitionId={competitionId} onSignupApproved={loadCompetition} />
+          </TabsContent>
+        )}
+
+        {showStagesTab && (
+          <TabsContent value="stages" className="mt-4">
+            <CompetitionRoundStages
+              competitionId={competitionId}
+              competition={competition}
+              readOnly={!canUseOrganizerTools}
+            />
           </TabsContent>
         )}
 
