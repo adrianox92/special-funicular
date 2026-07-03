@@ -33,7 +33,11 @@ const LeagueStandingsTable = ({
   exportBasePath = null,
   leagueName = '',
 }) => {
-  const closedCompetitions = (competitions || []).filter((c) => c.competition_status === 'closed');
+  const closedCompetitions = (competitions || []).filter(
+    (c) =>
+      c.competition_status === 'closed' ||
+      (c.competition_status === 'running' && c.has_results),
+  );
 
   const handleExport = async (type) => {
     if (!exportBasePath) return;
@@ -54,7 +58,7 @@ const LeagueStandingsTable = ({
       <Card>
         <CardContent className="py-12 text-center text-muted-foreground">
           <Trophy className="size-8 mx-auto mb-3 opacity-50" />
-          <p>Aún no hay clasificación. Se calculará cuando las pruebas estén cerradas.</p>
+          <p>Aún no hay clasificación. Se calculará cuando las pruebas tengan resultados o estén cerradas.</p>
         </CardContent>
       </Card>
     );

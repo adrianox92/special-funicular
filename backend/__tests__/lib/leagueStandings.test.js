@@ -92,12 +92,26 @@ describe('leagueStandings — counting_races', () => {
     expect(row.by_competition.c4.dropped).toBe(false);
   });
 
+  it('suma puntos numéricamente aunque vengan como texto', () => {
+    const row = {
+      name: 'Piloto C',
+      by_competition: {
+        c1: { points: '10', position: 1 },
+        c2: { points: '18', position: 2 },
+      },
+    };
+
+    applyCountingRaces(row, null);
+
+    expect(row.total_points).toBe(28);
+  });
+
   it('cuenta todas las pruebas si counting_races es null', () => {
     const row = {
       name: 'Piloto B',
       by_competition: {
-        'c1': { points: 10, position: 1 },
-        'c2': { points: 8, position: 2 },
+        c1: { points: 10, position: 1 },
+        c2: { points: 8, position: 2 },
       },
     };
 

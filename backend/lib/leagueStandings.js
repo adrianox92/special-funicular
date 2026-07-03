@@ -38,12 +38,19 @@ function formatParticipantVehicle(participant) {
  */
 function buildCompetitionStandingEntry(points, position, vehicle, powerStagePoints = 0) {
   return {
-    points,
+    points: Number(points) || 0,
     position,
     dropped: false,
     vehicle: vehicle || null,
-    power_stage_points: powerStagePoints || 0,
+    power_stage_points: Number(powerStagePoints) || 0,
   };
+}
+
+/**
+ * Pruebas que pueden aportar puntos a la clasificación de liga.
+ */
+function isCompetitionScorable(status) {
+  return status === 'closed' || status === 'running';
 }
 
 /**
@@ -100,16 +107,19 @@ function applyCountingRaces(row, countingRaces) {
     r.dropped = false;
   });
 
+  const sumPoints = (list) =>
+    list.reduce((s, [, r]) => s + (Number(r.points) || 0), 0);
+
   if (!countingRaces || countingRaces <= 0 || entries.length <= countingRaces) {
-    row.total_points = entries.reduce((s, [, r]) => s + (r.points || 0), 0);
+    row.total_points = sumPoints(entries);
     row.dropped_competitions = 0;
-    row.competitions_completed = entries.filter(([, r]) => (r.points || 0) > 0).length;
+    row.competitions_completed = entries.filter(([, r]) => (Number(r.points) || 0) > 0).length;
     row.wins = entries.filter(([, r]) => r.position === 1).length;
     return;
   }
 
   const sortedWorstFirst = [...entries].sort(
-    (a, b) => (a[1].points || 0) - (b[1].points || 0),
+    (a, b) => (Number(a[1].points) || 0) - (Number(b[1].points) || 0),
   );
   const dropCount = entries.length - countingRaces;
   const dropIds = new Set(sortedWorstFirst.slice(0, dropCount).map(([id]) => id));
@@ -120,8 +130,8 @@ function applyCountingRaces(row, countingRaces) {
   for (const [compId, r] of entries) {
     r.dropped = dropIds.has(compId);
     if (!r.dropped) {
-      total += r.points || 0;
-      if ((r.points || 0) > 0) completed += 1;
+      total += Number(r.points) || 0;
+      if ((Number(r.points) || 0) > 0) completed += 1;
       if (r.position === 1) wins += 1;
     }
   }
@@ -276,12 +286,14 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
       has_results: false,
     };
 
-    if (comp.status !== 'closed') {
+    if (!isCompetitionScorable(comp.status)) {
       competitionResults.push(compResult);
       continue;
     }
 
-    closedCompetitionIds.push(comp.id);
+    if (comp.status === 'closed') {
+      closedCompetitionIds.push(comp.id);
+    }
 
     const { data: participants, error: partErr } = await supabase
       .from('competition_participants')
@@ -321,7 +333,7 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
       .eq('competition_id', comp.id);
 
     let rules = leagueRules;
-    if (league.scoring_mode === 'per_competition') {
+    if (league.scoring_mode === 'per_competition' || leagueRules.length === 0) {
       const { data: compRules, error: compRulesErr } = await supabase
         .from('competition_rules')
         .select('*')
@@ -357,14 +369,23 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
 
     compResult.has_results = (timings || []).length > 0;
 
+    if (comp.status === 'running' && !compResult.has_results) {
+      competitionResults.push(compResult);
+      continue;
+    }
+
+    if (comp.status === 'running') {
+      closedCompetitionIds.push(comp.id);
+    }
+
     for (const stat of pointsResult.sortedParticipants) {
       const participant = filteredParticipants.find((p) => p.id === stat.participant_id);
       if (!participant) continue;
 
       const email = signupEmailByName.get(participantMatchKey(participant.driver_name, null)) || null;
       const key = resolveParticipantKey(keyAliases, standingsMap, participant.driver_name, email);
-      const pts = stat.points || 0;
-      const powerStagePts = stat.power_stage_points || 0;
+      const pts = Number(stat.points) || 0;
+      const powerStagePts = Number(stat.power_stage_points) || 0;
       const vehicle = formatParticipantVehicle(participant);
       const compEntry = {
         ...buildCompetitionStandingEntry(pts, stat.position, vehicle, powerStagePts),
@@ -434,5 +455,6 @@ module.exports = {
   resolveParticipantKey,
   applyCountingRaces,
   sortStandings,
+  isCompetitionScorable,
   computeLeagueStandings,
 };

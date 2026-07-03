@@ -7,7 +7,11 @@ const { safeFilenamePart } = require('./competitionCsvGenerator');
  */
 function generateLeagueCSV(payload) {
   const { league, standings = [], competitions = [] } = payload;
-  const closedCompetitions = competitions.filter((c) => c.competition_status === 'closed');
+  const closedCompetitions = competitions.filter(
+    (c) =>
+      c.competition_status === 'closed' ||
+      (c.competition_status === 'running' && c.has_results),
+  );
 
   let csv = '';
   csv += `Liga: ${league.name}\n`;

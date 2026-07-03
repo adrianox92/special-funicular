@@ -166,7 +166,7 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
 
         Object.entries(perRoundRule.points_structure).forEach(([, pts], idx) => {
           if (sorted[idx]) {
-            pointsByParticipant[sorted[idx].participant_id] += pts;
+            pointsByParticipant[sorted[idx].participant_id] += Number(pts) || 0;
           }
         });
 
@@ -241,7 +241,7 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
 
     Object.entries(finalRule.points_structure).forEach(([, pts], idx) => {
       if (finalSorted[idx]?.has_participation) {
-        pointsByParticipant[finalSorted[idx].participant_id] += pts;
+        pointsByParticipant[finalSorted[idx].participant_id] += Number(pts) || 0;
       }
     });
   }

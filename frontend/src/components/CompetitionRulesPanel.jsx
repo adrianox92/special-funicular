@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Plus, Pencil, Trash2, AlertTriangle, Settings, Wand2 } from 'lucide-react';
+import { Trophy, Plus, Pencil, Trash2, AlertTriangle, Settings, Wand2, Bookmark } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Spinner } from './ui/spinner';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -31,6 +33,8 @@ const CompetitionRulesPanel = ({ competitionId, leagueId, onRuleChange, readOnly
   const [competition, setCompetition] = useState(null);
   const [timesRegistered, setTimesRegistered] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, ruleId: null });
+  const [saveTemplateConfirm, setSaveTemplateConfirm] = useState({ open: false, ruleId: null, name: '' });
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   useEffect(() => {
     if (competitionId) {
@@ -93,6 +97,23 @@ const CompetitionRulesPanel = ({ competitionId, leagueId, onRuleChange, readOnly
     } catch (err) {
       console.error('Error al eliminar regla:', err);
       toast.error('Error al eliminar la regla');
+    }
+  };
+
+  const confirmSaveAsTemplate = async () => {
+    if (!saveTemplateConfirm.ruleId || !saveTemplateConfirm.name.trim()) return;
+    try {
+      setSavingTemplate(true);
+      await axios.post(`/competition-rules/${saveTemplateConfirm.ruleId}/save-as-template`, {
+        name: saveTemplateConfirm.name.trim(),
+      });
+      setSaveTemplateConfirm({ open: false, ruleId: null, name: '' });
+      toast.success('Plantilla guardada correctamente');
+    } catch (err) {
+      console.error('Error al guardar plantilla:', err);
+      toast.error(err.response?.data?.error || 'Error al guardar la plantilla');
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
@@ -241,6 +262,14 @@ const CompetitionRulesPanel = ({ competitionId, leagueId, onRuleChange, readOnly
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => setSaveTemplateConfirm({ open: true, ruleId: rule.id, name: rule.description || '' })}
+                          title="Guardar como plantilla"
+                        >
+                          <Bookmark className="size-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => openRuleModal(rule)}
                           disabled={!leagueId && timesRegistered > 0}
                           title="Editar regla"
@@ -293,6 +322,40 @@ const CompetitionRulesPanel = ({ competitionId, leagueId, onRuleChange, readOnly
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      )}
+
+      {!readOnly && (
+      <AlertDialog
+        open={saveTemplateConfirm.open}
+        onOpenChange={(open) => !open && setSaveTemplateConfirm({ open: false, ruleId: null, name: '' })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Guardar como plantilla</AlertDialogTitle>
+            <AlertDialogDescription>
+              Guarda esta regla como plantilla personalizada para reutilizarla en otras competiciones o ligas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="template-name">Nombre de la plantilla</Label>
+            <Input
+              id="template-name"
+              value={saveTemplateConfirm.name}
+              onChange={(e) => setSaveTemplateConfirm((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="Ej: Puntos por ronda personalizados"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingTemplate}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmSaveAsTemplate}
+              disabled={savingTemplate || !saveTemplateConfirm.name.trim()}
+            >
+              {savingTemplate ? 'Guardando...' : 'Guardar plantilla'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

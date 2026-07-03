@@ -26,6 +26,43 @@ function validateTargetRounds(ruleType, targetRounds) {
   return { ok: true, value: normalized.sort((a, b) => a - b) };
 }
 
+async function assertCanManageRule(res, user, rule) {
+  if (rule.is_template) {
+    if (rule.created_by !== user.id) {
+      res.status(403).json({ error: 'No tienes permisos para gestionar esta plantilla' });
+      return false;
+    }
+    return true;
+  }
+
+  if (rule.league_id) {
+    const { data: league, error: leagueErr } = await supabase
+      .from('leagues')
+      .select('id, organizer')
+      .eq('id', rule.league_id)
+      .maybeSingle();
+
+    if (leagueErr || !league || !canManageLeague(user, league)) {
+      res.status(403).json({ error: 'No tienes permisos para gestionar esta regla' });
+      return false;
+    }
+    return true;
+  }
+
+  const { data: competition, error: compError } = await supabase
+    .from('competitions')
+    .select('id, organizer')
+    .eq('id', rule.competition_id)
+    .maybeSingle();
+
+  if (compError || !competition || !canManageCompetition(user, competition)) {
+    res.status(403).json({ error: 'No tienes permisos para gestionar esta regla' });
+    return false;
+  }
+
+  return true;
+}
+
 // Aplicar middleware de autenticación a todas las rutas
 router.use(authMiddleware);
 
@@ -76,14 +113,22 @@ router.get('/templates', async (req, res) => {
       .from('competition_rules')
       .select('*')
       .eq('is_template', true)
-      .order('created_at', { ascending: false });
+      .or(`created_by.is.null,created_by.eq.${req.user.id}`);
 
     if (error) {
       console.error('Error al obtener plantillas:', error);
       return res.status(500).json({ error: error.message });
     }
 
-    res.json(data || []);
+    const templates = data || [];
+    const systemTemplates = templates
+      .filter((t) => t.created_by == null)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const userTemplates = templates
+      .filter((t) => t.created_by === req.user.id)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json([...systemTemplates, ...userTemplates]);
   } catch (error) {
     console.error('Error en GET /templates:', error);
     res.status(500).json({ error: error.message });
@@ -325,6 +370,61 @@ router.post('/', async (req, res) => {
     res.status(201).json(data);
   } catch (error) {
     console.error('Error en POST /:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/:id/save-as-template', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name || name.trim() === '') {
+      return res.status(400).json({ error: 'El nombre es requerido para la plantilla' });
+    }
+
+    const { data: sourceRule, error: ruleError } = await supabase
+      .from('competition_rules')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (ruleError || !sourceRule) {
+      return res.status(404).json({ error: 'Regla no encontrada' });
+    }
+
+    if (sourceRule.is_template) {
+      return res.status(400).json({ error: 'Esta regla ya es una plantilla' });
+    }
+
+    const allowed = await assertCanManageRule(res, req.user, sourceRule);
+    if (!allowed) return;
+
+    const templateData = {
+      name: name.trim(),
+      rule_type: sourceRule.rule_type,
+      description: sourceRule.description,
+      points_structure: sourceRule.points_structure,
+      is_template: true,
+      created_by: req.user.id,
+      use_bonus_best_lap: sourceRule.use_bonus_best_lap,
+      target_rounds: sourceRule.target_rounds || null,
+    };
+
+    const { data, error } = await supabase
+      .from('competition_rules')
+      .insert([templateData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error al guardar plantilla:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('Error en POST /:id/save-as-template:', error);
     res.status(500).json({ error: error.message });
   }
 });

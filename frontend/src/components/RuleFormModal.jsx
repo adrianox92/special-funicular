@@ -24,6 +24,7 @@ import {
 import { Spinner } from './ui/spinner';
 
 const DEFAULT_FORM_DATA = {
+  name: '',
   rule_type: 'per_round',
   description: '',
   points_structure: { "1": 10, "2": 8, "3": 6, "4": 4, "5": 2 },
@@ -32,15 +33,30 @@ const DEFAULT_FORM_DATA = {
   target_rounds: [],
 };
 
-const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories = [], totalRounds = 1, onSave, disabled = false }) => {
+const RuleFormModal = ({
+  show,
+  onHide,
+  rule,
+  competitionId,
+  leagueId,
+  categories = [],
+  totalRounds = 1,
+  onSave,
+  disabled = false,
+  templateMode = false,
+}) => {
   const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  const isTemplateOnly = templateMode === true;
 
   useEffect(() => {
     if (show) {
       if (rule) {
         setFormData({
+          name: rule.name || '',
           rule_type: rule.rule_type,
           description: rule.description || '',
           points_structure: rule.points_structure,
@@ -51,6 +67,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
       } else {
         setFormData(DEFAULT_FORM_DATA);
       }
+      setSaveAsTemplate(false);
       setError(null);
     }
   }, [show, rule]);
@@ -101,6 +118,23 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
     }
   };
 
+  const buildRulePayload = (isTemplate) => ({
+    name: isTemplate ? formData.name.trim() : undefined,
+    rule_type: formData.rule_type,
+    description: formData.description,
+    points_structure: formData.points_structure,
+    is_template: isTemplate,
+    use_bonus_best_lap: formData.use_bonus_best_lap,
+    target_rounds: formData.rule_type === 'power_stage' ? formData.target_rounds : null,
+    ...(isTemplate
+      ? {}
+      : {
+          competition_id: leagueId ? undefined : competitionId,
+          league_id: leagueId || undefined,
+          category_id: leagueId ? null : (formData.category_id || null),
+        }),
+  });
+
   const handleSave = async (e) => {
     e.preventDefault();
     setError(null);
@@ -122,19 +156,34 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
         setSaving(false);
         return;
       }
-      const ruleData = {
-        ...formData,
-        competition_id: rule ? undefined : (leagueId ? undefined : competitionId),
-        league_id: rule ? undefined : (leagueId || undefined),
-        is_template: false,
-        category_id: leagueId ? null : (formData.category_id || null),
-        target_rounds: formData.rule_type === 'power_stage' ? formData.target_rounds : null,
-      };
-      if (rule) {
+
+      if (isTemplateOnly || saveAsTemplate) {
+        if (!formData.name.trim()) {
+          setError('El nombre es obligatorio para la plantilla');
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (isTemplateOnly) {
+        const templateData = buildRulePayload(true);
+        if (rule) {
+          await axios.put(`/competition-rules/${rule.id}`, templateData);
+        } else {
+          await axios.post('/competition-rules', templateData);
+        }
+      } else if (rule) {
+        const ruleData = buildRulePayload(false);
         await axios.put(`/competition-rules/${rule.id}`, ruleData);
       } else {
-        await axios.post(`/competition-rules`, ruleData);
+        const ruleData = buildRulePayload(false);
+        await axios.post('/competition-rules', ruleData);
+
+        if (saveAsTemplate) {
+          await axios.post('/competition-rules', buildRulePayload(true));
+        }
       }
+
       onHide();
       onSave?.();
     } catch (err) {
@@ -145,15 +194,23 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
     }
   };
 
+  const dialogTitle = isTemplateOnly
+    ? (rule ? 'Editar plantilla' : 'Nueva plantilla personalizada')
+    : (rule ? 'Editar Regla' : 'Nueva Regla de Puntuación');
+
   return (
     <Dialog open={show} onOpenChange={(open) => !open && onHide()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="size-5" />
-            {rule ? 'Editar Regla' : 'Nueva Regla de Puntuación'}
+            {dialogTitle}
           </DialogTitle>
-          <DialogDescription>Configura los puntos para cada posición</DialogDescription>
+          <DialogDescription>
+            {isTemplateOnly
+              ? 'Configura una plantilla reutilizable en futuras competiciones o ligas'
+              : 'Configura los puntos para cada posición'}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSave}>
           <div className="space-y-4 py-4">
@@ -161,6 +218,19 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            )}
+
+            {(isTemplateOnly || saveAsTemplate) && (
+              <div className="space-y-2">
+                <Label htmlFor="rule-name">Nombre de la plantilla *</Label>
+                <Input
+                  id="rule-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Ej: Mi sistema F1 personalizado"
+                  disabled={disabled}
+                />
+              </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -196,7 +266,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
               </div>
             </div>
 
-            {!disabled && categories.length > 0 && (
+            {!isTemplateOnly && !disabled && categories.length > 0 && (
               <div className="space-y-2">
                 <Label>Categoría (opcional)</Label>
                 <Select
@@ -309,6 +379,22 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
                 />
               </div>
             )}
+
+            {!isTemplateOnly && !rule && !disabled && (
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="save-as-template">Guardar también como plantilla personalizada</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Podrás reutilizar esta regla en otras competiciones o ligas.
+                  </p>
+                </div>
+                <Switch
+                  id="save-as-template"
+                  checked={saveAsTemplate}
+                  onCheckedChange={setSaveAsTemplate}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onHide} disabled={saving}>
@@ -324,7 +410,7 @@ const RuleFormModal = ({ show, onHide, rule, competitionId, leagueId, categories
               ) : (
                 <>
                   <Save className="size-4 mr-2" />
-                  {rule ? 'Actualizar' : 'Crear'}
+                  {isTemplateOnly ? (rule ? 'Actualizar plantilla' : 'Crear plantilla') : (rule ? 'Actualizar' : 'Crear')}
                 </>
               )}
             </Button>
