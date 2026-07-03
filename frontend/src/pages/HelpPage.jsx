@@ -153,6 +153,12 @@ const HelpPage = () => {
                   <BulletList items={sec.tips} />
                 </div>
               )}
+              {sec.qa?.length > 0 && (
+                <div>
+                  <p className="font-medium text-foreground mb-2">Comportamiento esperado (QA)</p>
+                  <BulletList items={sec.qa} />
+                </div>
+              )}
               {sec.gotchas?.length > 0 && (
                 <div>
                   <p className="font-medium text-foreground mb-2">Errores frecuentes</p>

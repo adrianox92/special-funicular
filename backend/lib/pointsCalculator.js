@@ -290,6 +290,8 @@ function calculatePointsCore({ competition, participants, timings, rules }) {
     return {
       participant_id: p.id,
       category_id: p.category_id || null,
+      start_order: p.start_order ?? null,
+      created_at: p.created_at ?? null,
       driver_name: p.driver_name,
       team_name: teamName,
       vehicle_info: p.vehicles

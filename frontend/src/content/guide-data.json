@@ -171,6 +171,7 @@
         "En Mis competiciones, crea un evento nuevo con nombre, plazas, rondas y datos básicos.",
         "Opcional al crear: despliega «Añadir pilotos favoritos ahora», marca favoritos y la fuente de vehículo por fila; se creará la categoría indicada y se darán de alta como participantes confirmados.",
         "En Participantes del evento: categorías, inscripciones si aplica, alta manual, modo Favorito o «Añadir desde favoritos» en bloque; los ya añadidos desde un favorito no se duplican desde ese mismo favorito.",
+        "En Participantes, define el orden de salida con la columna «Orden salida» o las flechas arriba/abajo; ese orden se usa en el modo presentación/TV para el bloque «Próximo piloto».",
         "Asocia un circuito si lo necesitas (debe existir en Circuitos).",
         "Gestiona participantes y tiempos desde las pantallas del evento.",
         "En Tiempos de la competición, pestaña «Vista por Rondas»: registra tiempos con el botón general o, por cada piloto que aún no tenga tiempo en esa ronda, usa «Tiempos» en la lista «Pendientes en esta ronda» para abrir el formulario ya con la ronda y el piloto elegidos.",
@@ -188,10 +189,18 @@
         "En clasificación y vistas públicas, las columnas de diferencia respecto al líder o al anterior muestran el signo correcto (+ más lento, − más rápido) aunque el orden de la tabla sea por puntos.",
         "Eliminar un tiempo de una ronda vuelve a dejar al piloto como pendiente en esa ronda; puedes volver a darle tiempo o marcarle NP."
       ],
+      "qa": [
+        "Modo presentación/TV (`/competitions/presentation/:slug`, `?tv=1`, overlay OBS): el bloque «Próximo piloto» indica quién debería salir a pista a continuación.",
+        "Prioridad de rondas: se usa la primera ronda (1, luego 2, …) que aún tenga pilotos pendientes (sin tiempo registrado y sin NP). Aunque alguien ya haya empezado una ronda posterior, el bloque sigue en la ronda más antigua con huecos.",
+        "Dentro de esa ronda, el piloto mostrado es el pendiente con menor orden de salida (`start_order` en Participantes). Si no tiene orden explícito, se usa la fecha de alta del participante.",
+        "La etiqueta «Posición actual: P…» refleja la clasificación por puntos, no el orden de salida.",
+        "Ejemplo (2 rondas, 5 pilotos): si 4 completaron R1, 1 piloto sigue pendiente en R1 y otro ya está en R2, se muestra al pendiente de R1 (p. ej. Eva, «Ronda 1 · Siguiente salida a pista»), no al siguiente en R2.",
+        "Cuando todos completaron todas las rondas, el bloque muestra que no quedan salidas pendientes."
+      ],
       "gotchas": [],
       "linkTo": "/competitions",
       "linkLabel": "Ir a Competiciones",
-      "keywords": ["competición", "competiciones", "evento", "participantes", "inscripción", "rondas", "favoritos", "pilotos favoritos", "slug", "cupo", "plazas", "menú", "submenú", "NP", "no participado", "penalización", "editar tiempo", "pendientes", "organizador", "tiempos"]
+      "keywords": ["competición", "competiciones", "evento", "participantes", "inscripción", "rondas", "favoritos", "pilotos favoritos", "slug", "cupo", "plazas", "menú", "submenú", "NP", "no participado", "penalización", "editar tiempo", "pendientes", "organizador", "tiempos", "presentación", "tv", "próximo piloto", "orden de salida", "broadcast"]
     },
     {
       "id": "configuracion",
@@ -397,6 +406,21 @@
         "También puedes registrar un tiempo nuevo o NP desde el formulario general; al editar un tiempo existente el piloto sale correctamente seleccionado.",
         "NP: ese piloto obtiene 0 puntos en esa ronda; la ronda cuenta igualmente como completada para él y el resto puede recibir puntos de ronda cuando todos tengan registro (tiempo o NP).",
         "Las tablas de clasificación muestran diferencias de tiempo con signo coherente (+ o −) respecto al líder o al anterior, aunque el orden sea por puntos."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Ir a Competiciones"
+    },
+    {
+      "id": "presentacion-proximo-piloto",
+      "question": "¿Qué muestra el bloque «Próximo piloto» en presentación o TV?",
+      "keywords": ["presentación", "tv", "próximo piloto", "orden de salida", "broadcast", "obs", "proyector", "modo presentación"],
+      "answerSteps": [
+        "El bloque respeta el orden de salida configurado en Participantes de la competición (columna «Orden salida»), no la clasificación por puntos.",
+        "Primero se busca la ronda más antigua que aún tenga pilotos pendientes (sin tiempo ni NP). Si queda alguien sin correr la ronda 1, el bloque sigue en ronda 1 aunque otros pilotos ya hayan empezado la ronda 2.",
+        "Entre los pendientes de esa ronda, se muestra el de menor orden de salida; si no tiene orden explícito, se usa la fecha de alta.",
+        "«Posición actual: P…» es la posición en clasificación por puntos, distinta del orden de salida.",
+        "Acceso: URL pública de presentación (`/competitions/presentation/:slug`), modo TV (`?tv=1`) u overlays OBS desde el hub de enlaces del evento."
       ],
       "sectionId": "competiciones",
       "linkTo": "/competitions",

@@ -89,6 +89,8 @@ function mapParticipantToPresentation(participant, competitionRounds) {
     position: participant.position,
     points: participant.points ?? 0,
     category_id: participant.category_id || null,
+    start_order: participant.start_order ?? null,
+    created_at: participant.created_at ?? null,
     rounds_completed: participant.rounds_completed ?? 0,
     rounds_remaining: participant.rounds_remaining ?? 0,
     total_laps: participant.total_laps ?? 0,
@@ -920,6 +922,8 @@ router.get('/:slug/presentation', async (req, res) => {
         team_name,
         vehicle_model,
         category_id,
+        start_order,
+        created_at,
         vehicles(model, manufacturer)
       `)
       .eq('competition_id', competition.id)

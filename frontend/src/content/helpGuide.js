@@ -41,6 +41,10 @@ export function getHelpGuidePlainText(isAdmin = false) {
       lines.push('Consejos:');
       sec.tips.forEach((t) => lines.push(`- ${t}`));
     }
+    if (sec.qa?.length) {
+      lines.push('Comportamiento esperado (QA):');
+      sec.qa.forEach((t) => lines.push(`- ${t}`));
+    }
     lines.push('');
   }
   lines.push('## Preguntas frecuentes\n');
