@@ -32,7 +32,10 @@ const LeagueCreate = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    axios.get('/clubs').then((res) => setClubs(res.data || [])).catch(() => {});
+    axios
+      .get('/clubs/mine')
+      .then((res) => setClubs(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
   }, []);
 
   const handleSubmit = async (e) => {
