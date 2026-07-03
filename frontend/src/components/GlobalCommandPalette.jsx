@@ -144,14 +144,14 @@ function SearchOverlay({ open, onOpenChange, children }) {
       <button
         type="button"
         aria-label="Cerrar búsqueda"
-        className="pointer-events-auto absolute inset-0 bg-black/80"
+        className="pointer-events-auto absolute inset-0 modal-overlay bg-black/80"
         onClick={() => onOpenChange(false)}
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="command-palette-title"
-        className="pointer-events-auto relative z-10 flex max-h-[min(90vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
+        className="pointer-events-auto relative z-10 flex max-h-[min(90vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-lg border modal-panel bg-background shadow-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {children}
