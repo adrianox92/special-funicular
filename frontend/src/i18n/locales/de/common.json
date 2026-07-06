@@ -13,6 +13,11 @@
     "back": "Zurück"
   },
   "loading": "Laden…",
+  "tabsNav": {
+    "navigation": "Navigation",
+    "sectionLabel": "Zum Bereich wechseln",
+    "chooseSection": "Bereich wählen"
+  },
   "footer": {
     "copyright": "© {{year}} Adrian Palomera Sanz. Alle Rechte vorbehalten.",
     "privacy": "Datenschutz",

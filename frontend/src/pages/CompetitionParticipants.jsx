@@ -29,7 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import {
   Table,
   TableBody,
@@ -147,11 +148,78 @@ const CompetitionParticipants = () => {
     (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
   );
   const showStagesTab = Boolean(canUseOrganizerTools && competition?.is_multi_stage);
-  const tabsGridClass = showStagesTab
-    ? 'grid-cols-2 lg:grid-cols-5'
-    : canUseOrganizerTools
-      ? 'grid-cols-2 lg:grid-cols-4'
-      : 'grid-cols-3';
+  const participantTabOptions = useMemo(() => {
+    const waitlistSuffix =
+      competition?.waitlist_count > 0 ? ` · espera ${competition.waitlist_count}` : '';
+    return [
+      {
+        value: 'participants',
+        label: `Participantes (${participants.length})`,
+        trigger: (
+          <>
+            <Users className="size-4" />
+            Participantes ({participants.length})
+          </>
+        ),
+      },
+      ...(canUseOrganizerTools
+        ? [
+            {
+              value: 'signups',
+              label: `Inscripciones (${competition?.signups_count || 0}${waitlistSuffix})`,
+              trigger: (
+                <>
+                  <Users className="size-4" />
+                  Inscripciones ({competition?.signups_count || 0}
+                  {waitlistSuffix})
+                </>
+              ),
+            },
+          ]
+        : []),
+      ...(showStagesTab
+        ? [
+            {
+              value: 'stages',
+              label: 'Tramos',
+              trigger: (
+                <>
+                  <Flag className="size-4" />
+                  Tramos
+                </>
+              ),
+            },
+          ]
+        : []),
+      {
+        value: 'categories',
+        label: `Categorías (${competition?.categories?.length || 0})`,
+        trigger: (
+          <>
+            <Tags className="size-4" />
+            Categorías ({competition?.categories?.length || 0})
+          </>
+        ),
+      },
+      {
+        value: 'rules',
+        label: 'Reglas',
+        trigger: (
+          <>
+            <Trophy className="size-4" />
+            Reglas
+          </>
+        ),
+      },
+    ];
+  }, [
+    canUseOrganizerTools,
+    showStagesTab,
+    participants.length,
+    competition?.signups_count,
+    competition?.waitlist_count,
+    competition?.categories?.length,
+  ]);
   const effectiveCompetitionStatus = competition?.status || 'published';
   const registrationDeadlineExpired = Boolean(
     competition?.registration_deadline &&
@@ -922,33 +990,14 @@ const CompetitionParticipants = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full gap-2 ${tabsGridClass}`}>
-          <TabsTrigger value="participants" className="flex items-center gap-2">
-            <Users className="size-4" />
-            Participantes ({participants.length})
-          </TabsTrigger>
-          {canUseOrganizerTools && (
-            <TabsTrigger value="signups" className="flex items-center gap-2">
-              <Users className="size-4" />
-              Inscripciones ({competition?.signups_count || 0}
-              {competition?.waitlist_count > 0 ? ` · espera ${competition.waitlist_count}` : ''})
-            </TabsTrigger>
-          )}
-          {showStagesTab && (
-            <TabsTrigger value="stages" className="flex items-center gap-2">
-              <Flag className="size-4" />
-              Tramos
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="categories" className="flex items-center gap-2">
-            <Tags className="size-4" />
-            Categorías ({competition?.categories?.length || 0})
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="flex items-center gap-2">
-            <Trophy className="size-4" />
-            Reglas
-          </TabsTrigger>
-        </TabsList>
+        <ResponsiveTabsNav
+          value={activeTab}
+          onValueChange={setActiveTab}
+          options={participantTabOptions}
+          listClassName="sm:grid-cols-2 lg:grid-cols-5"
+          triggerClassName="flex items-center gap-2"
+          mobileLabel="Sección de la competición"
+        />
 
         <TabsContent value="participants" className="mt-4">
           {!canUseOrganizerTools && (

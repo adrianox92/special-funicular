@@ -65,6 +65,7 @@
   },
   "analyticsTitle": "Tiefenanalyse",
   "tabsAria": "Dashboard-Analysebereiche",
+  "tabsSectionLabel": "Analysebereich",
   "sectionFleetDist": "Flottenverteilung",
   "sectionFleetDistDesc": "Marke, Shop, Fahrzeugtyp und modifiziert vs. Serie.",
   "sectionReval": "Wertsteigerung & Zeiten",

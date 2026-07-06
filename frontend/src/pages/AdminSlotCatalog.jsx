@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +13,8 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import PageRangePagination from '../components/PageRangePagination';
 import { Badge } from '../components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import {
   Table,
   TableBody,
@@ -258,6 +259,63 @@ function AdminSlotCatalog() {
   const [chgReq, setChgReq] = useState([]);
   const [insReq, setInsReq] = useState([]);
   const [queuesLoading, setQueuesLoading] = useState(false);
+
+  const catalogTabOptions = useMemo(() => {
+    const queueCount = chgReq.length + insReq.length;
+    return [
+      {
+        value: 'dashboard',
+        label: 'Dashboard',
+        trigger: (
+          <>
+            <LayoutDashboard className="size-4 mr-1 inline" />
+            Dashboard
+          </>
+        ),
+      },
+      { value: 'items', label: 'Ítems' },
+      {
+        value: 'brands',
+        label: 'Marcas',
+        trigger: (
+          <>
+            <Tag className="size-4 mr-1 inline" />
+            Marcas
+          </>
+        ),
+      },
+      {
+        value: 'import',
+        label: 'Importar',
+        trigger: (
+          <>
+            <Upload className="size-4 mr-1 inline" />
+            Importar
+          </>
+        ),
+      },
+      {
+        value: 'queues',
+        label: `Colas (${queueCount})`,
+        trigger: (
+          <>
+            <GitPullRequest className="size-4 mr-1 inline" />
+            Colas ({queueCount})
+          </>
+        ),
+      },
+      {
+        value: 'stores',
+        label: 'Tiendas',
+        trigger: (
+          <>
+            <Store className="size-4 mr-1 inline" />
+            Tiendas
+          </>
+        ),
+      },
+    ];
+  }, [chgReq.length, insReq.length]);
 
   // Tiendas
   const [sellers, setSellers] = useState([]);
@@ -789,29 +847,13 @@ function AdminSlotCatalog() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="dashboard">
-            <LayoutDashboard className="size-4 mr-1 inline" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="items">Ítems</TabsTrigger>
-          <TabsTrigger value="brands">
-            <Tag className="size-4 mr-1 inline" />
-            Marcas
-          </TabsTrigger>
-          <TabsTrigger value="import">
-            <Upload className="size-4 mr-1 inline" />
-            Importar
-          </TabsTrigger>
-          <TabsTrigger value="queues">
-            <GitPullRequest className="size-4 mr-1 inline" />
-            Colas ({chgReq.length + insReq.length})
-          </TabsTrigger>
-          <TabsTrigger value="stores">
-            <Store className="size-4 mr-1 inline" />
-            Tiendas
-          </TabsTrigger>
-        </TabsList>
+        <ResponsiveTabsNav
+          value={tab}
+          onValueChange={setTab}
+          options={catalogTabOptions}
+          listClassName="sm:grid-cols-3 md:grid-cols-6"
+          mobileLabel="Sección del catálogo"
+        />
 
         <TabsContent value="dashboard" className="space-y-4 mt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">

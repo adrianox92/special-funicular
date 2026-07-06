@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ArrowLeft, Users, Loader2, CalendarDays, Megaphone, Building2, Trophy, Flag } from 'lucide-react';
 import axios from '../lib/axios';
@@ -44,7 +44,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import ClubCalendar from '../components/ClubCalendar';
 import ClubBoard from '../components/ClubBoard';
 import ClubCircuits from '../components/ClubCircuits';
@@ -122,6 +123,108 @@ const ClubMembers = () => {
   const onTabChange = (value) => {
     setSearchParams({ tab: value }, { replace: true });
   };
+
+  const adminClubTabOptions = useMemo(
+    () => [
+      {
+        value: 'members',
+        label: 'Miembros',
+        trigger: (
+          <>
+            <Users className="size-4 shrink-0" />
+            Miembros
+          </>
+        ),
+      },
+      {
+        value: 'board',
+        label: 'Tablón',
+        trigger: (
+          <>
+            <Megaphone className="size-4 shrink-0" />
+            Tablón
+          </>
+        ),
+      },
+      {
+        value: 'calendar',
+        label: 'Calendario',
+        trigger: (
+          <>
+            <CalendarDays className="size-4 shrink-0" />
+            Calendario
+          </>
+        ),
+      },
+      {
+        value: 'circuits',
+        label: 'Circuitos',
+        trigger: (
+          <>
+            <Flag className="size-4 shrink-0" />
+            Circuitos
+          </>
+        ),
+      },
+      {
+        value: 'leagues',
+        label: 'Ligas',
+        trigger: (
+          <>
+            <Trophy className="size-4 shrink-0" />
+            Ligas
+          </>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const memberClubTabOptions = useMemo(
+    () => [
+      {
+        value: 'board',
+        label: 'Tablón',
+        trigger: (
+          <>
+            <Megaphone className="size-4 shrink-0" />
+            Tablón
+          </>
+        ),
+      },
+      {
+        value: 'calendar',
+        label: 'Calendario',
+        trigger: (
+          <>
+            <CalendarDays className="size-4 shrink-0" />
+            Calendario
+          </>
+        ),
+      },
+      {
+        value: 'circuits',
+        label: 'Circuitos',
+        trigger: (
+          <>
+            <Flag className="size-4 shrink-0" />
+            Circuitos
+          </>
+        ),
+      },
+      {
+        value: 'leagues',
+        label: 'Ligas',
+        trigger: (
+          <>
+            <Trophy className="size-4 shrink-0" />
+            Ligas
+          </>
+        ),
+      },
+    ],
+    [],
+  );
 
   const formatDate = (iso) => {
     if (!iso) return '—';
@@ -256,28 +359,14 @@ const ClubMembers = () => {
       {canManage ? (
         <>
           <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-            <TabsList className="grid w-full max-w-4xl grid-cols-5">
-              <TabsTrigger value="members" className="gap-2">
-                <Users className="size-4 shrink-0" />
-                Miembros
-              </TabsTrigger>
-              <TabsTrigger value="board" className="gap-2">
-                <Megaphone className="size-4 shrink-0" />
-                Tablón
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-2">
-                <CalendarDays className="size-4 shrink-0" />
-                Calendario
-              </TabsTrigger>
-              <TabsTrigger value="circuits" className="gap-2">
-                <Flag className="size-4 shrink-0" />
-                Circuitos
-              </TabsTrigger>
-              <TabsTrigger value="leagues" className="gap-2">
-                <Trophy className="size-4 shrink-0" />
-                Ligas
-              </TabsTrigger>
-            </TabsList>
+            <ResponsiveTabsNav
+              value={activeTab}
+              onValueChange={onTabChange}
+              options={adminClubTabOptions}
+              listClassName="max-w-4xl sm:grid-cols-2 md:grid-cols-5"
+              triggerClassName="gap-2"
+              mobileLabel="Sección del club"
+            />
             <TabsContent value="members" className="mt-4">
               <Card>
                 <CardHeader className="pb-2">
@@ -475,24 +564,14 @@ const ClubMembers = () => {
         </>
       ) : (
         <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
-            <TabsTrigger value="board" className="gap-2">
-              <Megaphone className="size-4 shrink-0" />
-              Tablón
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-2">
-              <CalendarDays className="size-4 shrink-0" />
-              Calendario
-            </TabsTrigger>
-            <TabsTrigger value="circuits" className="gap-2">
-              <Flag className="size-4 shrink-0" />
-              Circuitos
-            </TabsTrigger>
-            <TabsTrigger value="leagues" className="gap-2">
-              <Trophy className="size-4 shrink-0" />
-              Ligas
-            </TabsTrigger>
-          </TabsList>
+          <ResponsiveTabsNav
+            value={activeTab}
+            onValueChange={onTabChange}
+            options={memberClubTabOptions}
+            listClassName="max-w-2xl sm:grid-cols-2 md:grid-cols-4"
+            triggerClassName="gap-2"
+            mobileLabel="Sección del club"
+          />
           <TabsContent value="board" className="mt-4">
             <ClubBoard clubId={clubId} canManage={false} />
           </TabsContent>

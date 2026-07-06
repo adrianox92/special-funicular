@@ -190,6 +190,7 @@
     "loadingLaps": "Cargando vueltas...",
     "noLaps": "No hay datos de vueltas individuales para esta sesión.",
     "tabEvolution": "Evolución",
+    "tabsSectionLabel": "Vista del análisis",
     "tabStatistics": "Estadísticas",
     "worstLap": "Peor vuelta",
     "mean": "Media",

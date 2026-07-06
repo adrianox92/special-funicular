@@ -39,6 +39,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import { Spinner } from '../components/ui/spinner';
 import { formatTimeDiff } from '../utils/formatTimeDiff';
 import {
@@ -76,6 +77,16 @@ const CompetitionStatus = () => {
   const [showGeneralExtraColumns, setShowGeneralExtraColumns] = useState(false);
   const [participantDetailsOpen, setParticipantDetailsOpen] = useState(false);
   const [activeClassificationTab, setActiveClassificationTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('summary');
+
+  const statusTabOptions = useMemo(
+    () => [
+      { value: 'summary', label: 'Resumen' },
+      { value: 'general', label: 'Clasificación general' },
+      { value: 'round', label: 'Por ronda' },
+    ],
+    [],
+  );
 
   useEffect(() => {
     loadCompetitionStatus();
@@ -471,12 +482,14 @@ const CompetitionStatus = () => {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full max-w-xl grid-cols-3">
-          <TabsTrigger value="summary">Resumen</TabsTrigger>
-          <TabsTrigger value="general">Clasificación general</TabsTrigger>
-          <TabsTrigger value="round">Por ronda</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <ResponsiveTabsNav
+          value={activeTab}
+          onValueChange={setActiveTab}
+          options={statusTabOptions}
+          listClassName="max-w-xl sm:grid-cols-3"
+          mobileLabel="Sección de la competición"
+        />
 
         <TabsContent value="summary" className="space-y-6 mt-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -190,6 +190,7 @@
     "loadingLaps": "Loading laps...",
     "noLaps": "No individual lap data for this session.",
     "tabEvolution": "Evolution",
+    "tabsSectionLabel": "Analysis view",
     "tabStatistics": "Statistics",
     "worstLap": "Worst lap",
     "mean": "Mean",

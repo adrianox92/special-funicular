@@ -65,6 +65,7 @@
   },
   "analyticsTitle": "Análisis en profundidad",
   "tabsAria": "Secciones de análisis del dashboard",
+  "tabsSectionLabel": "Sección de análisis",
   "sectionFleetDist": "Distribución de la flota",
   "sectionFleetDistDesc": "Marca, tienda, tipo de vehículo y proporción modificados vs stock.",
   "sectionReval": "Revalorización y tiempos",

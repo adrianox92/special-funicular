@@ -6,7 +6,8 @@
   "tabs": {
     "dashboard": "Dashboard",
     "notifications": "Benachrichtigungen",
-    "account": "Konto"
+    "account": "Konto",
+    "sectionLabel": "Einstellungsbereich"
   },
   "staleDays": {
     "title": "Dashboard: übliche Strecke",

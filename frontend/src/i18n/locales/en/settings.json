@@ -6,7 +6,8 @@
   "tabs": {
     "dashboard": "Dashboard",
     "notifications": "Notifications",
-    "account": "Account"
+    "account": "Account",
+    "sectionLabel": "Settings section"
   },
   "staleDays": {
     "title": "Dashboard: usual circuit",

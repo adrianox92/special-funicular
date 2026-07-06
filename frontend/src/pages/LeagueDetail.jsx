@@ -6,7 +6,8 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import {
   Select,
   SelectContent,
@@ -187,6 +188,15 @@ const LeagueDetail = () => {
   const hasCompetitionsOrRules =
     (league.competitions?.length || 0) > 0 || (league.rules_count || 0) > 0;
 
+  const leagueTabOptions = [
+    { value: 'competitions', label: 'Pruebas' },
+    { value: 'participants', label: 'Participantes' },
+    ...(league.scoring_mode === 'league_rules'
+      ? [{ value: 'rules', label: 'Reglas' }]
+      : []),
+    { value: 'standings', label: 'Clasificación' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
@@ -273,14 +283,13 @@ const LeagueDetail = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="competitions">Pruebas</TabsTrigger>
-          <TabsTrigger value="participants">Participantes</TabsTrigger>
-          {league.scoring_mode === 'league_rules' && (
-            <TabsTrigger value="rules">Reglas</TabsTrigger>
-          )}
-          <TabsTrigger value="standings">Clasificación</TabsTrigger>
-        </TabsList>
+        <ResponsiveTabsNav
+          value={activeTab}
+          onValueChange={setActiveTab}
+          options={leagueTabOptions}
+          listClassName="sm:grid-cols-2 md:grid-cols-4"
+          mobileLabel="Sección de la liga"
+        />
 
         <TabsContent value="competitions" className="mt-4">
           <LeagueCompetitionsTab league={league} canManage={canManage} onRefresh={loadLeague} />

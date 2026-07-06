@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog,
@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsContent } from './ui/tabs';
+import { ResponsiveTabsNav } from './ui/responsive-tabs-nav';
 import { Card, CardContent, CardHeader } from './ui/card';
 import {
   LineChart,
@@ -56,6 +57,16 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
   const { t } = useTranslation('timings');
   const [laps, setLaps] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [performanceTab, setPerformanceTab] = useState('evolution');
+
+  const performanceTabOptions = useMemo(
+    () => [
+      { value: 'evolution', label: t('performanceModal.tabEvolution') },
+      { value: 'pace', label: t('performanceModal.tabPace') },
+      { value: 'statistics', label: t('performanceModal.tabStatistics') },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (show && timing?.id) {
@@ -211,12 +222,14 @@ const SessionPerformanceModal = ({ show, onHide, timing, vehicle }) => {
         ) : !hasLaps ? (
           <p className="text-muted-foreground py-8 text-center">{t('performanceModal.noLaps')}</p>
         ) : (
-          <Tabs defaultValue="evolution" className="mt-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="evolution">{t('performanceModal.tabEvolution')}</TabsTrigger>
-              <TabsTrigger value="pace">{t('performanceModal.tabPace')}</TabsTrigger>
-              <TabsTrigger value="statistics">{t('performanceModal.tabStatistics')}</TabsTrigger>
-            </TabsList>
+          <Tabs value={performanceTab} onValueChange={setPerformanceTab} className="mt-4">
+            <ResponsiveTabsNav
+              value={performanceTab}
+              onValueChange={setPerformanceTab}
+              options={performanceTabOptions}
+              listClassName="sm:grid-cols-3"
+              mobileLabel={t('performanceModal.tabsSectionLabel')}
+            />
 
             {gs && (
               <Card className="mt-4 border-primary/30 bg-primary/5">

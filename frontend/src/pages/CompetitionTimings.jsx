@@ -53,6 +53,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import {
   Tooltip,
   TooltipContent,
@@ -163,6 +164,15 @@ const CompetitionTimings = () => {
   const [categoryRankings, setCategoryRankings] = useState([]);
   const [hasCategoryRules, setHasCategoryRules] = useState(false);
   const [activeClassificationTab, setActiveClassificationTab] = useState('general');
+
+  const timingTabOptions = useMemo(
+    () => [
+      { value: 'rounds', label: 'Vista por Rondas' },
+      { value: 'participants', label: 'Vista por Participantes' },
+      { value: 'aggregated', label: 'Tiempos Agregados' },
+    ],
+    [],
+  );
 
   // Estados para el modal de penalización
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
@@ -1163,20 +1173,13 @@ const CompetitionTimings = () => {
 
         {/* Tabs para diferentes vistas */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 gap-1">
-            <TabsTrigger value="rounds" className="text-xs sm:text-sm px-1 sm:px-3">
-              <span className="sm:hidden">Rondas</span>
-              <span className="hidden sm:inline">Vista por Rondas</span>
-            </TabsTrigger>
-            <TabsTrigger value="participants" className="text-xs sm:text-sm px-1 sm:px-3">
-              <span className="sm:hidden">Pilotos</span>
-              <span className="hidden sm:inline">Vista por Participantes</span>
-            </TabsTrigger>
-            <TabsTrigger value="aggregated" className="text-xs sm:text-sm px-1 sm:px-3">
-              <span className="sm:hidden">Clasif.</span>
-              <span className="hidden sm:inline">Tiempos Agregados</span>
-            </TabsTrigger>
-          </TabsList>
+          <ResponsiveTabsNav
+            value={activeTab}
+            onValueChange={setActiveTab}
+            options={timingTabOptions}
+            listClassName="sm:grid-cols-3"
+            mobileLabel="Sección de la competición"
+          />
 
           <TabsContent value="rounds" className="mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

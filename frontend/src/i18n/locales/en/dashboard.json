@@ -65,6 +65,7 @@
   },
   "analyticsTitle": "In-depth analysis",
   "tabsAria": "Dashboard analysis sections",
+  "tabsSectionLabel": "Analysis section",
   "sectionFleetDist": "Fleet distribution",
   "sectionFleetDistDesc": "Brand, store, vehicle type and modified vs stock ratio.",
   "sectionReval": "Revaluation & timings",

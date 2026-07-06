@@ -28,7 +28,8 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import { cn } from '../lib/utils';
 import api from '../lib/axios';
 import {
@@ -181,6 +182,43 @@ const Dashboard = () => {
   const formatIncrementSubtitle = (vehicle) =>
     !vehicle?.model || !vehicle?.manufacturer ? t('na') : `${vehicle.manufacturer} ${vehicle.model}`;
   const formatBestTimeSubtitle = formatIncrementSubtitle;
+
+  const [analyticsTab, setAnalyticsTab] = useState('coleccion');
+  const analyticsTabOptions = useMemo(
+    () => [
+      {
+        value: 'coleccion',
+        label: t('collection'),
+        trigger: (
+          <>
+            <LayoutDashboard className="size-3.5 opacity-70" aria-hidden />
+            {t('collection')}
+          </>
+        ),
+      },
+      {
+        value: 'rendimiento',
+        label: t('performance'),
+        trigger: (
+          <>
+            <Gauge className="size-3.5 opacity-70" aria-hidden />
+            {t('performance')}
+          </>
+        ),
+      },
+      {
+        value: 'inversion',
+        label: t('investment'),
+        trigger: (
+          <>
+            <Sparkles className="size-3.5 opacity-70" aria-hidden />
+            {t('investment')}
+          </>
+        ),
+      },
+    ],
+    [t],
+  );
 
   if (loading) {
     return (
@@ -571,24 +609,16 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="coleccion" className="w-full">
-          <TabsList
-            className="grid h-auto w-full grid-cols-1 gap-1 p-1 sm:inline-flex sm:h-9 sm:w-auto sm:grid-cols-none"
-            aria-label={t('tabsAria')}
-          >
-            <TabsTrigger value="coleccion" className="gap-1.5">
-              <LayoutDashboard className="size-3.5 opacity-70" aria-hidden />
-              {t('collection')}
-            </TabsTrigger>
-            <TabsTrigger value="rendimiento" className="gap-1.5">
-              <Gauge className="size-3.5 opacity-70" aria-hidden />
-              {t('performance')}
-            </TabsTrigger>
-            <TabsTrigger value="inversion" className="gap-1.5">
-              <Sparkles className="size-3.5 opacity-70" aria-hidden />
-              {t('investment')}
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={analyticsTab} onValueChange={setAnalyticsTab} className="w-full">
+          <ResponsiveTabsNav
+            value={analyticsTab}
+            onValueChange={setAnalyticsTab}
+            options={analyticsTabOptions}
+            listClassName="sm:grid-cols-3"
+            triggerClassName="gap-1.5"
+            listAriaLabel={t('tabsAria')}
+            mobileLabel={t('tabsSectionLabel')}
+          />
 
           <TabsContent value="coleccion" className="mt-4 space-y-6 focus-visible:outline-none">
             <TabSectionIntro

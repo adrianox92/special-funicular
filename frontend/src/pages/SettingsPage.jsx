@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +10,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent } from '../components/ui/tabs';
+import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
 import { Switch } from '../components/ui/switch';
 import {
   Select,
@@ -205,6 +206,15 @@ const SettingsPage = () => {
     }
   };
 
+  const settingsTabOptions = useMemo(
+    () => [
+      { value: 'dashboard', label: t('tabs.dashboard') },
+      { value: 'notifications', label: t('tabs.notifications') },
+      { value: 'cuenta', label: t('tabs.account') },
+    ],
+    [t],
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -215,11 +225,13 @@ const SettingsPage = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
-          <TabsTrigger value="dashboard">{t('tabs.dashboard')}</TabsTrigger>
-          <TabsTrigger value="notifications">{t('tabs.notifications')}</TabsTrigger>
-          <TabsTrigger value="cuenta">{t('tabs.account')}</TabsTrigger>
-        </TabsList>
+        <ResponsiveTabsNav
+          value={activeTab}
+          onValueChange={handleTabChange}
+          options={settingsTabOptions}
+          listClassName="max-w-2xl sm:grid-cols-3"
+          mobileLabel={t('tabs.sectionLabel')}
+        />
 
         <TabsContent value="dashboard" className="mt-6 space-y-6">
           <Card>
