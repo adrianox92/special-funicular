@@ -22,6 +22,12 @@ const {
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 const { resolveCircuitForClubCompetition } = require('../lib/clubCircuits');
 const {
+  getNextStartOrder,
+  findStartOrderConflict,
+  renumberStartOrders,
+  startOrderConflictMessage,
+} = require('../lib/competitionStartOrder');
+const {
   normalizeStatus,
   timingForbiddenReason,
   participantMutationForbiddenReason,
@@ -1080,7 +1086,14 @@ router.post('/:id/participants', async (req, res) => {
       participantData.team_name = String(team_name).trim();
     }
     if (start_order != null && Number.isFinite(Number(start_order)) && Number(start_order) >= 1) {
-      participantData.start_order = Number(start_order);
+      const orderValue = Number(start_order);
+      const conflict = await findStartOrderConflict(supabase, competitionId, orderValue);
+      if (conflict) {
+        return res.status(400).json({ error: startOrderConflictMessage(conflict, orderValue) });
+      }
+      participantData.start_order = orderValue;
+    } else {
+      participantData.start_order = await getNextStartOrder(supabase, competitionId);
     }
 
     const { data, error } = await supabase
@@ -1295,6 +1308,12 @@ router.post('/:id/participants/bulk-from-favorites', async (req, res) => {
 
     let created = [];
     if (toInsert.length > 0) {
+      let nextOrder = await getNextStartOrder(supabase, competitionId);
+      for (const row of toInsert) {
+        row.start_order = nextOrder;
+        nextOrder += 1;
+      }
+
       const { data, error } = await supabase
         .from('competition_participants')
         .insert(toInsert)
@@ -1312,6 +1331,70 @@ router.post('/:id/participants/bulk-from-favorites', async (req, res) => {
     return res.status(201).json({ created, skipped });
   } catch (error) {
     console.error('Error en POST /competitions/:id/participants/bulk-from-favorites:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reordenar participantes (start_order 1..n) en una sola operación
+router.put('/:id/participants/reorder', async (req, res) => {
+  try {
+    const { id: competitionId } = req.params;
+    const orderedIds = Array.isArray(req.body?.ordered_ids) ? req.body.ordered_ids : [];
+
+    if (orderedIds.length === 0) {
+      return res.status(400).json({ error: 'Debes indicar ordered_ids' });
+    }
+
+    const access = await requireManageCompetition(supabase, req.user, competitionId);
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
+
+    const partBlock = participantMutationForbiddenReason(competition.status);
+    if (partBlock) {
+      return res.status(400).json({ error: partBlock });
+    }
+
+    const uniqueIds = [...new Set(orderedIds.map(String))];
+    if (uniqueIds.length !== orderedIds.length) {
+      return res.status(400).json({ error: 'ordered_ids contiene IDs duplicados' });
+    }
+
+    const { data: existing, error: listError } = await supabase
+      .from('competition_participants')
+      .select('id')
+      .eq('competition_id', competitionId);
+
+    if (listError) {
+      return res.status(500).json({ error: listError.message });
+    }
+
+    const existingIds = new Set((existing || []).map((p) => p.id));
+    if (uniqueIds.length !== existingIds.size) {
+      return res.status(400).json({ error: 'ordered_ids debe incluir todos los participantes' });
+    }
+    for (const pid of uniqueIds) {
+      if (!existingIds.has(pid)) {
+        return res.status(400).json({ error: `Participante ${pid} no pertenece a esta competición` });
+      }
+    }
+
+    await renumberStartOrders(supabase, competitionId, orderedIds);
+
+    const { data: participants, error: fetchError } = await supabase
+      .from('competition_participants')
+      .select(`
+        *,
+        vehicles(model, manufacturer)
+      `)
+      .eq('competition_id', competitionId);
+
+    if (fetchError) {
+      return res.status(500).json({ error: fetchError.message });
+    }
+
+    return res.json({ participants: participants || [] });
+  } catch (error) {
+    console.error('Error en PUT /competitions/:id/participants/reorder:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1446,6 +1529,20 @@ router.put('/:id/participants/:participantId', async (req, res) => {
           : Number.isFinite(Number(start_order)) && Number(start_order) >= 1
             ? Number(start_order)
             : null;
+
+      if (updateData.start_order != null) {
+        const conflict = await findStartOrderConflict(
+          supabase,
+          competitionId,
+          updateData.start_order,
+          participantId,
+        );
+        if (conflict) {
+          return res.status(400).json({
+            error: startOrderConflictMessage(conflict, updateData.start_order),
+          });
+        }
+      }
     }
 
     const { data, error } = await supabase

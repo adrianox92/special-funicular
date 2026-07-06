@@ -169,6 +169,7 @@ const CompetitionParticipants = () => {
       const response = await axios.get(`/competitions/${competitionId}`);
       setCompetition(response.data);
       setParticipants(response.data.participants || []);
+      setStartOrderDraft({});
       setError(null);
     } catch (err) {
       console.error('Error al cargar competición:', err);
@@ -565,39 +566,39 @@ const CompetitionParticipants = () => {
         start_order: parsed,
       });
       await loadCompetition();
+      setStartOrderDraft((prev) => {
+        const next = { ...prev };
+        delete next[participantId];
+        return next;
+      });
     } catch (err) {
       toast.error(err.response?.data?.error || 'No se pudo guardar el orden de salida');
+      setStartOrderDraft((prev) => {
+        const next = { ...prev };
+        delete next[participantId];
+        return next;
+      });
+      await loadCompetition();
     } finally {
       setStartOrderSavingId(null);
     }
   }, [competitionId, participants, loadCompetition]);
 
   const moveParticipantOrder = useCallback(async (participantId, direction) => {
-    const list = sortedParticipants;
+    const list = [...sortedParticipants];
     const idx = list.findIndex((p) => p.id === participantId);
     if (idx < 0) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= list.length) return;
-    const current = list[idx];
-    const other = list[swapIdx];
-    const currentOrder = current.start_order ?? idx + 1;
-    const otherOrder = other.start_order ?? swapIdx + 1;
+
+    [list[idx], list[swapIdx]] = [list[swapIdx], list[idx]];
+
     try {
       setStartOrderSavingId(participantId);
-      await Promise.all([
-        axios.put(`/competitions/${competitionId}/participants/${current.id}`, {
-          driver_name: current.driver_name,
-          category_id: current.category_id,
-          ...(current.vehicle_id ? { vehicle_id: current.vehicle_id } : { vehicle_model: current.vehicle_model }),
-          start_order: otherOrder,
-        }),
-        axios.put(`/competitions/${competitionId}/participants/${other.id}`, {
-          driver_name: other.driver_name,
-          category_id: other.category_id,
-          ...(other.vehicle_id ? { vehicle_id: other.vehicle_id } : { vehicle_model: other.vehicle_model }),
-          start_order: currentOrder,
-        }),
-      ]);
+      await axios.put(`/competitions/${competitionId}/participants/reorder`, {
+        ordered_ids: list.map((p) => p.id),
+      });
+      setStartOrderDraft({});
       await loadCompetition();
     } catch (err) {
       toast.error(err.response?.data?.error || 'No se pudo reordenar');
@@ -1121,7 +1122,7 @@ const CompetitionParticipants = () => {
                     );
                     return (
                       <TableRow key={participant.id}>
-                        <TableCell>{participant.start_order ?? idx + 1}</TableCell>
+                        <TableCell>{idx + 1}</TableCell>
                         <TableCell>
                           {canUseOrganizerTools ? (
                             <div className="flex items-center gap-1">
