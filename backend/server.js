@@ -79,7 +79,7 @@ const corsSyncOptions = {
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Admin-Key'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
@@ -102,6 +102,7 @@ function pickCorsOptions(path) {
   // /api/license-account/* comparte prefijo con /api/license pero es JWT + PATCH → corsOptions.
   if (path.startsWith('/api/license-account')) return corsOptions;
   if (path.startsWith('/api/lap-timer/license')) return corsSyncOptions;
+  if (path.startsWith('/api/lap-timer/promo')) return corsSyncOptions;
   if (
     path.startsWith('/api/sync') ||
     path === '/api/auth/api-key' ||
@@ -221,6 +222,8 @@ const licenseRoute = require('./routes/license');
 const licenseAccountRoute = require('./routes/licenseAccount');
 const lapTimerLicenseRoute = require('./routes/lapTimerLicense');
 const { revenueCatWebhookRoute } = require('./routes/lapTimerLicense');
+const promoCodesRoute = require('./routes/promoCodes');
+const adminPromoCodesRoute = require('./routes/adminPromoCodes');
 const helpRoute = require('./routes/help');
 const catalogRoute = require('./routes/catalog');
 const storeListingsRoute = require('./routes/storeListings');
@@ -240,6 +243,7 @@ app.post('/api/license/webhook', ...revenueCatWebhookRoute);
 app.use('/api/license', apiKeyAuth, licenseRoute);
 app.use('/api/license-account', authMiddleware, licenseAccountRoute);
 app.use('/api/lap-timer/license', lapTimerLicenseRoute);
+app.use('/api/lap-timer/promo', promoCodesRoute);
 app.use('/api/competition-rules', competitionRulesRoute);
 app.use('/api/api-keys', apiKeysRoute);
 app.use('/api/circuits', circuitsRoute);
@@ -253,6 +257,7 @@ app.use('/api/store-listings', storeListingsRoute);
 app.use('/api/changelog', changelogRoute);
 app.use('/api/admin', authMiddleware, adminPlatformMetricsRoute);
 app.use('/api/admin', authMiddleware, adminLapTimerLicensesRoute);
+app.use('/api/admin', authMiddleware, adminPromoCodesRoute);
 
 const competitionsRoute = require('./routes/competitions');
 const leaguesRoute = require('./routes/leagues');
