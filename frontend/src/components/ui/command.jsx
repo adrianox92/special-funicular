@@ -51,7 +51,7 @@ const CommandDialog = ({
     >
       <div
         role="presentation"
-        className="pointer-events-auto absolute inset-0 bg-black/80"
+        className="pointer-events-auto absolute inset-0 modal-overlay bg-black/80"
         onPointerDown={() => onOpenChange(false)}
       />
       <div
@@ -59,7 +59,7 @@ const CommandDialog = ({
         aria-modal="true"
         aria-labelledby="command-palette-title"
         className={cn(
-          'pointer-events-auto absolute left-[50%] top-[50%] z-10 flex max-h-[min(90vh,640px)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden border bg-background shadow-lg duration-200 animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%] sm:rounded-lg',
+          'pointer-events-auto absolute left-[50%] top-[50%] z-10 flex max-h-[min(90vh,640px)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden border modal-panel bg-background shadow-lg duration-200 animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%] sm:rounded-lg',
           'p-0 shadow-lg',
           contentClassName,
         )}

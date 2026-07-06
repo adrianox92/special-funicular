@@ -1,0 +1,23 @@
+/*
+ * Compatibilidad con navegadores antiguos (p. ej. Chrome <111 en Windows 7).
+ * oklch() y color-mix() no están soportados; los modales quedaban transparentes.
+ */
+
+@supports not (color: oklch(0 0 0)) {
+  .modal-overlay {
+    background-color: rgba(0, 0, 0, 0.8) !important;
+  }
+
+  .modal-panel {
+    background-color: #ffffff !important;
+    border-color: #e5e5e5 !important;
+    color: #0a0a0a !important;
+    max-height: calc(100vh - 2rem);
+  }
+
+  .dark .modal-panel {
+    background-color: #262626 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: #fafafa !important;
+  }
+}
