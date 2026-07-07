@@ -62,6 +62,74 @@ function registrationDeadlineForbiddenReason(competition) {
  * Transiciones manuales permitidas para PATCH status.
  * @returns {string|null} error message or null
  */
+/**
+ * Cuenta tiempos registrados en una competición.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} competitionId
+ */
+async function countCompetitionTimings(supabase, competitionId) {
+  const { data: participants, error: partErr } = await supabase
+    .from('competition_participants')
+    .select('id')
+    .eq('competition_id', competitionId);
+
+  if (partErr) {
+    throw new Error(partErr.message);
+  }
+
+  const participantIds = (participants || []).map((p) => p.id);
+  if (participantIds.length === 0) {
+    return 0;
+  }
+
+  const { count, error: countErr } = await supabase
+    .from('competition_timings')
+    .select('*', { count: 'exact', head: true })
+    .in('participant_id', participantIds);
+
+  if (countErr) {
+    throw new Error(countErr.message);
+  }
+
+  return count || 0;
+}
+
+/**
+ * Pasa la competición a `running` cuando se registra el primer tiempo y aún está publicada.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} competitionId
+ * @param {string|null|undefined} currentStatus
+ * @param {number} [timingsBefore]
+ */
+async function promoteCompetitionToRunningOnFirstTiming(
+  supabase,
+  competitionId,
+  currentStatus,
+  timingsBefore = 0,
+) {
+  if (normalizeStatus({ status: currentStatus }) !== STATUS.PUBLISHED) {
+    return { promoted: false };
+  }
+  if (timingsBefore > 0) {
+    return { promoted: false };
+  }
+
+  const { data, error } = await supabase
+    .from('competitions')
+    .update({ status: STATUS.RUNNING })
+    .eq('id', competitionId)
+    .eq('status', STATUS.PUBLISHED)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[competitionLifecycle] No se pudo pasar la competición a running:', error.message);
+    return { promoted: false, error: error.message };
+  }
+
+  return { promoted: Boolean(data?.id) };
+}
+
 function validateManualStatusTransition(fromRaw, toRaw, opts = {}) {
   const from = normalizeStatus({ status: fromRaw });
   const to = normalizeStatus({ status: toRaw });
@@ -94,5 +162,7 @@ module.exports = {
   signupForbiddenReason,
   registrationDeadlineExpired,
   registrationDeadlineForbiddenReason,
+  countCompetitionTimings,
+  promoteCompetitionToRunningOnFirstTiming,
   validateManualStatusTransition,
 };

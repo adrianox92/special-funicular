@@ -2,7 +2,11 @@
 
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('./distanceCalculator');
 const { deriveCompetitionAverageFromTotalAndLaps } = require('./competitionTimingDerivation');
-const { normalizeStatus, timingForbiddenReason } = require('./competitionLifecycle');
+const {
+  normalizeStatus,
+  timingForbiddenReason,
+  promoteCompetitionToRunningOnFirstTiming,
+} = require('./competitionLifecycle');
 const {
   loadCompetitionStandingsContext,
   notifyCompetitionLiveEventsAfterTimingChange,
@@ -279,13 +283,12 @@ async function createCompetitionTiming(supabase, competitionId, competition, bod
     return { error: { status: 500, message: error.message } };
   }
 
-  if (normalizeStatus(competition) === 'published' && timingsBefore === 0) {
-    const { error: stErr } = await supabase
-      .from('competitions')
-      .update({ status: 'running' })
-      .eq('id', competitionId);
-    if (stErr) console.warn('No se pudo pasar la competición a en_curso:', stErr.message);
-  }
+  await promoteCompetitionToRunningOnFirstTiming(
+    supabase,
+    competitionId,
+    competition.status,
+    timingsBefore,
+  );
 
   if (!isDnp && participant.vehicle_id) {
     try {

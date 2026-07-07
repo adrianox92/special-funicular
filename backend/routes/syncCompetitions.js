@@ -10,6 +10,10 @@ const { handleValidationErrors } = require('../middleware/validateRequest');
 const { deriveCompetitionAverageFromTotalAndLaps } = require('../lib/competitionTimingDerivation');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
+const {
+  countCompetitionTimings,
+  promoteCompetitionToRunningOnFirstTiming,
+} = require('../lib/competitionLifecycle');
 
 const router = express.Router();
 
@@ -530,12 +534,13 @@ router.post(
       const competitionId = req.params.id;
       const { data: competition } = await supabaseAdmin
         .from('competitions')
-        .select('id, rounds, circuit_id, circuit_name')
+        .select('id, rounds, circuit_id, circuit_name, status')
         .eq('id', competitionId)
         .single();
 
       if (!competition) return res.status(404).json({ error: 'Competición no encontrada' });
 
+      const timingsBefore = await countCompetitionTimings(supabaseAdmin, competitionId);
       const created = [];
       const updated = [];
 
@@ -686,6 +691,15 @@ router.post(
             { lap_times: normalizedLapTimes },
           );
         }
+      }
+
+      if (created.length > 0) {
+        await promoteCompetitionToRunningOnFirstTiming(
+          supabaseAdmin,
+          competitionId,
+          competition.status,
+          timingsBefore,
+        );
       }
 
       res.status(201).json({ created, updated });
