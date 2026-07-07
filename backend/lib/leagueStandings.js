@@ -47,10 +47,29 @@ function buildCompetitionStandingEntry(points, position, vehicle, powerStagePoin
 }
 
 /**
- * Pruebas que pueden aportar puntos a la clasificación de liga.
+ * Pruebas que pueden procesarse para la clasificación de liga.
  */
 function isCompetitionScorable(status) {
-  return status === 'closed' || status === 'running';
+  return status === 'closed' || status === 'running' || status === 'published';
+}
+
+/**
+ * Pruebas que aportan puntos a la clasificación (publicadas/en curso solo con tiempos).
+ * @param {string} status
+ * @param {boolean} hasResults
+ */
+function shouldScoreCompetition(status, hasResults) {
+  if (status === 'closed') return true;
+  if ((status === 'running' || status === 'published') && hasResults) return true;
+  return false;
+}
+
+/**
+ * Pruebas visibles en columnas de clasificación/exportación.
+ * @param {{ competition_status?: string, has_results?: boolean }} comp
+ */
+function isLeagueCompetitionVisibleInStandings(comp) {
+  return shouldScoreCompetition(comp.competition_status, Boolean(comp.has_results));
 }
 
 /**
@@ -291,10 +310,6 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
       continue;
     }
 
-    if (comp.status === 'closed') {
-      closedCompetitionIds.push(comp.id);
-    }
-
     const { data: participants, error: partErr } = await supabase
       .from('competition_participants')
       .select(`
@@ -369,14 +384,12 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
 
     compResult.has_results = (timings || []).length > 0;
 
-    if (comp.status === 'running' && !compResult.has_results) {
+    if (!shouldScoreCompetition(comp.status, compResult.has_results)) {
       competitionResults.push(compResult);
       continue;
     }
 
-    if (comp.status === 'running') {
-      closedCompetitionIds.push(comp.id);
-    }
+    closedCompetitionIds.push(comp.id);
 
     for (const stat of pointsResult.sortedParticipants) {
       const participant = filteredParticipants.find((p) => p.id === stat.participant_id);
@@ -456,5 +469,7 @@ module.exports = {
   applyCountingRaces,
   sortStandings,
   isCompetitionScorable,
+  shouldScoreCompetition,
+  isLeagueCompetitionVisibleInStandings,
   computeLeagueStandings,
 };

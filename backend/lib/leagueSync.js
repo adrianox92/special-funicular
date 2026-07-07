@@ -305,6 +305,7 @@ async function syncLeagueParticipantsToCompetition(supabase, leagueId, competiti
   );
 
   const toInsert = [];
+  const directParticipants = [];
   for (const lp of leagueParticipants || []) {
     const key = participantMatchKey(lp.name, lp.email);
     if (existingKeys.has(key)) continue;
@@ -312,7 +313,9 @@ async function syncLeagueParticipantsToCompetition(supabase, leagueId, competiti
     const nameOnlyKey = participantMatchKey(lp.name, null);
     if (existingKeys.has(nameOnlyKey)) continue;
 
-    if (autoApprove) {
+    const useDirectParticipant = autoApprove || !lp.email;
+
+    if (useDirectParticipant) {
       const participantData = {
         competition_id: competitionId,
         driver_name: lp.name,
@@ -325,15 +328,9 @@ async function syncLeagueParticipantsToCompetition(supabase, leagueId, competiti
         continue;
       }
 
-      const { error: partErr } = await supabase
-        .from('competition_participants')
-        .insert([participantData]);
-
-      if (!partErr) {
-        existingKeys.add(key);
-        existingKeys.add(nameOnlyKey);
-        toInsert.push({ type: 'participant', name: lp.name });
-      }
+      directParticipants.push(participantData);
+      existingKeys.add(key);
+      existingKeys.add(nameOnlyKey);
     } else {
       toInsert.push({
         competition_id: competitionId,
@@ -348,15 +345,24 @@ async function syncLeagueParticipantsToCompetition(supabase, leagueId, competiti
     }
   }
 
-  if (toInsert.length === 0) {
+  if (toInsert.length === 0 && directParticipants.length === 0) {
     return { created: 0, signups: [], participants: [] };
   }
 
-  if (autoApprove) {
+  if (directParticipants.length > 0) {
+    const { data: createdParticipants, error: partErr } = await supabase
+      .from('competition_participants')
+      .insert(directParticipants)
+      .select('id, driver_name');
+
+    if (partErr) {
+      throw new Error(partErr.message);
+    }
+
     return {
-      created: toInsert.length,
+      created: (createdParticipants || []).length,
       signups: [],
-      participants: toInsert,
+      participants: createdParticipants || [],
     };
   }
 

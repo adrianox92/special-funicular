@@ -14,6 +14,11 @@ import {
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 
+const isLeagueCompetitionVisible = (comp) =>
+  comp.competition_status === 'closed' ||
+  ((comp.competition_status === 'running' || comp.competition_status === 'published') &&
+    comp.has_results);
+
 const triggerBlobDownload = (data, filename) => {
   const blob = data instanceof Blob ? data : new Blob([data]);
   const url = window.URL.createObjectURL(blob);
@@ -33,11 +38,7 @@ const LeagueStandingsTable = ({
   exportBasePath = null,
   leagueName = '',
 }) => {
-  const closedCompetitions = (competitions || []).filter(
-    (c) =>
-      c.competition_status === 'closed' ||
-      (c.competition_status === 'running' && c.has_results),
-  );
+  const closedCompetitions = (competitions || []).filter(isLeagueCompetitionVisible);
 
   const handleExport = async (type) => {
     if (!exportBasePath) return;

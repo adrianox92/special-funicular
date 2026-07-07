@@ -7,7 +7,23 @@ const {
   resolveParticipantKey,
   applyCountingRaces,
   sortStandings,
+  isCompetitionScorable,
+  shouldScoreCompetition,
 } = require('../../lib/leagueStandings');
+
+describe('leagueStandings — estados de competición', () => {
+  it('considera publicada como procesable', () => {
+    expect(isCompetitionScorable('published')).toBe(true);
+  });
+
+  it('puntúa publicada/en curso solo con resultados', () => {
+    expect(shouldScoreCompetition('published', true)).toBe(true);
+    expect(shouldScoreCompetition('published', false)).toBe(false);
+    expect(shouldScoreCompetition('running', true)).toBe(true);
+    expect(shouldScoreCompetition('running', false)).toBe(false);
+    expect(shouldScoreCompetition('closed', false)).toBe(true);
+  });
+});
 
 describe('leagueStandings — emparejamiento de participantes', () => {
   it('genera claves distintas con y sin email', () => {

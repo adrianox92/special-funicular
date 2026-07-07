@@ -1,17 +1,14 @@
 'use strict';
 
 const { safeFilenamePart } = require('./competitionCsvGenerator');
+const { isLeagueCompetitionVisibleInStandings } = require('./leagueStandings');
 
 /**
  * @param {object} payload — resultado de computeLeagueStandings
  */
 function generateLeagueCSV(payload) {
   const { league, standings = [], competitions = [] } = payload;
-  const closedCompetitions = competitions.filter(
-    (c) =>
-      c.competition_status === 'closed' ||
-      (c.competition_status === 'running' && c.has_results),
-  );
+  const closedCompetitions = competitions.filter(isLeagueCompetitionVisibleInStandings);
 
   let csv = '';
   csv += `Liga: ${league.name}\n`;
