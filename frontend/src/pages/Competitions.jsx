@@ -71,6 +71,7 @@ const Competitions = () => {
     name: '',
     num_slots: '',
     rounds: '1',
+    laps_per_round: '',
     circuit_id: '',
     club_id: '',
     registration_deadline: '',
@@ -249,6 +250,12 @@ const Competitions = () => {
         name: createForm.name.trim(),
         num_slots: parseInt(createForm.num_slots),
         rounds: parseInt(createForm.rounds),
+        laps_per_round:
+          createForm.is_multi_stage || parseInt(createForm.rounds, 10) > 1
+            ? null
+            : createForm.laps_per_round
+              ? parseInt(createForm.laps_per_round, 10)
+              : null,
         circuit_id: createForm.circuit_id || null,
         club_id: createForm.club_id || null,
         is_multi_stage: Boolean(createForm.is_multi_stage),
@@ -294,7 +301,7 @@ const Competitions = () => {
       }
 
       setShowCreateModal(false);
-      setCreateForm({ name: '', num_slots: '', rounds: '1', circuit_id: '', club_id: '', registration_deadline: '', is_multi_stage: false });
+      setCreateForm({ name: '', num_slots: '', rounds: '1', laps_per_round: '', circuit_id: '', club_id: '', registration_deadline: '', is_multi_stage: false });
       setSelectedFavorites({});
       setFavoritesExpanded(false);
       setDefaultCategoryName('General');
@@ -495,10 +502,41 @@ const Competitions = () => {
                     min="1"
                     placeholder="Ej: 3"
                     value={createForm.rounds}
-                    onChange={(e) => setCreateForm({ ...createForm, rounds: e.target.value })}
+                    onChange={(e) => {
+                      const nextRounds = e.target.value;
+                      const roundsNum = parseInt(nextRounds || '1', 10);
+                      setCreateForm({
+                        ...createForm,
+                        rounds: nextRounds,
+                        laps_per_round: roundsNum > 1 ? '' : createForm.laps_per_round,
+                      });
+                    }}
                     required
                   />
                   <p className="text-sm text-muted-foreground">Número máximo de rondas permitidas</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="laps_per_round">Vueltas por ronda (objetivo)</Label>
+                  <Input
+                    id="laps_per_round"
+                    type="number"
+                    min="1"
+                    placeholder="Sin límite"
+                    value={createForm.laps_per_round}
+                    onChange={(e) => setCreateForm({ ...createForm, laps_per_round: e.target.value })}
+                    disabled={
+                      createForm.is_multi_stage ||
+                      parseInt(createForm.rounds || '1', 10) > 1
+                    }
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {createForm.is_multi_stage
+                      ? 'En competiciones multi-tramo, configura las vueltas por tramo en la gestión de la competición.'
+                      : parseInt(createForm.rounds || '1', 10) > 1
+                        ? 'Con varias rondas, configura las vueltas por ronda en la gestión de la competición.'
+                        : 'Opcional. Si se define, Slot Lap Timer fijará ese número de vueltas y no permitirá cambiarlo.'}
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between rounded-md border p-4">
@@ -512,7 +550,11 @@ const Competitions = () => {
                     id="is_multi_stage"
                     checked={createForm.is_multi_stage}
                     onCheckedChange={(checked) =>
-                      setCreateForm({ ...createForm, is_multi_stage: checked })
+                      setCreateForm({
+                        ...createForm,
+                        is_multi_stage: checked,
+                        laps_per_round: checked ? '' : createForm.laps_per_round,
+                      })
                     }
                   />
                 </div>
@@ -520,7 +562,7 @@ const Competitions = () => {
                 {createForm.is_multi_stage && (
                   <Alert>
                     <AlertDescription>
-                      El circuito de cada tramo se configura en la gestión de la competición.
+                      El circuito y las vueltas de cada tramo se configuran en la gestión de la competición.
                       El circuito seleccionado abajo actuará como circuito por defecto.
                     </AlertDescription>
                   </Alert>
@@ -890,6 +932,9 @@ const Competitions = () => {
                   <div className="flex items-center gap-2">
                     <Trophy className="size-4" />
                     Rondas: {competition.rounds}
+                    {competition.laps_per_round ? (
+                      <span> · Vueltas/ronda: {competition.laps_per_round}</span>
+                    ) : null}
                   </div>
                   {(competition.circuit_name || competition.circuits?.name) && (
                     <div className="flex items-center gap-2">

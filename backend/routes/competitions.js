@@ -120,10 +120,36 @@ function parseRegistrationDeadline(value) {
   return parsed.toISOString();
 }
 
+async function deleteLapsOnlyRoundStages(competitionId) {
+  const { error } = await supabase
+    .from('competition_round_stages')
+    .delete()
+    .eq('competition_id', competitionId)
+    .is('laps_per_round', null);
+
+  if (error) throw error;
+}
+
+async function clearRoundStageCircuits(competitionId) {
+  const { error } = await supabase
+    .from('competition_round_stages')
+    .update({ circuit_id: null, circuit_name: null })
+    .eq('competition_id', competitionId);
+
+  if (error) throw error;
+}
+
+async function loadRoundStagesIfConfigured(competitionId, competition) {
+  if (!competition?.is_multi_stage && (competition?.rounds ?? 0) <= 1) {
+    return [];
+  }
+  return loadRoundStagesForCompetition(competitionId);
+}
+
 async function loadRoundStagesForCompetition(competitionId) {
   const { data, error } = await supabase
     .from('competition_round_stages')
-    .select('id, competition_id, round_number, circuit_id, circuit_name, created_at')
+    .select('id, competition_id, round_number, circuit_id, circuit_name, laps_per_round, created_at')
     .eq('competition_id', competitionId)
     .order('round_number', { ascending: true });
 
@@ -303,6 +329,10 @@ const competitionCreateValidators = [
     .optional()
     .isBoolean()
     .withMessage('is_multi_stage debe ser booleano'),
+  body('laps_per_round')
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage('laps_per_round debe ser un entero mayor a 0'),
 ];
 
 // Crear una nueva competición
@@ -317,6 +347,7 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       club_id,
       registration_deadline,
       is_multi_stage,
+      laps_per_round,
     } = req.body;
 
     if (club_id) {
@@ -378,6 +409,7 @@ router.post('/', competitionCreateValidators, handleValidationErrors, async (req
       status: 'draft',
       registration_deadline: parsedDeadline,
       is_multi_stage: Boolean(is_multi_stage),
+      laps_per_round: laps_per_round != null ? laps_per_round : null,
     };
 
     const { data, error } = await supabase
@@ -611,12 +643,10 @@ router.get('/:id', async (req, res) => {
       .maybeSingle();
 
     let round_stages = [];
-    if (competition.is_multi_stage) {
-      try {
-        round_stages = await loadRoundStagesForCompetition(id);
-      } catch (stageErr) {
-        console.error('Error al obtener tramos:', stageErr);
-      }
+    try {
+      round_stages = await loadRoundStagesIfConfigured(id, competition);
+    } catch (stageErr) {
+      console.error('Error al obtener tramos:', stageErr);
     }
 
     res.json({
@@ -646,7 +676,16 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, num_slots, rounds, circuit_name, circuit_id, registration_deadline, is_multi_stage } = req.body;
+    const {
+      name,
+      num_slots,
+      rounds,
+      circuit_name,
+      circuit_id,
+      registration_deadline,
+      is_multi_stage,
+      laps_per_round,
+    } = req.body;
 
     const access = await requireManageCompetition(supabase, req.user, id, 'id, num_slots, rounds, organizer, club_id, is_multi_stage');
     if (!access.ok) return access.respond(res);
@@ -742,6 +781,18 @@ router.put('/:id', async (req, res) => {
       updateData.is_multi_stage = Boolean(is_multi_stage);
     }
 
+    if (laps_per_round !== undefined) {
+      if (laps_per_round === null || laps_per_round === '') {
+        updateData.laps_per_round = null;
+      } else {
+        const parsedLaps = parseInt(laps_per_round, 10);
+        if (Number.isNaN(parsedLaps) || parsedLaps < 1) {
+          return res.status(400).json({ error: 'El número de vueltas por ronda debe ser al menos 1' });
+        }
+        updateData.laps_per_round = parsedLaps;
+      }
+    }
+
     const { data, error } = await supabase
       .from('competitions')
       .update(updateData)
@@ -759,8 +810,10 @@ router.put('/:id', async (req, res) => {
 
     try {
       if (effectiveMultiStage === false) {
-        await deleteAllRoundStages(id);
-      } else if (rounds) {
+        await clearRoundStageCircuits(id);
+        await deleteLapsOnlyRoundStages(id);
+      }
+      if (rounds) {
         await deleteRoundStagesBeyond(id, effectiveRounds);
       }
     } catch (stageCleanupErr) {
@@ -794,7 +847,7 @@ router.get('/:id/round-stages', param('id').isUUID(), handleValidationErrors, as
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
 
-    if (!competition.is_multi_stage) {
+    if (!competition.is_multi_stage && competition.rounds <= 1) {
       return res.json([]);
     }
 
@@ -815,6 +868,10 @@ router.put(
     .optional({ values: 'falsy' })
     .isUUID()
     .withMessage('circuit_id inválido'),
+  body('stages.*.laps_per_round')
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage('laps_per_round inválido'),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -830,8 +887,13 @@ router.put(
       if (!access.ok) return access.respond(res);
       const existingComp = access.competition;
 
-      if (!existingComp.is_multi_stage) {
-        return res.status(400).json({ error: 'Esta competición no es multi-tramo' });
+      const allowMultiStage = existingComp.is_multi_stage;
+      const allowLapsOnly = !existingComp.is_multi_stage && existingComp.rounds > 1;
+
+      if (!allowMultiStage && !allowLapsOnly) {
+        return res.status(400).json({
+          error: 'Esta competición no admite configuración por ronda',
+        });
       }
 
       const metaBlock = metadataEditForbiddenReason(existingComp.status);
@@ -855,6 +917,12 @@ router.put(
         }
         seenRounds.add(roundNumber);
 
+        if (!allowMultiStage && stage.circuit_id) {
+          return res.status(400).json({
+            error: 'No se puede asignar circuito por ronda si la competición no es multi-tramo',
+          });
+        }
+
         let circuitIdToStore = null;
         let circuitNameToStore = null;
 
@@ -874,12 +942,23 @@ router.put(
           }
         }
 
-        if (circuitIdToStore) {
+        let lapsPerRound = null;
+        if (stage.laps_per_round != null && stage.laps_per_round !== '') {
+          lapsPerRound = parseInt(stage.laps_per_round, 10);
+          if (Number.isNaN(lapsPerRound) || lapsPerRound < 1) {
+            return res.status(400).json({
+              error: `Vueltas por tramo inválidas para la ronda ${roundNumber}`,
+            });
+          }
+        }
+
+        if (circuitIdToStore || lapsPerRound != null) {
           rowsToUpsert.push({
             competition_id: id,
             round_number: roundNumber,
             circuit_id: circuitIdToStore,
             circuit_name: circuitNameToStore,
+            laps_per_round: lapsPerRound,
           });
         }
       }

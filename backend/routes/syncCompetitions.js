@@ -243,10 +243,10 @@ router.get('/competitions/:id', param('id').isUUID(), handleValidationErrors, as
     }
 
     let round_stages = [];
-    if (competition.is_multi_stage) {
+    if (competition.is_multi_stage || competition.rounds > 1) {
       const { data: stages, error: stagesErr } = await supabaseAdmin
         .from('competition_round_stages')
-        .select('id, competition_id, round_number, circuit_id, circuit_name, created_at')
+        .select('id, competition_id, round_number, circuit_id, circuit_name, laps_per_round, created_at')
         .eq('competition_id', id)
         .order('round_number', { ascending: true });
       if (stagesErr) {
@@ -303,6 +303,7 @@ router.post(
   body('club_id').optional({ values: 'null' }).isUUID(),
   body('circuit_id').optional({ values: 'null' }).isUUID(),
   body('circuit_name').optional({ values: 'null' }).isString(),
+  body('laps_per_round').optional({ nullable: true }).isInt({ min: 1 }),
   handleValidationErrors,
   async (req, res) => {
     try {
@@ -315,6 +316,7 @@ router.post(
         club_id: clubId,
         circuit_id: circuitId,
         circuit_name: circuitName,
+        laps_per_round: lapsPerRound,
       } = req.body;
 
       if (clubId && !(await assertClubMembership(userId, clubId))) {
@@ -345,6 +347,7 @@ router.post(
         circuit_name: circuitNameToStore,
         circuit_id: circuitId || null,
         club_id: clubId || null,
+        laps_per_round: lapsPerRound != null ? lapsPerRound : null,
       };
 
       const { data, error } = await supabaseAdmin.from('competitions').insert([insertData]).select().single();
@@ -376,6 +379,7 @@ router.put(
   body('circuit_name').optional({ values: 'null' }).isString(),
   body('external_status').optional().isIn(['DRAFT', 'RUNNING', 'FINISHED']),
   body('status').optional().isIn(['closed']),
+  body('laps_per_round').optional({ nullable: true }).isInt({ min: 1 }),
   body('updated_at').optional().isString(),
   handleValidationErrors,
   async (req, res) => {
@@ -402,6 +406,9 @@ router.put(
       if (req.body.name != null) patch.name = req.body.name.trim();
       if (req.body.num_slots != null) patch.num_slots = req.body.num_slots;
       if (req.body.rounds != null) patch.rounds = req.body.rounds;
+      if (req.body.laps_per_round !== undefined) {
+        patch.laps_per_round = req.body.laps_per_round != null ? req.body.laps_per_round : null;
+      }
       if (req.body.external_status != null) patch.external_status = req.body.external_status;
       if (req.body.status != null) patch.status = req.body.status;
       if (req.body.circuit_name !== undefined) {

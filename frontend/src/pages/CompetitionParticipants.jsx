@@ -148,6 +148,12 @@ const CompetitionParticipants = () => {
     (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
   );
   const showStagesTab = Boolean(canUseOrganizerTools && competition?.is_multi_stage);
+  const showRoundLapsTab = Boolean(
+    canUseOrganizerTools &&
+      !competition?.is_multi_stage &&
+      (competition?.rounds ?? 0) > 1,
+  );
+  const showRoundConfigTab = showStagesTab || showRoundLapsTab;
   const participantTabOptions = useMemo(() => {
     const waitlistSuffix =
       competition?.waitlist_count > 0 ? ` · espera ${competition.waitlist_count}` : '';
@@ -177,15 +183,15 @@ const CompetitionParticipants = () => {
             },
           ]
         : []),
-      ...(showStagesTab
+      ...(showRoundConfigTab
         ? [
             {
               value: 'stages',
-              label: 'Tramos',
+              label: showStagesTab ? 'Tramos' : 'Vueltas por ronda',
               trigger: (
                 <>
                   <Flag className="size-4" />
-                  Tramos
+                  {showStagesTab ? 'Tramos' : 'Vueltas por ronda'}
                 </>
               ),
             },
@@ -214,6 +220,7 @@ const CompetitionParticipants = () => {
     ];
   }, [
     canUseOrganizerTools,
+    showRoundConfigTab,
     showStagesTab,
     participants.length,
     competition?.signups_count,
@@ -286,10 +293,10 @@ const CompetitionParticipants = () => {
     if (competition && !canUseOrganizerTools && activeTab === 'signups') {
       setActiveTab('participants');
     }
-    if (competition && !showStagesTab && activeTab === 'stages') {
+    if (competition && !showRoundConfigTab && activeTab === 'stages') {
       setActiveTab('participants');
     }
-  }, [competition, canUseOrganizerTools, showStagesTab, activeTab]);
+  }, [competition, canUseOrganizerTools, showRoundConfigTab, activeTab]);
 
   const handleAddParticipant = useCallback(async (e) => {
     e.preventDefault();
@@ -1262,7 +1269,7 @@ const CompetitionParticipants = () => {
           </TabsContent>
         )}
 
-        {showStagesTab && (
+        {showRoundConfigTab && (
           <TabsContent value="stages" className="mt-4">
             <CompetitionRoundStages
               competitionId={competitionId}
