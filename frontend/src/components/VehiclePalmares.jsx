@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import api from '../lib/axios';
 import { formatHistoryDate, getIntlLocale } from '../utils/formatUtils';
 import CompetitionStatusBadge from './CompetitionStatusBadge';
+import { competitionDetailPath } from '../utils/competitionRoutes';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -288,7 +289,7 @@ const VehiclePalmares = ({ vehicleId }) => {
                   <div className="flex flex-wrap gap-2">
                     {entry.competition_id && (
                       <Button variant="outline" size="sm" asChild>
-                        <Link to={`/competitions/${entry.competition_id}/participants`}>
+                        <Link to={competitionDetailPath(entry.competition_id)}>
                           <ExternalLink className="size-4 mr-2" />
                           {t('palmares.viewCompetition')}
                         </Link>

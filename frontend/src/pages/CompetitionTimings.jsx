@@ -74,6 +74,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import { competitionDetailPath } from '../utils/competitionRoutes';
 import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
 import LiveEventHubLinks from '../components/LiveEventHubLinks';
 
@@ -129,7 +130,7 @@ function mapParticipantStatToAggregatedRow(stat, totalRounds) {
   };
 }
 
-const CompetitionTimings = () => {
+const CompetitionTimings = ({ embedded = false }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -421,6 +422,10 @@ const CompetitionTimings = () => {
       setLoading(true);
       const compResponse = await axios.get(`/competitions/${id}`);
       const organizerId = compResponse.data?.organizer;
+      // Solo admin puede listar circuitos de otro usuario; el resto usa los propios/club.
+      const canLoadOrganizerCircuits =
+        Boolean(organizerId) &&
+        (organizerId === user?.id || isLicenseAdminUser(user));
       const [
         partResponse,
         timingsResponse,
@@ -432,7 +437,7 @@ const CompetitionTimings = () => {
         axios.get(`/competitions/${id}/timings`),
         axios.get(`/competitions/${id}/progress`),
         axios.get(`/competitions/${id}/rules`),
-        organizerId
+        canLoadOrganizerCircuits
           ? axios.get('/circuits', { params: { owner_user_id: organizerId } })
           : axios.get('/circuits'),
       ]);
@@ -864,11 +869,12 @@ const CompetitionTimings = () => {
   if (competition && participants.length === 0) {
     const showOrganizerEmptyActions = canUseOrganizerTools;
     return (
-      <div className="mt-4 max-w-4xl mx-auto space-y-4">
+      <div className={`${embedded ? '' : 'mt-4 '}max-w-4xl mx-auto space-y-4`}>
+        {!embedded && (
         <div className="flex items-center gap-3 mb-4">
           <Button
             variant="outline"
-            onClick={() => navigate(`/competitions/${id}/participants`)}
+            onClick={() => navigate(competitionDetailPath(id, { section: 'setup' }))}
           >
             <ArrowLeft className="size-4 mr-2" />
             Volver
@@ -878,6 +884,7 @@ const CompetitionTimings = () => {
             <p className="text-muted-foreground">{competition?.name}</p>
           </div>
         </div>
+        )}
 
         <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
           <AlertTriangle className="size-12 text-amber-600 dark:text-amber-400 mb-3" />
@@ -903,7 +910,7 @@ const CompetitionTimings = () => {
             </div>
             {showOrganizerEmptyActions && (
               <Button
-                onClick={() => navigate(`/competitions/${id}/participants`)}
+                onClick={() => navigate(competitionDetailPath(id, { section: 'setup' }))}
                 className="flex items-center gap-2"
               >
                 <Users className="size-4" />
@@ -935,7 +942,7 @@ const CompetitionTimings = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="mt-4 max-w-7xl mx-auto space-y-4">
+      <div className={`${embedded ? '' : 'mt-4 '}max-w-7xl mx-auto space-y-4`}>
         {isLicenseAdminUser(user) && competition?.organizer && user?.id !== competition.organizer && (
           <Alert>
             <AlertDescription>
@@ -950,13 +957,13 @@ const CompetitionTimings = () => {
             </AlertDescription>
           </Alert>
         )}
-        {/* Header */}
-        <div className="flex flex-col gap-4 mb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className={`flex flex-col gap-4 mb-4 ${embedded ? 'sm:flex-row sm:justify-end' : ''}`}>
+          <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${embedded ? 'w-full' : ''}`}>
+            {!embedded && (
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => navigate(`/competitions/${id}/participants`)}
+                onClick={() => navigate(competitionDetailPath(id, { section: 'setup' }))}
               >
                 <ArrowLeft className="size-4 mr-2" />
                 Volver
@@ -969,6 +976,7 @@ const CompetitionTimings = () => {
                 <p className="text-muted-foreground">{competition?.name}</p>
               </div>
             </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {isCompetitionComplete() && (
                 <>

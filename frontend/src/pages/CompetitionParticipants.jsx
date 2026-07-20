@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown, Calendar, Flag } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
@@ -43,6 +43,7 @@ import { Spinner } from '../components/ui/spinner';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import CollectionVehiclePicker from '../components/CollectionVehiclePicker';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+
+import { competitionDetailPath } from '../utils/competitionRoutes';
+
+const SETUP_TABS = new Set(['participants', 'signups', 'stages', 'categories', 'rules']);
 
 function formatCompetitionDate(dateString) {
   if (!dateString) return '';
@@ -90,9 +95,10 @@ function getCompetitionProgressStatus(competition, participantsCount, timingsCou
   return { label: status, variant: 'outline' };
 }
 
-const CompetitionParticipants = () => {
+const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const { id: competitionId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [competition, setCompetition] = useState(null);
@@ -100,7 +106,8 @@ const CompetitionParticipants = () => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('participants');
+  const tabFromUrl = searchParams.get('tab');
+  const [localTab, setLocalTab] = useState('participants');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -238,6 +245,25 @@ const CompetitionParticipants = () => {
     ? participants.length >= (competition.num_slots ?? 0)
     : false;
 
+  const activeTab = useMemo(() => {
+    const raw = embedded ? tabFromUrl : localTab;
+    if (!SETUP_TABS.has(raw)) return 'participants';
+    if (raw === 'signups' && !canUseOrganizerTools) return 'participants';
+    if (raw === 'stages' && !showRoundConfigTab) return 'participants';
+    return raw;
+  }, [embedded, tabFromUrl, localTab, canUseOrganizerTools, showRoundConfigTab]);
+
+  const onTabChange = useCallback(
+    (value) => {
+      if (embedded) {
+        setSearchParams({ section: 'setup', tab: value }, { replace: true });
+      } else {
+        setLocalTab(value);
+      }
+    },
+    [embedded, setSearchParams],
+  );
+
   const loadCompetition = useCallback(async () => {
     try {
       setLoading(true);
@@ -266,15 +292,15 @@ const CompetitionParticipants = () => {
     }
   }, []);
 
-  const loadVehicles = useCallback(async (organizerId) => {
-    if (!organizerId) return;
+  const loadVehicles = useCallback(async (garageUserId) => {
     try {
       const response = await axios.get('/competitions/vehicles', {
-        params: { garage_user_id: organizerId },
+        params: garageUserId ? { garage_user_id: garageUserId } : undefined,
       });
-      setVehicles(response.data);
+      setVehicles(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Error al cargar vehículos:', err);
+      setVehicles([]);
     }
   }, []);
 
@@ -283,20 +309,18 @@ const CompetitionParticipants = () => {
   }, [loadCompetition]);
 
   useEffect(() => {
-    if (competition?.organizer) {
+    if (!competition?.organizer || !user?.id) return;
+    const isOrganizerOrAdmin =
+      competition.organizer === user.id || isLicenseAdminUser(user);
+    if (isOrganizerOrAdmin) {
+      // Organizador: garaje propio (o el del organizador si es admin de licencia).
       loadVehicles(competition.organizer);
       loadFavorites(competition.organizer);
+    } else {
+      // Miembro: su propia colección para inscribirse.
+      loadVehicles();
     }
-  }, [competition?.organizer, loadVehicles, loadFavorites]);
-
-  useEffect(() => {
-    if (competition && !canUseOrganizerTools && activeTab === 'signups') {
-      setActiveTab('participants');
-    }
-    if (competition && !showRoundConfigTab && activeTab === 'stages') {
-      setActiveTab('participants');
-    }
-  }, [competition, canUseOrganizerTools, showRoundConfigTab, activeTab]);
+  }, [competition?.organizer, user, loadVehicles, loadFavorites]);
 
   const handleAddParticipant = useCallback(async (e) => {
     e.preventDefault();
@@ -688,11 +712,12 @@ const CompetitionParticipants = () => {
         await axios.patch(`/competitions/${competitionId}/status`, { status });
         toast.success('Estado actualizado');
         await loadCompetition();
+        onCompetitionChange?.();
       } catch (err) {
         toast.error(err.response?.data?.error || 'No se pudo cambiar el estado');
       }
     },
-    [competitionId, loadCompetition],
+    [competitionId, loadCompetition, onCompetitionChange],
   );
 
   const generatePublicLink = () => {
@@ -751,9 +776,11 @@ const CompetitionParticipants = () => {
               Esta competición está en <strong>borrador</strong>: el formulario público de inscripción no es visible.
               Publícala cuando esté lista.
             </span>
-            <Button type="button" size="sm" variant="secondary" onClick={() => patchCompetitionStatus('published')}>
-              Publicar
-            </Button>
+            {!embedded && (
+              <Button type="button" size="sm" variant="secondary" onClick={() => patchCompetitionStatus('published')}>
+                Publicar
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -784,7 +811,8 @@ const CompetitionParticipants = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Header */}
+      {!embedded && (
+      <>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -862,7 +890,7 @@ const CompetitionParticipants = () => {
             )}
             {canUseOrganizerTools && (
               <Button
-                onClick={() => navigate(`/competitions/${competitionId}/timings`)}
+                onClick={() => navigate(competitionDetailPath(competitionId, { section: 'timings' }))}
                 disabled={!canStartCompetition}
                 title={!canStartCompetition ? 'Necesitas al menos un participante' : 'Gestionar tiempos'}
               >
@@ -871,7 +899,7 @@ const CompetitionParticipants = () => {
               </Button>
             )}
             {!canUseOrganizerTools && canStartCompetition && (
-              <Button variant="outline" size="sm" onClick={() => navigate(`/competitions/${competitionId}/timings`)}>
+              <Button variant="outline" size="sm" onClick={() => navigate(competitionDetailPath(competitionId, { section: 'timings' }))}>
                 <Clock className="size-4 mr-2" />
                 Ver tiempos
               </Button>
@@ -879,6 +907,8 @@ const CompetitionParticipants = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Info card */}
       <Card>
@@ -996,10 +1026,10 @@ const CompetitionParticipants = () => {
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={onTabChange}>
         <ResponsiveTabsNav
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={onTabChange}
           options={participantTabOptions}
           listClassName="sm:grid-cols-2 lg:grid-cols-5"
           triggerClassName="flex items-center gap-2"
@@ -1060,22 +1090,12 @@ const CompetitionParticipants = () => {
                     </div>
                     {memberVehicleSource === 'own' ? (
                       vehicles.length > 0 ? (
-                        <Select
+                        <CollectionVehiclePicker
+                          vehicles={vehicles}
                           value={memberSignupForm.vehicle_id}
-                          onValueChange={(v) => setMemberSignupForm((f) => ({ ...f, vehicle_id: v }))}
+                          onChange={(v) => setMemberSignupForm((f) => ({ ...f, vehicle_id: v }))}
                           disabled={memberSignupBlocked}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona un vehículo de tu colección" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {vehicles.map((v) => (
-                              <SelectItem key={v.id} value={String(v.id)}>
-                                {v.manufacturer} {v.model} ({v.type})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        />
                       ) : (
                         <p className="text-sm text-muted-foreground">
                           No tienes vehículos en tu colección. Cambia a "Otro (texto)" para escribir un modelo.

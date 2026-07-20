@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
+import { PENDING_CLUB_INVITE_KEY, useClubInvite } from '../hooks/useClubInvite';
 
-export const PENDING_CLUB_INVITE_KEY = 'pending_club_invite';
+export { PENDING_CLUB_INVITE_KEY };
 
 /**
  * Tras iniciar sesión, aplica la invitación al club guardada en sessionStorage
@@ -13,6 +12,7 @@ export const PENDING_CLUB_INVITE_KEY = 'pending_club_invite';
 const PendingInviteConsumer = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { joinWithToken } = useClubInvite();
   const inFlightRef = useRef(false);
 
   useEffect(() => {
@@ -24,23 +24,17 @@ const PendingInviteConsumer = () => {
     inFlightRef.current = true;
     (async () => {
       try {
-        const { data } = await axios.post(`/clubs/join/${encodeURIComponent(token)}`);
+        await joinWithToken(token);
         sessionStorage.removeItem(PENDING_CLUB_INVITE_KEY);
-        if (data?.already_member) {
-          toast.info('Ya eras miembro de este club');
-        } else {
-          toast.success('Te has unido al club');
-        }
         navigate('/clubs', { replace: true });
-      } catch (e) {
+      } catch {
         sessionStorage.removeItem(PENDING_CLUB_INVITE_KEY);
-        toast.error(e.response?.data?.error || 'No se pudo unir al club con la invitación guardada');
         navigate('/clubs', { replace: true });
       } finally {
         inFlightRef.current = false;
       }
     })();
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, joinWithToken]);
 
   return null;
 };

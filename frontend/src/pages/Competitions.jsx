@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp, Link2, ChevronRight } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -46,6 +46,7 @@ import {
   buildCompetitionCircuitOptions,
   competitionCircuitLabel,
 } from '../utils/competitionCircuits';
+import { competitionDetailPath } from '../utils/competitionRoutes';
 
 const COMPETITIONS_DEBUG_ORG_KEY = 'scalextric_competitions_for_organizer';
 
@@ -306,7 +307,7 @@ const Competitions = () => {
       setFavoritesExpanded(false);
       setDefaultCategoryName('General');
 
-      navigate(`/competitions/${competitionId}/participants`);
+      navigate(competitionDetailPath(competitionId));
     } catch (err) {
       console.error('Error al crear competición:', err);
       setCreateError(err.response?.data?.error || 'Error al crear la competición');
@@ -341,7 +342,12 @@ const Competitions = () => {
       loadCompetitions();
     } catch (err) {
       console.error('Error al eliminar competición:', err);
-      toast.error('Error al eliminar la competición');
+      const status = err.response?.status;
+      const msg =
+        status === 404
+          ? 'No puedes eliminar esta competición (solo el organizador o un administrador).'
+          : err.response?.data?.error || 'Error al eliminar la competición';
+      toast.error(msg);
     }
   };
 
@@ -420,8 +426,8 @@ const Competitions = () => {
           <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="text-muted-foreground">
             {isLicenseAdmin && debugOrganizerId
-              ? `Modo depuración: competiciones del organizador ${debugOrganizerId}`
-              : 'Gestiona tus competiciones y participantes'}
+              ? t('list.debugSubtitle', { id: debugOrganizerId })
+              : t('list.subtitle')}
           </p>
         </div>
         <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, competitionId: null })}>
@@ -951,39 +957,38 @@ const Competitions = () => {
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2">
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => navigate(`/competitions/${competition.id}/participants`)}
+                    className="w-full gap-2 justify-between"
+                    onClick={() => navigate(competitionDetailPath(competition.id))}
                   >
-                    Gestionar Participantes
+                    {t('list.openCompetition')}
+                    <ChevronRight className="size-4" />
                   </Button>
-                  {participantCount > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => navigate(`/competitions/${competition.id}/timings`)}
-                    >
-                      <Clock className="size-4 mr-1" />
-                      Tiempos
-                      {participantCount < slotCap && (
-                        <Badge variant="secondary" className="ml-1 text-xs tabular-nums">
-                          {participantCount}
-                        </Badge>
-                      )}
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteCompetition(competition.id)}
-                  >
-                    Eliminar
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {competition.public_slug && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => copyPublicSignupLink(competition.public_slug)}
+                      >
+                        <Link2 className="size-3.5" />
+                        {t('list.copyPublicLink')}
+                      </Button>
+                    )}
+                    {(isLicenseAdmin || user?.id === competition.organizer) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteCompetition(competition.id)}
+                      >
+                        {t('list.delete')}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

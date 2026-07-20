@@ -5,10 +5,49 @@
   "favorites": "Favorite pilots",
   "participants": "Participants",
   "timings": "Timings",
-  "signup": "Registration",
+  "signup": "Signup",
   "status": "Competition status",
   "presentation": "Presentation",
   "publicStatus": "Live status",
   "classification": "Standings",
-  "round": "Round {{n}}"
+  "round": "Round {{n}}",
+  "list": {
+    "subtitle": "Create competitions, manage participants and record timings from one place.",
+    "debugSubtitle": "Debug mode: competitions for organizer {{id}}",
+    "empty": "You have no competitions yet",
+    "openCompetition": "Open competition",
+    "copyPublicLink": "Copy public link",
+    "delete": "Delete",
+    "recentTitle": "Recent competitions",
+    "viewAll": "View all",
+    "createFirst": "Create first competition",
+    "flowTitle": "Recommended flow:",
+    "flowStep1": "Create a competition",
+    "flowStep2": "Add all participants",
+    "flowStep3": "Record timings per round",
+    "roundsCount": "{{count}} rounds"
+  },
+  "detail": {
+    "back": "Back to competitions",
+    "loadError": "Could not load competition",
+    "notFound": "Competition not found",
+    "subtitleOrganizer": "Setup, participants, categories and rules",
+    "subtitleMember": "View your club competition",
+    "sectionLabel": "Competition section",
+    "sections": {
+      "setup": "Setup",
+      "timings": "Timings"
+    },
+    "publish": "Publish",
+    "unpublish": "Unpublish",
+    "close": "Close",
+    "reopen": "Reopen",
+    "statusUpdated": "Status updated",
+    "statusUpdateError": "Could not change status",
+    "copySignupLink": "Copy signup link",
+    "openSignup": "Public signup",
+    "signupLinkCopied": "Signup link copied",
+    "signupLinkCopyError": "Could not copy link",
+    "leagueBadge": "League: {{name}}"
+  }
 }

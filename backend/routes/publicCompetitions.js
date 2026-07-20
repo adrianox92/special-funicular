@@ -497,7 +497,7 @@ router.get('/:slug', async (req, res) => {
 router.post('/:slug/signup', optionalAuthMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
-    const { name, email, category_id, vehicle } = req.body;
+    const { name, email, category_id, vehicle, vehicle_id: vehicleIdBody } = req.body;
 
     // Validaciones
     if (!name || !name.trim()) {
@@ -508,7 +508,9 @@ router.post('/:slug/signup', optionalAuthMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'El email es requerido' });
     }
 
-    if (!vehicle || !vehicle.trim()) {
+    const hasVehicleId = typeof vehicleIdBody === 'string' && vehicleIdBody.trim().length > 0;
+    const hasVehicleText = typeof vehicle === 'string' && vehicle.trim().length > 0;
+    if (!hasVehicleId && !hasVehicleText) {
       return res.status(400).json({ error: 'El vehículo es requerido' });
     }
 
@@ -574,6 +576,35 @@ router.post('/:slug/signup', optionalAuthMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Esta competición no tiene categorías' });
     }
 
+    let vehicleText = hasVehicleText ? String(vehicle).trim() : null;
+    let vehicleIdValue = null;
+    if (hasVehicleId) {
+      if (!req.user?.id) {
+        return res.status(401).json({
+          error: 'Debes iniciar sesión para inscribirte con un vehículo de tu colección',
+        });
+      }
+      const { data: vehicleRow, error: vehicleErr } = await supabase
+        .from('vehicles')
+        .select('id, manufacturer, model, user_id')
+        .eq('id', vehicleIdBody)
+        .maybeSingle();
+      if (vehicleErr || !vehicleRow) {
+        return res.status(400).json({ error: 'Vehículo no encontrado' });
+      }
+      if (vehicleRow.user_id !== req.user.id) {
+        return res.status(403).json({
+          error: 'Solo puedes inscribirte con vehículos de tu propia colección.',
+        });
+      }
+      vehicleIdValue = vehicleRow.id;
+      if (!vehicleText) {
+        vehicleText =
+          [vehicleRow.manufacturer, vehicleRow.model].filter(Boolean).join(' ').trim() ||
+          'Vehículo de colección';
+      }
+    }
+
     const { count: participantsCount, error: pcErr } = await supabase
       .from('competition_participants')
       .select('*', { count: 'exact', head: true })
@@ -606,7 +637,8 @@ router.post('/:slug/signup', optionalAuthMiddleware, async (req, res) => {
       competition_id: competition.id,
       name: name.trim(),
       email: email.trim(),
-      vehicle: vehicle.trim(),
+      vehicle: vehicleText,
+      vehicle_id: vehicleIdValue,
       category_id: resolvedCategoryId,
       is_waitlist: false,
       waitlist_position: null,
@@ -657,6 +689,7 @@ router.post('/:slug/signup', optionalAuthMiddleware, async (req, res) => {
         name: signup.name,
         email: signup.email,
         vehicle: signup.vehicle,
+        vehicle_id: signup.vehicle_id,
         category: signup.competition_categories?.name || categoryName,
       }
     });

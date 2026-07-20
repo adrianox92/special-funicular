@@ -10,5 +10,44 @@
   "presentation": "Presentación",
   "publicStatus": "Estado en vivo",
   "classification": "Clasificación",
-  "round": "Manga {{n}}"
+  "round": "Manga {{n}}",
+  "list": {
+    "subtitle": "Crea competiciones, gestiona participantes y registra tiempos desde un solo lugar.",
+    "debugSubtitle": "Modo depuración: competiciones del organizador {{id}}",
+    "empty": "No tienes competiciones creadas",
+    "openCompetition": "Abrir competición",
+    "copyPublicLink": "Copiar enlace público",
+    "delete": "Eliminar",
+    "recentTitle": "Competiciones recientes",
+    "viewAll": "Ver todas",
+    "createFirst": "Crear primera competición",
+    "flowTitle": "Flujo recomendado:",
+    "flowStep1": "Crea una competición",
+    "flowStep2": "Añade todos los participantes",
+    "flowStep3": "Registra los tiempos por ronda",
+    "roundsCount": "{{count}} rondas"
+  },
+  "detail": {
+    "back": "Volver a competiciones",
+    "loadError": "No se pudo cargar la competición",
+    "notFound": "Competición no encontrada",
+    "subtitleOrganizer": "Configuración, participantes, categorías y reglas",
+    "subtitleMember": "Consulta la competición de tu club",
+    "sectionLabel": "Sección de la competición",
+    "sections": {
+      "setup": "Gestión",
+      "timings": "Tiempos"
+    },
+    "publish": "Publicar",
+    "unpublish": "Despublicar",
+    "close": "Cerrar",
+    "reopen": "Reabrir",
+    "statusUpdated": "Estado actualizado",
+    "statusUpdateError": "No se pudo cambiar el estado",
+    "copySignupLink": "Copiar inscripción",
+    "openSignup": "Inscripción pública",
+    "signupLinkCopied": "Enlace de inscripción copiado",
+    "signupLinkCopyError": "No se pudo copiar el enlace",
+    "leagueBadge": "Liga: {{name}}"
+  }
 }

@@ -18,6 +18,12 @@ const {
   linkPersonalCircuitToClub,
 } = require('../lib/clubCircuits');
 const { buildClubCircuitLeaderboard } = require('../lib/clubCircuitLeaderboard');
+const {
+  assertGuestMemberInClub,
+  assertClubCircuit,
+  normalizeGuestTimingBody,
+  enrichGuestMembersWithLinkedEmails,
+} = require('../lib/clubGuestMembers');
 
 const router = express.Router();
 
@@ -1411,6 +1417,376 @@ router.delete(
       res.json({ ok: true });
     } catch (e) {
       console.error('DELETE /clubs/:id/members/:userId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/guest-members',
+  param('id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ok = await userIsClubMember(req.user.id, id);
+      if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
+
+      const { data: rows, error } = await supabaseAdmin
+        .from('club_guest_members')
+        .select('id, club_id, name, email, linked_user_id, created_at')
+        .eq('club_id', id)
+        .order('name', { ascending: true });
+
+      if (error) return res.status(500).json({ error: error.message });
+
+      const guests = await enrichGuestMembersWithLinkedEmails(supabaseAdmin, rows || []);
+      res.json({ guest_members: guests });
+    } catch (e) {
+      console.error('GET /clubs/:id/guest-members', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/guest-members',
+  param('id').isUUID(),
+  body('name').trim().notEmpty().isLength({ max: 200 }),
+  body('email').optional({ nullable: true }).isLength({ max: 320 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const name = req.body.name.trim();
+      const email =
+        req.body.email != null && String(req.body.email).trim() !== ''
+          ? String(req.body.email).trim()
+          : null;
+
+      const { data, error } = await supabaseAdmin
+        .from('club_guest_members')
+        .insert({
+          club_id: id,
+          name,
+          email,
+          created_by: req.user.id,
+        })
+        .select('id, club_id, name, email, linked_user_id, created_at')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'Ya existe un miembro invitado con ese nombre en el club' });
+        }
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.status(201).json(data);
+    } catch (e) {
+      console.error('POST /clubs/:id/guest-members', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.patch(
+  '/:id/guest-members/:guestId',
+  param('id').isUUID(),
+  param('guestId').isUUID(),
+  body('name').optional().trim().notEmpty().isLength({ max: 200 }),
+  body('email').optional({ nullable: true }).isLength({ max: 320 }),
+  body('linked_user_id').optional({ nullable: true }).isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, guestId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const existing = await assertGuestMemberInClub(supabaseAdmin, id, guestId);
+      if (!existing) return res.status(404).json({ error: 'Miembro invitado no encontrado' });
+
+      const patch = {};
+      if (Object.prototype.hasOwnProperty.call(req.body, 'name')) {
+        patch.name = String(req.body.name).trim();
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'email')) {
+        patch.email =
+          req.body.email != null && String(req.body.email).trim() !== ''
+            ? String(req.body.email).trim()
+            : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'linked_user_id')) {
+        const linked = req.body.linked_user_id;
+        if (linked) {
+          try {
+            const { data: u, error: uErr } = await supabaseAdmin.auth.admin.getUserById(linked);
+            if (uErr || !u?.user) return res.status(400).json({ error: 'Usuario vinculado no encontrado' });
+          } catch {
+            return res.status(400).json({ error: 'Usuario vinculado no encontrado' });
+          }
+          patch.linked_user_id = linked;
+        } else {
+          patch.linked_user_id = null;
+        }
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'Nada que actualizar' });
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('club_guest_members')
+        .update(patch)
+        .eq('id', guestId)
+        .eq('club_id', id)
+        .select('id, club_id, name, email, linked_user_id, created_at')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'Ya existe un miembro invitado con ese nombre en el club' });
+        }
+        return res.status(500).json({ error: error.message });
+      }
+
+      const [guest] = await enrichGuestMembersWithLinkedEmails(supabaseAdmin, [data]);
+      res.json(guest);
+    } catch (e) {
+      console.error('PATCH /clubs/:id/guest-members/:guestId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.delete(
+  '/:id/guest-members/:guestId',
+  param('id').isUUID(),
+  param('guestId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, guestId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const existing = await assertGuestMemberInClub(supabaseAdmin, id, guestId);
+      if (!existing) return res.status(404).json({ error: 'Miembro invitado no encontrado' });
+
+      const { error } = await supabaseAdmin
+        .from('club_guest_members')
+        .delete()
+        .eq('id', guestId)
+        .eq('club_id', id);
+
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(204).send();
+    } catch (e) {
+      console.error('DELETE /clubs/:id/guest-members/:guestId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/guest-members/:guestId/timings',
+  param('id').isUUID(),
+  param('guestId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, guestId } = req.params;
+      const ok = await userIsClubMember(req.user.id, id);
+      if (!ok) return res.status(404).json({ error: 'Club no encontrado' });
+
+      const guest = await assertGuestMemberInClub(supabaseAdmin, id, guestId);
+      if (!guest) return res.status(404).json({ error: 'Miembro invitado no encontrado' });
+
+      let query = supabaseAdmin
+        .from('club_guest_timings')
+        .select('*')
+        .eq('club_id', id)
+        .eq('guest_member_id', guestId)
+        .order('timing_date', { ascending: false });
+
+      if (req.query.circuit_id) {
+        query = query.eq('circuit_id', String(req.query.circuit_id));
+      }
+
+      const { data, error } = await query;
+      if (error) return res.status(500).json({ error: error.message });
+      res.json({ timings: data || [] });
+    } catch (e) {
+      console.error('GET /clubs/:id/guest-members/:guestId/timings', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.post(
+  '/:id/guest-members/:guestId/timings',
+  param('id').isUUID(),
+  param('guestId').isUUID(),
+  body('best_lap_time').trim().notEmpty(),
+  body('circuit_id').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, guestId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const guest = await assertGuestMemberInClub(supabaseAdmin, id, guestId);
+      if (!guest) return res.status(404).json({ error: 'Miembro invitado no encontrado' });
+
+      const circuitCheck = await assertClubCircuit(supabaseAdmin, id, req.body.circuit_id);
+      if (!circuitCheck.ok) return res.status(400).json({ error: circuitCheck.error });
+
+      const source = req.body.source === 'app' ? 'app' : 'manual';
+      const normalized = normalizeGuestTimingBody(req.body, {
+        source,
+        enteredBy: req.user.id,
+      });
+      if (normalized.error) return res.status(400).json({ error: normalized.error });
+
+      const { data, error } = await supabaseAdmin
+        .from('club_guest_timings')
+        .insert({
+          club_id: id,
+          guest_member_id: guestId,
+          ...normalized.row,
+        })
+        .select('*')
+        .single();
+
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(201).json(data);
+    } catch (e) {
+      console.error('POST /clubs/:id/guest-members/:guestId/timings', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.patch(
+  '/:id/guest-members/:guestId/timings/:timingId',
+  param('id').isUUID(),
+  param('guestId').isUUID(),
+  param('timingId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, guestId, timingId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const guest = await assertGuestMemberInClub(supabaseAdmin, id, guestId);
+      if (!guest) return res.status(404).json({ error: 'Miembro invitado no encontrado' });
+
+      const { data: existing } = await supabaseAdmin
+        .from('club_guest_timings')
+        .select('*')
+        .eq('id', timingId)
+        .eq('guest_member_id', guestId)
+        .eq('club_id', id)
+        .maybeSingle();
+      if (!existing) return res.status(404).json({ error: 'Tiempo no encontrado' });
+
+      const patch = {};
+      if (req.body.circuit_id) {
+        const circuitCheck = await assertClubCircuit(supabaseAdmin, id, req.body.circuit_id);
+        if (!circuitCheck.ok) return res.status(400).json({ error: circuitCheck.error });
+        patch.circuit_id = req.body.circuit_id;
+      }
+      if (req.body.best_lap_time != null) {
+        const normalized = normalizeGuestTimingBody(
+          { ...existing, ...req.body },
+          { source: existing.source, enteredBy: existing.entered_by },
+        );
+        if (normalized.error) return res.status(400).json({ error: normalized.error });
+        Object.assign(patch, normalized.row);
+      } else {
+        if (req.body.lane !== undefined) {
+          patch.lane =
+            req.body.lane != null && String(req.body.lane).trim() !== ''
+              ? String(req.body.lane).trim()
+              : null;
+        }
+        if (req.body.laps !== undefined) patch.laps = req.body.laps != null ? parseInt(String(req.body.laps), 10) : null;
+        if (req.body.consistency_score !== undefined) {
+          patch.consistency_score =
+            req.body.consistency_score != null ? Number(req.body.consistency_score) : null;
+        }
+        if (req.body.vehicle_model !== undefined) {
+          patch.vehicle_model =
+            req.body.vehicle_model != null && String(req.body.vehicle_model).trim() !== ''
+              ? String(req.body.vehicle_model).trim()
+              : null;
+        }
+        if (req.body.vehicle_type !== undefined) {
+          patch.vehicle_type =
+            req.body.vehicle_type != null && String(req.body.vehicle_type).trim() !== ''
+              ? String(req.body.vehicle_type).trim()
+              : null;
+        }
+        if (req.body.notes !== undefined) {
+          patch.notes =
+            req.body.notes != null && String(req.body.notes).trim() !== ''
+              ? String(req.body.notes).trim()
+              : null;
+        }
+        if (req.body.timing_date !== undefined) patch.timing_date = req.body.timing_date;
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'Nada que actualizar' });
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('club_guest_timings')
+        .update(patch)
+        .eq('id', timingId)
+        .eq('guest_member_id', guestId)
+        .eq('club_id', id)
+        .select('*')
+        .single();
+
+      if (error) return res.status(500).json({ error: error.message });
+      res.json(data);
+    } catch (e) {
+      console.error('PATCH /clubs/:id/guest-members/:guestId/timings/:timingId', e);
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+router.delete(
+  '/:id/guest-members/:guestId/timings/:timingId',
+  param('id').isUUID(),
+  param('guestId').isUUID(),
+  param('timingId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id, guestId, timingId } = req.params;
+      const admin = await userIsClubAdmin(req.user.id, id);
+      if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+      const { error } = await supabaseAdmin
+        .from('club_guest_timings')
+        .delete()
+        .eq('id', timingId)
+        .eq('guest_member_id', guestId)
+        .eq('club_id', id);
+
+      if (error) return res.status(500).json({ error: error.message });
+      res.status(204).send();
+    } catch (e) {
+      console.error('DELETE /clubs/:id/guest-members/:guestId/timings/:timingId', e);
       res.status(500).json({ error: e.message });
     }
   },

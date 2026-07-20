@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { competitionDetailPath } from '../utils/competitionRoutes';
 import { useCommandPalette } from '../context/CommandPaletteContext';
 import {
   Car,
@@ -212,7 +213,7 @@ const GlobalCommandPalette = () => {
   const goCompetition = useCallback(
     (id) => {
       setOpen(false);
-      navigate(`/competitions/${id}/timings`);
+      navigate(competitionDetailPath(id, { section: 'timings' }));
     },
     [navigate, setOpen],
   );

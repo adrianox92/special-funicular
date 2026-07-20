@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Trash2, RefreshCw, ExternalLink, ChevronUp, ChevronDown, Import } from 'lucide-react';
 import axios from '../../lib/axios';
+import { competitionDetailPath } from '../../utils/competitionRoutes';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -301,7 +302,7 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
                     </>
                   )}
                   <Button variant="outline" size="sm" asChild>
-                    <Link to={`/competitions/${comp.id}/participants`}>
+                    <Link to={competitionDetailPath(comp.id)}>
                       <ExternalLink className="size-4 mr-2" />
                       Gestionar
                     </Link>

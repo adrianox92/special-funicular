@@ -1,13 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Link2, LogOut, Loader2, Users, CalendarDays, Megaphone } from 'lucide-react';
+import {
+  Building2,
+  Plus,
+  Link2,
+  LogOut,
+  Loader2,
+  ChevronRight,
+  Copy,
+} from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
+import { useClubInvite } from '../hooks/useClubInvite';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import {
   Dialog,
@@ -19,11 +29,11 @@ import {
   DialogTrigger,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { PENDING_CLUB_INVITE_KEY } from '../components/PendingInviteConsumer';
 
 const Clubs = () => {
   const { t } = useTranslation('clubs');
   const { user } = useAuth();
+  const { joinWithToken } = useClubInvite();
   const [clubs, setClubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,11 +51,11 @@ const Clubs = () => {
       setError(null);
     } catch (e) {
       console.error(e);
-      setError('No se pudieron cargar los clubes');
+      setError(t('loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -55,46 +65,11 @@ const Clubs = () => {
     const token = searchParams.get('token');
     if (!token?.trim()) return;
     (async () => {
-      try {
-        const { data } = await axios.post(`/clubs/join/${encodeURIComponent(token.trim())}`);
-        if (data?.already_member) {
-          toast.info('Ya eras miembro de este club');
-        } else {
-          toast.success('Te has unido al club');
-        }
-        navigate('/clubs', { replace: true });
-        load();
-      } catch (e) {
-        toast.error(e.response?.data?.error || 'No se pudo unir al club');
-        navigate('/clubs', { replace: true });
-      }
+      await joinWithToken(token);
+      navigate('/clubs', { replace: true });
+      load();
     })();
-  }, [searchParams, navigate, load]);
-
-  /** Invitación guardada en sessionStorage (p. ej. login tras /clubs/join sin sesión). */
-  useEffect(() => {
-    if (!user) return;
-    if (searchParams.get('token')?.trim()) return;
-
-    const stored = sessionStorage.getItem(PENDING_CLUB_INVITE_KEY)?.trim();
-    if (!stored) return;
-
-    (async () => {
-      try {
-        const { data } = await axios.post(`/clubs/join/${encodeURIComponent(stored)}`);
-        sessionStorage.removeItem(PENDING_CLUB_INVITE_KEY);
-        if (data?.already_member) {
-          toast.info('Ya eras miembro de este club');
-        } else {
-          toast.success('Te has unido al club');
-        }
-        load();
-      } catch (e) {
-        sessionStorage.removeItem(PENDING_CLUB_INVITE_KEY);
-        toast.error(e.response?.data?.error || 'No se pudo unir al club');
-      }
-    })();
-  }, [user, searchParams, load]);
+  }, [searchParams, navigate, load, joinWithToken]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -102,12 +77,12 @@ const Clubs = () => {
     try {
       setCreating(true);
       await axios.post('/clubs', { name: createName.trim() });
-      toast.success('Club creado');
+      toast.success(t('list.created'));
       setCreateOpen(false);
       setCreateName('');
       load();
     } catch (e) {
-      toast.error(e.response?.data?.error || 'Error al crear el club');
+      toast.error(e.response?.data?.error || t('list.createError'));
     } finally {
       setCreating(false);
     }
@@ -119,31 +94,51 @@ const Clubs = () => {
       const url = data.join_url || data.joinUrl;
       if (url && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
-        toast.success('Enlace de invitación copiado al portapapeles');
+        toast.success(t('invite.copied'));
       } else if (url) {
         toast.message(url);
       }
     } catch (e) {
-      toast.error(e.response?.data?.error || 'No se pudo generar la invitación');
+      toast.error(e.response?.data?.error || t('invite.error'));
     }
   };
 
   const handleLeave = async (club) => {
     if (!user?.id) {
-      toast.error('Sesión no válida');
+      toast.error(t('list.sessionError'));
       return;
     }
     if (club.owner_user_id === user.id) {
-      toast.error('Como propietario no puedes abandonar el club desde aquí.');
+      toast.error(t('list.ownerLeaveError'));
       return;
     }
     try {
       await axios.delete(`/clubs/${club.id}/members/${user.id}`);
-      toast.success('Has abandonado el club');
+      toast.success(t('list.left'));
       load();
     } catch (e) {
-      toast.error(e.response?.data?.error || 'Error al abandonar');
+      toast.error(e.response?.data?.error || t('list.leaveError'));
     }
+  };
+
+  const copyClubId = async (clubId) => {
+    try {
+      await navigator.clipboard.writeText(clubId);
+      toast.success(t('list.uuidCopied'));
+    } catch {
+      toast.error(t('list.uuidCopyError'));
+    }
+  };
+
+  const roleLabel = (club) => {
+    if (user?.id && club.owner_user_id === user.id) return t('roles.owner');
+    if (club.my_role === 'admin') return t('roles.admin');
+    return t('roles.member');
+  };
+
+  const openClub = (club, tab) => {
+    const defaultTab = tab || (club.my_role === 'admin' || club.owner_user_id === user?.id ? 'members' : 'board');
+    navigate(`/clubs/${club.id}?tab=${defaultTab}`);
   };
 
   if (loading) {
@@ -162,41 +157,37 @@ const Clubs = () => {
             <Building2 className="size-7" />
             {t('title')}
           </h1>
-          <p className="text-muted-foreground">
-            Crea un club, invita miembros y asocia competiciones. Desde cada tarjeta entras al tablón (avisos y
-            documentos) o al calendario de eventos. Para licencias multi-PC del Slot Race Manager, pega el UUID del
-            club en la configuración de licencia de la app de escritorio.
-          </p>
+          <p className="text-muted-foreground max-w-2xl">{t('list.subtitle')}</p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="size-4" />
-              Nuevo club
+              {t('create')}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <form onSubmit={handleCreate}>
               <DialogHeader>
-                <DialogTitle>Crear club</DialogTitle>
-                <DialogDescription>Nombre visible para los miembros.</DialogDescription>
+                <DialogTitle>{t('list.createTitle')}</DialogTitle>
+                <DialogDescription>{t('list.createDescription')}</DialogDescription>
               </DialogHeader>
               <div className="py-4">
-                <Label htmlFor="club-name">Nombre</Label>
+                <Label htmlFor="club-name">{t('list.nameLabel')}</Label>
                 <Input
                   id="club-name"
                   value={createName}
                   onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="Ej: Club Slot Valencia"
+                  placeholder={t('list.namePlaceholder')}
                   className="mt-2"
                 />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancelar
+                  {t('guestMembers.cancel')}
                 </Button>
                 <Button type="submit" disabled={creating || !createName.trim()}>
-                  {creating ? 'Creando…' : 'Crear'}
+                  {creating ? t('list.creating') : t('create')}
                 </Button>
               </DialogFooter>
             </form>
@@ -212,9 +203,7 @@ const Clubs = () => {
 
       {clubs.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No perteneces a ningún club. Crea uno o acepta una invitación.
-          </CardContent>
+          <CardContent className="py-12 text-center text-muted-foreground">{t('list.empty')}</CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -222,63 +211,46 @@ const Clubs = () => {
             const isOwner = user?.id && c.owner_user_id === user.id;
             const canInvite = c.my_role === 'admin' || isOwner;
             return (
-              <Card key={c.id}>
+              <Card key={c.id} className="flex flex-col">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex flex-wrap items-center gap-2">
-                    {c.name}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {isOwner ? '(propietario)' : c.my_role === 'admin' ? '(admin)' : '(miembro)'}
-                    </span>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground font-mono break-all">UUID: {c.id}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Instalaciones licencia (club): hasta {c.license_installations_max ?? 10} PCs
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-lg">{c.name}</CardTitle>
+                    <Badge variant="secondary">{roleLabel(c)}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('list.licenseHint', { max: c.license_installations_max ?? 10 })}</p>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="flex flex-col gap-3 flex-1">
+                  <Button className="w-full gap-2 justify-between" onClick={() => openClub(c)}>
+                    {t('list.openClub')}
+                    <ChevronRight className="size-4" />
+                  </Button>
                   <div className="flex flex-wrap gap-2">
-                    {canInvite ? (
-                      <Button
-                        size="sm"
-                        className="gap-1"
-                        onClick={() => navigate(`/clubs/${c.id}/members?tab=members`)}
-                      >
-                        <Users className="size-3.5" />
-                        Miembros
+                    {canInvite && (
+                      <Button variant="outline" size="sm" className="gap-1" onClick={() => handleInvite(c.id)}>
+                        <Link2 className="size-3.5" />
+                        {t('invite.action')}
                       </Button>
-                    ) : null}
+                    )}
                     <Button
-                      variant={canInvite ? 'outline' : 'default'}
+                      variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => navigate(`/clubs/${c.id}/members?tab=board`)}
+                      onClick={() => copyClubId(c.id)}
                     >
-                      <Megaphone className="size-3.5" />
-                      Tablón
+                      <Copy className="size-3.5" />
+                      {t('list.copyUuid')}
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/clubs/${c.id}/members?tab=calendar`)}>
-                      <CalendarDays className="size-3.5" />
-                      Calendario
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                  {canInvite && (
-                    <Button variant="outline" size="sm" className="gap-1" onClick={() => handleInvite(c.id)}>
-                      <Link2 className="size-3.5" />
-                      Invitar (copiar enlace)
-                    </Button>
-                  )}
-                  {!isOwner && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive gap-1"
-                      onClick={() => handleLeave(c)}
-                    >
-                      <LogOut className="size-3.5" />
-                      Abandonar
-                    </Button>
-                  )}
+                    {!isOwner && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive gap-1"
+                        onClick={() => handleLeave(c)}
+                      >
+                        <LogOut className="size-3.5" />
+                        {t('list.leave')}
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

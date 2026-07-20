@@ -5,6 +5,7 @@ import { Trophy, Clock, Car, Package, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { formatInventoryCategory } from '../utils/formatUtils';
+import { competitionDetailPath } from '../utils/competitionRoutes';
 
 const BlockCard = ({ icon: Icon, title, children, footer }) => (
   <Card className="flex flex-col h-full border-border/80 shadow-sm">
@@ -94,7 +95,7 @@ const DashboardActionBlocks = ({ data, loadError }) => {
                   : t('actionBlocks.inProgress')}
               </p>
               <Button size="sm" className="mt-1" asChild>
-                <Link to={`/competitions/${nextCompetition.id}/timings`}>
+                <Link to={competitionDetailPath(nextCompetition.id, { section: 'timings' })}>
                   {t('actionBlocks.registerTimings')}
                 </Link>
               </Button>
@@ -121,7 +122,7 @@ const DashboardActionBlocks = ({ data, loadError }) => {
               {openCompetitionTimings.map((c) => (
                 <li key={c.id} className="border-b border-border/50 last:border-0 pb-2 last:pb-0">
                   <Link
-                    to={`/competitions/${c.id}/timings`}
+                    to={competitionDetailPath(c.id, { section: 'timings' })}
                     className="font-medium text-foreground hover:underline"
                   >
                     {c.name}

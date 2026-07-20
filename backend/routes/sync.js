@@ -335,6 +335,173 @@ router.get('/timings', async (req, res) => {
   }
 });
 
+const {
+  assertGuestMemberInClub,
+  assertClubCircuit,
+  normalizeGuestTimingBody,
+  enrichGuestMembersWithLinkedEmails,
+} = require('../lib/clubGuestMembers');
+
+async function syncUserIsClubAdmin(userId, clubId) {
+  const sb = supabaseForSyncWrite();
+  const { data: owned } = await sb.from('clubs').select('id').eq('id', clubId).eq('owner_user_id', userId).maybeSingle();
+  if (owned?.id) return true;
+  const { data: mem } = await sb
+    .from('club_members')
+    .select('role')
+    .eq('club_id', clubId)
+    .eq('user_id', userId)
+    .eq('role', 'admin')
+    .maybeSingle();
+  return Boolean(mem);
+}
+
+/**
+ * GET /api/sync/clubs/admin
+ * Clubes donde el usuario autenticado (API key) es admin o propietario.
+ */
+router.get('/clubs/admin', async (req, res) => {
+  try {
+    const sb = supabaseForSyncWrite();
+    const userId = req.user.id;
+
+    const { data: owned } = await sb.from('clubs').select('id, name, slug').eq('owner_user_id', userId);
+    const { data: adminMemberships } = await sb
+      .from('club_members')
+      .select('club_id, clubs ( id, name, slug )')
+      .eq('user_id', userId)
+      .eq('role', 'admin');
+
+    const byId = new Map();
+    for (const c of owned || []) {
+      byId.set(c.id, { id: c.id, name: c.name, slug: c.slug });
+    }
+    for (const m of adminMemberships || []) {
+      const c = m.clubs;
+      if (c?.id && !byId.has(c.id)) {
+        byId.set(c.id, { id: c.id, name: c.name, slug: c.slug });
+      }
+    }
+
+    res.json({ clubs: [...byId.values()] });
+  } catch (error) {
+    console.error('GET /api/sync/clubs/admin', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+});
+
+/**
+ * GET /api/sync/clubs/:id/circuits
+ * Circuitos del club (admin) para grabar sesiones de invitados.
+ */
+router.get('/clubs/:id/circuits', async (req, res) => {
+  try {
+    const clubId = req.params.id;
+    const sb = supabaseForSyncWrite();
+    const admin = await syncUserIsClubAdmin(req.user.id, clubId);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const { data, error } = await sb
+      .from('circuits')
+      .select('id, name, description, num_lanes, lane_lengths')
+      .eq('club_id', clubId)
+      .order('name', { ascending: true });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ circuits: data || [] });
+  } catch (error) {
+    console.error('GET /api/sync/clubs/:id/circuits', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+});
+
+/**
+ * GET /api/sync/clubs/:id/guest-members
+ */
+router.get('/clubs/:id/guest-members', async (req, res) => {
+  try {
+    const clubId = req.params.id;
+    const sb = supabaseForSyncWrite();
+    const admin = await syncUserIsClubAdmin(req.user.id, clubId);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const { data: rows, error } = await sb
+      .from('club_guest_members')
+      .select('id, club_id, name, email, linked_user_id, created_at')
+      .eq('club_id', clubId)
+      .order('name', { ascending: true });
+
+    if (error) return res.status(500).json({ error: error.message });
+    const guests = await enrichGuestMembersWithLinkedEmails(sb, rows || []);
+    res.json({ guest_members: guests });
+  } catch (error) {
+    console.error('GET /api/sync/clubs/:id/guest-members', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+});
+
+/**
+ * POST /api/sync/clubs/:id/guest-members/:guestId/timings
+ * Registra una sesión de entrenamiento para un miembro invitado (desde Slot Lap Timer).
+ */
+router.post('/clubs/:id/guest-members/:guestId/timings', async (req, res) => {
+  try {
+    const { id: clubId, guestId } = req.params;
+    const sb = supabaseForSyncWrite();
+    const admin = await syncUserIsClubAdmin(req.user.id, clubId);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const guest = await assertGuestMemberInClub(sb, clubId, guestId);
+    if (!guest) return res.status(404).json({ error: 'Miembro invitado no encontrado' });
+
+    const circuitId = req.body.circuit_id;
+    if (!circuitId) return res.status(400).json({ error: 'circuit_id es obligatorio' });
+
+    const circuitCheck = await assertClubCircuit(sb, clubId, circuitId);
+    if (!circuitCheck.ok) return res.status(400).json({ error: circuitCheck.error });
+
+    let vehicleModel = req.body.vehicle_model;
+    let vehicleType = req.body.vehicle_type;
+    if (req.body.vehicle_id && (!vehicleModel || !vehicleType)) {
+      const { data: vehicle } = await sb
+        .from('vehicles')
+        .select('model, type')
+        .eq('id', req.body.vehicle_id)
+        .maybeSingle();
+      if (vehicle) {
+        vehicleModel = vehicleModel || vehicle.model;
+        vehicleType = vehicleType || vehicle.type;
+      }
+    }
+
+    const normalized = normalizeGuestTimingBody(
+      {
+        ...req.body,
+        vehicle_model: vehicleModel,
+        vehicle_type: vehicleType,
+      },
+      { source: 'app', enteredBy: req.user.id },
+    );
+    if (normalized.error) return res.status(400).json({ error: normalized.error });
+
+    const { data, error } = await sb
+      .from('club_guest_timings')
+      .insert({
+        club_id: clubId,
+        guest_member_id: guestId,
+        ...normalized.row,
+      })
+      .select('*')
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('POST /api/sync/clubs/:id/guest-members/:guestId/timings', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+});
+
 const syncCompetitionsRoute = require('./syncCompetitions');
 router.use(syncCompetitionsRoute);
 

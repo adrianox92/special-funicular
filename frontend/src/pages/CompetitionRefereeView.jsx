@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import CompetitionRefereePanel from '../components/CompetitionRefereePanel';
+import { competitionDetailPath } from '../utils/competitionRoutes';
 
 const CompetitionRefereeView = () => {
   const { id } = useParams();
@@ -91,7 +92,7 @@ const CompetitionRefereeView = () => {
           <AlertTriangle className="size-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button variant="outline" className="mt-4" onClick={() => navigate(`/competitions/${id}/timings`)}>
+        <Button variant="outline" className="mt-4" onClick={() => navigate(competitionDetailPath(id, { section: 'timings' }))}>
           Volver a tiempos
         </Button>
       </div>
@@ -104,7 +105,7 @@ const CompetitionRefereeView = () => {
         <Alert>
           <AlertDescription>No tienes permiso para usar el modo árbitro en esta competición.</AlertDescription>
         </Alert>
-        <Button variant="outline" onClick={() => navigate(`/competitions/${id}/timings`)}>
+        <Button variant="outline" onClick={() => navigate(competitionDetailPath(id, { section: 'timings' }))}>
           <ArrowLeft className="size-4 mr-2" />
           Volver
         </Button>
@@ -118,7 +119,7 @@ const CompetitionRefereeView = () => {
         <Alert>
           <AlertDescription>Añade participantes antes de registrar tiempos.</AlertDescription>
         </Alert>
-        <Button variant="outline" onClick={() => navigate(`/competitions/${id}/participants`)}>
+        <Button variant="outline" onClick={() => navigate(competitionDetailPath(id))}>
           Ir a participantes
         </Button>
       </div>
@@ -134,7 +135,7 @@ const CompetitionRefereeView = () => {
       setRound={setRound}
       onReload={loadCompetitionData}
       apiRequest={apiRequest}
-      onBack={() => navigate(`/competitions/${id}/timings`)}
+      onBack={() => navigate(competitionDetailPath(id, { section: 'timings' }))}
       showBackButton
     />
   );

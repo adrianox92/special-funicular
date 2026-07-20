@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Trophy, Users, Calendar, Flag, CheckCircle, AlertTriangle, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
 import axios from '../lib/axios';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { resolveRegulationLink } from '../utils/competitionRegulation';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
@@ -25,6 +26,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { Spinner } from '../components/ui/spinner';
+import CollectionVehiclePicker from '../components/CollectionVehiclePicker';
 
 const headerImgClass =
   'h-9 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:max-w-[16rem]';
@@ -94,6 +96,7 @@ const CompetitionSignup = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { user } = useAuth();
 
   const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
     theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
@@ -107,12 +110,15 @@ const CompetitionSignup = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [signupResult, setSignupResult] = useState(null);
   const [status, setStatus] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
+  const [vehicleSource, setVehicleSource] = useState('text'); // 'own' | 'text'
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     category_id: '',
-    vehicle: ''
+    vehicle: '',
+    vehicle_id: '',
   });
 
   const loadCompetition = async () => {
@@ -139,6 +145,37 @@ const CompetitionSignup = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
+  useEffect(() => {
+    if (!user?.id) {
+      setVehicles([]);
+      setVehicleSource('text');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get('/competitions/vehicles');
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        setVehicles(list);
+        setVehicleSource(list.length > 0 ? 'own' : 'text');
+        setFormData((prev) => ({
+          ...prev,
+          name: prev.name || user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+          email: prev.email || user.email || '',
+        }));
+      } catch {
+        if (!cancelled) {
+          setVehicles([]);
+          setVehicleSource('text');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.email, user?.user_metadata?.full_name]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -153,20 +190,35 @@ const CompetitionSignup = () => {
       setSubmitError('Debes seleccionar una categoría');
       return;
     }
-    if (!formData.vehicle.trim()) {
+    const useOwnVehicle = Boolean(user?.id) && vehicleSource === 'own';
+    if (useOwnVehicle && !formData.vehicle_id) {
+      setSubmitError('Selecciona un vehículo de tu colección');
+      return;
+    }
+    if (!useOwnVehicle && !formData.vehicle.trim()) {
       setSubmitError('El vehículo es requerido');
       return;
     }
     try {
       setSubmitting(true);
       setSubmitError(null);
-      const res = await axios.post(`/public-signup/${slug}/signup`, formData);
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        category_id: formData.category_id,
+      };
+      if (useOwnVehicle) {
+        payload.vehicle_id = formData.vehicle_id;
+      } else {
+        payload.vehicle = formData.vehicle.trim();
+      }
+      const res = await axios.post(`/public-signup/${slug}/signup`, payload);
       setSignupResult({
         waitlisted: Boolean(res.data?.waitlisted),
         position: res.data?.waitlist_position ?? null,
       });
       setShowSuccessModal(true);
-      setFormData({ name: '', email: '', category_id: '', vehicle: '' });
+      setFormData({ name: '', email: '', category_id: '', vehicle: '', vehicle_id: '' });
     } catch (err) {
       console.error('Error al enviar inscripción:', err);
       setSubmitError(err.response?.data?.error || 'Error al enviar la inscripción');
@@ -430,14 +482,70 @@ const CompetitionSignup = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="vehicle">Vehículo con el que competirás *</Label>
-                    <Input
-                      id="vehicle"
-                      value={formData.vehicle}
-                      onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
-                      placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
-                      required
-                    />
-                    <p className="text-sm text-muted-foreground">Especifica el modelo y marca de tu vehículo</p>
+                    {user?.id ? (
+                      <>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="signupVehicleSource"
+                              checked={vehicleSource === 'own'}
+                              onChange={() => setVehicleSource('own')}
+                              className="rounded-full"
+                            />
+                            De mi colección
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="signupVehicleSource"
+                              checked={vehicleSource === 'text'}
+                              onChange={() => setVehicleSource('text')}
+                              className="rounded-full"
+                            />
+                            Otro (texto)
+                          </label>
+                        </div>
+                        {vehicleSource === 'own' ? (
+                          vehicles.length > 0 ? (
+                            <CollectionVehiclePicker
+                              id="vehicle"
+                              vehicles={vehicles}
+                              value={formData.vehicle_id}
+                              onChange={(v) => setFormData({ ...formData, vehicle_id: v })}
+                            />
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              No tienes vehículos en tu colección. Cambia a «Otro (texto)» para escribir un modelo.
+                            </p>
+                          )
+                        ) : (
+                          <Input
+                            id="vehicle"
+                            value={formData.vehicle}
+                            onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
+                            placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Input
+                          id="vehicle"
+                          value={formData.vehicle}
+                          onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
+                          placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
+                          required
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Especifica el modelo y marca de tu vehículo.{' '}
+                          <Link to="/login" className="underline">
+                            Inicia sesión
+                          </Link>{' '}
+                          para elegir uno de tu colección.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <Button

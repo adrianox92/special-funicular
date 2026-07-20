@@ -19,10 +19,13 @@ import LeagueSignup from './pages/LeagueSignup';
 import LeagueStandings from './pages/LeagueStandings';
 import Clubs from './pages/Clubs';
 import ClubMembers from './pages/ClubMembers';
+import ClubLegacyMembersRedirect from './components/ClubLegacyMembersRedirect';
 import PendingInviteConsumer from './components/PendingInviteConsumer';
 import Circuits from './pages/Circuits';
 import Inventory from './pages/Inventory';
 import CompetitionParticipants from './pages/CompetitionParticipants';
+import CompetitionDetail from './pages/CompetitionDetail';
+import CompetitionLegacyRedirect from './components/CompetitionLegacyRedirect';
 import FavoritePilots from './pages/FavoritePilots';
 import CompetitionTimings from './pages/CompetitionTimings';
 import CompetitionRefereeView from './pages/CompetitionRefereeView';
@@ -478,7 +481,7 @@ const AppContent = () => {
         />
 
         <Route
-          path="/clubs/:id/members"
+          path="/clubs/:id"
           element={
             <PrivateRoute>
               <AuthedShell>
@@ -488,15 +491,27 @@ const AppContent = () => {
           }
         />
 
+        <Route path="/clubs/:id/members" element={<ClubLegacyMembersRedirect />} />
+
         <Route
-          path="/competitions/:id/participants"
+          path="/competitions/:id"
           element={
             <PrivateRoute>
               <AuthedShell>
-                <CompetitionParticipants />
+                <CompetitionDetail />
               </AuthedShell>
             </PrivateRoute>
           }
+        />
+
+        <Route
+          path="/competitions/:id/participants"
+          element={<CompetitionLegacyRedirect section="setup" />}
+        />
+
+        <Route
+          path="/competitions/:id/timings"
+          element={<CompetitionLegacyRedirect section="timings" />}
         />
 
         <Route
@@ -516,17 +531,6 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <CompetitionRefereeView />
-              </AuthedShell>
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/competitions/:id/timings"
-          element={
-            <PrivateRoute>
-              <AuthedShell>
-                <CompetitionTimings />
               </AuthedShell>
             </PrivateRoute>
           }

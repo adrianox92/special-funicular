@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Trophy } from 'lucide-react';
 import axios from '../lib/axios';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -27,6 +28,7 @@ import { VEHICLE_TYPES } from '../data/vehicleTypes';
  *   Si publicSlug está definido, usa endpoints públicos (sin auth).
  */
 const ClubCircuitLeaderboard = ({ clubId, circuitId, circuits = [], publicSlug }) => {
+  const { t } = useTranslation('clubs');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lane, setLane] = useState('all');
@@ -151,18 +153,27 @@ const ClubCircuitLeaderboard = ({ clubId, circuitId, circuits = [], publicSlug }
             </TableHeader>
             <TableBody>
               {entries.map((row) => (
-                <TableRow key={row.user_id}>
+                <TableRow key={row.guest_member_id || row.user_id || row.rank}>
                   <TableCell>
                     <Badge variant={row.rank <= 3 ? 'default' : 'outline'}>{row.rank}</Badge>
                   </TableCell>
                   <TableCell className="font-medium">
-                    {row.pilot_slug ? (
-                      <Link to={`/pilot/${row.pilot_slug}`} className="hover:underline">
-                        {row.display_name || 'Piloto'}
-                      </Link>
-                    ) : (
-                      row.display_name || `Piloto ${String(row.user_id).slice(0, 8)}…`
-                    )}
+                    <span className="inline-flex items-center gap-2 flex-wrap">
+                      {row.is_guest ? (
+                        <>
+                          <span>{row.display_name || t('guestMembers.guestMember')}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {t('guestMembers.guestBadge')}
+                          </Badge>
+                        </>
+                      ) : row.pilot_slug ? (
+                        <Link to={`/pilot/${row.pilot_slug}`} className="hover:underline">
+                          {row.display_name || 'Piloto'}
+                        </Link>
+                      ) : (
+                        row.display_name || `Piloto ${String(row.user_id).slice(0, 8)}…`
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell className="font-mono">{row.best_lap_time}</TableCell>
                   <TableCell>{row.lane || '—'}</TableCell>
