@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Users, Calendar, Trophy, Flag, Clock, Star, ChevronDown, ChevronUp, Link2, ChevronRight } from 'lucide-react';
+import { Plus, Users, Calendar, Trophy, Flag, Star, ChevronDown, ChevronUp, Link2, ChevronRight } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';

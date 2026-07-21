@@ -208,6 +208,7 @@ app.use('/api/public-leagues', publicSignupLimiter, publicLeaguesRoute);
 const vehiclesRoute = require('./routes/vehicles');
 const timingsRoute = require('./routes/timings');
 const dashboardRoute = require('./routes/dashboard');
+const onboardingRoute = require('./routes/onboarding');
 const authRoute = require('./routes/auth');
 const competitionRulesRoute = require('./routes/competition-rules');
 const apiKeysRoute = require('./routes/api-keys');
@@ -234,6 +235,7 @@ const adminLapTimerLicensesRoute = require('./routes/adminLapTimerLicenses');
 app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
+app.use('/api/onboarding', onboardingRoute);
 app.use('/api/sync', syncRoute);
 app.use('/api/auth', authSoftLimiter, authRoute);
 // Webhook RevenueCat: montado ANTES de /api/license + apiKeyAuth.

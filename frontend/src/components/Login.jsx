@@ -63,7 +63,7 @@ const Login = () => {
     try {
       if (activeTab === 'login') {
         await login(formData.email, formData.password);
-        navigate('/vehicles');
+        navigate('/dashboard');
       } else {
         if (formData.password !== formData.confirmPassword) {
           throw new Error(t('passwordMismatch'));

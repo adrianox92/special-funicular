@@ -1,0 +1,11 @@
+{
+  "title": "Primeros pasos",
+  "progress": "{{done}}/{{total}} completados",
+  "steps": {
+    "vehicle": "Añadir tu primer vehículo",
+    "circuit": "Crear tu primer circuito",
+    "timing": "Registrar tu primer tiempo"
+  },
+  "cta": "Continuar",
+  "dismiss": "Ocultar checklist"
+}

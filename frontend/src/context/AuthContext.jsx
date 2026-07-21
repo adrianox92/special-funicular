@@ -62,6 +62,13 @@ export const AuthProvider = ({ children }) => {
     if (error) throw error;
   };
 
+  const refreshUser = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    setUser(session?.user ?? null);
+  };
+
   const value = {
     user,
     loading,
@@ -69,6 +76,7 @@ export const AuthProvider = ({ children }) => {
     loginWithGoogle,
     logout,
     requestPasswordReset,
+    refreshUser,
   };
 
   return (

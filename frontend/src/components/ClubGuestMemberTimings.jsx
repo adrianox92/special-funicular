@@ -55,7 +55,7 @@ const emptyTimingForm = () => ({
 
 const ClubGuestMemberTimings = ({ clubId, guestMember, open, onOpenChange, circuits = [] }) => {
   const { t } = useTranslation('clubs');
-  const gt = (key, opts) => t(`guestTimings.${key}`, opts);
+  const gt = useCallback((key, opts) => t(`guestTimings.${key}`, opts), [t]);
 
   const [timings, setTimings] = useState([]);
   const [loading, setLoading] = useState(false);

@@ -23,11 +23,9 @@ import ClubLegacyMembersRedirect from './components/ClubLegacyMembersRedirect';
 import PendingInviteConsumer from './components/PendingInviteConsumer';
 import Circuits from './pages/Circuits';
 import Inventory from './pages/Inventory';
-import CompetitionParticipants from './pages/CompetitionParticipants';
 import CompetitionDetail from './pages/CompetitionDetail';
 import CompetitionLegacyRedirect from './components/CompetitionLegacyRedirect';
 import FavoritePilots from './pages/FavoritePilots';
-import CompetitionTimings from './pages/CompetitionTimings';
 import CompetitionRefereeView from './pages/CompetitionRefereeView';
 import PublicRefereeView from './pages/PublicRefereeView';
 import CompetitionSignup from './pages/CompetitionSignup';
@@ -75,9 +73,11 @@ import i18n from './i18n';
 import { useTranslation } from 'react-i18next';
 import { stripLocalePrefix } from './i18n/localeUtils';
 import LocalePrefixRedirect from './components/LocalePrefixRedirect';
+import OnboardingChecklistBanner from './components/OnboardingChecklistBanner';
 
 const PageLayout = ({ children }) => (
   <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
+    <OnboardingChecklistBanner />
     {children}
   </div>
 );
