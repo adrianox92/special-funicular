@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown, Calendar, Flag } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
@@ -100,6 +101,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { t } = useTranslation('competitions');
 
   const [competition, setCompetition] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -146,6 +148,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [favoritesSelection, setFavoritesSelection] = useState({});
   const [favoritesCategoryId, setFavoritesCategoryId] = useState('');
+  const [guestMembers, setGuestMembers] = useState([]);
+  const [showGuestsModal, setShowGuestsModal] = useState(false);
+  const [guestsSelection, setGuestsSelection] = useState({});
+  const [guestsCategoryId, setGuestsCategoryId] = useState('');
+  const [selectedGuestId, setSelectedGuestId] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState(null);
   const [startOrderSavingId, setStartOrderSavingId] = useState(null);
@@ -292,6 +299,20 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     }
   }, []);
 
+  const loadGuestMembers = useCallback(async (clubId) => {
+    if (!clubId) {
+      setGuestMembers([]);
+      return;
+    }
+    try {
+      const response = await axios.get(`/clubs/${clubId}/guest-members`);
+      setGuestMembers(Array.isArray(response.data?.guest_members) ? response.data.guest_members : []);
+    } catch (err) {
+      console.error('Error al cargar miembros invitados:', err);
+      setGuestMembers([]);
+    }
+  }, []);
+
   const loadVehicles = useCallback(async (garageUserId) => {
     try {
       const response = await axios.get('/competitions/vehicles', {
@@ -316,11 +337,21 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       // Organizador: garaje propio (o el del organizador si es admin de licencia).
       loadVehicles(competition.organizer);
       loadFavorites(competition.organizer);
+      if (competition.club_id) {
+        loadGuestMembers(competition.club_id);
+      } else {
+        setGuestMembers([]);
+      }
     } else {
       // Miembro: su propia colección para inscribirse.
       loadVehicles();
     }
-  }, [competition?.organizer, user, loadVehicles, loadFavorites]);
+  }, [competition?.organizer, competition?.club_id, user, loadVehicles, loadFavorites, loadGuestMembers]);
+
+  const eligibleGuestMembers = useMemo(
+    () => (guestMembers || []).filter((guest) => !guest.linked_user_id),
+    [guestMembers],
+  );
 
   const handleAddParticipant = useCallback(async (e) => {
     e.preventDefault();
@@ -387,6 +418,57 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       return;
     }
 
+    if (participantType === 'club_guest') {
+      if (!selectedGuestId) {
+        setAddError(t('guestMembers.selectGuestRequired'));
+        return;
+      }
+      const guest = eligibleGuestMembers.find((g) => g.id === selectedGuestId);
+      if (!guest) {
+        setAddError(t('guestMembers.selectGuestRequired'));
+        return;
+      }
+      const vehicleSource = addForm.vehicle_id ? 'own' : addForm.vehicle_model.trim() ? 'text' : null;
+      if (!vehicleSource) {
+        setAddError(t('guestMembers.vehicleRequired'));
+        return;
+      }
+      try {
+        setAdding(true);
+        setAddError(null);
+        const item = {
+          guest_member_id: selectedGuestId,
+          category_id: addForm.category_id,
+          vehicle_source: vehicleSource,
+        };
+        if (vehicleSource === 'own') item.vehicle_id = addForm.vehicle_id;
+        if (vehicleSource === 'text') item.vehicle_model = addForm.vehicle_model.trim();
+        const response = await axios.post(
+          `/competitions/${competitionId}/participants/bulk-from-guest-members`,
+          { items: [item] },
+        );
+        const created = response.data?.created?.length || 0;
+        const skipped = response.data?.skipped || [];
+        if (created > 0) {
+          toast.success(t('guestMembers.addedSuccess'));
+        } else if (skipped.length > 0) {
+          setAddError(skipped[0].reason || t('guestMembers.bulkSkippedWarning', { count: 1 }));
+          return;
+        }
+        setShowAddModal(false);
+        setAddForm({ vehicle_id: '', driver_name: '', vehicle_model: '', category_id: '' });
+        setParticipantType('own');
+        setSelectedGuestId('');
+        loadCompetition();
+      } catch (err) {
+        console.error('Error al añadir miembro invitado:', err);
+        setAddError(err.response?.data?.error || t('guestMembers.createBulkError'));
+      } finally {
+        setAdding(false);
+      }
+      return;
+    }
+
     if (!addForm.driver_name.trim()) {
       setAddError('El nombre del piloto es requerido');
       return;
@@ -423,7 +505,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     } finally {
       setAdding(false);
     }
-  }, [addForm, participantType, selectedFavoriteId, favorites, competitionId, loadCompetition]);
+  }, [addForm, participantType, selectedFavoriteId, selectedGuestId, favorites, eligibleGuestMembers, competitionId, loadCompetition, t]);
 
   const handleEditParticipant = useCallback(async (e) => {
     e.preventDefault();
@@ -529,6 +611,14 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     return set;
   }, [participants]);
 
+  const usedGuestMemberIds = useMemo(() => {
+    const set = new Set();
+    (participants || []).forEach((p) => {
+      if (p.from_guest_member_id) set.add(p.from_guest_member_id);
+    });
+    return set;
+  }, [participants]);
+
   const openFavoritesModal = useCallback(() => {
     const defaultCat = competition?.categories?.[0]?.id || '';
     setFavoritesCategoryId(defaultCat ? String(defaultCat) : '');
@@ -607,6 +697,84 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       setBulkSaving(false);
     }
   }, [competitionId, favoritesSelection, favoritesCategoryId, loadCompetition]);
+
+  const openGuestsModal = useCallback(() => {
+    const defaultCat = competition?.categories?.[0]?.id || '';
+    setGuestsCategoryId(defaultCat ? String(defaultCat) : '');
+    const sel = {};
+    (eligibleGuestMembers || []).forEach((guest) => {
+      if (!usedGuestMemberIds.has(guest.id)) {
+        sel[guest.id] = {
+          checked: false,
+          vehicle_source: 'text',
+          vehicle_id: '',
+          vehicle_model: '',
+        };
+      }
+    });
+    setGuestsSelection(sel);
+    setBulkError(null);
+    setShowGuestsModal(true);
+  }, [competition?.categories, eligibleGuestMembers, usedGuestMemberIds]);
+
+  const toggleGuestCheck = useCallback((guestId) => {
+    setGuestsSelection((prev) => ({
+      ...prev,
+      [guestId]: { ...prev[guestId], checked: !prev[guestId]?.checked },
+    }));
+  }, []);
+
+  const updateGuestBulkRow = useCallback((guestId, patch) => {
+    setGuestsSelection((prev) => ({
+      ...prev,
+      [guestId]: { ...prev[guestId], ...patch },
+    }));
+  }, []);
+
+  const handleBulkAddFromGuests = useCallback(async () => {
+    const items = [];
+    for (const [guestId, cfg] of Object.entries(guestsSelection)) {
+      if (!cfg?.checked) continue;
+      items.push({
+        guest_member_id: guestId,
+        category_id: guestsCategoryId,
+        vehicle_source: cfg.vehicle_source,
+        vehicle_id: cfg.vehicle_source === 'own' ? cfg.vehicle_id : undefined,
+        vehicle_model: cfg.vehicle_source === 'text' ? cfg.vehicle_model : undefined,
+      });
+    }
+    if (items.length === 0) {
+      setBulkError(t('guestMembers.selectAtLeastOne'));
+      return;
+    }
+    if (!guestsCategoryId) {
+      setBulkError(t('guestMembers.selectCategory'));
+      return;
+    }
+    try {
+      setBulkSaving(true);
+      setBulkError(null);
+      const response = await axios.post(
+        `/competitions/${competitionId}/participants/bulk-from-guest-members`,
+        { items },
+      );
+      const created = response.data?.created?.length || 0;
+      const skipped = response.data?.skipped || [];
+      if (created > 0) {
+        toast.success(t('guestMembers.bulkAddedSuccess', { count: created }));
+      }
+      if (skipped.length > 0) {
+        toast.warning(t('guestMembers.bulkSkippedWarning', { count: skipped.length }));
+      }
+      setShowGuestsModal(false);
+      loadCompetition();
+    } catch (err) {
+      console.error('Error alta masiva miembros invitados:', err);
+      setBulkError(err.response?.data?.error || t('guestMembers.createBulkError'));
+    } finally {
+      setBulkSaving(false);
+    }
+  }, [competitionId, guestsSelection, guestsCategoryId, loadCompetition, t]);
 
   const confirmDeleteParticipant = useCallback(async () => {
     if (!deleteConfirm.participantId) return;
@@ -1146,6 +1314,24 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                     <Badge variant="secondary" className="ml-2">{favorites.length}</Badge>
                   )}
                 </Button>
+                {competition.club_id && (
+                  <Button
+                    variant="outline"
+                    onClick={openGuestsModal}
+                    disabled={
+                      participantsFull
+                      || !competition.categories
+                      || competition.categories.length === 0
+                      || eligibleGuestMembers.length === 0
+                    }
+                  >
+                    <Users className="size-4 mr-2" />
+                    {t('guestMembers.addFromClub')}
+                    {eligibleGuestMembers.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{eligibleGuestMembers.length}</Badge>
+                    )}
+                  </Button>
+                )}
                 <Button
                   onClick={() => setShowAddModal(true)}
                   disabled={participantsFull || !competition.categories || competition.categories.length === 0}
@@ -1477,6 +1663,152 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         </DialogContent>
       </Dialog>
 
+      {/* Modal: añadir desde miembros del club sin cuenta */}
+      <Dialog
+        open={showGuestsModal}
+        onOpenChange={(open) => {
+          setShowGuestsModal(open);
+          if (!open) setBulkError(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('guestMembers.addModalTitle')}</DialogTitle>
+            <DialogDescription>{t('guestMembers.addModalDescription')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {bulkError && (
+              <Alert variant="destructive">
+                <AlertDescription>{bulkError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label>{t('guestMembers.categoryLabel')}</Label>
+              <Select value={guestsCategoryId} onValueChange={setGuestsCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('guestMembers.selectCategory')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(competition?.categories || []).map((cat) => (
+                    <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {eligibleGuestMembers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {t('guestMembers.empty')}{' '}
+                {competition?.club_id && (
+                  <Link to={`/clubs/${competition.club_id}`} className="underline">
+                    {t('guestMembers.emptyManageLink')}
+                  </Link>
+                )}
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                {eligibleGuestMembers.map((guest) => {
+                  const already = usedGuestMemberIds.has(guest.id);
+                  const cfg = guestsSelection[guest.id];
+                  return (
+                    <div key={guest.id} className="border rounded-md p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={!!cfg?.checked}
+                          disabled={already}
+                          onChange={() => toggleGuestCheck(guest.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{guest.name}</span>
+                            {already && (
+                              <Badge variant="outline" className="text-xs">{t('guestMembers.alreadyAdded')}</Badge>
+                            )}
+                          </div>
+                          {guest.email && (
+                            <div className="text-xs text-muted-foreground">{guest.email}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {cfg?.checked && !already && (
+                        <div className="pl-6 space-y-2">
+                          <div className="flex flex-wrap gap-3 text-xs">
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`bulk-guest-src-${guest.id}`}
+                                checked={cfg.vehicle_source === 'own'}
+                                onChange={() => updateGuestBulkRow(guest.id, { vehicle_source: 'own' })}
+                              />
+                              {t('guestMembers.vehicleCollection')}
+                            </label>
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`bulk-guest-src-${guest.id}`}
+                                checked={cfg.vehicle_source === 'text'}
+                                onChange={() => updateGuestBulkRow(guest.id, { vehicle_source: 'text' })}
+                              />
+                              {t('guestMembers.vehicleText')}
+                            </label>
+                          </div>
+                          {cfg.vehicle_source === 'own' && (
+                            <Select
+                              value={cfg.vehicle_id}
+                              onValueChange={(v) => updateGuestBulkRow(guest.id, { vehicle_id: v })}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder={t('guestMembers.vehicleLabel')} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {vehicles.map((v) => (
+                                  <SelectItem key={v.id} value={String(v.id)}>
+                                    {v.manufacturer} {v.model} ({v.type})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          {cfg.vehicle_source === 'text' && (
+                            <Input
+                              value={cfg.vehicle_model}
+                              onChange={(e) => updateGuestBulkRow(guest.id, { vehicle_model: e.target.value })}
+                              placeholder={t('guestMembers.vehicleTextPlaceholder')}
+                              className="h-8 text-sm"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowGuestsModal(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleBulkAddFromGuests} disabled={bulkSaving}>
+              {bulkSaving ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  {t('guestMembers.adding')}
+                </>
+              ) : (
+                t('guestMembers.addSelected')
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal Añadir */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent>
@@ -1535,6 +1867,25 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                       Favorito
                     </span>
                   </label>
+                  {competition?.club_id && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="participantType"
+                        checked={participantType === 'club_guest'}
+                        onChange={() => {
+                          setParticipantType('club_guest');
+                          setSelectedFavoriteId('');
+                        }}
+                        className="rounded-full"
+                        disabled={eligibleGuestMembers.length === 0}
+                      />
+                      <span className="flex items-center gap-1">
+                        <Users className="size-3" />
+                        {t('guestMembers.participantType')}
+                      </span>
+                    </label>
+                  )}
                 </div>
               </div>
 
@@ -1625,6 +1976,77 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                           value={addForm.vehicle_model}
                           onChange={(e) => setAddForm({ ...addForm, vehicle_model: e.target.value })}
                           placeholder="O escribe un modelo (si el favorito no tiene vehículo por defecto)"
+                        />
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : participantType === 'club_guest' ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>{t('guestMembers.selectGuest')} *</Label>
+                    <Select
+                      value={selectedGuestId}
+                      onValueChange={(v) => {
+                        setSelectedGuestId(v);
+                        const guest = eligibleGuestMembers.find((g) => g.id === v);
+                        if (guest) {
+                          setAddForm((prev) => ({
+                            ...prev,
+                            driver_name: guest.name,
+                            vehicle_id: '',
+                            vehicle_model: '',
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('guestMembers.selectGuest')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {eligibleGuestMembers.map((guest) => (
+                          <SelectItem
+                            key={guest.id}
+                            value={guest.id}
+                            disabled={usedGuestMemberIds.has(guest.id)}
+                          >
+                            {guest.name}{usedGuestMemberIds.has(guest.id) ? ` (${t('guestMembers.alreadyAdded').toLowerCase()})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedGuestId && (
+                    <div className="space-y-2">
+                      <Label>{t('guestMembers.vehicleLabel')} *</Label>
+                      <Select
+                        value={addForm.vehicle_id || 'none'}
+                        onValueChange={(v) =>
+                          setAddForm({
+                            ...addForm,
+                            vehicle_id: v === 'none' ? '' : v,
+                            vehicle_model: v === 'none' ? addForm.vehicle_model : '',
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('guestMembers.vehicleCollection')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">{t('guestMembers.vehicleText')}</SelectItem>
+                          {vehicles.map((v) => (
+                            <SelectItem key={v.id} value={String(v.id)}>
+                              {v.manufacturer} {v.model} ({v.type})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!addForm.vehicle_id && (
+                        <Input
+                          value={addForm.vehicle_model}
+                          onChange={(e) => setAddForm({ ...addForm, vehicle_model: e.target.value })}
+                          placeholder={t('guestMembers.vehicleTextPlaceholder')}
                         />
                       )}
                     </div>

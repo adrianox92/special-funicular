@@ -85,6 +85,9 @@ const Competitions = () => {
   const [favorites, setFavorites] = useState([]);
   const [favoritesExpanded, setFavoritesExpanded] = useState(false);
   const [selectedFavorites, setSelectedFavorites] = useState({});
+  const [guestMembers, setGuestMembers] = useState([]);
+  const [guestsExpanded, setGuestsExpanded] = useState(false);
+  const [selectedGuests, setSelectedGuests] = useState({});
   const [defaultCategoryName, setDefaultCategoryName] = useState('General');
 
   const [debugOrganizerId, setDebugOrganizerId] = useState(null);
@@ -150,6 +153,20 @@ const Competitions = () => {
     }
   };
 
+  const loadGuestMembers = async (clubId) => {
+    if (!clubId) {
+      setGuestMembers([]);
+      return;
+    }
+    try {
+      const response = await axios.get(`/clubs/${clubId}/guest-members`);
+      setGuestMembers(Array.isArray(response.data?.guest_members) ? response.data.guest_members : []);
+    } catch (err) {
+      console.error('Error al cargar miembros invitados:', err);
+      setGuestMembers([]);
+    }
+  };
+
   const patchCompetitionStatus = async (competitionId, status) => {
     try {
       await axios.patch(`/competitions/${competitionId}/status`, { status });
@@ -186,6 +203,11 @@ const Competitions = () => {
 
   useEffect(() => {
     loadClubCircuits(createForm.club_id || null);
+    loadGuestMembers(createForm.club_id || null);
+    if (!createForm.club_id) {
+      setSelectedGuests({});
+      setGuestsExpanded(false);
+    }
   }, [createForm.club_id]);
 
   const circuitOptions = buildCompetitionCircuitOptions(
@@ -219,6 +241,31 @@ const Competitions = () => {
     }));
   };
 
+  const eligibleGuestMembers = (guestMembers || []).filter((guest) => !guest.linked_user_id);
+
+  const toggleGuestSelection = (guestId) => {
+    setSelectedGuests((prev) => {
+      const next = { ...prev };
+      if (next[guestId]) {
+        delete next[guestId];
+      } else {
+        next[guestId] = {
+          vehicle_source: 'text',
+          vehicle_id: '',
+          vehicle_model: '',
+        };
+      }
+      return next;
+    });
+  };
+
+  const updateGuestSelection = (guestId, patch) => {
+    setSelectedGuests((prev) => ({
+      ...prev,
+      [guestId]: { ...prev[guestId], ...patch },
+    }));
+  };
+
   const handleCreateCompetition = async (e) => {
     e.preventDefault();
 
@@ -238,8 +285,15 @@ const Competitions = () => {
     }
 
     const favoriteItems = Object.entries(selectedFavorites);
-    if (favoriteItems.length > parseInt(createForm.num_slots || '0', 10)) {
-      setCreateError(`Has seleccionado ${favoriteItems.length} favoritos pero solo tienes ${createForm.num_slots} plazas`);
+    const guestItems = Object.entries(selectedGuests);
+    const totalQuickAdd = favoriteItems.length + guestItems.length;
+    if (totalQuickAdd > parseInt(createForm.num_slots || '0', 10)) {
+      setCreateError(
+        t('guestMembers.slotsExceeded', {
+          total: totalQuickAdd,
+          slots: createForm.num_slots,
+        }),
+      );
       return;
     }
 
@@ -267,7 +321,7 @@ const Competitions = () => {
 
       const competitionId = response.data.id;
 
-      if (favoriteItems.length > 0) {
+      if (favoriteItems.length > 0 || guestItems.length > 0) {
         try {
           const catName = (defaultCategoryName || 'General').trim() || 'General';
           const catResponse = await axios.post(`/competitions/${competitionId}/categories`, {
@@ -275,36 +329,63 @@ const Competitions = () => {
           });
           const categoryId = catResponse.data.id;
 
-          const items = favoriteItems.map(([favorite_id, cfg]) => ({
-            favorite_id,
-            category_id: categoryId,
-            vehicle_source: cfg.vehicle_source,
-            vehicle_id: cfg.vehicle_source === 'own' ? cfg.vehicle_id : undefined,
-            vehicle_model: cfg.vehicle_source === 'text' ? cfg.vehicle_model : undefined,
-          }));
+          if (favoriteItems.length > 0) {
+            const items = favoriteItems.map(([favorite_id, cfg]) => ({
+              favorite_id,
+              category_id: categoryId,
+              vehicle_source: cfg.vehicle_source,
+              vehicle_id: cfg.vehicle_source === 'own' ? cfg.vehicle_id : undefined,
+              vehicle_model: cfg.vehicle_source === 'text' ? cfg.vehicle_model : undefined,
+            }));
 
-          const bulkResponse = await axios.post(
-            `/competitions/${competitionId}/participants/bulk-from-favorites`,
-            { items },
-          );
-          const created = bulkResponse.data?.created?.length || 0;
-          const skipped = bulkResponse.data?.skipped || [];
-          if (created > 0) {
-            toast.success(`Competición creada con ${created} piloto${created === 1 ? '' : 's'} favorito${created === 1 ? '' : 's'}`);
+            const bulkResponse = await axios.post(
+              `/competitions/${competitionId}/participants/bulk-from-favorites`,
+              { items },
+            );
+            const created = bulkResponse.data?.created?.length || 0;
+            const skipped = bulkResponse.data?.skipped || [];
+            if (created > 0) {
+              toast.success(`Competición creada con ${created} piloto${created === 1 ? '' : 's'} favorito${created === 1 ? '' : 's'}`);
+            }
+            if (skipped.length > 0) {
+              toast.warning(`${skipped.length} favorito(s) no se pudieron añadir`);
+            }
           }
-          if (skipped.length > 0) {
-            toast.warning(`${skipped.length} favorito(s) no se pudieron añadir`);
+
+          if (guestItems.length > 0) {
+            const guestBulkItems = guestItems.map(([guest_member_id, cfg]) => ({
+              guest_member_id,
+              category_id: categoryId,
+              vehicle_source: cfg.vehicle_source,
+              vehicle_id: cfg.vehicle_source === 'own' ? cfg.vehicle_id : undefined,
+              vehicle_model: cfg.vehicle_source === 'text' ? cfg.vehicle_model : undefined,
+            }));
+
+            const guestBulkResponse = await axios.post(
+              `/competitions/${competitionId}/participants/bulk-from-guest-members`,
+              { items: guestBulkItems },
+            );
+            const guestCreated = guestBulkResponse.data?.created?.length || 0;
+            const guestSkipped = guestBulkResponse.data?.skipped || [];
+            if (guestCreated > 0) {
+              toast.success(t('guestMembers.createBulkSuccess', { count: guestCreated }));
+            }
+            if (guestSkipped.length > 0) {
+              toast.warning(t('guestMembers.createBulkWarning', { count: guestSkipped.length }));
+            }
           }
         } catch (bulkErr) {
-          console.error('Error añadiendo favoritos:', bulkErr);
-          toast.error(bulkErr.response?.data?.error || 'La competición se creó, pero no se pudieron añadir los favoritos');
+          console.error('Error añadiendo pilotos:', bulkErr);
+          toast.error(bulkErr.response?.data?.error || t('guestMembers.createBulkError'));
         }
       }
 
       setShowCreateModal(false);
       setCreateForm({ name: '', num_slots: '', rounds: '1', laps_per_round: '', circuit_id: '', club_id: '', registration_deadline: '', is_multi_stage: false });
       setSelectedFavorites({});
+      setSelectedGuests({});
       setFavoritesExpanded(false);
+      setGuestsExpanded(false);
       setDefaultCategoryName('General');
 
       navigate(competitionDetailPath(competitionId));
@@ -753,6 +834,107 @@ const Competitions = () => {
                     </div>
                   )}
                 </div>
+
+                {createForm.club_id && (
+                  <div className="rounded-md border">
+                    <button
+                      type="button"
+                      onClick={() => requestAnimationFrame(() => setGuestsExpanded((v) => !v))}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent rounded-md"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Users className="size-4 text-primary" />
+                        {t('guestMembers.createSectionTitle')}
+                        {Object.keys(selectedGuests).length > 0 && (
+                          <Badge variant="secondary">{Object.keys(selectedGuests).length}</Badge>
+                        )}
+                      </span>
+                      {guestsExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                    </button>
+
+                    {guestsExpanded && (
+                      <div className="px-3 pb-3 pt-1 space-y-3">
+                        {eligibleGuestMembers.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            {t('guestMembers.empty')}{' '}
+                            <Link to={`/clubs/${createForm.club_id}`} className="underline">
+                              {t('guestMembers.emptyManageLink')}
+                            </Link>
+                          </p>
+                        ) : (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="default-category-guests">{t('guestMembers.categoryLabel')}</Label>
+                              <Input
+                                id="default-category-guests"
+                                value={defaultCategoryName}
+                                onChange={(e) => setDefaultCategoryName(e.target.value)}
+                                placeholder="General"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Se creará una categoría con este nombre y todos los miembros seleccionados se añadirán a ella.
+                              </p>
+                            </div>
+
+                            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                              {eligibleGuestMembers.map((guest) => {
+                                const selected = selectedGuests[guest.id];
+                                return (
+                                  <div key={guest.id} className="border rounded-md p-2 space-y-2">
+                                    <label className="flex items-start gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={!!selected}
+                                        onChange={() => toggleGuestSelection(guest.id)}
+                                        className="mt-1"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="font-medium text-sm">{guest.name}</div>
+                                        {guest.email && (
+                                          <div className="text-xs text-muted-foreground">{guest.email}</div>
+                                        )}
+                                      </div>
+                                    </label>
+
+                                    {selected && (
+                                      <div className="pl-6 space-y-2">
+                                        <div className="flex flex-wrap gap-3 text-xs">
+                                          <label className="flex items-center gap-1 cursor-pointer">
+                                            <input
+                                              type="radio"
+                                              name={`guest-src-${guest.id}`}
+                                              checked={selected.vehicle_source === 'text'}
+                                              onChange={() =>
+                                                updateGuestSelection(guest.id, { vehicle_source: 'text' })
+                                              }
+                                            />
+                                            {t('guestMembers.vehicleText')}
+                                          </label>
+                                        </div>
+                                        {selected.vehicle_source === 'text' && (
+                                          <Input
+                                            value={selected.vehicle_model}
+                                            onChange={(e) =>
+                                              updateGuestSelection(guest.id, {
+                                                vehicle_model: e.target.value,
+                                              })
+                                            }
+                                            placeholder={t('guestMembers.vehicleTextPlaceholder')}
+                                            className="h-8 text-sm"
+                                          />
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>

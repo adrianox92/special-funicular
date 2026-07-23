@@ -1414,6 +1414,217 @@ router.post('/:id/participants/bulk-from-favorites', async (req, res) => {
   }
 });
 
+// Añadir participantes en bloque a partir de miembros invitados del club (sin cuenta)
+router.post('/:id/participants/bulk-from-guest-members', async (req, res) => {
+  try {
+    const { id: competitionId } = req.params;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+
+    if (items.length === 0) {
+      return res.status(400).json({ error: 'Debes indicar al menos un miembro invitado del club' });
+    }
+
+    const access = await requireManageCompetition(
+      supabase,
+      req.user,
+      competitionId,
+      'id, num_slots, organizer, club_id',
+    );
+    if (!access.ok) return access.respond(res);
+    const competition = access.competition;
+
+    if (!competition.club_id) {
+      return res.status(400).json({
+        error: 'Esta competición no está asociada a un club; no se pueden añadir miembros invitados',
+      });
+    }
+
+    const partBlockBulk = participantMutationForbiddenReason(competition.status);
+    if (partBlockBulk) {
+      return res.status(400).json({ error: partBlockBulk });
+    }
+
+    for (const [idx, item] of items.entries()) {
+      if (!item || typeof item !== 'object') {
+        return res.status(400).json({ error: `Item ${idx} inválido` });
+      }
+      if (!item.guest_member_id) {
+        return res.status(400).json({ error: `Item ${idx}: guest_member_id es requerido` });
+      }
+      if (!item.category_id) {
+        return res.status(400).json({ error: `Item ${idx}: category_id es requerido` });
+      }
+      const src = item.vehicle_source || 'text';
+      if (!['own', 'text'].includes(src)) {
+        return res.status(400).json({ error: `Item ${idx}: vehicle_source no válido` });
+      }
+    }
+
+    const guestMemberIds = [...new Set(items.map((i) => i.guest_member_id))];
+    const { data: guests, error: guestErr } = await supabase
+      .from('club_guest_members')
+      .select('id, name, club_id, linked_user_id')
+      .in('id', guestMemberIds)
+      .eq('club_id', competition.club_id);
+
+    if (guestErr) {
+      console.error('bulk-from-guest-members guest lookup', guestErr);
+      return res.status(500).json({ error: guestErr.message });
+    }
+
+    const guestsById = new Map((guests || []).map((g) => [g.id, g]));
+    for (const gid of guestMemberIds) {
+      if (!guestsById.has(gid)) {
+        return res.status(404).json({ error: `Miembro invitado ${gid} no encontrado en el club` });
+      }
+    }
+
+    const categoryIds = [...new Set(items.map((i) => i.category_id))];
+    const { data: categories, error: catErr } = await supabase
+      .from('competition_categories')
+      .select('id')
+      .eq('competition_id', competitionId)
+      .in('id', categoryIds);
+
+    if (catErr) {
+      console.error('bulk-from-guest-members cat lookup', catErr);
+      return res.status(500).json({ error: catErr.message });
+    }
+    const validCategoryIds = new Set((categories || []).map((c) => c.id));
+    for (const cid of categoryIds) {
+      if (!validCategoryIds.has(cid)) {
+        return res.status(404).json({ error: `Categoría ${cid} no encontrada en esta competición` });
+      }
+    }
+
+    const ownVehicleIds = items
+      .filter((i) => i.vehicle_source === 'own' && i.vehicle_id)
+      .map((i) => i.vehicle_id);
+    const allOwnVehicleIds = [...new Set(ownVehicleIds)];
+
+    const ownedVehicleIds = new Set();
+    if (allOwnVehicleIds.length > 0) {
+      const { data: ownedVehicles, error: vErr } = await supabase
+        .from('vehicles')
+        .select('id')
+        .in('id', allOwnVehicleIds)
+        .eq('user_id', competition.organizer);
+      if (vErr) {
+        console.error('bulk-from-guest-members vehicle lookup', vErr);
+        return res.status(500).json({ error: vErr.message });
+      }
+      (ownedVehicles || []).forEach((v) => ownedVehicleIds.add(v.id));
+    }
+
+    const { data: existingSameGuests, error: existErr } = await supabase
+      .from('competition_participants')
+      .select('id, from_guest_member_id')
+      .eq('competition_id', competitionId)
+      .in('from_guest_member_id', guestMemberIds);
+
+    if (existErr) {
+      console.error('bulk-from-guest-members existing lookup', existErr);
+      return res.status(500).json({ error: existErr.message });
+    }
+    const alreadyGuestIds = new Set(
+      (existingSameGuests || []).map((p) => p.from_guest_member_id),
+    );
+
+    const { count: currentCount, error: countError } = await supabase
+      .from('competition_participants')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', competitionId);
+    if (countError) {
+      console.error('bulk-from-guest-members count', countError);
+      return res.status(500).json({ error: countError.message });
+    }
+
+    const slotsLeft = (competition.num_slots || 0) - (currentCount || 0);
+
+    const toInsert = [];
+    const skipped = [];
+
+    for (const item of items) {
+      const guest = guestsById.get(item.guest_member_id);
+      if (alreadyGuestIds.has(item.guest_member_id)) {
+        skipped.push({ guest_member_id: item.guest_member_id, reason: 'Ya añadido previamente' });
+        continue;
+      }
+
+      const src = item.vehicle_source || 'text';
+      let vehicle_id = null;
+      let vehicle_model = null;
+
+      if (src === 'own') {
+        if (!item.vehicle_id) {
+          skipped.push({ guest_member_id: item.guest_member_id, reason: 'Falta vehicle_id' });
+          continue;
+        }
+        if (!ownedVehicleIds.has(item.vehicle_id)) {
+          skipped.push({
+            guest_member_id: item.guest_member_id,
+            reason: 'Vehículo no pertenece al organizador',
+          });
+          continue;
+        }
+        vehicle_id = item.vehicle_id;
+      } else {
+        const trimmed = (item.vehicle_model || '').trim();
+        if (!trimmed) {
+          skipped.push({ guest_member_id: item.guest_member_id, reason: 'Falta vehicle_model' });
+          continue;
+        }
+        vehicle_model = trimmed;
+      }
+
+      const row = {
+        competition_id: competitionId,
+        driver_name: guest.name,
+        category_id: item.category_id,
+        registered_by: req.user.id,
+        from_guest_member_id: guest.id,
+      };
+      if (vehicle_id) row.vehicle_id = vehicle_id;
+      if (vehicle_model) row.vehicle_model = vehicle_model;
+
+      toInsert.push(row);
+    }
+
+    if (toInsert.length > slotsLeft) {
+      return res.status(400).json({
+        error: `Solo quedan ${slotsLeft} plazas disponibles y se intentan añadir ${toInsert.length}`,
+      });
+    }
+
+    let created = [];
+    if (toInsert.length > 0) {
+      let nextOrder = await getNextStartOrder(supabase, competitionId);
+      for (const row of toInsert) {
+        row.start_order = nextOrder;
+        nextOrder += 1;
+      }
+
+      const { data, error } = await supabase
+        .from('competition_participants')
+        .insert(toInsert)
+        .select(`
+          *,
+          vehicles(model, manufacturer)
+        `);
+      if (error) {
+        console.error('bulk-from-guest-members insert', error);
+        return res.status(500).json({ error: error.message });
+      }
+      created = data || [];
+    }
+
+    return res.status(201).json({ created, skipped });
+  } catch (error) {
+    console.error('Error en POST /competitions/:id/participants/bulk-from-guest-members:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Reordenar participantes (start_order 1..n) en una sola operación
 router.put('/:id/participants/reorder', async (req, res) => {
   try {
