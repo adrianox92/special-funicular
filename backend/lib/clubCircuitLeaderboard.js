@@ -18,12 +18,60 @@ function parsePeriodFilter(period) {
 }
 
 /**
+ * Actualiza el mejor tiempo de un mapa (por user_id o guest_member_id).
+ * @param {Map<string, object>} map
+ * @param {string} key
+ * @param {number} lapSec
+ * @param {object} entry
+ */
+function upsertBestLap(map, key, lapSec, entry) {
+  const prev = map.get(key);
+  if (!prev || lapSec < prev.lapSeconds) {
+    map.set(key, { ...entry, lapSeconds: lapSec });
+    return;
+  }
+  if (lapSec === prev.lapSeconds) {
+    const prevDate = prev.timing_date || '';
+    const rowDate = entry.timing_date || '';
+    if (rowDate > prevDate) {
+      map.set(key, {
+        ...prev,
+        timing_date: entry.timing_date,
+        timing_id: entry.timing_id,
+      });
+    }
+  }
+}
+
+/**
+ * Aplica un tiempo de invitado: fusiona con usuario vinculado o ranking de guest.
+ */
+function applyGuestLap(bestByUser, bestByGuest, { guestMemberId, linkedUserId, guestName, lapSec, entryBase }) {
+  if (linkedUserId) {
+    upsertBestLap(bestByUser, linkedUserId, lapSec, {
+      user_id: linkedUserId,
+      ...entryBase,
+    });
+    return;
+  }
+  upsertBestLap(bestByGuest, guestMemberId, lapSec, {
+    guest_member_id: guestMemberId,
+    display_name: guestName || null,
+    ...entryBase,
+  });
+}
+
+/**
  * Mejor vuelta por piloto en un circuito de club.
+ * Incluye vehicle_timings, club_guest_timings y competition_timings del mismo circuito.
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {{ clubId: string, circuitId: string, lane?: string|null, period?: string, vehicleType?: string|null }} params
  */
 async function buildClubCircuitLeaderboard(supabase, { clubId, circuitId, lane, period, vehicleType }) {
   const { since, label: periodLabel } = parsePeriodFilter(period);
+  const laneFilter = lane != null && String(lane).trim() !== '' ? String(lane).trim() : null;
+  const vehicleTypeFilter =
+    vehicleType != null && String(vehicleType).trim() !== '' ? String(vehicleType).trim() : null;
 
   let query = supabase
     .from('vehicle_timings')
@@ -48,17 +96,9 @@ async function buildClubCircuitLeaderboard(supabase, { clubId, circuitId, lane, 
     .eq('circuit_id', circuitId)
     .not('best_lap_time', 'is', null);
 
-  if (lane != null && String(lane).trim() !== '') {
-    query = query.eq('lane', String(lane).trim());
-  }
-  const vehicleTypeFilter =
-    vehicleType != null && String(vehicleType).trim() !== '' ? String(vehicleType).trim() : null;
-  if (vehicleTypeFilter) {
-    query = query.eq('vehicles.type', vehicleTypeFilter);
-  }
-  if (since) {
-    query = query.gte('timing_date', since);
-  }
+  if (laneFilter) query = query.eq('lane', laneFilter);
+  if (vehicleTypeFilter) query = query.eq('vehicles.type', vehicleTypeFilter);
+  if (since) query = query.gte('timing_date', since);
 
   const { data: rows, error } = await query;
   if (error) throw error;
@@ -78,6 +118,7 @@ async function buildClubCircuitLeaderboard(supabase, { clubId, circuitId, lane, 
   if (clubRow?.owner_user_id) memberUserIds.add(clubRow.owner_user_id);
 
   const bestByUser = new Map();
+  const bestByGuest = new Map();
 
   for (const row of rows || []) {
     const vehicle = row.vehicles;
@@ -87,32 +128,18 @@ async function buildClubCircuitLeaderboard(supabase, { clubId, circuitId, lane, 
     const lapSec = bestLapSecondsFromTimingRow(row);
     if (lapSec == null) continue;
 
-    const prev = bestByUser.get(userId);
-    if (!prev || lapSec < prev.lapSeconds) {
-      bestByUser.set(userId, {
-        user_id: userId,
-        lapSeconds: lapSec,
-        best_lap_time: row.best_lap_time,
-        best_lap_timestamp: row.best_lap_timestamp,
-        timing_date: row.timing_date,
-        lane: row.lane,
-        laps: row.laps,
-        consistency_score: row.consistency_score,
-        vehicle_model: vehicle?.model || null,
-        vehicle_type: vehicle?.type || null,
-        timing_id: row.id,
-      });
-    } else if (lapSec === prev.lapSeconds) {
-      const prevDate = prev.timing_date || '';
-      const rowDate = row.timing_date || '';
-      if (rowDate > prevDate) {
-        bestByUser.set(userId, {
-          ...prev,
-          timing_date: row.timing_date,
-          timing_id: row.id,
-        });
-      }
-    }
+    upsertBestLap(bestByUser, userId, lapSec, {
+      user_id: userId,
+      best_lap_time: row.best_lap_time,
+      best_lap_timestamp: row.best_lap_timestamp,
+      timing_date: row.timing_date,
+      lane: row.lane,
+      laps: row.laps,
+      consistency_score: row.consistency_score,
+      vehicle_model: vehicle?.model || null,
+      vehicle_type: vehicle?.type || null,
+      timing_id: row.id,
+    });
   }
 
   let guestQuery = supabase
@@ -140,78 +167,148 @@ async function buildClubCircuitLeaderboard(supabase, { clubId, circuitId, lane, 
     .eq('circuit_id', circuitId)
     .not('best_lap_time', 'is', null);
 
-  if (lane != null && String(lane).trim() !== '') {
-    guestQuery = guestQuery.eq('lane', String(lane).trim());
-  }
-  if (vehicleTypeFilter) {
-    guestQuery = guestQuery.eq('vehicle_type', vehicleTypeFilter);
-  }
-  if (since) {
-    guestQuery = guestQuery.gte('timing_date', since);
-  }
+  if (laneFilter) guestQuery = guestQuery.eq('lane', laneFilter);
+  if (vehicleTypeFilter) guestQuery = guestQuery.eq('vehicle_type', vehicleTypeFilter);
+  if (since) guestQuery = guestQuery.gte('timing_date', since);
 
   const { data: guestRows, error: guestErr } = await guestQuery;
   if (guestErr) throw guestErr;
 
-  const bestByGuest = new Map();
-
   for (const row of guestRows || []) {
     const guest = row.club_guest_members;
     const guestMemberId = row.guest_member_id;
-    const linkedUserId = guest?.linked_user_id;
+    const lapSec = bestLapSecondsFromTimingRow(row);
+    if (lapSec == null) continue;
+
+    applyGuestLap(bestByUser, bestByGuest, {
+      guestMemberId,
+      linkedUserId: guest?.linked_user_id,
+      guestName: guest?.name,
+      lapSec,
+      entryBase: {
+        best_lap_time: row.best_lap_time,
+        best_lap_timestamp: row.best_lap_timestamp,
+        timing_date: row.timing_date,
+        lane: row.lane,
+        laps: row.laps,
+        consistency_score: row.consistency_score,
+        vehicle_model: row.vehicle_model,
+        vehicle_type: row.vehicle_type,
+        timing_id: row.id,
+        guest_name: guest?.name || null,
+      },
+    });
+  }
+
+  // Tiempos de competición en el mismo circuito (miembros e invitados del club).
+  let compQuery = supabase
+    .from('competition_timings')
+    .select(
+      `
+      id,
+      best_lap_time,
+      best_lap_timestamp,
+      timing_date,
+      lane,
+      laps,
+      did_not_participate,
+      participant_id,
+      competition_participants!inner (
+        id,
+        vehicle_id,
+        vehicle_model,
+        driver_name,
+        from_guest_member_id,
+        vehicles (
+          id,
+          user_id,
+          model,
+          type
+        )
+      )
+    `,
+    )
+    .eq('circuit_id', circuitId)
+    .not('best_lap_time', 'is', null);
+
+  if (laneFilter) compQuery = compQuery.eq('lane', laneFilter);
+  if (since) compQuery = compQuery.gte('timing_date', since);
+
+  const { data: compRows, error: compErr } = await compQuery;
+  if (compErr) throw compErr;
+
+  const guestIdsFromComp = new Set();
+  for (const row of compRows || []) {
+    const gid = row.competition_participants?.from_guest_member_id;
+    if (gid) guestIdsFromComp.add(gid);
+  }
+
+  const guestById = new Map();
+  if (guestIdsFromComp.size > 0) {
+    const { data: guestMembers, error: gmErr } = await supabase
+      .from('club_guest_members')
+      .select('id, name, linked_user_id, club_id')
+      .eq('club_id', clubId)
+      .in('id', [...guestIdsFromComp]);
+    if (gmErr) throw gmErr;
+    for (const g of guestMembers || []) {
+      guestById.set(g.id, g);
+    }
+  }
+
+  for (const row of compRows || []) {
+    if (row.did_not_participate) continue;
+
+    const participant = row.competition_participants;
+    if (!participant) continue;
 
     const lapSec = bestLapSecondsFromTimingRow(row);
     if (lapSec == null) continue;
 
+    const vehicle = participant.vehicles;
+    const vehicleModel = vehicle?.model || participant.vehicle_model || null;
+    const vehicleType = vehicle?.type || null;
+
+    if (vehicleTypeFilter) {
+      if (!vehicleType || vehicleType !== vehicleTypeFilter) continue;
+    }
+
     const entryBase = {
-      lapSeconds: lapSec,
       best_lap_time: row.best_lap_time,
       best_lap_timestamp: row.best_lap_timestamp,
       timing_date: row.timing_date,
       lane: row.lane,
       laps: row.laps,
-      consistency_score: row.consistency_score,
-      vehicle_model: row.vehicle_model,
-      vehicle_type: row.vehicle_type,
+      consistency_score: null,
+      vehicle_model: vehicleModel,
+      vehicle_type: vehicleType,
       timing_id: row.id,
-      guest_name: guest?.name || null,
     };
 
-    if (linkedUserId) {
-      const prev = bestByUser.get(linkedUserId);
-      if (!prev || lapSec < prev.lapSeconds) {
-        bestByUser.set(linkedUserId, {
-          user_id: linkedUserId,
+    const guestMemberId = participant.from_guest_member_id;
+    if (guestMemberId) {
+      const guest = guestById.get(guestMemberId);
+      if (!guest) continue; // no es invitado de este club
+      applyGuestLap(bestByUser, bestByGuest, {
+        guestMemberId,
+        linkedUserId: guest.linked_user_id,
+        guestName: guest.name || participant.driver_name,
+        lapSec,
+        entryBase: {
           ...entryBase,
-        });
-      } else if (lapSec === prev.lapSeconds) {
-        const prevDate = prev.timing_date || '';
-        const rowDate = row.timing_date || '';
-        if (rowDate > prevDate) {
-          bestByUser.set(linkedUserId, { ...prev, timing_date: row.timing_date, timing_id: row.id });
-        }
-      }
+          guest_name: guest.name || participant.driver_name || null,
+        },
+      });
       continue;
     }
 
-    const prevGuest = bestByGuest.get(guestMemberId);
-    if (!prevGuest || lapSec < prevGuest.lapSeconds) {
-      bestByGuest.set(guestMemberId, {
-        guest_member_id: guestMemberId,
-        display_name: guest?.name || null,
-        ...entryBase,
-      });
-    } else if (lapSec === prevGuest.lapSeconds) {
-      const prevDate = prevGuest.timing_date || '';
-      const rowDate = row.timing_date || '';
-      if (rowDate > prevDate) {
-        bestByGuest.set(guestMemberId, {
-          ...prevGuest,
-          timing_date: row.timing_date,
-          timing_id: row.id,
-        });
-      }
-    }
+    const userId = vehicle?.user_id;
+    if (!userId || !memberUserIds.has(userId)) continue;
+
+    upsertBestLap(bestByUser, userId, lapSec, {
+      user_id: userId,
+      ...entryBase,
+    });
   }
 
   const userIds = [...bestByUser.keys()];
@@ -277,7 +374,7 @@ async function buildClubCircuitLeaderboard(supabase, { clubId, circuitId, lane, 
 
   return {
     period: periodLabel,
-    lane: lane != null && String(lane).trim() !== '' ? String(lane).trim() : null,
+    lane: laneFilter,
     vehicle_type: vehicleTypeFilter,
     entries: ranked,
   };
@@ -286,5 +383,7 @@ async function buildClubCircuitLeaderboard(supabase, { clubId, circuitId, lane, 
 module.exports = {
   parsePeriodFilter,
   buildClubCircuitLeaderboard,
+  upsertBestLap,
+  applyGuestLap,
   timeToSeconds,
 };
