@@ -6,6 +6,7 @@ const { modificationLineTotal } = require('../lib/componentPricing');
 const { resolveStaleDaysThreshold } = require('../lib/userPreferences');
 const { evaluateGoalProgress } = require('../lib/trainingGoals');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
+const { logDbError } = require('../lib/logDbError');
 
 const supabase = getAnonClient();
 
@@ -948,7 +949,7 @@ router.get('/action-items', async (req, res) => {
       .eq('user_id', userId);
 
     if (vehErr) {
-      console.error('action-items vehicles:', vehErr);
+      logDbError('GET /api/dashboard/action-items vehicles', vehErr, { userId });
     }
 
     const vehicleIds = (vehicles || []).map((v) => v.id);
@@ -964,7 +965,11 @@ router.get('/action-items', async (req, res) => {
         .limit(8000);
 
       if (vtErr) {
-        console.error('action-items vehicle_timings:', vtErr);
+        logDbError('GET /api/dashboard/action-items vehicle_timings', vtErr, {
+          userId,
+          vehicleCount: vehicleIds.length,
+          limit: 8000,
+        });
       } else if (vtRows?.length) {
         const counts = new Map();
         for (const row of vtRows) {
@@ -1025,7 +1030,7 @@ router.get('/action-items', async (req, res) => {
       .eq('user_id', userId);
 
     if (invErr) {
-      console.error('action-items inventory:', invErr);
+      logDbError('GET /api/dashboard/action-items inventory', invErr, { userId });
     }
 
     let lowStockCritical = [];

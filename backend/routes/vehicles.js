@@ -21,6 +21,7 @@ const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFr
 const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/inventoryStockOps');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
+const { logDbError } = require('../lib/logDbError');
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
 const { resolveBaselineTimings, sortTimingsByBestLap } = require('../lib/syncTimingsQuery');
@@ -1113,7 +1114,11 @@ router.get('/', async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', req.user.id);
 
-    if (countError) throw countError;
+    if (countError) {
+      logDbError('GET /api/vehicles count', countError, { userId: req.user.id });
+      countError._dbErrorLogged = true;
+      throw countError;
+    }
     
     // Obtener los vehículos paginados
     const { data: vehicles, error: vehiclesError } = await applyVehicleListSort(
@@ -1122,7 +1127,17 @@ router.get('/', async (req, res) => {
       ascending,
     ).range(from, to);
 
-    if (vehiclesError) throw vehiclesError;
+    if (vehiclesError) {
+      logDbError('GET /api/vehicles list', vehiclesError, {
+        userId: req.user.id,
+        sort: req.query.sort || 'purchase_date',
+        dir: req.query.dir || 'desc',
+        page,
+        limit,
+      });
+      vehiclesError._dbErrorLogged = true;
+      throw vehiclesError;
+    }
 
     // Obtener los IDs de los vehículos para buscar sus imágenes
     const vehicleIds = vehicles.map((v) => v.id);
@@ -1135,7 +1150,14 @@ router.get('/', async (req, res) => {
         .in('vehicle_id', vehicleIds)
         .order('created_at', { ascending: true });
 
-      if (imageError) throw imageError;
+      if (imageError) {
+        logDbError('GET /api/vehicles images', imageError, {
+          userId: req.user.id,
+          vehicleCount: vehicleIds.length,
+        });
+        imageError._dbErrorLogged = true;
+        throw imageError;
+      }
       images = imgRows || [];
     }
 
@@ -1168,7 +1190,9 @@ router.get('/', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error en /vehicles:', error);
+    if (!error?._dbErrorLogged) {
+      logDbError('GET /api/vehicles', error, { userId: req.user?.id });
+    }
     res.status(500).json({ error: error.message });
   }
 });
