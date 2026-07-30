@@ -4,6 +4,7 @@ const {
   estimateInFilterUrlChars,
 } = require('../../lib/postgrestInFilter');
 const { fetchVehicleTimingsForVehicleIds } = require('../../lib/fetchVehicleTimingsForVehicleIds');
+const { fetchVehicleImagesForVehicleIds } = require('../../lib/fetchVehicleImagesForVehicleIds');
 const { logDbError, extractErrorFields, inferLikelyCause } = require('../../lib/logDbError');
 
 describe('postgrestInFilter', () => {
@@ -66,6 +67,51 @@ describe('fetchVehicleTimingsForVehicleIds', () => {
     expect(calls).toEqual([80, 70]);
     expect(data).toHaveLength(2);
     expect(data[0].timing_date).toBe('2024-02-01T00:00:00Z');
+  });
+});
+
+describe('fetchVehicleImagesForVehicleIds', () => {
+  test('consulta imágenes en lotes y fusiona filas', async () => {
+    const ids = Array.from({ length: 150 }, (_, i) => `id-${i}`);
+    const calls = [];
+
+    const supabase = {
+      from(table) {
+        expect(table).toBe('vehicle_images');
+        return {
+          select() {
+            return this;
+          },
+          in(_col, chunk) {
+            calls.push(chunk.length);
+            return this;
+          },
+          async order() {
+            const chunkIndex = calls.length - 1;
+            return {
+              data: [
+                {
+                  vehicle_id: chunkIndex === 0 ? 'id-0' : 'id-100',
+                  image_url: `https://example.com/${chunkIndex}.jpg`,
+                  view_type: 'front',
+                },
+              ],
+              error: null,
+            };
+          },
+        };
+      },
+    };
+
+    const { data, error, meta } = await fetchVehicleImagesForVehicleIds(supabase, ids);
+
+    expect(error).toBeNull();
+    expect(meta.chunkCount).toBe(2);
+    expect(meta.vehicleCount).toBe(150);
+    expect(calls).toEqual([80, 70]);
+    expect(data).toHaveLength(2);
+    expect(data[0].vehicle_id).toBe('id-0');
+    expect(data[1].vehicle_id).toBe('id-100');
   });
 });
 

@@ -22,6 +22,7 @@ const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/in
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const { logDbError } = require('../lib/logDbError');
+const { fetchVehicleImagesForVehicleIds } = require('../lib/fetchVehicleImagesForVehicleIds');
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
 const { resolveBaselineTimings, sortTimingsByBestLap } = require('../lib/syncTimingsQuery');
@@ -750,13 +751,16 @@ router.get('/export-pdf', async (req, res) => {
 
     const urlByVehicleId = new Map();
     if (ids.length > 0) {
-      const { data: images, error: imagesError } = await req.supabase
-        .from('vehicle_images')
-        .select('vehicle_id, image_url, view_type')
-        .in('vehicle_id', ids)
-        .order('created_at', { ascending: true });
+      const { data: images, error: imagesError, meta: imagesMeta } =
+        await fetchVehicleImagesForVehicleIds(req.supabase, ids);
 
-      if (imagesError) throw imagesError;
+      if (imagesError) {
+        logDbError('GET /api/vehicles/export-pdf images', imagesError, {
+          userId: req.user.id,
+          ...imagesMeta,
+        });
+        throw imagesError;
+      }
 
       const grouped = new Map();
       for (const img of images || []) {
@@ -1174,16 +1178,13 @@ router.get('/', async (req, res) => {
 
     let images = [];
     if (vehicleIds.length > 0) {
-      const { data: imgRows, error: imageError } = await req.supabase
-        .from('vehicle_images')
-        .select('vehicle_id, image_url, view_type')
-        .in('vehicle_id', vehicleIds)
-        .order('created_at', { ascending: true });
+      const { data: imgRows, error: imageError, meta: imagesMeta } =
+        await fetchVehicleImagesForVehicleIds(req.supabase, vehicleIds);
 
       if (imageError) {
         logDbError('GET /api/vehicles images', imageError, {
           userId: req.user.id,
-          vehicleCount: vehicleIds.length,
+          ...imagesMeta,
         });
         imageError._dbErrorLogged = true;
         throw imageError;
