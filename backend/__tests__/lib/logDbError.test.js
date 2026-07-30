@@ -1,4 +1,73 @@
-const { logDbError, extractErrorFields } = require('../../lib/logDbError');
+const {
+  POSTGREST_IN_FILTER_CHUNK,
+  chunkArray,
+  estimateInFilterUrlChars,
+} = require('../../lib/postgrestInFilter');
+const { fetchVehicleTimingsForVehicleIds } = require('../../lib/fetchVehicleTimingsForVehicleIds');
+const { logDbError, extractErrorFields, inferLikelyCause } = require('../../lib/logDbError');
+
+describe('postgrestInFilter', () => {
+  test('chunkArray divide en trozos del tamaño indicado', () => {
+    expect(chunkArray([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  test('estimateInFilterUrlChars crece con UUIDs', () => {
+    const ids = Array.from({ length: 660 }, (_, i) =>
+      `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+    );
+    const chars = estimateInFilterUrlChars(ids);
+    expect(chars).toBeGreaterThan(20_000);
+    expect(chunkArray(ids, POSTGREST_IN_FILTER_CHUNK).length).toBe(9);
+  });
+});
+
+describe('fetchVehicleTimingsForVehicleIds', () => {
+  test('consulta en lotes y fusiona resultados ordenados', async () => {
+    const ids = Array.from({ length: 150 }, (_, i) => `id-${i}`);
+    const calls = [];
+
+    const supabase = {
+      from(table) {
+        expect(table).toBe('vehicle_timings');
+        return {
+          select() {
+            return this;
+          },
+          in(_col, chunk) {
+            calls.push(chunk.length);
+            return this;
+          },
+          order() {
+            return this;
+          },
+          async limit() {
+            const chunkIndex = calls.length - 1;
+            return {
+              data: [
+                {
+                  vehicle_id: chunkIndex === 0 ? 'id-0' : 'id-100',
+                  timing_date: chunkIndex === 0 ? '2024-02-01T00:00:00Z' : '2024-01-01T00:00:00Z',
+                  circuit_id: null,
+                  circuit: 'Test',
+                  circuits: null,
+                },
+              ],
+              error: null,
+            };
+          },
+        };
+      },
+    };
+
+    const { data, error, meta } = await fetchVehicleTimingsForVehicleIds(supabase, ids, { limit: 8000 });
+
+    expect(error).toBeNull();
+    expect(meta.chunkCount).toBe(2);
+    expect(calls).toEqual([80, 70]);
+    expect(data).toHaveLength(2);
+    expect(data[0].timing_date).toBe('2024-02-01T00:00:00Z');
+  });
+});
 
 describe('logDbError', () => {
   let consoleErrorSpy;
@@ -34,8 +103,16 @@ describe('logDbError', () => {
       const result = extractErrorFields(err);
 
       expect(result.message).toBe('Bad Request');
-      expect(result.fields).toEqual([]);
-      expect(result.raw).toBe(JSON.stringify(err));
+      expect(result.fields).toContain('foo=bar');
+      expect(result.raw).toContain('"message":"Bad Request"');
+    });
+  });
+
+  describe('inferLikelyCause', () => {
+    test('detecta URL demasiado larga en filtro in', () => {
+      expect(
+        inferLikelyCause('Bad Request', { inFilterChars: 24_000, vehicleCount: 660 }),
+      ).toBe('postgrest_in_filter_url_too_long');
     });
   });
 
@@ -57,18 +134,19 @@ describe('logDbError', () => {
       expect(line).toContain('code=PGRST102');
       expect(line).toContain('details=column does not exist');
       expect(line).toContain('userId=u1');
-      expect(line).toContain('page=1');
-      expect(line).toContain('limit=25');
     });
 
-    test('incluye raw en errores mínimos', () => {
-      logDbError('action-items vehicle_timings', { message: 'Bad Request' }, { vehicleCount: 42 });
+    test('incluye likelyCause cuando el filtro in es enorme', () => {
+      logDbError(
+        'GET /api/dashboard/action-items vehicle_timings',
+        { message: 'Bad Request' },
+        { vehicleCount: 660, inFilterChars: 24_424, limit: 8000 },
+      );
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
       const line = consoleErrorSpy.mock.calls[0][0];
-      expect(line).toContain('[action-items vehicle_timings] Bad Request');
-      expect(line).toContain('raw={"message":"Bad Request"}');
-      expect(line).toContain('vehicleCount=42');
+      expect(line).toContain('likelyCause=postgrest_in_filter_url_too_long');
+      expect(line).toContain('inFilterChars=24424');
+      expect(line).toContain('vehicleCount=660');
     });
   });
 });

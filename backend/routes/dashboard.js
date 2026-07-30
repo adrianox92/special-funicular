@@ -7,6 +7,7 @@ const { resolveStaleDaysThreshold } = require('../lib/userPreferences');
 const { evaluateGoalProgress } = require('../lib/trainingGoals');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
 const { logDbError } = require('../lib/logDbError');
+const { fetchVehicleTimingsForVehicleIds } = require('../lib/fetchVehicleTimingsForVehicleIds');
 
 const supabase = getAnonClient();
 
@@ -957,18 +958,16 @@ router.get('/action-items', async (req, res) => {
     let staleVehiclesAtUsualCircuit = [];
 
     if (vehicleIds.length > 0) {
-      const { data: vtRows, error: vtErr } = await supabase
-        .from('vehicle_timings')
-        .select('vehicle_id, timing_date, circuit_id, circuit, circuits(id, name)')
-        .in('vehicle_id', vehicleIds)
-        .order('timing_date', { ascending: false })
-        .limit(8000);
+      const { data: vtRows, error: vtErr, meta: vtMeta } = await fetchVehicleTimingsForVehicleIds(
+        supabase,
+        vehicleIds,
+        { limit: 8000 },
+      );
 
       if (vtErr) {
         logDbError('GET /api/dashboard/action-items vehicle_timings', vtErr, {
           userId,
-          vehicleCount: vehicleIds.length,
-          limit: 8000,
+          ...vtMeta,
         });
       } else if (vtRows?.length) {
         const counts = new Map();

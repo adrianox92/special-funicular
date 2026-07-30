@@ -1,6 +1,11 @@
 'use strict';
 
 const RAW_MAX_LEN = 500;
+const EXTRA_FIELD_MAX_LEN = 120;
+const KNOWN_ERROR_KEYS = new Set(['message', 'code', 'details', 'hint', 'status', 'statusCode']);
+
+/** Umbral aproximado (chars del filtro `in.(...)`) por encima del cual nginx/proxy suele devolver 400 genérico. */
+const IN_FILTER_URL_WARN_CHARS = 6000;
 
 /**
  * Serializa meta a pares key=value para logs.
@@ -18,6 +23,43 @@ function formatMeta(meta) {
 }
 
 /**
+ * @param {string} message
+ * @param {Record<string, unknown>} [meta]
+ * @returns {string|null}
+ */
+function inferLikelyCause(message, meta) {
+  const generic =
+    message === 'Bad Request' ||
+    message === 'Request-URI Too Large' ||
+    message === 'URI Too Long';
+
+  if (!generic || !meta) return null;
+
+  const inFilterChars = Number(meta.inFilterChars ?? meta.failedChunkInFilterChars);
+  if (Number.isFinite(inFilterChars) && inFilterChars > IN_FILTER_URL_WARN_CHARS) {
+    return 'postgrest_in_filter_url_too_long';
+  }
+
+  return null;
+}
+
+/**
+ * @param {unknown} val
+ * @returns {string|null}
+ */
+function stringifyExtraField(val) {
+  if (val == null || val === '') return null;
+  if (typeof val === 'object') {
+    try {
+      return JSON.stringify(val).slice(0, EXTRA_FIELD_MAX_LEN);
+    } catch {
+      return String(val).slice(0, EXTRA_FIELD_MAX_LEN);
+    }
+  }
+  return String(val).slice(0, EXTRA_FIELD_MAX_LEN);
+}
+
+/**
  * Extrae campos útiles de errores Supabase/PostgREST u otros.
  * @param {unknown} err
  * @returns {{ message: string, fields: string[], raw?: string }}
@@ -28,25 +70,47 @@ function extractErrorFields(err) {
 
   if (err instanceof Error) {
     message = err.message || message;
+    if (err.name && err.name !== 'Error') fields.push(`name=${err.name}`);
+    if (err.cause) {
+      const causeText = stringifyExtraField(
+        err.cause instanceof Error ? err.cause.message : err.cause,
+      );
+      if (causeText) fields.push(`cause=${causeText}`);
+    }
   } else if (typeof err === 'string') {
     message = err;
-  } else if (err && typeof err === 'object') {
+  }
+
+  if (err && typeof err === 'object') {
     const o = /** @type {Record<string, unknown>} */ (err);
-    if (typeof o.message === 'string' && o.message) message = o.message;
+    if (!(err instanceof Error) && typeof o.message === 'string' && o.message) {
+      message = o.message;
+    }
     for (const key of ['code', 'details', 'hint', 'status', 'statusCode']) {
       const val = o[key];
       if (val != null && val !== '') fields.push(`${key}=${String(val)}`);
     }
+    for (const key of Object.keys(o)) {
+      if (KNOWN_ERROR_KEYS.has(key)) continue;
+      const text = stringifyExtraField(o[key]);
+      if (text) fields.push(`${key}=${text}`);
+    }
   }
 
-  const hasExtraFields = fields.length > 0;
+  const hasPostgrestFields = fields.some((f) =>
+    /^(code|details|hint)=/.test(f),
+  );
   const onlyGenericMessage =
-    !hasExtraFields && (message === 'Bad Request' || message === 'Unknown error');
+    !hasPostgrestFields &&
+    (message === 'Bad Request' ||
+      message === 'Unknown error' ||
+      message === 'Request-URI Too Large' ||
+      message === 'URI Too Long');
 
   let raw;
   if (onlyGenericMessage && err != null) {
     try {
-      raw = JSON.stringify(err);
+      raw = JSON.stringify(err, Object.getOwnPropertyNames(err instanceof Error ? err : err));
     } catch {
       raw = String(err);
     }
@@ -66,9 +130,11 @@ function extractErrorFields(err) {
  */
 function logDbError(label, err, meta) {
   const { message, fields, raw } = extractErrorFields(err);
+  const likelyCause = inferLikelyCause(message, meta);
+  const enrichedMeta = likelyCause ? { ...meta, likelyCause } : meta;
   const fieldPart = fields.length ? ` | ${fields.join(' | ')}` : '';
   const rawPart = raw ? ` | raw=${raw}` : '';
-  const metaPart = formatMeta(meta);
+  const metaPart = formatMeta(enrichedMeta);
   console.error(`[${label}] ${message}${fieldPart}${rawPart}${metaPart}`);
 }
 
@@ -76,4 +142,6 @@ module.exports = {
   logDbError,
   extractErrorFields,
   formatMeta,
+  inferLikelyCause,
+  IN_FILTER_URL_WARN_CHARS,
 };
