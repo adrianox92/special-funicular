@@ -395,10 +395,13 @@ function applyVehicleListSort(query, sortColumn, ascending) {
 
 /** Filtros opcionales compartidos entre GET /vehicles/export y GET /vehicles/export-pdf */
 function applyVehicleExportFilters(query, req) {
-  const { manufacturer, type, modified, digital, filterMuseo, filterTaller, scale, scale_factor } = req.query;
+  const { manufacturer, model, type, modified, digital, filterMuseo, filterTaller, scale, scale_factor } = req.query;
 
   if (manufacturer && String(manufacturer).trim()) {
     query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
+  }
+  if (model && String(model).trim()) {
+    query = query.ilike('model', `%${String(model).trim()}%`);
   }
   if (type && String(type).trim()) {
     query = query.eq('type', String(type).trim());
@@ -782,6 +785,31 @@ router.get('/export-pdf', async (req, res) => {
   } catch (error) {
     console.error('Error en /vehicles/export-pdf:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Fabricantes distintos en la colección del usuario (autocompletado de filtro)
+router.get('/manufacturers', async (req, res) => {
+  try {
+    const { data, error } = await req.supabase
+      .from('vehicles')
+      .select('manufacturer')
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+
+    const set = new Set();
+    for (const row of data || []) {
+      const m = row?.manufacturer;
+      if (m != null && String(m).trim() !== '') set.add(String(m).trim());
+    }
+    const manufacturers = Array.from(set).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' }),
+    );
+    res.json({ manufacturers });
+  } catch (err) {
+    console.error('Error en /vehicles/manufacturers:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import VehicleImportDialog from '../components/VehicleImportDialog';
+import { ManufacturerFilterInput } from '../components/ManufacturerFilterInput';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const ALL_VEHICLES_LIMIT = 10000;
@@ -54,7 +55,7 @@ const saveSort = (next) => {
   } catch {}
 };
 
-const defaultFilters = { manufacturer: '', type: '', modified: '', digital: '', scale: '', filterMuseo: false, filterTaller: false };
+const defaultFilters = { model: '', manufacturer: '', type: '', modified: '', digital: '', scale: '', filterMuseo: false, filterTaller: false };
 
 /** @param {URLSearchParams} searchParams */
 function parseFiltersFromSearchParams(searchParams) {
@@ -69,6 +70,8 @@ function parseFiltersFromSearchParams(searchParams) {
   if (ft === 'true' || ft === '1') patches.filterTaller = true;
   const man = searchParams.get('manufacturer');
   if (man != null && String(man).trim() !== '') patches.manufacturer = String(man).slice(0, 200);
+  const modl = searchParams.get('model');
+  if (modl != null && String(modl).trim() !== '') patches.model = String(modl).slice(0, 200);
   const typ = searchParams.get('type');
   if (typ != null && String(typ).trim() !== '') patches.type = typ;
   const sc = searchParams.get('scale');
@@ -85,6 +88,7 @@ const loadStoredFilters = () => {
     if (!stored) return defaultFilters;
     const parsed = JSON.parse(stored);
     return {
+      model: String(parsed.model ?? '').slice(0, 200),
       manufacturer: String(parsed.manufacturer ?? '').slice(0, 200),
       type: typeof parsed.type === 'string' ? parsed.type : '',
       modified: typeof parsed.modified === 'string' ? parsed.modified : '',
@@ -111,6 +115,7 @@ const saveFilters = (filters) => {
 
 const applyFilters = (list, filters) => {
   return list.filter(v => {
+    const mod = filters.model ? v.model?.toLowerCase().includes(filters.model.toLowerCase()) : true;
     const m = filters.manufacturer ? v.manufacturer?.toLowerCase().includes(filters.manufacturer.toLowerCase()) : true;
     const t = filters.type ? v.type === filters.type : true;
     const mo = filters.modified === '' ? true : filters.modified === 'Sí' ? v.modified : !v.modified;
@@ -125,7 +130,7 @@ const applyFilters = (list, filters) => {
     const sc = filters.scale
       ? Number(v.scale_factor) === Number(filters.scale)
       : true;
-    return m && t && mo && d && museoTaller && sc;
+    return m && mod && t && mo && d && museoTaller && sc;
   });
 };
 
@@ -136,6 +141,7 @@ const VehicleList = () => {
   const [vehicles, setVehicles] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
   const [userScaleDenominators, setUserScaleDenominators] = useState([]);
+  const [userManufacturers, setUserManufacturers] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
@@ -202,16 +208,27 @@ const VehicleList = () => {
     }
   }, []);
 
+  const loadUserManufacturers = useCallback(async () => {
+    try {
+      const { data } = await api.get('/vehicles/manufacturers');
+      const arr = Array.isArray(data?.manufacturers) ? data.manufacturers : [];
+      setUserManufacturers(arr.filter((m) => typeof m === 'string' && m.trim() !== ''));
+    } catch (e) {
+      console.error('Error al cargar fabricantes de la colección:', e);
+    }
+  }, []);
+
   useEffect(() => {
     loadUserScaleDenominators();
-  }, [loadUserScaleDenominators]);
+    loadUserManufacturers();
+  }, [loadUserScaleDenominators, loadUserManufacturers]);
 
   const scaleDenominatorOptions = useMemo(
     () => mergeScaleDenominators(userScaleDenominators, filters.scale),
     [userScaleDenominators, filters.scale],
   );
 
-  const hasActiveFilters = !!(filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.scale !== '' || filters.filterMuseo || filters.filterTaller);
+  const hasActiveFilters = !!(filters.model || filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.scale !== '' || filters.filterMuseo || filters.filterTaller);
 
   const sortQuery = `sort=${encodeURIComponent(listSort.sort)}&dir=${encodeURIComponent(listSort.dir)}`;
 
@@ -289,10 +306,12 @@ const VehicleList = () => {
     setFiltered(prev => prev.filter(v => v.id !== vehicleId));
     if (hasActiveFilters) setAllVehicles(prev => prev.filter(v => v.id !== vehicleId));
     void loadUserScaleDenominators();
+    void loadUserManufacturers();
   };
 
   const handleImportedVehicles = () => {
     void loadUserScaleDenominators();
+    void loadUserManufacturers();
     if (hasActiveFilters) {
       void loadAllVehicles();
     } else {
@@ -311,6 +330,7 @@ const VehicleList = () => {
   const buildExportQueryParams = () => {
     const params = new URLSearchParams();
     if (hasActiveFilters) {
+      if (filters.model) params.set('model', filters.model);
       if (filters.manufacturer) params.set('manufacturer', filters.manufacturer);
       if (filters.type) params.set('type', filters.type);
       if (filters.modified) params.set('modified', filters.modified);
@@ -530,15 +550,28 @@ const VehicleList = () => {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
           <div className="flex flex-col gap-1">
+            <label htmlFor="filter-model" className="text-xs font-medium text-muted-foreground">
+              {t('model')}
+            </label>
+            <Input
+              id="filter-model"
+              placeholder={t('modelPlaceholder')}
+              value={filters.model}
+              onChange={e => setFilters({ ...filters, model: e.target.value })}
+              className="h-9"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
             <label htmlFor="filter-manufacturer" className="text-xs font-medium text-muted-foreground">
               {t('manufacturer')}
             </label>
-            <Input
+            <ManufacturerFilterInput
               id="filter-manufacturer"
               placeholder={t('manufacturerPlaceholder')}
               value={filters.manufacturer}
-              onChange={e => setFilters({ ...filters, manufacturer: e.target.value })}
-              className="h-9"
+              onChange={(manufacturer) => setFilters({ ...filters, manufacturer })}
+              manufacturers={userManufacturers}
             />
           </div>
 

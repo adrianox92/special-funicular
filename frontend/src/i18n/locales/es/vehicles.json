@@ -14,6 +14,8 @@
   "tableViewTitle": "Vista tabla",
   "filtersAndSort": "Filtros y ordenación",
   "filters": "Filtros",
+  "model": "Modelo",
+  "modelPlaceholder": "Buscar por modelo...",
   "manufacturer": "Fabricante",
   "manufacturerPlaceholder": "Buscar fabricante...",
   "type": "Tipo",
