@@ -116,6 +116,9 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
       </AlertDialog>
 
       <TableRow className="cursor-pointer transition-colors hover:bg-muted" onClick={handleRowClick}>
+        <TableCell className="w-10 p-2 text-center font-mono tabular-nums text-sm text-muted-foreground">
+          {vehicle.collection_number != null ? `#${vehicle.collection_number}` : '—'}
+        </TableCell>
         <TableCell className="w-12 p-2">
           <TooltipProvider delayDuration={200}>
             <Tooltip>
@@ -207,6 +210,7 @@ const VehicleTable = ({ vehicles, onDelete, onDuplicateSuccess }) => {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10 text-center">{t('table.collectionNumber')}</TableHead>
             <TableHead className="w-12"></TableHead>
             <TableHead>{t('table.model')}</TableHead>
             <TableHead>{t('table.type')}</TableHead>

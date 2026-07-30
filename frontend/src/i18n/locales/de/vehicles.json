@@ -40,6 +40,8 @@
     "purchaseAsc": "Kaufdatum — älteste zuerst",
     "createdDesc": "Erstellt — neueste zuerst",
     "createdAsc": "Erstellt — älteste zuerst",
+    "collectionAsc": "Sammlungsnr. — aufsteigend",
+    "collectionDesc": "Sammlungsnr. — absteigend",
     "odometerAsc": "Kilometerstand — aufsteigend",
     "odometerDesc": "Kilometerstand — absteigend",
     "updatedDesc": "Letzte Änderung — neueste zuerst",
@@ -94,6 +96,7 @@
   "edit": {
     "title": "Fahrzeug bearbeiten",
     "titleWithModel": "Fahrzeug bearbeiten: {{model}}",
+    "collectionNumber": "Nr. {{number}}",
     "odometer": "Kilometerzähler:",
     "backToList": "Zurück zur Liste",
     "navigation": "Navigation",
@@ -288,6 +291,7 @@
     "priceUnavailable": "Preis nicht verfügbar"
   },
   "table": {
+    "collectionNumber": "Nr.",
     "model": "Modell",
     "type": "Typ",
     "status": "Status",
@@ -299,6 +303,7 @@
     "digitalShort": "Dig."
   },
   "csvExport": {
+    "collectionNumber": "Sammlungsnr.",
     "id": "ID",
     "model": "Modell",
     "reference": "Referenz",

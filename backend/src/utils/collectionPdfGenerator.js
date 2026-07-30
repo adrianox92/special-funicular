@@ -129,7 +129,7 @@ function drawTableHeaderBand(doc, y, widths, headers, headerRowH) {
 }
 
 /**
- * @param {Array<{ imageUrl?: string | null, manufacturer?: unknown, model?: unknown, purchase_date?: unknown, price?: unknown, total_price?: unknown }>} rows
+ * @param {Array<{ imageUrl?: string | null, collection_number?: number | null, manufacturer?: unknown, model?: unknown, purchase_date?: unknown, price?: unknown, total_price?: unknown }>} rows
  * @returns {Promise<Buffer>}
  */
 async function generateCollectionVehiclesPDF(rows) {
@@ -144,10 +144,10 @@ async function generateCollectionVehiclesPDF(rows) {
   const headerRowH = 26;
   const minYBreak = 110;
   const fontSize = 9;
-  /** Pesos relativos: miniatura, marca/modelo, fecha, precio (columna precio un poco más ancha para dos líneas) */
-  const colWeights = [108, 220, 92, 126];
+  /** Pesos relativos: nº colección, miniatura, marca/modelo, fecha, precio */
+  const colWeights = [32, 96, 200, 88, 120];
   const widths = normalizeColumnWidths(colWeights);
-  const headers = ['Imagen', 'Marca y modelo', 'Compra', 'Precio'];
+  const headers = ['Nº', 'Imagen', 'Marca y modelo', 'Compra', 'Precio'];
 
   const imageBuffers = [];
   for (const row of rows) {
@@ -184,11 +184,15 @@ async function generateCollectionVehiclesPDF(rows) {
           const marcaModelo = formatBrandModel(row.manufacturer, row.model);
           const compra = formatPurchaseDate(row.purchase_date);
           const priceParts = resolvePriceParts(row);
+          const collectionNum =
+            row.collection_number != null && row.collection_number !== ''
+              ? String(row.collection_number)
+              : '—';
 
-          const innerThumbW = Math.max(20, widths[0] - 16);
+          const innerThumbW = Math.max(20, widths[1] - 16);
           const innerThumbH = 56;
-          const textBlockW = Math.max(10, widths[1] - 16);
-          const priceColW = Math.max(10, widths[3] - 16);
+          const textBlockW = Math.max(10, widths[2] - 16);
+          const priceColW = Math.max(10, widths[4] - 16);
           const hBrand = doc.heightOfString(marcaModelo, { width: textBlockW });
           const hPrice = measurePriceColumnHeight(doc, priceParts, priceColW, fontSize);
           const lineH = Math.max(innerThumbH + 14, hBrand + 12, hPrice + 12, 28);
@@ -205,7 +209,14 @@ async function generateCollectionVehiclesPDF(rows) {
           }
 
           const imgBuf = imageBuffers[i];
-          const imgX = MARGIN + 8;
+          const numX = MARGIN + 8;
+          doc.fillColor(COLORS.text).fontSize(fontSize).font('Helvetica-Bold');
+          doc.text(collectionNum, numX, y + 6, {
+            width: Math.max(10, widths[0] - 16),
+            align: 'center',
+          });
+
+          const imgX = MARGIN + widths[0] + 8;
           const imgY = y + 6;
           if (imgBuf) {
             try {
@@ -228,13 +239,13 @@ async function generateCollectionVehiclesPDF(rows) {
           }
 
           doc.fillColor(COLORS.text).fontSize(fontSize).font('Helvetica');
-          let cx = MARGIN + widths[0] + 8;
+          let cx = MARGIN + widths[0] + widths[1] + 8;
           doc.text(marcaModelo, cx, y + 6, { width: textBlockW, lineGap: 2 });
-          cx += widths[1];
-          doc.text(compra, cx, y + 6, {
-            width: Math.max(10, widths[2] - 16),
-          });
           cx += widths[2];
+          doc.text(compra, cx, y + 6, {
+            width: Math.max(10, widths[3] - 16),
+          });
+          cx += widths[3];
           drawPriceColumn(doc, priceParts, cx, y + 6, priceColW, fontSize);
 
           y += lineH + 10;

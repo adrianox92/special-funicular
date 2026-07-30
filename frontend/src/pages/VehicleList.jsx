@@ -30,6 +30,7 @@ const SORT_STORAGE_KEY = 'vehicleListSort';
 const SORT_KEYS = new Set([
   'purchase_date',
   'created_at',
+  'collection_number',
   'total_distance_meters',
   'updated_at',
   'model',
@@ -374,6 +375,7 @@ const VehicleList = () => {
       const response = await api.get(url);
       const vehiclesData = response.data.vehicles;
       const headers = [
+        t('csvExport.collectionNumber'),
         t('csvExport.id'),
         t('csvExport.model'),
         t('csvExport.reference'),
@@ -424,6 +426,7 @@ const VehicleList = () => {
           const odometerStr = formatDistance(vehicle.total_distance_meters);
           const anotaciones = vehicle.anotaciones != null && vehicle.anotaciones !== '' && String(vehicle.anotaciones) !== 'null' ? String(vehicle.anotaciones) : '';
           return [
+            vehicle.collection_number ?? '',
             vehicle.id,
             escapeCsv(vehicle.model),
             escapeCsv(vehicle.reference),
@@ -696,6 +699,8 @@ const VehicleList = () => {
             >
               <option value="model|asc">{t('sort.modelAsc')}</option>
               <option value="model|desc">{t('sort.modelDesc')}</option>
+              <option value="collection_number|asc">{t('sort.collectionAsc')}</option>
+              <option value="collection_number|desc">{t('sort.collectionDesc')}</option>
               <option value="purchase_date|desc">{t('sort.purchaseDesc')}</option>
               <option value="purchase_date|asc">{t('sort.purchaseAsc')}</option>
               <option value="created_at|desc">{t('sort.createdDesc')}</option>

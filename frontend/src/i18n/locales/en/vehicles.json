@@ -40,6 +40,8 @@
     "purchaseAsc": "Purchase date — oldest first",
     "createdDesc": "Created — newest first",
     "createdAsc": "Created — oldest first",
+    "collectionAsc": "Collection no. — lowest first",
+    "collectionDesc": "Collection no. — highest first",
     "odometerAsc": "Odometer — low to high",
     "odometerDesc": "Odometer — high to low",
     "updatedDesc": "Last modified — newest first",
@@ -94,6 +96,7 @@
   "edit": {
     "title": "Edit Vehicle",
     "titleWithModel": "Edit Vehicle: {{model}}",
+    "collectionNumber": "No. {{number}}",
     "odometer": "Odometer:",
     "backToList": "Back to list",
     "navigation": "Navigation",
@@ -288,6 +291,7 @@
     "priceUnavailable": "Price unavailable"
   },
   "table": {
+    "collectionNumber": "No.",
     "model": "Model",
     "type": "Type",
     "status": "Status",
@@ -299,6 +303,7 @@
     "digitalShort": "Dig."
   },
   "csvExport": {
+    "collectionNumber": "Collection no.",
     "id": "ID",
     "model": "Model",
     "reference": "Reference",

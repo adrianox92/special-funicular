@@ -34,6 +34,7 @@ const { resolveCircuitForTiming } = require('../lib/clubCircuits');
 const VEHICLE_SORT_COLUMNS = {
   purchase_date: 'purchase_date',
   created_at: 'created_at',
+  collection_number: 'collection_number',
   total_distance_meters: 'total_distance_meters',
   updated_at: 'updated_at',
   /** Modelo primero y fabricante como desempate (listado alfabético A-Z / Z-A). */
@@ -770,6 +771,7 @@ router.get('/export-pdf', async (req, res) => {
 
     const rows = vehicles.map((v) => ({
       imageUrl: urlByVehicleId.get(v.id) || null,
+      collection_number: v.collection_number,
       manufacturer: v.manufacturer,
       model: v.model,
       purchase_date: v.purchase_date,
