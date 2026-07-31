@@ -53,9 +53,25 @@ const {
   isAllowedRegulationMime,
   REGULATION_MAX_BYTES,
 } = require('../lib/competitionRegulationUpload');
+const { logDbError } = require('../lib/logDbError');
 
 /** Cliente que usa service role si existe (omite RLS; el API valida permisos). Igual que clubs/sync. */
 const supabase = getServiceOrAnonClient();
+
+/**
+ * Cuenta filas con GET + limit(0) en lugar de HEAD.
+ * `head: true` oculta el body de errores PostgREST → `{ message: '' }` (supabase-js#1661).
+ * @param {string} table
+ * @param {(q: object) => object} [applyFilters] - recibe el builder tras select('id', { count })
+ * @returns {Promise<{ count: number|null, error: unknown, status?: number, statusText?: string }>}
+ */
+async function countExactWithoutHead(table, applyFilters = (q) => q) {
+  const filtered = applyFilters(
+    supabase.from(table).select('id', { count: 'exact' }),
+  );
+  const { count, error, status, statusText } = await filtered.limit(0);
+  return { count, error, status, statusText };
+}
 
 const regulationFileUpload = multer({
   storage: multer.memoryStorage(),
@@ -604,33 +620,61 @@ router.get('/:id', async (req, res) => {
       console.error('Error al obtener categorías:', catError);
     }
 
-    // Obtener el número de inscripciones pendientes (sin lista de espera)
-    const { count: signupsPending, error: signupsPendingErr } = await supabase
-      .from('competition_signups')
-      .select('*', { count: 'exact', head: true })
-      .eq('competition_id', id)
-      .eq('is_waitlist', false);
+    // Conteos sin HEAD: si falla, el body trae code/message reales (no `{ message: '' }`).
+    const {
+      count: signupsPending,
+      error: signupsPendingErr,
+      status: signupsPendingStatus,
+      statusText: signupsPendingStatusText,
+    } = await countExactWithoutHead('competition_signups', (q) =>
+      q.eq('competition_id', id).eq('is_waitlist', false),
+    );
 
-    const { count: waitlistCount, error: waitlistErr } = await supabase
-      .from('competition_signups')
-      .select('*', { count: 'exact', head: true })
-      .eq('competition_id', id)
-      .eq('is_waitlist', true);
+    const {
+      count: waitlistCount,
+      error: waitlistErr,
+      status: waitlistStatus,
+      statusText: waitlistStatusText,
+    } = await countExactWithoutHead('competition_signups', (q) =>
+      q.eq('competition_id', id).eq('is_waitlist', true),
+    );
 
     if (signupsPendingErr) {
-      console.error('Error al contar inscripciones:', signupsPendingErr);
+      logDbError('GET /api/competitions/:id signups count', signupsPendingErr, {
+        competitionId: id,
+        status: signupsPendingStatus,
+        statusText: signupsPendingStatusText,
+      });
     }
     if (waitlistErr) {
-      console.error('Error al contar lista de espera:', waitlistErr);
+      logDbError('GET /api/competitions/:id waitlist count', waitlistErr, {
+        competitionId: id,
+        status: waitlistStatus,
+        statusText: waitlistStatusText,
+      });
     }
 
-    const { count: timingsCount, error: timingsCountErr } = await supabase
+    // competition_timings no tiene competition_id: se relaciona vía participant_id.
+    let timingsCount = 0;
+    const {
+      count: timingsCountRaw,
+      error: timingsCountErr,
+      status: timingsCountStatus,
+      statusText: timingsCountStatusText,
+    } = await supabase
       .from('competition_timings')
-      .select('*', { count: 'exact', head: true })
-      .eq('competition_id', id);
+      .select('id, competition_participants!inner(id)', { count: 'exact' })
+      .eq('competition_participants.competition_id', id)
+      .limit(0);
 
     if (timingsCountErr) {
-      console.error('Error al contar tiempos:', timingsCountErr);
+      logDbError('GET /api/competitions/:id timings count', timingsCountErr, {
+        competitionId: id,
+        status: timingsCountStatus,
+        statusText: timingsCountStatusText,
+      });
+    } else {
+      timingsCount = timingsCountRaw || 0;
     }
 
     const { data: leagueLink } = await supabase

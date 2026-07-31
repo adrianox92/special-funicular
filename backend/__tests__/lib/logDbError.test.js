@@ -152,6 +152,12 @@ describe('logDbError', () => {
       expect(result.fields).toContain('foo=bar');
       expect(result.raw).toContain('"message":"Bad Request"');
     });
+
+    test('normaliza message vacío típico de HEAD count', () => {
+      const result = extractErrorFields({ message: '' });
+      expect(result.message).toBe('Empty error message');
+      expect(result.raw).toContain('"message":""');
+    });
   });
 
   describe('inferLikelyCause', () => {
@@ -159,6 +165,12 @@ describe('logDbError', () => {
       expect(
         inferLikelyCause('Bad Request', { inFilterChars: 24_000, vehicleCount: 660 }),
       ).toBe('postgrest_in_filter_url_too_long');
+    });
+
+    test('detecta HEAD count que oculta el body del error', () => {
+      expect(
+        inferLikelyCause('Empty error message', { status: 500, competitionId: 'c1' }),
+      ).toBe('postgrest_head_count_hides_error_body');
     });
   });
 

@@ -28,6 +28,15 @@ function formatMeta(meta) {
  * @returns {string|null}
  */
 function inferLikelyCause(message, meta) {
+  const status = Number(meta?.status ?? meta?.statusCode);
+  if (
+    (message === 'Empty error message' || message === '' || message === 'Unknown error') &&
+    Number.isFinite(status) &&
+    status >= 500
+  ) {
+    return 'postgrest_head_count_hides_error_body';
+  }
+
   const generic =
     message === 'Bad Request' ||
     message === 'Request-URI Too Large' ||
@@ -86,6 +95,12 @@ function extractErrorFields(err) {
     if (!(err instanceof Error) && typeof o.message === 'string' && o.message) {
       message = o.message;
     }
+    // HEAD + count=exact a menudo devuelve { message: '' } sin body; no dejar el log vacío.
+    if (!message || message === 'Unknown error') {
+      if (typeof o.message === 'string' && o.message === '') {
+        message = 'Empty error message';
+      }
+    }
     for (const key of ['code', 'details', 'hint', 'status', 'statusCode']) {
       const val = o[key];
       if (val != null && val !== '') fields.push(`${key}=${String(val)}`);
@@ -104,6 +119,7 @@ function extractErrorFields(err) {
     !hasPostgrestFields &&
     (message === 'Bad Request' ||
       message === 'Unknown error' ||
+      message === 'Empty error message' ||
       message === 'Request-URI Too Large' ||
       message === 'URI Too Long');
 
