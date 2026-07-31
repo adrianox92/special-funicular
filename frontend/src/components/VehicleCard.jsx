@@ -119,17 +119,17 @@ const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
         <img ref={imgRef} src={vehicle.image || placeholderImage} alt={vehicle.model} className="w-full h-full object-cover" loading="lazy" />
       </div>
       <CardContent className="p-4">
-        <div className="flex items-start gap-2">
+        <h3 className="font-semibold text-lg">{vehicle.model}</h3>
+        <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-2 mt-0.5">
+          <span>
+            {vehicle.manufacturer}
+            {vehicle.reference != null && vehicle.reference !== '' && String(vehicle.reference) !== 'null' && <span> - {vehicle.reference}</span>}
+          </span>
           {vehicle.collection_number != null && (
             <Badge variant="outline" className="shrink-0 font-mono tabular-nums">
               #{vehicle.collection_number}
             </Badge>
           )}
-          <h3 className="font-semibold text-lg min-w-0">{vehicle.model}</h3>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {vehicle.manufacturer}
-          {vehicle.reference != null && vehicle.reference !== '' && String(vehicle.reference) !== 'null' && <span> - {vehicle.reference}</span>}
         </p>
         <div className="flex flex-wrap gap-1 mt-2">
           {vehicle.type && <Badge variant="secondary">{vehicle.type}</Badge>}
