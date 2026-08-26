@@ -172,8 +172,12 @@
       "addSpec": "Add Technical Specification",
       "fromInventory": "From inventory",
       "usingInventory": "Using inventory item «{{name}}». Type, name, reference, link and price come from the item. {{count}} {{unit}} will be deducted from stock on save (max. {{max}}).",
+      "usingInventoryNoDeduct": "Using inventory item «{{name}}». It will be recorded as a factory spec without deducting stock.",
       "removeLink": "Remove link",
       "unitsHint": "Quantity is set in the «Units» field (below brand). Choose how many to deduct from stock and how many the mounted part represents.",
+      "stockMatchAlert": "There are {{count}} {{unit}} of «{{name}}» in inventory.",
+      "deductFromInventory": "Deduct from inventory",
+      "deductFromInventoryHint": "If enabled, mounted units are subtracted from this part's stock. Factory specs leave this off because the part usually came with the car.",
       "modHistoryHint": "On save, the current component is recorded in history with the indicated date (if you change any data). Review previous values in this tab and on the vehicle detail page.",
       "changeDate": "Change date",
       "componentType": "Component Type",
@@ -272,7 +276,9 @@
       "inventoryReturnError": "Changes saved, but could not add to inventory: {{error}}",
       "modUpdatedInventory": "Modification updated and removed part added to inventory",
       "modSavedDeducted": "Modification saved; {{qty}} unit(s) deducted from inventory",
-      "modDeletedInventory": "Modification deleted and part added to inventory"
+      "modDeletedInventory": "Modification deleted and part added to inventory",
+      "specCreated": "Part recorded on the vehicle",
+      "specCreatedPartialDeduct": "Part recorded. Deducted {{deducted}} of {{requested}} unit(s) (insufficient stock)."
     },
     "notices": {
       "positionsUpdated": "Positions automatically updated on: {{circuits}}",

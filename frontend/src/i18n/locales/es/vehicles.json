@@ -172,8 +172,12 @@
       "addSpec": "Añadir Especificación Técnica",
       "fromInventory": "Desde inventario",
       "usingInventory": "Usando ítem de inventario «{{name}}». El tipo, nombre, referencia, enlace y precio los toma del ítem. Al guardar se descontarán {{count}} {{unit}} del stock (máx. {{max}}).",
+      "usingInventoryNoDeduct": "Usando ítem de inventario «{{name}}». Se registrará como pieza de serie sin descontar stock.",
       "removeLink": "Quitar enlace",
       "unitsHint": "La cantidad se indica en el campo «Unidades» del formulario (debajo de marca). Ahí eliges cuántas se descuentan del stock y cuántas representa la pieza montada.",
+      "stockMatchAlert": "Hay {{count}} {{unit}} de «{{name}}» en el inventario.",
+      "deductFromInventory": "Descontar del inventario",
+      "deductFromInventoryHint": "Si está activo, se restarán las unidades montadas del stock de esta pieza. En la especificación de serie viene desactivado porque la pieza suele venir de fábrica.",
       "modHistoryHint": "Al guardar, el componente actual quedará registrado en el historial con la fecha indicada (si cambias algún dato respecto al que había). Puedes revisar los valores anteriores en esta misma pestaña y en el detalle del vehículo.",
       "changeDate": "Fecha del cambio",
       "componentType": "Tipo de Componente",
@@ -272,7 +276,9 @@
       "inventoryReturnError": "Cambios guardados, pero no se pudo añadir al inventario: {{error}}",
       "modUpdatedInventory": "Modificación actualizada y pieza retirada añadida al inventario",
       "modSavedDeducted": "Modificación guardada; se descontaron {{qty}} ud(s) del inventario",
-      "modDeletedInventory": "Modificación eliminada y pieza añadida al inventario"
+      "modDeletedInventory": "Modificación eliminada y pieza añadida al inventario",
+      "specCreated": "Pieza registrada en el vehículo",
+      "specCreatedPartialDeduct": "Pieza registrada. Se descontaron {{deducted}} de {{requested}} ud(s) (stock insuficiente)."
     },
     "notices": {
       "positionsUpdated": "Posiciones actualizadas automáticamente en: {{circuits}}",

@@ -3,31 +3,7 @@
  * Si ya existe una línea compatible, suma cantidad y anota el reingreso; si no, inserta.
  */
 
-const ALLOWED_CATEGORIES = new Set([
-  'pinion',
-  'crown',
-  'motor',
-  'guide',
-  'chassis',
-  'front_wheel',
-  'rear_wheel',
-  'front_rim',
-  'rear_rim',
-  'axle',
-  'aceite',
-  'limpiador',
-  'electronica',
-  'herramienta',
-  'neumaticos',
-  'cables',
-  'suspension',
-  'trencillas',
-  'tornillos',
-  'stoppers',
-  'topes_y_centradores',
-  'cojinetes',
-  'otro',
-]);
+const { resolvePartId, componentTypeToInventoryCategory } = require('./partsRegistry');
 
 function normalizeOptionalText(val) {
   if (val == null) return null;
@@ -44,14 +20,6 @@ function normalizeUrl(val) {
   } catch {
     return '__invalid__';
   }
-}
-
-function componentTypeToInventoryCategory(ct) {
-  const c = ct == null ? '' : String(ct).trim();
-  if (!c) return 'otro';
-  if (c === 'other') return 'otro';
-  if (ALLOWED_CATEGORIES.has(c)) return c;
-  return 'otro';
 }
 
 function refKey(val) {
@@ -182,11 +150,46 @@ function buildReturnRow(userId, snapshot, vehicleLabel) {
  * @param {string|null} [opts.vehicleLabel] - texto para notas
  * @returns {Promise<{ ok: true, data: object, merged?: boolean } | { ok: false, error: string }>}
  */
-async function insertReturnedComponentToInventory(supabase, { userId, snapshot, vehicleLabel }) {
+async function insertReturnedComponentToInventory(supabase, { userId, snapshot, vehicleLabel, partId: partIdHint }) {
   const { row, qty, firstNoteLine } = buildReturnRow(userId, snapshot, vehicleLabel);
   const reingressLine = `${new Date().toISOString().slice(0, 10)}: Reingreso de ${qty} uds — ${firstNoteLine}`;
 
-  const existing = await findMergeableInventoryItem(supabase, userId, row);
+  let partId = partIdHint || null;
+  if (!partId) {
+    const resolved = await resolvePartId(supabase, userId, {
+      category: row.category,
+      name: row.name,
+      manufacturer: row.manufacturer,
+      reference: row.reference,
+      teeth: row.teeth,
+      rpm: row.rpm,
+      material: row.material,
+      size: row.size,
+      color: row.color,
+      gaus: row.gaus,
+      url: row.url,
+      description: row.description,
+    });
+    if (resolved.ok) partId = resolved.part.id;
+  }
+  row.part_id = partId || null;
+
+  let existing = null;
+  if (partId) {
+    const { data: byPart, error: byPartErr } = await supabase
+      .from('inventory_items')
+      .select('id, quantity, notes, updated_at')
+      .eq('user_id', userId)
+      .eq('part_id', partId)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (!byPartErr && byPart?.length) {
+      existing = { id: byPart[0].id, quantity: byPart[0].quantity, notes: byPart[0].notes };
+    }
+  }
+  if (!existing) {
+    existing = await findMergeableInventoryItem(supabase, userId, row);
+  }
   if (existing) {
     const prevQty = Number(existing.quantity);
     const newQty = prevQty + qty;
@@ -199,6 +202,7 @@ async function insertReturnedComponentToInventory(supabase, { userId, snapshot, 
       .update({
         quantity: newQty,
         notes: combinedNotes,
+        part_id: partId || undefined,
         updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)

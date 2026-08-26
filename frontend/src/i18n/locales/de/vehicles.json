@@ -172,8 +172,12 @@
       "addSpec": "Technische Spezifikation hinzufügen",
       "fromInventory": "Aus Inventar",
       "usingInventory": "Inventareintrag «{{name}}» wird verwendet. Typ, Name, Referenz, Link und Preis stammen vom Eintrag. Beim Speichern werden {{count}} {{unit}} vom Bestand abgezogen (max. {{max}}).",
+      "usingInventoryNoDeduct": "Inventareintrag «{{name}}» wird verwendet. Er wird als Werksangabe ohne Bestandsabzug erfasst.",
       "removeLink": "Verknüpfung entfernen",
       "unitsHint": "Die Menge wird im Feld «Einheiten» (unter Marke) angegeben. Dort wählst du, wie viele vom Bestand abgezogen werden und wie viele das montierte Teil repräsentiert.",
+      "stockMatchAlert": "Es sind {{count}} {{unit}} von «{{name}}» im Inventar.",
+      "deductFromInventory": "Vom Inventar abziehen",
+      "deductFromInventoryHint": "Wenn aktiv, werden die montierten Einheiten vom Bestand dieses Teils abgezogen. Bei Werksangaben bleibt das aus, weil das Teil meist ab Werk kam.",
       "modHistoryHint": "Beim Speichern wird die aktuelle Komponente mit dem angegebenen Datum im Verlauf gespeichert (bei Datenänderung). Frühere Werte findest du in diesem Tab und in der Fahrzeugdetailseite.",
       "changeDate": "Änderungsdatum",
       "componentType": "Komponententyp",
@@ -272,7 +276,9 @@
       "inventoryReturnError": "Änderungen gespeichert, aber Inventar konnte nicht ergänzt werden: {{error}}",
       "modUpdatedInventory": "Modifikation aktualisiert und entferntes Teil zum Inventar hinzugefügt",
       "modSavedDeducted": "Modifikation gespeichert; {{qty}} Einheit(en) vom Inventar abgezogen",
-      "modDeletedInventory": "Modifikation gelöscht und Teil zum Inventar hinzugefügt"
+      "modDeletedInventory": "Modifikation gelöscht und Teil zum Inventar hinzugefügt",
+      "specCreated": "Teil am Fahrzeug erfasst",
+      "specCreatedPartialDeduct": "Teil erfasst. {{deducted}} von {{requested}} Einheit(en) abgezogen (Bestand unzureichend)."
     },
     "notices": {
       "positionsUpdated": "Positionen automatisch aktualisiert auf: {{circuits}}",

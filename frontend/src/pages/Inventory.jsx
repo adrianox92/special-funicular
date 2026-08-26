@@ -50,6 +50,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { Separator } from '../components/ui/separator';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { SearchableCategorySelect } from '../components/SearchableCategorySelect';
 import {
   INVENTORY_CATEGORIES,
@@ -113,6 +114,13 @@ const Inventory = () => {
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
+  const [viewMode, setViewMode] = useState('parts');
+  const [parts, setParts] = useState([]);
+  const [onlyMounted, setOnlyMounted] = useState(false);
+  const [editingPart, setEditingPart] = useState(null);
+  const [partForm, setPartForm] = useState(null);
+  const [partSaving, setPartSaving] = useState(false);
+  const [partFormError, setPartFormError] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(searchInput.trim()), 350);
@@ -146,17 +154,26 @@ const Inventory = () => {
       if (categoryFilter && categoryFilter !== 'all') params.category = categoryFilter;
       if (lowStockOnly) params.low_stock = 'true';
       if (debouncedQ) params.q = debouncedQ;
-      const { data } = await api.get('/inventory', { params });
-      setItems(Array.isArray(data) ? data : []);
+      if (viewMode === 'parts') {
+        if (onlyMounted) params.only_mounted = 'true';
+        const { data } = await api.get('/inventory/parts', { params });
+        setParts(Array.isArray(data) ? data : []);
+        setItems([]);
+      } else {
+        const { data } = await api.get('/inventory', { params });
+        setItems(Array.isArray(data) ? data : []);
+        setParts([]);
+      }
       setError(null);
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.error || 'Error al cargar el inventario');
       setItems([]);
+      setParts([]);
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter, lowStockOnly, debouncedQ]);
+  }, [categoryFilter, lowStockOnly, debouncedQ, viewMode, onlyMounted]);
 
   useEffect(() => {
     loadVehicles();
@@ -527,13 +544,36 @@ const Inventory = () => {
     try {
       setRestockSaving(true);
       setRestockError(null);
-      await api.post(`/inventory/${restockTarget.id}/restock`, {
-        quantity: addQty,
-        purchase_price: price,
-        supplier: restockForm.supplier.trim(),
-        purchase_date: restockForm.purchase_date.trim() || null,
-        notes: restockForm.notes.trim() || null,
-      });
+      if (restockTarget._createForPart) {
+        const p = restockTarget._createForPart;
+        await api.post('/inventory', {
+          name: p.name,
+          reference: p.reference,
+          url: p.url,
+          category: p.category,
+          quantity: addQty,
+          unit: restockTarget.unit || 'uds',
+          purchase_price: price,
+          purchase_date: restockForm.purchase_date.trim() || null,
+          notes: restockForm.notes.trim() || `Compra: ${restockForm.supplier.trim()}`,
+          manufacturer: p.manufacturer,
+          material: p.material,
+          size: p.size,
+          color: p.color,
+          teeth: p.teeth,
+          rpm: p.rpm,
+          gaus: p.gaus,
+          description: p.description,
+        });
+      } else {
+        await api.post(`/inventory/${restockTarget.id}/restock`, {
+          quantity: addQty,
+          purchase_price: price,
+          supplier: restockForm.supplier.trim(),
+          purchase_date: restockForm.purchase_date.trim() || null,
+          notes: restockForm.notes.trim() || null,
+        });
+      }
       toast.success('Stock actualizado y compra registrada');
       closeRestock();
       loadItems();
@@ -566,12 +606,127 @@ const Inventory = () => {
     setHistoryError(null);
   };
 
+  const firstStockLine = (view) =>
+    (view?.inventory_lines || []).find((l) => Number(l.quantity) > 0) || view?.inventory_lines?.[0] || null;
+
+  const openPartRestock = (view) => {
+    const line = firstStockLine(view);
+    if (line) {
+      openRestock(line);
+      return;
+    }
+    openRestock({
+      _createForPart: view.part,
+      name: view.part.name,
+      unit: 'uds',
+      purchase_price: null,
+    });
+  };
+
+  const openPartMount = (view) => {
+    const line = (view?.inventory_lines || []).find((l) => Number(l.quantity) > 0);
+    if (!line) return;
+    openMount({
+      ...line,
+      name: view.part.name,
+      manufacturer: view.part.manufacturer || line.manufacturer,
+      material: view.part.material || line.material,
+      size: view.part.size || line.size,
+      color: view.part.color || line.color,
+      teeth: view.part.teeth ?? line.teeth,
+      rpm: view.part.rpm ?? line.rpm,
+      gaus: view.part.gaus ?? line.gaus,
+      description: view.part.description || line.description,
+      category: view.part.category || line.category,
+    });
+  };
+
+  const openPartHistory = (view) => {
+    const line = view?.inventory_lines?.[0];
+    if (!line) {
+      toast.info('Esta pieza aún no tiene líneas de stock ni historial de compras.');
+      return;
+    }
+    openHistory(line);
+  };
+
+  const openEditPart = (view) => {
+    const p = view.part;
+    setEditingPart(view);
+    setPartForm({
+      name: p.name || '',
+      category: p.category || 'otro',
+      reference: p.reference ?? '',
+      url: p.url ?? '',
+      manufacturer: p.manufacturer ?? '',
+      material: p.material ?? '',
+      size: p.size ?? '',
+      color: p.color ?? '',
+      teeth: p.teeth != null ? String(p.teeth) : '',
+      rpm: p.rpm != null ? String(p.rpm) : '',
+      gaus: p.gaus != null ? String(p.gaus) : '',
+      description: p.description ?? '',
+    });
+    setPartFormError(null);
+  };
+
+  const closeEditPart = () => {
+    setEditingPart(null);
+    setPartForm(null);
+    setPartFormError(null);
+  };
+
+  const handlePartSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingPart || !partForm) return;
+    if (!partForm.name.trim()) {
+      setPartFormError('El nombre es obligatorio');
+      return;
+    }
+    try {
+      setPartSaving(true);
+      setPartFormError(null);
+      const payload = {
+        name: partForm.name.trim(),
+        category: partForm.category,
+        reference: partForm.reference.trim() || null,
+        url: partForm.url.trim() || null,
+        manufacturer: partForm.manufacturer.trim() || null,
+        material: partForm.material.trim() || null,
+        size: partForm.size.trim() || null,
+        color: partForm.color.trim() || null,
+        teeth: partForm.teeth.trim() === '' ? null : parseInt(partForm.teeth, 10),
+        rpm: partForm.rpm.trim() === '' ? null : Number(partForm.rpm),
+        gaus: partForm.gaus.trim() === '' ? null : Number(partForm.gaus),
+        description: partForm.description.trim() || null,
+      };
+      if (payload.teeth != null && Number.isNaN(payload.teeth)) {
+        setPartFormError('Dientes no válidos');
+        setPartSaving(false);
+        return;
+      }
+      if (payload.rpm != null && Number.isNaN(payload.rpm)) {
+        setPartFormError('RPM no válidas');
+        setPartSaving(false);
+        return;
+      }
+      await api.put(`/inventory/parts/${editingPart.part.id}`, payload);
+      toast.success('Pieza actualizada en inventario y coches');
+      closeEditPart();
+      loadItems();
+    } catch (err) {
+      setPartFormError(err.response?.data?.error || 'Error al guardar la pieza');
+    } finally {
+      setPartSaving(false);
+    }
+  };
+
   const isLowStock = (item) =>
     item.min_stock != null && Number(item.quantity) <= Number(item.min_stock);
 
   const unitLabel = (u) => INVENTORY_UNITS.find((x) => x.value === u)?.label || u;
 
-  if (loading && items.length === 0) {
+  if (loading && items.length === 0 && parts.length === 0) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <Spinner className="size-8" />
@@ -585,7 +740,9 @@ const Inventory = () => {
         <div>
           <h1 className="text-2xl font-bold">Inventario</h1>
           <p className="text-muted-foreground">
-            Repuestos y consumibles. Para más unidades del mismo ítem con otro precio o tienda, usa «Reponer» y consulta el historial de compras.
+            {viewMode === 'parts'
+              ? 'Todas las piezas: stock en almacén y unidades montadas en coches, consolidadas por identidad.'
+              : 'Líneas de stock. Para más unidades del mismo ítem con otro precio o tienda, usa «Reponer» y consulta el historial de compras.'}
           </p>
         </div>
         <Button className="flex items-center gap-2" onClick={handleOpenCreate}>
@@ -593,6 +750,13 @@ const Inventory = () => {
           Nuevo ítem
         </Button>
       </div>
+
+      <Tabs value={viewMode} onValueChange={setViewMode}>
+        <TabsList>
+          <TabsTrigger value="parts">Todas las piezas</TabsTrigger>
+          <TabsTrigger value="stock">Líneas de stock</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, item: null })}>
         <AlertDialogContent>
@@ -1241,6 +1405,156 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!editingPart} onOpenChange={(open) => { if (!open) closeEditPart(); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar pieza</DialogTitle>
+            <DialogDescription>
+              Los cambios de nombre, marca, referencia y datos técnicos se aplican a las líneas de inventario y a las piezas montadas en los coches. No se modifican cantidades ni precios.
+            </DialogDescription>
+          </DialogHeader>
+          {partForm && (
+            <form onSubmit={handlePartSubmit}>
+              <div className="space-y-4 py-2">
+                {partFormError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{partFormError}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="part-name">Nombre</Label>
+                  <Input
+                    id="part-name"
+                    value={partForm.name}
+                    onChange={(e) => setPartForm({ ...partForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="part-category">Categoría</Label>
+                  <SearchableCategorySelect
+                    id="part-category"
+                    value={partForm.category}
+                    onValueChange={(v) => setPartForm({ ...partForm, category: v })}
+                    options={INVENTORY_CATEGORIES}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="part-mfg">Marca</Label>
+                    <Input
+                      id="part-mfg"
+                      value={partForm.manufacturer}
+                      onChange={(e) => setPartForm({ ...partForm, manufacturer: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="part-ref">Referencia</Label>
+                    <Input
+                      id="part-ref"
+                      value={partForm.reference}
+                      onChange={(e) => setPartForm({ ...partForm, reference: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="part-url">Enlace</Label>
+                  <Input
+                    id="part-url"
+                    type="url"
+                    value={partForm.url}
+                    onChange={(e) => setPartForm({ ...partForm, url: e.target.value })}
+                  />
+                </div>
+                {mountCategoryIs(partForm.category, 'pinion', 'crown') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="part-teeth">Dientes</Label>
+                    <Input
+                      id="part-teeth"
+                      type="number"
+                      value={partForm.teeth}
+                      onChange={(e) => setPartForm({ ...partForm, teeth: e.target.value })}
+                    />
+                  </div>
+                )}
+                {mountCategoryIs(partForm.category, 'motor') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="part-rpm">RPM</Label>
+                      <Input
+                        id="part-rpm"
+                        type="number"
+                        value={partForm.rpm}
+                        onChange={(e) => setPartForm({ ...partForm, rpm: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="part-gaus">Gaus</Label>
+                      <Input
+                        id="part-gaus"
+                        type="number"
+                        value={partForm.gaus}
+                        onChange={(e) => setPartForm({ ...partForm, gaus: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="part-mat">Material</Label>
+                    <Input
+                      id="part-mat"
+                      value={partForm.material}
+                      onChange={(e) => setPartForm({ ...partForm, material: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="part-size">Tamaño</Label>
+                    <Input
+                      id="part-size"
+                      value={partForm.size}
+                      onChange={(e) => setPartForm({ ...partForm, size: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="part-color">Color</Label>
+                  <Input
+                    id="part-color"
+                    value={partForm.color}
+                    onChange={(e) => setPartForm({ ...partForm, color: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="part-desc">Descripción</Label>
+                  <Textarea
+                    id="part-desc"
+                    rows={2}
+                    value={partForm.description}
+                    onChange={(e) => setPartForm({ ...partForm, description: e.target.value })}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={closeEditPart}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={partSaving}>
+                  {partSaving ? (
+                    <>
+                      <Spinner className="size-4 mr-2" />
+                      Guardando…
+                    </>
+                  ) : (
+                    'Guardar pieza'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-col lg:flex-row gap-4 flex-wrap items-start lg:items-end">
         <div className="space-y-2 min-w-[180px]">
           <Label htmlFor="inv-filter-cat">Categoría</Label>
@@ -1273,6 +1587,14 @@ const Inventory = () => {
             Solo stock bajo
           </Label>
         </div>
+        {viewMode === 'parts' && (
+          <div className="flex items-center gap-2 pb-2">
+            <Switch id="inv-mounted" checked={onlyMounted} onCheckedChange={setOnlyMounted} />
+            <Label htmlFor="inv-mounted" className="cursor-pointer">
+              Solo montadas en coches
+            </Label>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -1281,17 +1603,17 @@ const Inventory = () => {
         </Alert>
       )}
 
-      {loading && items.length > 0 && (
+      {loading && (items.length > 0 || parts.length > 0) && (
         <div className="flex justify-center py-2">
           <Spinner className="size-6" />
         </div>
       )}
 
-      {!loading && items.length === 0 ? (
+      {!loading && (viewMode === 'parts' ? parts.length === 0 : items.length === 0) ? (
         <Card className="text-center py-12">
           <CardContent>
             <Package className="size-12 mx-auto text-muted-foreground mb-4" />
-            <h4 className="mb-2">No hay ítems</h4>
+            <h4 className="mb-2">{viewMode === 'parts' ? 'No hay piezas' : 'No hay ítems'}</h4>
             <p className="text-muted-foreground mb-6">
               Añade repuestos o ajusta los filtros de búsqueda.
             </p>
@@ -1301,6 +1623,116 @@ const Inventory = () => {
             </Button>
           </CardContent>
         </Card>
+      ) : viewMode === 'parts' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {parts.map((view) => {
+            const p = view.part;
+            const stockLine = (view.inventory_lines || []).find((l) => Number(l.quantity) > 0);
+            return (
+              <Card
+                key={p.id}
+                className="relative flex h-full flex-col overflow-hidden hover:shadow-lg transition-shadow"
+              >
+                <CardContent className="flex flex-1 flex-col p-4">
+                  <h3 className="font-semibold text-lg leading-tight break-words">{p.name}</h3>
+                  {p.reference && (
+                    <p className="text-sm text-muted-foreground">
+                      Ref: <span className="font-mono text-foreground/90">{p.reference}</span>
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Badge variant="secondary">{formatInventoryCategory(p.category)}</Badge>
+                    {view.low_stock && <Badge variant="destructive">Stock bajo</Badge>}
+                    {Number(view.stock_qty) === 0 && Number(view.mounted_qty) > 0 && (
+                      <Badge variant="outline">Solo montada</Badge>
+                    )}
+                    {p.manufacturer && <Badge variant="outline">{p.manufacturer}</Badge>}
+                  </div>
+                  <div className="mt-3 text-sm space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">En stock:</span>{' '}
+                      <span className="font-medium">{view.stock_qty}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Montadas:</span>{' '}
+                      <span className="font-medium">{view.mounted_qty}</span>
+                    </div>
+                  </div>
+                  {Array.isArray(view.mounted_in) && view.mounted_in.length > 0 && (
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <div className="flex items-start gap-1">
+                        <Car className="size-3 shrink-0 mt-0.5" aria-hidden />
+                        <span className="leading-snug">
+                          Montado en{' '}
+                          {view.mounted_in.map((m, idx) => (
+                            <span key={`${m.component_id}-${m.vehicle.id}`}>
+                              {idx > 0 ? (idx === view.mounted_in.length - 1 ? ' y ' : ', ') : ''}
+                              <Link
+                                to={`/vehicles/${m.vehicle.id}`}
+                                className="font-medium text-primary hover:underline"
+                              >
+                                {m.vehicle.manufacturer} {m.vehicle.model}
+                              </Link>
+                              {m.mounted_qty > 1 ? ` (${m.mounted_qty})` : ''}
+                            </span>
+                          ))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <div
+                    className="mt-auto flex w-full min-w-0 flex-nowrap items-center justify-end gap-0.5 overflow-x-auto border-t border-border pt-3"
+                    role="toolbar"
+                    aria-label="Acciones de la pieza"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      className="h-8 w-8 shrink-0"
+                      title="Reponer stock"
+                      onClick={() => openPartRestock(view)}
+                    >
+                      <PackagePlus className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      className="h-8 w-8 shrink-0"
+                      title="Historial de compras"
+                      onClick={() => openPartHistory(view)}
+                    >
+                      <History className="size-4" />
+                    </Button>
+                    {stockLine && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        className="h-8 w-8 shrink-0"
+                        title="Montar en vehículo"
+                        onClick={() => openPartMount(view)}
+                      >
+                        <Wrench className="size-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      className="h-8 w-8 shrink-0"
+                      title="Editar pieza (afecta a inventario y coches)"
+                      onClick={() => openEditPart(view)}
+                    >
+                      <Pen className="size-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {items.map((item) => (

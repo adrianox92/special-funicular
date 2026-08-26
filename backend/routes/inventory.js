@@ -4,34 +4,14 @@ const { createUserScopedClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
 const { getOrCreateBaseSpecs, updateVehicleTotalPrice } = require('../lib/vehicleSpecs');
+const {
+  ALLOWED_CATEGORIES,
+  resolvePartId,
+  buildPartIdentity,
+  inventoryCategoryToComponentType,
+} = require('../lib/partsRegistry');
 
 const router = express.Router();
-
-const ALLOWED_CATEGORIES = new Set([
-  'pinion',
-  'crown',
-  'motor',
-  'guide',
-  'chassis',
-  'front_wheel',
-  'rear_wheel',
-  'front_rim',
-  'rear_rim',
-  'axle',
-  'aceite',
-  'limpiador',
-  'electronica',
-  'herramienta',
-  'neumaticos',
-  'cables',
-  'suspension',
-  'trencillas',
-  'tornillos',
-  'stoppers',
-  'topes_y_centradores',
-  'cojinetes',
-  'otro',
-]);
 
 const ALLOWED_UNITS = new Set(['uds', 'pares', 'ml', 'metros', 'juego']);
 
@@ -113,10 +93,10 @@ async function assertVehicleOwned(supabase, vehicleId, userId) {
   return !!data;
 }
 
-/** Inventario usa `otro`; componentes del vehículo usan `other`. */
-function inventoryCategoryToComponentType(category) {
-  const c = String(category);
-  return c === 'otro' ? 'other' : c;
+async function resolveAndAttachPartId(supabase, userId, attrs) {
+  const resolved = await resolvePartId(supabase, userId, attrs);
+  if (!resolved.ok) return { ok: false, error: resolved.error };
+  return { ok: true, partId: resolved.part.id, part: resolved.part };
 }
 
 /**
@@ -264,6 +244,141 @@ async function enrichInventoryRows(supabase, rows, userId) {
   return attachMountedVehiclesFromComponents(supabase, withVehicle, userId);
 }
 
+const PART_QUERY_CHUNK = 80;
+
+/**
+ * Agrupa líneas de stock y montajes por part_id.
+ * @returns {Promise<object[]>}
+ */
+async function assemblePartViews(supabase, parts, userId) {
+  if (!parts?.length) return [];
+  const partIds = parts.map((p) => p.id).filter(Boolean);
+
+  /** @type {Map<string, object[]>} */
+  const linesByPart = new Map();
+  /** @type {Map<string, object[]>} */
+  const mountsByPart = new Map();
+
+  for (let i = 0; i < partIds.length; i += PART_QUERY_CHUNK) {
+    const chunk = partIds.slice(i, i + PART_QUERY_CHUNK);
+    const { data: lines, error: linesErr } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('user_id', userId)
+      .in('part_id', chunk)
+      .order('created_at', { ascending: true });
+    if (linesErr) throw linesErr;
+    for (const line of lines || []) {
+      if (!line.part_id) continue;
+      const arr = linesByPart.get(line.part_id) || [];
+      arr.push(line);
+      linesByPart.set(line.part_id, arr);
+    }
+
+    const { data: comps, error: compsErr } = await supabase
+      .from('components')
+      .select('id, part_id, mounted_qty, tech_spec_id, source_inventory_item_id')
+      .not('part_id', 'is', null)
+      .in('part_id', chunk);
+    if (compsErr) throw compsErr;
+
+    const specIds = [...new Set((comps || []).map((c) => c.tech_spec_id).filter(Boolean))];
+    if (specIds.length === 0) continue;
+
+    const { data: specs, error: specsErr } = await supabase
+      .from('technical_specs')
+      .select('id, vehicle_id, is_modification')
+      .in('id', specIds);
+    if (specsErr) throw specsErr;
+
+    const specMap = Object.fromEntries((specs || []).map((s) => [s.id, s]));
+    const vehicleIds = [...new Set((specs || []).map((s) => s.vehicle_id).filter(Boolean))];
+    if (vehicleIds.length === 0) continue;
+
+    const { data: vehRows, error: vehErr } = await supabase
+      .from('vehicles')
+      .select('id, manufacturer, model')
+      .eq('user_id', userId)
+      .in('id', vehicleIds);
+    if (vehErr) throw vehErr;
+    const vehMap = Object.fromEntries((vehRows || []).map((v) => [v.id, v]));
+
+    for (const c of comps || []) {
+      const spec = c.tech_spec_id ? specMap[c.tech_spec_id] : null;
+      const vehicle = spec?.vehicle_id ? vehMap[spec.vehicle_id] : null;
+      if (!c.part_id || !vehicle) continue;
+      const arr = mountsByPart.get(c.part_id) || [];
+      arr.push({
+        vehicle: {
+          id: vehicle.id,
+          manufacturer: vehicle.manufacturer,
+          model: vehicle.model,
+        },
+        component_id: c.id,
+        mounted_qty: Math.max(1, parseInt(c.mounted_qty, 10) || 1),
+        is_modification: !!spec?.is_modification,
+      });
+      mountsByPart.set(c.part_id, arr);
+    }
+  }
+
+  return parts.map((part) => {
+    const inventoryLines = linesByPart.get(part.id) || [];
+    const mountedIn = (mountsByPart.get(part.id) || []).sort((a, b) =>
+      `${a.vehicle.manufacturer || ''} ${a.vehicle.model || ''}`.localeCompare(
+        `${b.vehicle.manufacturer || ''} ${b.vehicle.model || ''}`,
+        undefined,
+        { sensitivity: 'base' },
+      ),
+    );
+    const stockQty = inventoryLines.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+    const mountedQty = mountedIn.reduce((sum, row) => sum + (Number(row.mounted_qty) || 0), 0);
+    const lowStock = inventoryLines.some(
+      (r) => r.min_stock != null && Number(r.quantity) <= Number(r.min_stock),
+    );
+    return {
+      part,
+      stock_qty: stockQty,
+      mounted_qty: mountedQty,
+      low_stock: lowStock,
+      inventory_lines: inventoryLines,
+      mounted_in: mountedIn,
+    };
+  });
+}
+
+async function loadUserParts(supabase, userId, { category, q } = {}) {
+  let query = supabase
+    .from('parts')
+    .select('*')
+    .eq('user_id', userId)
+    .order('name', { ascending: true });
+
+  if (category && String(category).trim() !== '' && String(category) !== 'all') {
+    if (!ALLOWED_CATEGORIES.has(String(category))) {
+      const err = new Error('category no válida');
+      err.status = 400;
+      throw err;
+    }
+    query = query.eq('category', String(category));
+  }
+
+  const searchQ = q != null && String(q).trim() !== '' ? String(q).trim() : null;
+  if (searchQ) {
+    const safe = searchQ.replace(/%/g, '').replace(/,/g, ' ').replace(/[()]/g, ' ').trim();
+    if (safe) {
+      const esc = safe.replace(/_/g, '\\_');
+      query = query.or(
+        `name.ilike.%${esc}%,reference.ilike.%${esc}%,manufacturer.ilike.%${esc}%`,
+      );
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
 /**
  * GET /api/inventory?category=&low_stock=true&vehicle_id=&q=
  */
@@ -321,6 +436,231 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/inventory/parts/match
+ * Resuelve una pieza candidata por identidad (ficha de vehículo).
+ */
+router.get('/parts/match', async (req, res) => {
+  try {
+    const { category, name, manufacturer, reference, sku, teeth, rpm, component_type: componentType } = req.query;
+    const { identityKey } = buildPartIdentity({
+      category: category || componentType,
+      name,
+      manufacturer,
+      reference: reference || sku,
+      teeth,
+      rpm,
+    });
+    if (!name || !String(name).trim()) {
+      return res.json(null);
+    }
+
+    const { data: part, error } = await req.supabase
+      .from('parts')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .eq('identity_key', identityKey)
+      .maybeSingle();
+    if (error) {
+      console.error('GET /inventory/parts/match:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    if (!part) return res.json(null);
+
+    const [view] = await assemblePartViews(req.supabase, [part], req.user.id);
+    res.json(view || null);
+  } catch (err) {
+    console.error('GET /inventory/parts/match:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/inventory/parts
+ * Vista consolidada: stock + unidades montadas por identidad de pieza.
+ */
+router.get('/parts', async (req, res) => {
+  try {
+    const { category, low_stock: lowStock, q, only_mounted: onlyMounted } = req.query;
+    const parts = await loadUserParts(req.supabase, req.user.id, { category, q });
+    let views = await assemblePartViews(req.supabase, parts, req.user.id);
+
+    if (lowStock === 'true' || lowStock === '1') {
+      views = views.filter((v) => v.low_stock);
+    }
+    if (onlyMounted === 'true' || onlyMounted === '1') {
+      views = views.filter((v) => Number(v.mounted_qty) > 0);
+    }
+
+    res.json(views);
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    console.error('GET /inventory/parts:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/inventory/parts/:partId
+ * Actualiza la identidad/descriptivos de una pieza y propaga a stock y componentes montados.
+ * No toca cantidades ni precios.
+ */
+router.put('/parts/:partId', async (req, res) => {
+  try {
+    const { partId } = req.params;
+    const { data: existing, error: fetchErr } = await req.supabase
+      .from('parts')
+      .select('*')
+      .eq('id', partId)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+    if (!existing) return res.status(404).json({ error: 'Pieza no encontrada' });
+
+    const next = { ...existing };
+    const assignText = (key, val) => {
+      if (val === undefined) return;
+      next[key] = normalizeOptionalText(val);
+    };
+    if (req.body.name !== undefined) {
+      if (!req.body.name || !String(req.body.name).trim()) {
+        return res.status(400).json({ error: 'name no puede estar vacío' });
+      }
+      next.name = String(req.body.name).trim();
+    }
+    if (req.body.category !== undefined) {
+      if (!ALLOWED_CATEGORIES.has(String(req.body.category))) {
+        return res.status(400).json({ error: 'category no válida' });
+      }
+      next.category = String(req.body.category);
+    }
+    assignText('manufacturer', req.body.manufacturer);
+    assignText('reference', req.body.reference);
+    assignText('material', req.body.material);
+    assignText('size', req.body.size);
+    assignText('color', req.body.color);
+    assignText('url', req.body.url);
+    assignText('description', req.body.description);
+
+    if (req.body.teeth !== undefined) {
+      if (req.body.teeth === null || String(req.body.teeth).trim() === '') next.teeth = null;
+      else {
+        const t = parseInt(req.body.teeth, 10);
+        if (Number.isNaN(t)) return res.status(400).json({ error: 'teeth no válido' });
+        next.teeth = t;
+      }
+    }
+    if (req.body.rpm !== undefined) {
+      if (req.body.rpm === null || String(req.body.rpm).trim() === '') next.rpm = null;
+      else {
+        const r = Number(req.body.rpm);
+        if (Number.isNaN(r)) return res.status(400).json({ error: 'rpm no válido' });
+        next.rpm = r;
+      }
+    }
+    if (req.body.gaus !== undefined) {
+      if (req.body.gaus === null || String(req.body.gaus).trim() === '') next.gaus = null;
+      else {
+        const g = Number(req.body.gaus);
+        if (Number.isNaN(g)) return res.status(400).json({ error: 'gaus no válido' });
+        next.gaus = g;
+      }
+    }
+    if (req.body.url !== undefined) {
+      const urlNorm = normalizeUrl(req.body.url);
+      if (urlNorm === '__invalid__') return res.status(400).json({ error: 'url no válida' });
+      next.url = urlNorm;
+    }
+
+    const patch = {
+      name: next.name,
+      category: next.category,
+      manufacturer: next.manufacturer,
+      reference: next.reference,
+      teeth: next.teeth,
+      rpm: next.rpm,
+      material: next.material,
+      size: next.size,
+      color: next.color,
+      gaus: next.gaus,
+      url: next.url,
+      description: next.description,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: updatedPart, error: updErr } = await req.supabase
+      .from('parts')
+      .update(patch)
+      .eq('id', partId)
+      .eq('user_id', req.user.id)
+      .select('*')
+      .single();
+
+    if (updErr) {
+      if (updErr.code === '23505') {
+        return res.status(409).json({
+          error: 'Ya existe otra pieza con la misma identidad (categoría, nombre, marca, referencia, dientes/rpm).',
+        });
+      }
+      return res.status(500).json({ error: updErr.message });
+    }
+
+    const invPatch = {
+      name: updatedPart.name,
+      category: updatedPart.category,
+      manufacturer: updatedPart.manufacturer,
+      reference: updatedPart.reference,
+      teeth: updatedPart.teeth,
+      rpm: updatedPart.rpm,
+      material: updatedPart.material,
+      size: updatedPart.size,
+      color: updatedPart.color,
+      gaus: updatedPart.gaus,
+      url: updatedPart.url,
+      description: updatedPart.description,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: invErr } = await req.supabase
+      .from('inventory_items')
+      .update(invPatch)
+      .eq('part_id', partId)
+      .eq('user_id', req.user.id);
+    if (invErr) {
+      console.error('PUT /inventory/parts propagate inventory:', invErr);
+      return res.status(500).json({ error: invErr.message });
+    }
+
+    const { error: compErr } = await req.supabase
+      .from('components')
+      .update({
+        element: updatedPart.name,
+        sku: updatedPart.reference,
+        manufacturer: updatedPart.manufacturer,
+        teeth: updatedPart.teeth,
+        rpm: updatedPart.rpm,
+        material: updatedPart.material,
+        size: updatedPart.size,
+        color: updatedPart.color,
+        gaus: updatedPart.gaus,
+        url: updatedPart.url,
+        description: updatedPart.description,
+        component_type: inventoryCategoryToComponentType(updatedPart.category),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('part_id', partId);
+    if (compErr) {
+      console.error('PUT /inventory/parts propagate components:', compErr);
+      return res.status(500).json({ error: compErr.message });
+    }
+
+    const [view] = await assemblePartViews(req.supabase, [updatedPart], req.user.id);
+    res.json(view);
+  } catch (err) {
+    console.error('PUT /inventory/parts/:partId:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/inventory/:id/purchase-history
  * Historial de reposiciones (más reciente primero).
  */
@@ -369,7 +709,7 @@ router.get('/:id/purchase-history', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id || id === 'purchase-history') {
+    if (!id || id === 'purchase-history' || id === 'parts') {
       return res.status(400).json({ error: 'id no válido' });
     }
 
@@ -602,6 +942,24 @@ router.post('/', inventoryCreateValidators, handleValidationErrors, async (req, 
       vId = String(vehicleId);
     }
 
+    const partRes = await resolveAndAttachPartId(req.supabase, req.user.id, {
+      category: String(category),
+      name: String(name).trim(),
+      manufacturer,
+      reference,
+      teeth: teethPost,
+      rpm: rpmPost,
+      material,
+      size,
+      color,
+      gaus: gausPost,
+      url: urlNorm,
+      description: specDescription,
+    });
+    if (!partRes.ok) {
+      return res.status(500).json({ error: partRes.error });
+    }
+
     const row = {
       user_id: req.user.id,
       name: String(name).trim(),
@@ -623,6 +981,7 @@ router.post('/', inventoryCreateValidators, handleValidationErrors, async (req, 
       rpm: rpmPost,
       gaus: gausPost,
       description: normalizeOptionalText(specDescription),
+      part_id: partRes.partId,
       updated_at: new Date().toISOString(),
     };
 
@@ -788,6 +1147,13 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    const mergedForPart = { ...existing, ...updates };
+    const partRes = await resolveAndAttachPartId(req.supabase, req.user.id, mergedForPart);
+    if (!partRes.ok) {
+      return res.status(500).json({ error: partRes.error });
+    }
+    updates.part_id = partRes.partId;
+
     const { data, error } = await req.supabase
       .from('inventory_items')
       .update(updates)
@@ -851,7 +1217,8 @@ router.post('/:id/mount', async (req, res) => {
     if (!item) {
       return res.status(404).json({ error: 'Item no encontrado' });
     }
-    if (Number(item.quantity) < 1) {
+    const shouldDeduct = isModification;
+    if (shouldDeduct && Number(item.quantity) < mountQty) {
       return res.status(400).json({ error: 'Stock insuficiente' });
     }
 
@@ -899,6 +1266,24 @@ router.post('/:id/mount', async (req, res) => {
     const specs = await getOrCreateBaseSpecs(vehicleId);
     const targetSpec = isModification ? specs.modification : specs.technical;
 
+    let partId = item.part_id || null;
+    if (!partId) {
+      const partRes = await resolveAndAttachPartId(req.supabase, req.user.id, {
+        ...item,
+        manufacturer: manufacturerResolved,
+        teeth: teethMerged,
+        rpm: rpmMerged,
+        gaus: gausMerged,
+      });
+      if (!partRes.ok) return res.status(500).json({ error: partRes.error });
+      partId = partRes.partId;
+      await req.supabase
+        .from('inventory_items')
+        .update({ part_id: partId, updated_at: new Date().toISOString() })
+        .eq('id', inventoryId)
+        .eq('user_id', req.user.id);
+    }
+
     const row = {
       tech_spec_id: targetSpec.id,
       component_type: compType,
@@ -919,6 +1304,7 @@ router.post('/:id/mount', async (req, res) => {
       description: mergeSpecText(description, item.description),
       mounted_qty: mountQty,
       source_inventory_item_id: inventoryId,
+      part_id: partId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -934,25 +1320,29 @@ router.post('/:id/mount', async (req, res) => {
       return res.status(500).json({ error: insErr.message });
     }
 
-    const prevQty = Number(item.quantity);
-    const { data: updatedInv, error: updErr } = await req.supabase
-      .from('inventory_items')
-      .update({
-        quantity: prevQty - mountQty,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', inventoryId)
-      .eq('user_id', req.user.id)
-      .eq('quantity', prevQty)
-      .select('*')
-      .maybeSingle();
+    let updatedInv = item;
+    if (shouldDeduct) {
+      const prevQty = Number(item.quantity);
+      const { data: deducted, error: updErr } = await req.supabase
+        .from('inventory_items')
+        .update({
+          quantity: prevQty - mountQty,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', inventoryId)
+        .eq('user_id', req.user.id)
+        .eq('quantity', prevQty)
+        .select('*')
+        .maybeSingle();
 
-    if (updErr || !updatedInv) {
-      await req.supabase.from('components').delete().eq('id', inserted.id);
-      return res.status(409).json({
-        error:
-          'No se pudo actualizar el stock (posible condición de carrera o stock agotado). Reintenta.',
-      });
+      if (updErr || !deducted) {
+        await req.supabase.from('components').delete().eq('id', inserted.id);
+        return res.status(409).json({
+          error:
+            'No se pudo actualizar el stock (posible condición de carrera o stock agotado). Reintenta.',
+        });
+      }
+      updatedInv = deducted;
     }
 
     if (isModification) {

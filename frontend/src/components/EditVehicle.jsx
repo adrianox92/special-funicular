@@ -261,6 +261,8 @@ const EditVehicle = () => {
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [inventoryPickerLoading, setInventoryPickerLoading] = useState(false);
   const [inventoryPickerItems, setInventoryPickerItems] = useState([]);
+  const [deductFromInventory, setDeductFromInventory] = useState(null);
+  const [matchedPart, setMatchedPart] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState(null);
@@ -591,6 +593,8 @@ const EditVehicle = () => {
     setSelectedInventoryItemName('');
     setSelectedInventoryMountQty('1');
     setSelectedInventoryMaxQty(null);
+    setDeductFromInventory(null);
+    setMatchedPart(null);
     setNewSpec({
       component_type: '',
       element: '',
@@ -627,6 +631,55 @@ const EditVehicle = () => {
       setInventoryPickerLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (editingSpec || selectedInventoryItemId) {
+      setMatchedPart(null);
+      return undefined;
+    }
+    const type = newSpec.component_type;
+    const name = (newSpec.element || '').trim();
+    const manufacturer = (newSpec.manufacturer || '').trim();
+    if (!type || !name || !manufacturer) {
+      setMatchedPart(null);
+      return undefined;
+    }
+    if ((type === 'pinion' || type === 'crown') && (newSpec.teeth === '' || Number.isNaN(Number(newSpec.teeth)))) {
+      setMatchedPart(null);
+      return undefined;
+    }
+    if (type === 'motor' && (newSpec.rpm === '' || Number.isNaN(Number(newSpec.rpm)))) {
+      setMatchedPart(null);
+      return undefined;
+    }
+    const tmr = setTimeout(async () => {
+      try {
+        const params = {
+          category: type === 'other' ? 'otro' : type,
+          name,
+          manufacturer,
+        };
+        if (newSpec.sku?.trim()) params.reference = newSpec.sku.trim();
+        if (newSpec.teeth !== '') params.teeth = newSpec.teeth;
+        if (newSpec.rpm !== '') params.rpm = newSpec.rpm;
+        const { data } = await api.get('/inventory/parts/match', { params });
+        setMatchedPart(data && data.part ? data : null);
+      } catch (e) {
+        console.error(e);
+        setMatchedPart(null);
+      }
+    }, 350);
+    return () => clearTimeout(tmr);
+  }, [
+    editingSpec,
+    selectedInventoryItemId,
+    newSpec.component_type,
+    newSpec.element,
+    newSpec.manufacturer,
+    newSpec.sku,
+    newSpec.teeth,
+    newSpec.rpm,
+  ]);
 
   const handlePickInventoryItem = (item) => {
     setNewSpec((prev) => ({
@@ -680,7 +733,11 @@ const EditVehicle = () => {
         rpm: invMountPayload.rpm,
         gaus: invMountPayload.gaus,
       });
-      toast.success('Pieza montada y stock actualizado');
+      toast.success(
+        isModificationTab
+          ? 'Pieza montada y stock actualizado'
+          : t('edit.toasts.specCreated'),
+      );
     } else if (editingSpec) {
       const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
       if (!currentSpec?.id) {
@@ -703,7 +760,17 @@ const EditVehicle = () => {
         toast.success(t('edit.toasts.modSavedDeducted', { qty: res.data.inventory_deducted_qty }));
       }
     } else {
-      await api.post(`/vehicles/${id}/technical-specs`, specData);
+      const res = await api.post(`/vehicles/${id}/technical-specs`, specData);
+      const warnings = res.data?.inventory_deduct_warnings;
+      if (Array.isArray(warnings) && warnings.length > 0) {
+        const w = warnings[0];
+        toast.warning(t('edit.toasts.specCreatedPartialDeduct', {
+          deducted: w.deducted,
+          requested: w.requested,
+        }));
+      } else {
+        toast.success(t('edit.toasts.specCreated'));
+      }
     }
 
     const response = await api.get(`/vehicles/${id}/technical-specs`);
@@ -748,7 +815,7 @@ const EditVehicle = () => {
 
   const handleAddSpec = async (e, isModificationTab = false) => {
     e.preventDefault();
-    const fromInventory = !editingSpec && selectedInventoryItemId && isModificationTab;
+    const fromInventory = !editingSpec && selectedInventoryItemId;
     const compType = editingSpec?.component_type || newSpec.component_type;
     if (!compType && !fromInventory) {
       setError('El tipo de componente es requerido');
@@ -793,6 +860,7 @@ const EditVehicle = () => {
       const mountedQty = Number.isNaN(mountQtyVal) || mountQtyVal < 1 ? 1 : mountQtyVal;
       const specData = {
         is_modification: isModificationTab,
+        deduct_from_inventory: deductFromInventory == null ? isModificationTab : deductFromInventory,
         component_id: editingSpec?.component_id,
         components: [
           {
@@ -1245,7 +1313,7 @@ const EditVehicle = () => {
     const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
     const components = currentSpec?.components || [];
     const specValue = editingSpec || newSpec;
-    const fromInventory = !editingSpec && selectedInventoryItemId && isModificationTab;
+    const fromInventory = !editingSpec && selectedInventoryItemId;
 
     return (
       <div className="mt-4 space-y-4">
@@ -1259,7 +1327,7 @@ const EditVehicle = () => {
                 ? t('edit.specs.addModification')
                 : t('edit.specs.addSpec')}
           </h4>
-          {!editingSpec && isModificationTab && (
+          {!editingSpec && (
             <Button
               type="button"
               variant="outline"
@@ -1281,7 +1349,7 @@ const EditVehicle = () => {
             <AlertDescription className="flex flex-col gap-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <span>
-                  {t('edit.specs.usingInventory', {
+                  {t(isModificationTab ? 'edit.specs.usingInventory' : 'edit.specs.usingInventoryNoDeduct', {
                     name: selectedInventoryItemName,
                     count: (() => {
                       const n = Math.min(
@@ -1305,6 +1373,34 @@ const EditVehicle = () => {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">{t('edit.specs.unitsHint')}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+        {!editingSpec && !fromInventory && matchedPart && Number(matchedPart.stock_qty) > 0 && (
+          <Alert>
+            <Package className="size-4 shrink-0" aria-hidden />
+            <AlertDescription className="flex flex-col gap-3">
+              <span>
+                {t('edit.specs.stockMatchAlert', {
+                  count: matchedPart.stock_qty,
+                  unit: matchedPart.stock_qty === 1 ? t('modals.unit') : t('modals.units'),
+                  name: matchedPart.part?.name || newSpec.element,
+                })}
+              </span>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id={`deduct-inv-${isModificationTab ? 'mod' : 'tech'}`}
+                  checked={deductFromInventory == null ? isModificationTab : deductFromInventory}
+                  onCheckedChange={setDeductFromInventory}
+                />
+                <Label
+                  htmlFor={`deduct-inv-${isModificationTab ? 'mod' : 'tech'}`}
+                  className="cursor-pointer"
+                >
+                  {t('edit.specs.deductFromInventory')}
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('edit.specs.deductFromInventoryHint')}</p>
             </AlertDescription>
           </Alert>
         )}
@@ -1481,7 +1577,7 @@ const EditVehicle = () => {
           <div className="flex gap-2 mt-4">
             <Button type="submit">
               {fromInventory
-                ? t('edit.specs.mountAndDeduct')
+                ? (isModificationTab ? t('edit.specs.mountAndDeduct') : t('edit.specs.addSpecBtn'))
                 : editingSpec
                   ? isModificationTab
                     ? t('edit.specs.updateModification')
@@ -1497,66 +1593,6 @@ const EditVehicle = () => {
             )}
           </div>
         </form>
-        {isModificationTab && (
-          <Dialog open={inventoryPickerOpen} onOpenChange={(open) => setInventoryPickerOpen(open)}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{t('modals.inventoryPickerTitle')}</DialogTitle>
-                <DialogDescription>{t('modals.inventoryPickerDesc')}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto py-2">
-                {inventoryPickerLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Spinner className="size-8" />
-                  </div>
-                ) : inventoryPickerItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    {t('modals.noInventoryItems', {
-                      categorySuffix: newSpec.component_type ? t('modals.categorySuffix') : '',
-                    })}
-                  </p>
-                ) : (
-                  inventoryPickerItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatInventoryCategory(item.category)} · {t('modals.stock')}: {item.quantity}
-                          {item.purchase_price != null &&
-                            ` · ${Number(item.purchase_price).toFixed(2)} ${t('modals.unitPrice')}`}
-                        </p>
-                        {Array.isArray(item.mounted_vehicles) && item.mounted_vehicles.length > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
-                            {t('modals.mountedOn')}{' '}
-                            {item.mounted_vehicles.map((v, idx) => (
-                              <span key={v.id}>
-                                {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? t('edit.and') : ', ') : ''}
-                                <Link to={`/vehicles/${v.id}`} className="text-primary hover:underline font-medium">
-                                  {v.manufacturer} {v.model}
-                                </Link>
-                              </span>
-                            ))}
-                          </p>
-                        )}
-                      </div>
-                      <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
-                        {t('modals.useThis')}
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setInventoryPickerOpen(false)}>
-                  {t('modals.close')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
         <div className="mt-6">
           <h4 className="text-lg font-semibold mb-4">
             {isModificationTab ? t('edit.specs.currentModifications') : t('edit.specs.currentSpecs')}
@@ -2704,6 +2740,65 @@ const EditVehicle = () => {
         <TabsContent value="modifications">
           {renderSpecsForm(true)}
         </TabsContent>
+
+        <Dialog open={inventoryPickerOpen} onOpenChange={(open) => setInventoryPickerOpen(open)}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{t('modals.inventoryPickerTitle')}</DialogTitle>
+              <DialogDescription>{t('modals.inventoryPickerDesc')}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto py-2">
+              {inventoryPickerLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner className="size-8" />
+                </div>
+              ) : inventoryPickerItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  {t('modals.noInventoryItems', {
+                    categorySuffix: newSpec.component_type ? t('modals.categorySuffix') : '',
+                  })}
+                </p>
+              ) : (
+                inventoryPickerItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatInventoryCategory(item.category)} · {t('modals.stock')}: {item.quantity}
+                        {item.purchase_price != null &&
+                          ` · ${Number(item.purchase_price).toFixed(2)} ${t('modals.unitPrice')}`}
+                      </p>
+                      {Array.isArray(item.mounted_vehicles) && item.mounted_vehicles.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
+                          {t('modals.mountedOn')}{' '}
+                          {item.mounted_vehicles.map((v, idx) => (
+                            <span key={v.id}>
+                              {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? t('edit.and') : ', ') : ''}
+                              <Link to={`/vehicles/${v.id}`} className="text-primary hover:underline font-medium">
+                                {v.manufacturer} {v.model}
+                              </Link>
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                    </div>
+                    <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
+                      {t('modals.useThis')}
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setInventoryPickerOpen(false)}>
+                {t('modals.close')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <TabsContent value="timings">
           {renderTimingsForm()}

@@ -19,6 +19,11 @@ const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR }
 const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
 const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFromComponent');
 const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/inventoryStockOps');
+const {
+  resolvePartId,
+  deductPartStockFifo,
+  restorePartStockDeductions,
+} = require('../lib/partsRegistry');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const { logDbError } = require('../lib/logDbError');
@@ -1676,20 +1681,80 @@ router.post('/:id/technical-specs', async (req, res) => {
     const specs = await getOrCreateBaseSpecs(id);
     const targetSpec = is_modification ? specs.modification : specs.technical;
 
-    // Crear los componentes asociados
+    // Crear los componentes asociados (con identidad canónica y descuento opcional)
     let createdComponents = [];
+    const deductWarnings = [];
+    const allDeductions = [];
     if (Array.isArray(components) && components.length > 0) {
-      const compsToInsert = components.map(c => ({
-        ...c,
-        tech_spec_id: targetSpec.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
+      const compsToInsert = [];
+      for (const c of components) {
+        const picked = pickComponentFields(c);
+        const mountedQty = Math.max(1, parseInt(picked.mounted_qty, 10) || 1);
+        picked.mounted_qty = mountedQty;
+
+        const resolved = await resolvePartId(req.supabase, req.user.id, {
+          component_type: picked.component_type,
+          name: picked.element,
+          element: picked.element,
+          manufacturer: picked.manufacturer,
+          reference: picked.sku,
+          sku: picked.sku,
+          teeth: picked.teeth,
+          rpm: picked.rpm,
+          material: picked.material,
+          size: picked.size,
+          color: picked.color,
+          gaus: picked.gaus,
+          url: picked.url,
+          description: picked.description,
+        });
+        if (!resolved.ok) {
+          await restorePartStockDeductions(req.supabase, req.user.id, allDeductions);
+          return res.status(500).json({ error: resolved.error });
+        }
+
+        const wantDeduct =
+          c?.deduct_from_inventory === true || req.body.deduct_from_inventory === true;
+
+        let sourceInventoryItemId = c?.source_inventory_item_id || null;
+        if (wantDeduct) {
+          const fifo = await deductPartStockFifo(req.supabase, {
+            userId: req.user.id,
+            partId: resolved.part.id,
+            qty: mountedQty,
+          });
+          if (!fifo.ok) {
+            await restorePartStockDeductions(req.supabase, req.user.id, allDeductions);
+            return res.status(409).json({ error: fifo.error });
+          }
+          allDeductions.push(...fifo.deductions);
+          sourceInventoryItemId = fifo.sourceInventoryItemId || sourceInventoryItemId;
+          if (fifo.remainingUnfilled > 0) {
+            deductWarnings.push({
+              element: picked.element,
+              requested: mountedQty,
+              deducted: fifo.deductedQty,
+              missing: fifo.remainingUnfilled,
+            });
+          }
+        }
+
+        compsToInsert.push({
+          ...picked,
+          tech_spec_id: targetSpec.id,
+          part_id: resolved.part.id,
+          source_inventory_item_id: sourceInventoryItemId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+
       const { data: comps, error: compsError } = await req.supabase
         .from('components')
         .insert(compsToInsert)
         .select();
       if (compsError) {
+        await restorePartStockDeductions(req.supabase, req.user.id, allDeductions);
         return res.status(500).json({ error: compsError.message });
       }
       createdComponents = comps;
@@ -1699,7 +1764,11 @@ router.post('/:id/technical-specs', async (req, res) => {
       await updateVehicleTotalPrice(id);
     }
 
-    res.status(201).json({ ...targetSpec, components: createdComponents });
+    res.status(201).json({
+      ...targetSpec,
+      components: createdComponents,
+      ...(deductWarnings.length ? { inventory_deduct_warnings: deductWarnings } : {}),
+    });
   } catch (err) {
     console.error('Error al crear componente:', err);
     res.status(500).json({ error: err.message });
@@ -1755,6 +1824,27 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     const nextSnap = { ...prevSnap, ...pickedUpdate };
     const shouldRecordHistory =
       is_modification === true && modificationSnapshotsDiffer(prevSnap, nextSnap);
+
+    const resolvedPart = await resolvePartId(req.supabase, req.user.id, {
+      component_type: nextSnap.component_type,
+      name: nextSnap.element,
+      element: nextSnap.element,
+      manufacturer: nextSnap.manufacturer,
+      reference: nextSnap.sku,
+      sku: nextSnap.sku,
+      teeth: nextSnap.teeth,
+      rpm: nextSnap.rpm,
+      material: nextSnap.material,
+      size: nextSnap.size,
+      color: nextSnap.color,
+      gaus: nextSnap.gaus,
+      url: nextSnap.url,
+      description: nextSnap.description,
+    });
+    if (!resolvedPart.ok) {
+      return res.status(500).json({ error: resolvedPart.error });
+    }
+    const nextPartId = resolvedPart.part.id;
 
     const changedKeys = listChangedSnapshotKeys(prevSnap, nextSnap);
     const onlyMountedQtyChanged = changedKeys.length === 1 && changedKeys[0] === 'mounted_qty';
@@ -1817,6 +1907,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
       .from('components')
       .update({
         ...pickedUpdate,
+        part_id: nextPartId,
         updated_at: new Date().toISOString()
       })
       .eq('id', componentId);
@@ -1865,6 +1956,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
         userId: req.user.id,
         snapshot: returnSnap,
         vehicleLabel,
+        partId: existingComponent.part_id || nextPartId,
       });
       if (!invResult.ok) {
         inventoryReturnError = invResult.error;
@@ -1935,6 +2027,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
         userId: req.user.id,
         snapshot: prevSnap,
         vehicleLabel,
+        partId: existingComponent.part_id || null,
       });
       if (!invResult.ok) {
         console.error('insertReturnedComponentToInventory (DELETE component):', invResult.error);
