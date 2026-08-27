@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -52,6 +52,7 @@ import {
 import { Separator } from '../components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { SearchableCategorySelect } from '../components/SearchableCategorySelect';
+import PageRangePagination from '../components/PageRangePagination';
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_UNITS,
@@ -80,6 +81,9 @@ const emptyForm = () => ({
   gaus: '',
   description: '',
 });
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250];
+const PAGE_SIZE_STORAGE_KEY = 'inventoryPageSize';
 
 const Inventory = () => {
   const [searchParams] = useSearchParams();
@@ -121,6 +125,15 @@ const Inventory = () => {
   const [partForm, setPartForm] = useState(null);
   const [partSaving, setPartSaving] = useState(false);
   const [partFormError, setPartFormError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => {
+    try {
+      const stored = parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY), 10);
+      return PAGE_SIZE_OPTIONS.includes(stored) ? stored : 25;
+    } catch {
+      return 25;
+    }
+  });
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(searchInput.trim()), 350);
@@ -182,6 +195,10 @@ const Inventory = () => {
   useEffect(() => {
     loadItems();
   }, [loadItems]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryFilter, lowStockOnly, debouncedQ, viewMode, onlyMounted, pageSize]);
 
   const initForm = (item = null) => {
     if (item) {
@@ -725,6 +742,63 @@ const Inventory = () => {
     item.min_stock != null && Number(item.quantity) <= Number(item.min_stock);
 
   const unitLabel = (u) => INVENTORY_UNITS.find((x) => x.value === u)?.label || u;
+
+  const catalogTotal = viewMode === 'parts' ? parts.length : items.length;
+  const totalPages = Math.max(1, Math.ceil(catalogTotal / pageSize) || 1);
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const pagedParts = useMemo(
+    () => parts.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [parts, safePage, pageSize],
+  );
+  const pagedItems = useMemo(
+    () => items.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [items, safePage, pageSize],
+  );
+  const rangeStart = catalogTotal > 0 ? (safePage - 1) * pageSize + 1 : 0;
+  const rangeEnd = catalogTotal > 0 ? Math.min(safePage * pageSize, catalogTotal) : 0;
+
+  const handlePageSizeChange = (e) => {
+    const next = parseInt(e.target.value, 10);
+    if (!PAGE_SIZE_OPTIONS.includes(next)) return;
+    setPageSize(next);
+    try {
+      localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(next));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const paginationBar = catalogTotal > 0 ? (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="text-sm text-muted-foreground order-2 sm:order-1">
+        Mostrando {rangeStart}–{rangeEnd} de {catalogTotal}{' '}
+        {viewMode === 'parts' ? (catalogTotal === 1 ? 'pieza' : 'piezas') : (catalogTotal === 1 ? 'ítem' : 'ítems')}
+      </div>
+      <div className="order-1 sm:order-2">
+        <PageRangePagination
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          disabled={loading}
+        />
+      </div>
+      <div className="flex items-center gap-2 order-3">
+        <label htmlFor="inv-page-size" className="text-sm text-muted-foreground whitespace-nowrap">
+          Por página:
+        </label>
+        <select
+          id="inv-page-size"
+          value={pageSize}
+          onChange={handlePageSizeChange}
+          className="flex h-9 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm"
+        >
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  ) : null;
 
   if (loading && items.length === 0 && parts.length === 0) {
     return (
@@ -1623,9 +1697,11 @@ const Inventory = () => {
             </Button>
           </CardContent>
         </Card>
-      ) : viewMode === 'parts' ? (
+      ) : (
+        <>
+          {viewMode === 'parts' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {parts.map((view) => {
+          {pagedParts.map((view) => {
             const p = view.part;
             const stockLine = (view.inventory_lines || []).find((l) => Number(l.quantity) > 0);
             return (
@@ -1735,7 +1811,7 @@ const Inventory = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {items.map((item) => (
+          {pagedItems.map((item) => (
             <Card
               key={item.id}
               className="relative flex h-full flex-col overflow-hidden hover:shadow-lg transition-shadow"
@@ -1884,6 +1960,9 @@ const Inventory = () => {
             </Card>
           ))}
         </div>
+          )}
+          {paginationBar}
+        </>
       )}
     </div>
   );
