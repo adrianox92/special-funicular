@@ -1,6 +1,5 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import {
