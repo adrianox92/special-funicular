@@ -1,7 +1,7 @@
 const LAP_TIME_RE = /^(\d{2}):(\d{2})\.(\d{3})$/;
 
 /**
- * Convierte mm:ss.mmm a segundos (misma regla que EditVehicle).
+ * Convierte mm:ss.mmm a segundos.
  * @param {string} timeStr
  * @returns {number|null}
  */
@@ -17,7 +17,9 @@ export function parseLapTimeToSeconds(timeStr) {
 }
 
 /**
- * Formato mm:ss.mmm usado en EditVehicle al calcular el promedio (ms con Math.floor).
+ * Formato mm:ss.mmm. Redondea al milisegundo más cercano sobre el total
+ * (Math.round(seconds * 1000)), con acarreo correcto a segundos/minutos.
+ * Misma regla para NewSession (modo sesión) y la ficha de vehículo (EditVehicle).
  * @param {number} totalSeconds
  * @returns {string}
  */
@@ -32,7 +34,7 @@ export function formatSecondsToLapTime(totalSeconds) {
 }
 
 /**
- * Promedio = tiempo total / vueltas. Misma fórmula que EditVehicle.
+ * Promedio = tiempo total / vueltas, formateado con redondeo a ms.
  * @param {string} totalTime
  * @param {number|string} laps
  * @param {string} bestLapTime
@@ -61,8 +63,29 @@ export function isTotalTimeTooLow(totalTime, laps, bestLapTime) {
   return totalSeconds < bestLapSeconds * lapsN;
 }
 
+/**
+ * Variables de interpolación i18n cuando el total es menor que best × vueltas.
+ * `minimum` usa el mismo redondeo a ms que el promedio.
+ * @returns {{ total: string, minimum: string, laps: number|string, bestLap: string } | null}
+ */
+export function getTotalTimeTooLowContext(totalTime, laps, bestLapTime) {
+  if (!isTotalTimeTooLow(totalTime, laps, bestLapTime)) return null;
+  const bestLapSeconds = parseLapTimeToSeconds(bestLapTime);
+  return {
+    total: totalTime,
+    minimum: formatSecondsToLapTime(bestLapSeconds * Number(laps)),
+    laps,
+    bestLap: bestLapTime,
+  };
+}
+
 export function isValidLapTime(timeStr) {
   return parseLapTimeToSeconds(timeStr) != null;
+}
+
+/** Timestamp numérico del promedio mostrado (parsea el mm:ss.mmm ya redondeado). */
+export function averageTimeTimestamp(averageTime) {
+  return parseLapTimeToSeconds(averageTime);
 }
 
 /**

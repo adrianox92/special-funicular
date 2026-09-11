@@ -18,9 +18,8 @@ import {
   buildSessionTimingPayload,
   calculateAverageTime,
   formatSecondsToLapTime,
-  isTotalTimeTooLow,
+  getTotalTimeTooLowContext,
   isValidLapTime,
-  parseLapTimeToSeconds,
 } from '../utils/averageLapTime';
 import { getLastSessionCircuitId, pickDefaultCircuitId, setLastSessionCircuitId } from '../utils/sessionLastCircuit';
 
@@ -172,7 +171,7 @@ const NewSession = () => {
   const laneCount = Math.max(1, parseInt(String(selectedCircuit?.num_lanes || 1), 10) || 1);
 
   const averageTime = calculateAverageTime(capture.totalTime, capture.laps, capture.bestLapTime);
-  const totalTooLow = isTotalTimeTooLow(capture.totalTime, capture.laps, capture.bestLapTime);
+  const totalTooLow = getTotalTimeTooLowContext(capture.totalTime, capture.laps, capture.bestLapTime);
 
   const filteredVehicles = useMemo(() => {
     const q = vehicleSearch.trim().toLowerCase();
@@ -723,14 +722,7 @@ const NewSession = () => {
             {totalTooLow ? (
               <Alert>
                 <AlertDescription>
-                  {t('capture.totalTooLow', {
-                    total: capture.totalTime,
-                    minimum: formatSecondsToLapTime(
-                      (parseLapTimeToSeconds(capture.bestLapTime) || 0) * Number(capture.laps),
-                    ),
-                    laps: capture.laps,
-                    bestLap: capture.bestLapTime,
-                  })}
+                  {t('capture.totalTooLow', totalTooLow)}
                 </AlertDescription>
               </Alert>
             ) : null}
