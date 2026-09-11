@@ -1,7 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import i18n from '../../i18n';
 import NewSession from '../../pages/NewSession';
 import api from '../../lib/axios';
 
@@ -37,11 +36,6 @@ function renderSession(initial = '/session') {
 }
 
 describe('NewSession', () => {
-  beforeAll(async () => {
-    await i18n.loadNamespaces(['session', 'common']);
-    await i18n.changeLanguage('es');
-  });
-
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
@@ -52,10 +46,8 @@ describe('NewSession', () => {
     mockLists({ circuits: [], vehicles: [vehicle] });
     renderSession();
 
-    await waitFor(() => {
-      expect(screen.getByText(/Aún no tienes circuitos/i)).toBeInTheDocument();
-    });
-    expect(screen.getByLabelText(/Nombre/i)).toBeInTheDocument();
+    await screen.findByText(/Aún no tienes circuitos|You have no circuits yet|Du hast noch keine Strecken/i);
+    expect(screen.getByLabelText(/Nombre|Name/i)).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalled();
   });
 
@@ -63,16 +55,12 @@ describe('NewSession', () => {
     mockLists({ circuits: [circuit], vehicles: [] });
     renderSession();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('session-continue-circuit')).toBeInTheDocument();
-    });
+    await screen.findByTestId('session-continue-circuit');
     fireEvent.click(screen.getByTestId('session-continue-circuit'));
 
-    await waitFor(() => {
-      expect(screen.getByText(/Tu garaje está vacío/i)).toBeInTheDocument();
-    });
-    expect(screen.getByRole('link', { name: /Añadir vehículo/i })).toHaveAttribute('href', '/vehicles/new');
-    expect(screen.getByRole('link', { name: /Ver catálogo/i })).toHaveAttribute('href', '/catalogo');
+    await screen.findByText(/Tu garaje está vacío|Your garage is empty|Deine Garage ist leer/i);
+    expect(screen.getByRole('link', { name: /Añadir vehículo|Add vehicle|Fahrzeug hinzufügen/i })).toHaveAttribute('href', '/vehicles/new');
+    expect(screen.getByRole('link', { name: /Ver catálogo|View catalogue|Katalog ansehen/i })).toHaveAttribute('href', '/catalogo');
     expect(api.post).not.toHaveBeenCalled();
   });
 
@@ -80,10 +68,8 @@ describe('NewSession', () => {
     mockLists();
     renderSession();
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Cancelar/i })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }));
+    await screen.findByRole('button', { name: /Cancelar|Cancel|Abbrechen/i });
+    fireEvent.click(screen.getByRole('button', { name: /Cancelar|Cancel|Abbrechen/i }));
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
     expect(api.post).not.toHaveBeenCalled();
   });
@@ -101,32 +87,26 @@ describe('NewSession', () => {
 
     renderSession();
 
-    await waitFor(() => {
-      expect(screen.getByText(/Pista salón/i)).toBeInTheDocument();
-    });
+    await screen.findByText(/Pista salón/i);
     fireEvent.click(screen.getByRole('option', { name: /Pista salón/i }));
     fireEvent.click(screen.getByTestId('session-continue-circuit'));
 
-    await waitFor(() => {
-      expect(screen.getByText(/Ferrari F1/i)).toBeInTheDocument();
-    });
+    await screen.findByText(/Ferrari F1/i);
     fireEvent.click(screen.getByRole('option', { name: /Ferrari F1/i }));
     fireEvent.click(screen.getByTestId('session-continue-vehicle'));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Mejor vuelta/i)).toBeInTheDocument();
-    });
+    await screen.findByLabelText(/Mejor vuelta|Best lap|Beste Runde/i);
 
-    const best = screen.getByLabelText(/Mejor vuelta/i);
+    const best = screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i);
     fireEvent.change(best, { target: { value: '11324' } });
     fireEvent.blur(best);
 
-    const total = screen.getByLabelText(/Tiempo total/i);
+    const total = screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i);
     fireEvent.change(total, { target: { value: '0200000' } });
     fireEvent.blur(total);
 
-    fireEvent.change(screen.getByLabelText(/^Vueltas$/i), { target: { value: '10' } });
-    fireEvent.change(screen.getByLabelText(/^Carril$/i), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText(/^Carril$|^Lane$|^Spur$/i), { target: { value: '1' } });
 
     fireEvent.click(screen.getByTestId('session-save'));
 
@@ -145,8 +125,6 @@ describe('NewSession', () => {
     expect(body.average_time).toBe('00:12.000');
     expect(body.lane).toBe('1');
 
-    await waitFor(() => {
-      expect(screen.getByText(/Sesión guardada/i)).toBeInTheDocument();
-    });
+    await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
   });
 });

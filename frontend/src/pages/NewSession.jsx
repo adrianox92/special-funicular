@@ -151,6 +151,9 @@ const NewSession = () => {
     });
   }, [vehicles, vehicleSearch]);
 
+  const queryCircuitId = searchParams.get('circuit_id');
+  const queryVehicleId = searchParams.get('vehicle_id');
+
   const loadLists = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
@@ -164,25 +167,25 @@ const NewSession = () => {
       setCircuits(circuitList);
       setVehicles(vehicleList);
 
-      const qCircuit = searchParams.get('circuit_id');
-      const qVehicle = searchParams.get('vehicle_id');
-      const nextCircuitId = pickDefaultCircuitId(circuitList, qCircuit);
+      const nextCircuitId = pickDefaultCircuitId(circuitList, queryCircuitId);
       const nextVehicleId =
-        qVehicle && vehicleList.some((v) => String(v.id) === String(qVehicle)) ? String(qVehicle) : '';
+        queryVehicleId && vehicleList.some((v) => String(v.id) === String(queryVehicleId))
+          ? String(queryVehicleId)
+          : '';
       setCircuitId(nextCircuitId);
       setVehicleId(nextVehicleId);
 
       if (nextCircuitId && nextVehicleId) {
         setStep('capture');
-      } else if (nextCircuitId && qVehicle) {
+      } else if (nextCircuitId && queryVehicleId) {
         setStep('vehicle');
       }
     } catch (err) {
-      setLoadError(err.response?.data?.error || err.message || t('circuit.loadError'));
+      setLoadError(err.response?.data?.error || err.message || 'Error');
     } finally {
       setLoading(false);
     }
-  }, [searchParams, t]);
+  }, [queryCircuitId, queryVehicleId]);
 
   useEffect(() => {
     loadLists();

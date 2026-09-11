@@ -23,10 +23,11 @@ export function parseLapTimeToSeconds(timeStr) {
  */
 export function formatSecondsToLapTime(totalSeconds) {
   if (totalSeconds == null || !Number.isFinite(Number(totalSeconds))) return '';
-  const n = Number(totalSeconds);
-  const avgMinutes = Math.floor(n / 60);
-  const avgSeconds = Math.floor(n % 60);
-  const avgMilliseconds = Math.floor((n % 1) * 1000);
+  const totalMs = Math.round(Number(totalSeconds) * 1000);
+  const avgMinutes = Math.floor(totalMs / 60000);
+  const rem = totalMs % 60000;
+  const avgSeconds = Math.floor(rem / 1000);
+  const avgMilliseconds = rem % 1000;
   return `${String(avgMinutes).padStart(2, '0')}:${String(avgSeconds).padStart(2, '0')}.${String(avgMilliseconds).padStart(3, '0')}`;
 }
 
