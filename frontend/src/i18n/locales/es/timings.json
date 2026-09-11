@@ -29,6 +29,7 @@
   "deleteConfirmTitle": "¿Eliminar registro de tiempo?",
   "deleteConfirmBody": "¿Estás seguro de que quieres eliminar este registro de tiempo? Esta acción no se puede deshacer.",
   "import": "Importar sesiones",
+  "newSession": "Nueva sesión",
   "filters": "Filtros",
   "filterVehicle": "Filtrar por Vehículo",
   "filterDateFrom": "Fecha Desde",

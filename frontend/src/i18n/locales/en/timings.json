@@ -29,6 +29,7 @@
   "deleteConfirmTitle": "Delete timing record?",
   "deleteConfirmBody": "Are you sure you want to delete this timing record? This action cannot be undone.",
   "import": "Import sessions",
+  "newSession": "New session",
   "filters": "Filters",
   "filterVehicle": "Filter by vehicle",
   "filterDateFrom": "From date",

@@ -29,6 +29,7 @@
   "deleteConfirmTitle": "Zeiteintrag löschen?",
   "deleteConfirmBody": "Möchtest du diesen Zeiteintrag wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
   "import": "Sessions importieren",
+  "newSession": "Neue Session",
   "filters": "Filter",
   "filterVehicle": "Nach Fahrzeug filtern",
   "filterDateFrom": "Von Datum",

@@ -6,6 +6,7 @@ const { getCircuitRanking } = require('../lib/positionTracker');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
+const { sendTimingNotification } = require('../lib/notifier');
 const csvTimingParse = require('../lib/csvTimingParse');
 const smartraceCsv = require('../lib/smartraceCsvImport');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
@@ -367,6 +368,49 @@ router.post('/import', async (req, res) => {
   } catch (err) {
     console.error('POST /api/timings/import:', err);
     res.status(500).json({ error: err.message || 'Error al importar' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/timings:
+ *   post:
+ *     summary: Crea una sesión de cronometraje (mismo contrato que POST /api/sync/timings)
+ *     tags:
+ *       - Tiempos
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [vehicle_id, best_lap_time, total_time, laps, average_time]
+ *     responses:
+ *       201:
+ *         description: Sesión creada
+ *       400:
+ *         description: Datos inválidos
+ */
+router.post('/', async (req, res) => {
+  try {
+    const result = await insertVehicleTimingFromSyncBody(req.supabase, req.user.id, req.body);
+    if (!result.success) {
+      return res.status(result.status).json({ error: result.error });
+    }
+
+    const { finalTiming, previousBestLapSeconds, syncMeta } = result;
+    sendTimingNotification(req.user.id, finalTiming, previousBestLapSeconds, req.supabase).catch(() => {});
+
+    res.status(201).json({
+      ...finalTiming,
+      sync_meta: syncMeta,
+      previous_best_lap_seconds: previousBestLapSeconds,
+    });
+  } catch (err) {
+    console.error('POST /api/timings:', err);
+    res.status(500).json({ error: err.message || 'Error al guardar la sesión' });
   }
 });
 

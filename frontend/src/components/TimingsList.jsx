@@ -687,9 +687,14 @@ const TimingsList = () => {
     <div className="space-y-6 py-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold">{t('title')}</h1>
-        <Button type="button" variant="outline" onClick={() => setShowImportModal(true)}>
-          {t('import')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link to="/session">{t('newSession')}</Link>
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setShowImportModal(true)}>
+            {t('import')}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

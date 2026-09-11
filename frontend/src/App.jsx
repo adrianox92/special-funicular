@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import AddVehicle from './components/AddVehicle';
 import EditVehicle from './components/EditVehicle';
 import TimingsList from './components/TimingsList';
+import NewSession from './pages/NewSession';
 import Competitions from './pages/Competitions';
 import Leagues from './pages/Leagues';
 import LeagueCreate from './pages/LeagueCreate';
@@ -266,6 +267,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <TimingsList />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/session"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <NewSession />
               </AuthedShell>
             </PrivateRoute>
           }

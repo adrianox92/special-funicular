@@ -33,6 +33,7 @@ export const NAMESPACES = [
   'data',
   'timings',
   'onboarding',
+  'session',
 ];
 
 const LazyLocaleBackend = {

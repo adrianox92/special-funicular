@@ -23,9 +23,9 @@
       },
       {
         "title": "Registra tiempos de sesión",
-        "body": "Asocia cada sesión a vehículo, circuito y carril (manualmente, desde el listado de Tiempos o desde la pestaña «Tabla de Tiempos» de cada coche). También puedes importar CSV o JSON con «Importar sesiones» en Tiempos o en esa pestaña de la ficha.",
-        "linkTo": "/timings",
-        "linkLabel": "Ir a Tiempos"
+        "body": "La forma más rápida es «Nueva sesión» (Inicio o menú): eliges circuito, coche y los tiempos mínimos. También puedes hacerlo desde el listado de Tiempos o la pestaña «Tabla de Tiempos» de cada coche, e importar CSV o JSON con «Importar sesiones».",
+        "linkTo": "/session",
+        "linkLabel": "Nueva sesión"
       },
       {
         "title": "Opcional: inventario de piezas",
@@ -100,10 +100,10 @@
       "title": "Tiempos",
       "pathBadge": "/timings",
       "description": "Registro de sesiones por vehículo, circuito y carril: mejores vueltas, velocidad y comparativas.",
-      "intro": "Los tiempos se agrupan por vehículo, circuito y carril. Puedes ampliar el historial de sesiones, ver especificaciones de la sesión, comparar sesiones, analizar rendimiento e importar sesiones desde fichero CSV (formato propio o SmartRace) o JSON. En el listado global (/timings) usa «Importar sesiones» y elige a qué coche asignarlas; en la ficha de un vehículo, pestaña «Tabla de Tiempos», el mismo asistente asigna las sesiones directamente a ese coche.",
+      "intro": "Los tiempos se agrupan por vehículo, circuito y carril. Para un entrenamiento en casa usa «Nueva sesión» (/session): circuito → coche → mejor vuelta, total y vueltas, sin abrir la ficha del vehículo. En el listado (/timings) puedes ampliar el historial, ver especificaciones, comparar sesiones, analizar rendimiento e importar CSV (formato propio o SmartRace) o JSON. En la ficha de un vehículo, pestaña «Tabla de Tiempos», el mismo asistente de importación asigna las sesiones a ese coche.",
       "steps": [
-        "Desde Tiempos, elige o busca el vehículo y circuito que quieras.",
-        "Registra una nueva sesión con los datos que pida el formulario (carril, vueltas, etc.).",
+        "Desde Inicio o el menú, abre «Nueva sesión», elige circuito (o créalo si no tienes) y coche, introduce mejor vuelta, tiempo total y vueltas, y guarda.",
+        "Desde Tiempos, consulta el historial agrupado por vehículo, circuito y carril.",
         "Para importar en bloque: en Tiempos pulsa «Importar sesiones», elige CSV o JSON, pega el contenido o carga un fichero, selecciona el vehículo (obligatorio salvo que cada fila/objeto traiga vehicle_id) y confirma; con CSV SmartRace de varios pilotos puedes marcar filas y, si falta circuito o carril en el archivo, indicarlos desde tus circuitos dados de alta.",
         "Alternativa: abre la ficha del vehículo (editar), ve a la pestaña «Tabla de Tiempos» y pulsa «Importar sesiones»; el flujo es el mismo (CSV/JSON, plantilla, SmartRace) pero el coche ya está fijado y no hace falta elegirlo.",
         "Consulta el historial y comparativas desde la misma zona de la app."
@@ -117,7 +117,7 @@
       "gotchas": [],
       "linkTo": "/timings",
       "linkLabel": "Ir a Tiempos",
-      "keywords": ["tiempos", "vueltas", "sesión", "carril", "circuito", "cronometrar", "ranking", "importar", "csv", "json", "smartrace"]
+      "keywords": ["tiempos", "vueltas", "sesión", "carril", "circuito", "cronometrar", "ranking", "importar", "csv", "json", "smartrace", "entrenar", "nueva sesión"]
     },
     {
       "id": "circuitos",

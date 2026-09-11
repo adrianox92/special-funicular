@@ -9,6 +9,7 @@ import {
   Clock,
   Flag,
   Package,
+  Timer,
   User,
   LogOut,
   Settings,
@@ -236,6 +237,7 @@ const Navbar = () => {
   const navItems = [
     { path: '/dashboard', label: t('home'), icon: Home },
     { path: '/vehicles', label: t('vehicles'), icon: Car },
+    { path: '/session', label: t('newSession'), icon: Timer },
     { path: '/timings', label: t('timings'), icon: Clock },
     { path: '/circuits', label: t('circuits'), icon: Flag },
     { path: '/inventory', label: t('inventory'), icon: Package },
