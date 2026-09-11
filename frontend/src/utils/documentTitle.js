@@ -38,6 +38,7 @@ export function getDocumentTitle(pathname) {
     return withBrand(i18n.t('vehicles', { ns: 'meta' }));
   }
   if (normalized === '/timings') return withBrand(i18n.t('timings', { ns: 'meta' }));
+  if (normalized === '/session') return withBrand(i18n.t('session', { ns: 'meta' }));
   if (normalized === '/circuits') return withBrand(i18n.t('circuits', { ns: 'meta' }));
   if (normalized === '/inventory') return withBrand(i18n.t('inventory', { ns: 'meta' }));
   if (normalized.startsWith('/competitions/signup/')) return withBrand(i18n.t('signup', { ns: 'meta' }));

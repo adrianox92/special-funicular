@@ -2,6 +2,7 @@
   "search": { "aria": "Open quick search", "placeholder": "Search vehicles, circuits, inventory…" },
   "menu": "Menu",
   "home": "Home",
+  "newSession": "New session",
   "vehicles": "Vehicles",
   "timings": "Timings",
   "circuits": "Circuits",

@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 export const ONBOARDING_STEPS = [
   { id: 'vehicle', path: '/vehicles/new' },
   { id: 'circuit', path: '/circuits' },
-  { id: 'timing', path: '/timings' },
+  { id: 'timing', path: '/session' },
 ];
 
 const STATUS_KEYS = ['hasVehicle', 'hasCircuit', 'hasTiming'];

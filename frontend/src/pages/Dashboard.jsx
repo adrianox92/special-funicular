@@ -257,6 +257,12 @@ const Dashboard = () => {
               </Link>
             </Button>
             <Button variant="outline" size="lg" asChild>
+              <Link to="/session">
+                <Clock className="size-4 mr-2" aria-hidden />
+                {t('newSession')}
+              </Link>
+            </Button>
+            <Button variant="outline" size="lg" asChild>
               <Link to="/competitions">
                 <Trophy className="size-4 mr-2" aria-hidden />
                 {t('competitions')}
@@ -327,6 +333,12 @@ const Dashboard = () => {
             {t('refresh')}
           </Button>
           <Button size="default" asChild>
+            <Link to="/session">
+              <Clock className="size-4 mr-2" aria-hidden />
+              {t('newSession')}
+            </Link>
+          </Button>
+          <Button variant="outline" size="default" asChild>
             <Link to="/competitions">
               <Plus className="size-4 mr-2" aria-hidden />
               {t('newCompetition')}
