@@ -172,7 +172,7 @@
       "addSpec": "Add Technical Specification",
       "fromInventory": "From inventory",
       "usingInventory": "Using inventory item «{{name}}». Type, name, reference, link and price come from the item. {{count}} {{unit}} will be deducted from stock on save (max. {{max}}).",
-      "usingInventoryNoDeduct": "Using inventory item «{{name}}». It will be recorded as a factory spec without deducting stock.",
+      "usingInventoryNoDeduct": "Using inventory item «{{name}}». Type, name, reference, link and price come from the item. {{count}} {{unit}} will be deducted from stock on save (max. {{max}}).",
       "removeLink": "Remove link",
       "unitsHint": "Quantity is set in the «Units» field (below brand). Choose how many to deduct from stock and how many the mounted part represents.",
       "stockMatchAlert": "There are {{count}} {{unit}} of «{{name}}» in inventory.",
@@ -277,6 +277,7 @@
       "modUpdatedInventory": "Modification updated and removed part added to inventory",
       "modSavedDeducted": "Modification saved; {{qty}} unit(s) deducted from inventory",
       "modDeletedInventory": "Modification deleted and part added to inventory",
+      "mountedAndDeducted": "Part mounted and stock updated",
       "specCreated": "Part recorded on the vehicle",
       "specCreatedPartialDeduct": "Part recorded. Deducted {{deducted}} of {{requested}} unit(s) (insufficient stock)."
     },

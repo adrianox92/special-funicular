@@ -733,11 +733,7 @@ const EditVehicle = () => {
         rpm: invMountPayload.rpm,
         gaus: invMountPayload.gaus,
       });
-      toast.success(
-        isModificationTab
-          ? 'Pieza montada y stock actualizado'
-          : t('edit.toasts.specCreated'),
-      );
+      toast.success(t('edit.toasts.mountedAndDeducted'));
     } else if (editingSpec) {
       const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
       if (!currentSpec?.id) {
@@ -760,17 +756,12 @@ const EditVehicle = () => {
         toast.success(t('edit.toasts.modSavedDeducted', { qty: res.data.inventory_deducted_qty }));
       }
     } else {
-      const res = await api.post(`/vehicles/${id}/technical-specs`, specData);
-      const warnings = res.data?.inventory_deduct_warnings;
-      if (Array.isArray(warnings) && warnings.length > 0) {
-        const w = warnings[0];
-        toast.warning(t('edit.toasts.specCreatedPartialDeduct', {
-          deducted: w.deducted,
-          requested: w.requested,
-        }));
-      } else {
-        toast.success(t('edit.toasts.specCreated'));
-      }
+      await api.post(`/vehicles/${id}/technical-specs`, specData);
+      toast.success(
+        specData.deduct_from_inventory
+          ? t('edit.toasts.mountedAndDeducted')
+          : t('edit.toasts.specCreated'),
+      );
     }
 
     const response = await api.get(`/vehicles/${id}/technical-specs`);
@@ -809,7 +800,9 @@ const EditVehicle = () => {
       });
     } catch (error) {
       console.error('Error al guardar especificación:', error);
-      setError(error.response?.data?.error || t('edit.errors.saveSpec'));
+      const msg = error.response?.data?.error || t('edit.errors.saveSpec');
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -918,7 +911,9 @@ const EditVehicle = () => {
       }
     } catch (error) {
       console.error('Error al guardar especificación:', error);
-      setError(error.response?.data?.error || t('edit.errors.saveSpec'));
+      const msg = error.response?.data?.error || t('edit.errors.saveSpec');
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -1349,7 +1344,7 @@ const EditVehicle = () => {
             <AlertDescription className="flex flex-col gap-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <span>
-                  {t(isModificationTab ? 'edit.specs.usingInventory' : 'edit.specs.usingInventoryNoDeduct', {
+                  {t('edit.specs.usingInventory', {
                     name: selectedInventoryItemName,
                     count: (() => {
                       const n = Math.min(
@@ -1577,7 +1572,7 @@ const EditVehicle = () => {
           <div className="flex gap-2 mt-4">
             <Button type="submit">
               {fromInventory
-                ? (isModificationTab ? t('edit.specs.mountAndDeduct') : t('edit.specs.addSpecBtn'))
+                ? t('edit.specs.mountAndDeduct')
                 : editingSpec
                   ? isModificationTab
                     ? t('edit.specs.updateModification')
