@@ -27,6 +27,7 @@ const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const { logDbError } = require('../lib/logDbError');
 const { fetchVehicleImagesForVehicleIds } = require('../lib/fetchVehicleImagesForVehicleIds');
+const { applyVehicleListFilters } = require('../lib/vehicleListFilters');
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
 const { resolveBaselineTimings, sortTimingsByBestLap } = require('../lib/syncTimingsQuery');
@@ -399,52 +400,10 @@ function applyVehicleListSort(query, sortColumn, ascending) {
   return q;
 }
 
-/** Filtros opcionales compartidos entre GET /vehicles/export y GET /vehicles/export-pdf */
-function applyVehicleExportFilters(query, req) {
-  const { manufacturer, model, type, modified, digital, filterMuseo, filterTaller, scale, scale_factor } = req.query;
-
-  if (manufacturer && String(manufacturer).trim()) {
-    query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
-  }
-  if (model && String(model).trim()) {
-    query = query.ilike('model', `%${String(model).trim()}%`);
-  }
-  if (type && String(type).trim()) {
-    query = query.eq('type', String(type).trim());
-  }
-  if (modified === 'Sí' || modified === 'true') {
-    query = query.eq('modified', true);
-  } else if (modified === 'No' || modified === 'false') {
-    query = query.eq('modified', false);
-  }
-  if (digital === 'Digital' || digital === 'true') {
-    query = query.eq('digital', true);
-  } else if (digital === 'Analógico' || digital === 'false') {
-    query = query.eq('digital', false);
-  }
-  const museoFilter = filterMuseo === 'true' || filterMuseo === true;
-  const tallerFilter = filterTaller === 'true' || filterTaller === true;
-  if (museoFilter && tallerFilter) {
-    query = query.or('museo.eq.true,taller.eq.true');
-  } else if (museoFilter) {
-    query = query.eq('museo', true);
-  } else if (tallerFilter) {
-    query = query.eq('taller', true);
-  }
-  const scaleParam = scale != null && String(scale).trim() !== '' ? scale : scale_factor;
-  if (scaleParam != null && String(scaleParam).trim() !== '') {
-    const n = parseInt(String(scaleParam).trim(), 10);
-    if (Number.isFinite(n) && n > 0) {
-      query = query.eq('scale_factor', n);
-    }
-  }
-  return query;
-}
-
 async function fetchUserVehiclesForExport(supabase, userId, req) {
   const { column: sortColumn, ascending } = parseVehicleSort(req);
   let query = applyVehicleListSort(supabase.from('vehicles').select('*').eq('user_id', userId), sortColumn, ascending);
-  query = applyVehicleExportFilters(query, req);
+  query = applyVehicleListFilters(query, req.query);
   const { data: vehicles, error: vehiclesError } = await query;
   if (vehiclesError) throw vehiclesError;
   return vehicles || [];
@@ -1091,6 +1050,44 @@ router.post('/import', runVehicleImportUpload, async (req, res) => {
  *         schema:
  *           type: integer
  *         description: Cantidad de resultados por página
+ *       - in: query
+ *         name: manufacturer
+ *         schema:
+ *           type: string
+ *         description: Filtro parcial por fabricante (ilike)
+ *       - in: query
+ *         name: model
+ *         schema:
+ *           type: string
+ *         description: Filtro parcial por modelo (ilike)
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: modified
+ *         schema:
+ *           type: string
+ *         description: Sí/No o true/false
+ *       - in: query
+ *         name: digital
+ *         schema:
+ *           type: string
+ *         description: Digital/Analógico o true/false
+ *       - in: query
+ *         name: filterMuseo
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: filterTaller
+ *         schema:
+ *           type: string
+ *         description: Con filterMuseo=true, OR (museo o taller)
+ *       - in: query
+ *         name: scale
+ *         schema:
+ *           type: integer
+ *         description: Denominador de escala (p. ej. 32). Alias scale_factor.
  *     responses:
  *       200:
  *         description: Lista de vehículos y paginación
@@ -1146,21 +1143,29 @@ router.get('/', async (req, res) => {
     const to = from + limit - 1;
     const { column: sortColumn, ascending } = parseVehicleSort(req);
 
-    // Obtener el total de vehículos para la paginación
-    const { count, error: countError } = await req.supabase
-      .from('vehicles')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', req.user.id);
+    // Total del conjunto filtrado (mismos filtros que export CSV/PDF)
+    const { count, error: countError } = await applyVehicleListFilters(
+      req.supabase
+        .from('vehicles')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', req.user.id),
+      req.query,
+    );
 
     if (countError) {
       logDbError('GET /api/vehicles count', countError, { userId: req.user.id });
       countError._dbErrorLogged = true;
       throw countError;
     }
-    
-    // Obtener los vehículos paginados
+
+    const total = count ?? 0;
+
+    // Página del conjunto filtrado
     const { data: vehicles, error: vehiclesError } = await applyVehicleListSort(
-      req.supabase.from('vehicles').select('*').eq('user_id', req.user.id),
+      applyVehicleListFilters(
+        req.supabase.from('vehicles').select('*').eq('user_id', req.user.id),
+        req.query,
+      ),
       sortColumn,
       ascending,
     ).range(from, to);
@@ -1177,8 +1182,8 @@ router.get('/', async (req, res) => {
       throw vehiclesError;
     }
 
-    // Obtener los IDs de los vehículos para buscar sus imágenes
-    const vehicleIds = vehicles.map((v) => v.id);
+    const rows = Array.isArray(vehicles) ? vehicles : [];
+    const vehicleIds = rows.map((v) => v.id);
 
     let images = [];
     if (vehicleIds.length > 0) {
@@ -1210,7 +1215,7 @@ router.get('/', async (req, res) => {
       if (url) imagesMap.set(vehicleId, url);
     }
 
-    const result = vehicles.map((v) => ({
+    const result = rows.map((v) => ({
       ...v,
       image: imagesMap.get(v.id) || null,
     }));
@@ -1218,10 +1223,10 @@ router.get('/', async (req, res) => {
     res.json({
       vehicles: result,
       pagination: {
-        total: count,
+        total,
         page,
         limit,
-        totalPages: Math.ceil(count / limit)
+        totalPages: Math.ceil(total / limit)
       }
     });
   } catch (error) {
