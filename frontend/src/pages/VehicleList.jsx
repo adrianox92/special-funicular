@@ -21,9 +21,9 @@ import {
 } from '../components/ui/dropdown-menu';
 import VehicleImportDialog from '../components/VehicleImportDialog';
 import { ManufacturerFilterInput } from '../components/ManufacturerFilterInput';
+import { appendVehicleFilterQueryParams, hasActiveVehicleFilters } from '../utils/vehicleListQuery';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
-const ALL_VEHICLES_LIMIT = 10000;
 const FILTERS_STORAGE_KEY = 'vehicleListFilters';
 const SORT_STORAGE_KEY = 'vehicleListSort';
 
@@ -114,36 +114,13 @@ const saveFilters = (filters) => {
   } catch {}
 };
 
-const applyFilters = (list, filters) => {
-  return list.filter(v => {
-    const mod = filters.model ? v.model?.toLowerCase().includes(filters.model.toLowerCase()) : true;
-    const m = filters.manufacturer ? v.manufacturer?.toLowerCase().includes(filters.manufacturer.toLowerCase()) : true;
-    const t = filters.type ? v.type === filters.type : true;
-    const mo = filters.modified === '' ? true : filters.modified === 'Sí' ? v.modified : !v.modified;
-    const d = filters.digital === '' ? true : filters.digital === 'Digital' ? v.digital : !v.digital;
-    const museoTaller = !filters.filterMuseo && !filters.filterTaller
-      ? true
-      : filters.filterMuseo && filters.filterTaller
-        ? (v.museo || v.taller)
-        : filters.filterMuseo
-          ? v.museo
-          : v.taller;
-    const sc = filters.scale
-      ? Number(v.scale_factor) === Number(filters.scale)
-      : true;
-    return m && mod && t && mo && d && museoTaller && sc;
-  });
-};
-
 const VehicleList = () => {
   const { t } = useTranslation('vehicles');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
-  const [allVehicles, setAllVehicles] = useState([]);
   const [userScaleDenominators, setUserScaleDenominators] = useState([]);
   const [userManufacturers, setUserManufacturers] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
   const [filters, setFiltersState] = useState(() => {
@@ -167,6 +144,7 @@ const VehicleList = () => {
       saveFilters(next);
       return next;
     });
+    setCurrentPage(1);
   };
   const [viewMode, setViewMode] = useState(() => {
     try { return localStorage.getItem('vehicleViewMode') || 'grid'; } catch { return 'grid'; }
@@ -197,6 +175,7 @@ const VehicleList = () => {
     if (!fromUrl) return;
     setFiltersState(fromUrl);
     saveFilters(fromUrl);
+    setCurrentPage(1);
   }, [searchParams]);
 
   const loadUserScaleDenominators = useCallback(async () => {
@@ -229,51 +208,40 @@ const VehicleList = () => {
     [userScaleDenominators, filters.scale],
   );
 
-  const hasActiveFilters = !!(filters.model || filters.manufacturer || filters.type || filters.modified !== '' || filters.digital !== '' || filters.scale !== '' || filters.filterMuseo || filters.filterTaller);
-
-  const sortQuery = `sort=${encodeURIComponent(listSort.sort)}&dir=${encodeURIComponent(listSort.dir)}`;
+  const hasActiveFilters = hasActiveVehicleFilters(filters);
 
   const loadVehicles = useCallback(async (page = 1, limit = pageSize) => {
-    try {
-      const response = await api.get(`/vehicles?page=${page}&limit=${limit}&${sortQuery}`);
-      const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
-      setVehicles(vehiclesData);
-      setFiltered(vehiclesData);
-      setPagination(response.data.pagination || { total: 0, page: 1, limit, totalPages: 0 });
-    } catch (error) {
-      console.error('Error al cargar vehículos:', error);
-      setVehicles([]);
-      setFiltered([]);
-      setPagination({ total: 0, page: 1, limit, totalPages: 0 });
-    }
-  }, [pageSize, sortQuery]);
-
-  const loadAllVehicles = useCallback(async () => {
-    try {
-      const response = await api.get(`/vehicles?page=1&limit=${ALL_VEHICLES_LIMIT}&${sortQuery}`);
-      const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
-      setAllVehicles(vehiclesData);
-    } catch (error) {
-      console.error('Error al cargar vehículos:', error);
-      setAllVehicles([]);
-    }
-  }, [sortQuery]);
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', String(limit));
+    params.set('sort', listSort.sort);
+    params.set('dir', listSort.dir);
+    appendVehicleFilterQueryParams(params, filters);
+    const response = await api.get(`/vehicles?${params.toString()}`);
+    const vehiclesData = Array.isArray(response.data.vehicles) ? response.data.vehicles : [];
+    const nextPagination = response.data.pagination || { total: 0, page: 1, limit, totalPages: 0 };
+    return { vehiclesData, nextPagination };
+  }, [pageSize, listSort.sort, listSort.dir, filters]);
 
   useEffect(() => {
-    if (hasActiveFilters) {
-      setCurrentPage(1);
-      loadAllVehicles();
-    } else {
-      setAllVehicles([]);
-      setCurrentPage(1);
-    }
-  }, [hasActiveFilters, loadAllVehicles]);
-
-  useEffect(() => {
-    if (!hasActiveFilters) {
-      loadVehicles(currentPage, pageSize);
-    }
-  }, [currentPage, pageSize, hasActiveFilters, loadVehicles]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { vehiclesData, nextPagination } = await loadVehicles(currentPage, pageSize);
+        if (cancelled) return;
+        setVehicles(vehiclesData);
+        setPagination(nextPagination);
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error al cargar vehículos:', error);
+        setVehicles([]);
+        setPagination({ total: 0, page: 1, limit: pageSize, totalPages: 0 });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, pageSize, loadVehicles]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
@@ -295,17 +263,8 @@ const VehicleList = () => {
     try { localStorage.setItem('vehiclePageSize', String(value)); } catch {}
   };
 
-  useEffect(() => {
-    const source = hasActiveFilters ? allVehicles : vehicles;
-    const result = applyFilters(source, filters);
-    setFiltered(result);
-    if (hasActiveFilters) setCurrentPage(1);
-  }, [filters, vehicles, allVehicles, hasActiveFilters]);
-
   const handleDeleteVehicle = (vehicleId) => {
     setVehicles(prev => prev.filter(v => v.id !== vehicleId));
-    setFiltered(prev => prev.filter(v => v.id !== vehicleId));
-    if (hasActiveFilters) setAllVehicles(prev => prev.filter(v => v.id !== vehicleId));
     void loadUserScaleDenominators();
     void loadUserManufacturers();
   };
@@ -313,33 +272,26 @@ const VehicleList = () => {
   const handleImportedVehicles = () => {
     void loadUserScaleDenominators();
     void loadUserManufacturers();
-    if (hasActiveFilters) {
-      void loadAllVehicles();
-    } else {
-      void loadVehicles(currentPage, pageSize);
-    }
+    void (async () => {
+      try {
+        const { vehiclesData, nextPagination } = await loadVehicles(currentPage, pageSize);
+        setVehicles(vehiclesData);
+        setPagination(nextPagination);
+      } catch (error) {
+        console.error('Error al cargar vehículos:', error);
+      }
+    })();
   };
 
   const handlePageChange = (page) => setCurrentPage(page);
 
-  const filteredTotalPages = hasActiveFilters ? Math.ceil(filtered.length / pageSize) : pagination.totalPages;
-  const filteredTotal = hasActiveFilters ? filtered.length : pagination.total;
-  const displayVehicles = hasActiveFilters
-    ? filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-    : filtered;
+  const filteredTotalPages = pagination.totalPages;
+  const filteredTotal = pagination.total;
+  const displayVehicles = vehicles;
 
   const buildExportQueryParams = () => {
     const params = new URLSearchParams();
-    if (hasActiveFilters) {
-      if (filters.model) params.set('model', filters.model);
-      if (filters.manufacturer) params.set('manufacturer', filters.manufacturer);
-      if (filters.type) params.set('type', filters.type);
-      if (filters.modified) params.set('modified', filters.modified);
-      if (filters.digital) params.set('digital', filters.digital);
-      if (filters.filterMuseo) params.set('filterMuseo', 'true');
-      if (filters.filterTaller) params.set('filterTaller', 'true');
-      if (filters.scale) params.set('scale', filters.scale);
-    }
+    appendVehicleFilterQueryParams(params, filters);
     params.set('sort', listSort.sort);
     params.set('dir', listSort.dir);
     return params;
@@ -471,9 +423,7 @@ const VehicleList = () => {
   if (endPage - startPage + 1 < maxPages) startPage = Math.max(1, endPage - maxPages + 1);
 
   const rangeStart = filteredTotal > 0 ? (currentPage - 1) * pageSize + 1 : 0;
-  const rangeEnd = hasActiveFilters
-    ? Math.min(currentPage * pageSize, filteredTotal)
-    : Math.min(currentPage * pagination.limit, filteredTotal);
+  const rangeEnd = Math.min(currentPage * pageSize, filteredTotal);
 
   return (
     <div className="space-y-6">
