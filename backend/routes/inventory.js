@@ -1263,7 +1263,7 @@ router.post('/:id/mount', async (req, res) => {
       }
     }
 
-    const specs = await getOrCreateBaseSpecs(vehicleId);
+    const specs = await getOrCreateBaseSpecs(req.supabase, vehicleId);
     const targetSpec = isModification ? specs.modification : specs.technical;
 
     let partId = item.part_id || null;
@@ -1346,7 +1346,7 @@ router.post('/:id/mount', async (req, res) => {
     }
 
     if (isModification) {
-      await updateVehicleTotalPrice(vehicleId);
+      await updateVehicleTotalPrice(req.supabase, vehicleId);
     }
 
     const [enriched] = await enrichInventoryRows(req.supabase, [updatedInv], req.user.id);
