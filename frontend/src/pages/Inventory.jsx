@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -59,6 +59,7 @@ import {
   formatInventoryCategory,
   formatHistoryDate,
 } from '../utils/formatUtils';
+import { buildInventoryListQueryParams } from '../utils/inventoryListQuery';
 
 const emptyForm = () => ({
   name: '',
@@ -126,6 +127,7 @@ const Inventory = () => {
   const [partSaving, setPartSaving] = useState(false);
   const [partFormError, setPartFormError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 25, totalPages: 0 });
   const [pageSize, setPageSize] = useState(() => {
     try {
       const stored = parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY), 10);
@@ -136,9 +138,15 @@ const Inventory = () => {
   });
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(searchInput.trim()), 350);
+    const t = setTimeout(() => {
+      const next = searchInput.trim();
+      if (next !== debouncedQ) {
+        setDebouncedQ(next);
+        setCurrentPage(1);
+      }
+    }, 350);
     return () => clearTimeout(t);
-  }, [searchInput]);
+  }, [searchInput, debouncedQ]);
 
   const loadVehicles = useCallback(async () => {
     try {
@@ -163,19 +171,38 @@ const Inventory = () => {
   const loadItems = useCallback(async () => {
     try {
       setLoading(true);
-      const params = {};
-      if (categoryFilter && categoryFilter !== 'all') params.category = categoryFilter;
-      if (lowStockOnly) params.low_stock = 'true';
-      if (debouncedQ) params.q = debouncedQ;
+      const params = buildInventoryListQueryParams({
+        page: currentPage,
+        limit: pageSize,
+        category: categoryFilter,
+        lowStock: lowStockOnly,
+        q: debouncedQ,
+        onlyMounted: viewMode === 'parts' ? onlyMounted : false,
+      });
       if (viewMode === 'parts') {
-        if (onlyMounted) params.only_mounted = 'true';
         const { data } = await api.get('/inventory/parts', { params });
-        setParts(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.parts) ? data.parts : []);
+        const nextPagination = data?.pagination || {
+          total: list.length,
+          page: currentPage,
+          limit: pageSize,
+          totalPages: Math.ceil(list.length / pageSize) || 0,
+        };
+        setParts(list);
         setItems([]);
+        setPagination(nextPagination);
       } else {
         const { data } = await api.get('/inventory', { params });
-        setItems(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+        const nextPagination = data?.pagination || {
+          total: list.length,
+          page: currentPage,
+          limit: pageSize,
+          totalPages: Math.ceil(list.length / pageSize) || 0,
+        };
+        setItems(list);
         setParts([]);
+        setPagination(nextPagination);
       }
       setError(null);
     } catch (err) {
@@ -183,10 +210,11 @@ const Inventory = () => {
       setError(err.response?.data?.error || 'Error al cargar el inventario');
       setItems([]);
       setParts([]);
+      setPagination({ total: 0, page: currentPage, limit: pageSize, totalPages: 0 });
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter, lowStockOnly, debouncedQ, viewMode, onlyMounted]);
+  }, [categoryFilter, lowStockOnly, debouncedQ, viewMode, onlyMounted, currentPage, pageSize]);
 
   useEffect(() => {
     loadVehicles();
@@ -195,10 +223,6 @@ const Inventory = () => {
   useEffect(() => {
     loadItems();
   }, [loadItems]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [categoryFilter, lowStockOnly, debouncedQ, viewMode, onlyMounted, pageSize]);
 
   const initForm = (item = null) => {
     if (item) {
@@ -745,17 +769,9 @@ const Inventory = () => {
 
   const unitLabel = (u) => INVENTORY_UNITS.find((x) => x.value === u)?.label || u;
 
-  const catalogTotal = viewMode === 'parts' ? parts.length : items.length;
-  const totalPages = Math.max(1, Math.ceil(catalogTotal / pageSize) || 1);
+  const catalogTotal = pagination.total;
+  const totalPages = Math.max(1, pagination.totalPages || Math.ceil(catalogTotal / pageSize) || 1);
   const safePage = Math.min(Math.max(1, currentPage), totalPages);
-  const pagedParts = useMemo(
-    () => parts.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [parts, safePage, pageSize],
-  );
-  const pagedItems = useMemo(
-    () => items.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [items, safePage, pageSize],
-  );
   const rangeStart = catalogTotal > 0 ? (safePage - 1) * pageSize + 1 : 0;
   const rangeEnd = catalogTotal > 0 ? Math.min(safePage * pageSize, catalogTotal) : 0;
 
@@ -763,11 +779,32 @@ const Inventory = () => {
     const next = parseInt(e.target.value, 10);
     if (!PAGE_SIZE_OPTIONS.includes(next)) return;
     setPageSize(next);
+    setCurrentPage(1);
     try {
       localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(next));
     } catch {
       /* ignore */
     }
+  };
+
+  const handleCategoryFilterChange = (value) => {
+    setCategoryFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleLowStockChange = (value) => {
+    setLowStockOnly(value);
+    setCurrentPage(1);
+  };
+
+  const handleOnlyMountedChange = (value) => {
+    setOnlyMounted(value);
+    setCurrentPage(1);
+  };
+
+  const handleViewModeChange = (value) => {
+    setViewMode(value);
+    setCurrentPage(1);
   };
 
   const paginationBar = catalogTotal > 0 ? (
@@ -827,7 +864,7 @@ const Inventory = () => {
         </Button>
       </div>
 
-      <Tabs value={viewMode} onValueChange={setViewMode}>
+      <Tabs value={viewMode} onValueChange={handleViewModeChange}>
         <TabsList>
           <TabsTrigger value="parts">Todas las piezas</TabsTrigger>
           <TabsTrigger value="stock">Líneas de stock</TabsTrigger>
@@ -1634,7 +1671,7 @@ const Inventory = () => {
       <div className="flex flex-col lg:flex-row gap-4 flex-wrap items-start lg:items-end">
         <div className="space-y-2 min-w-[180px]">
           <Label htmlFor="inv-filter-cat">Categoría</Label>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter} onValueChange={handleCategoryFilterChange}>
             <SelectTrigger id="inv-filter-cat">
               <SelectValue />
             </SelectTrigger>
@@ -1658,14 +1695,14 @@ const Inventory = () => {
           />
         </div>
         <div className="flex items-center gap-2 pb-2">
-          <Switch id="inv-low" checked={lowStockOnly} onCheckedChange={setLowStockOnly} />
+          <Switch id="inv-low" checked={lowStockOnly} onCheckedChange={handleLowStockChange} />
           <Label htmlFor="inv-low" className="cursor-pointer">
             Solo stock bajo
           </Label>
         </div>
         {viewMode === 'parts' && (
           <div className="flex items-center gap-2 pb-2">
-            <Switch id="inv-mounted" checked={onlyMounted} onCheckedChange={setOnlyMounted} />
+            <Switch id="inv-mounted" checked={onlyMounted} onCheckedChange={handleOnlyMountedChange} />
             <Label htmlFor="inv-mounted" className="cursor-pointer">
               Solo montadas en coches
             </Label>
@@ -1685,7 +1722,7 @@ const Inventory = () => {
         </div>
       )}
 
-      {!loading && (viewMode === 'parts' ? parts.length === 0 : items.length === 0) ? (
+      {!loading && catalogTotal === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
             <Package className="size-12 mx-auto text-muted-foreground mb-4" />
@@ -1703,7 +1740,7 @@ const Inventory = () => {
         <>
           {viewMode === 'parts' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {pagedParts.map((view) => {
+          {parts.map((view) => {
             const p = view.part;
             const stockLine = (view.inventory_lines || []).find((l) => Number(l.quantity) > 0);
             return (
@@ -1813,7 +1850,7 @@ const Inventory = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {pagedItems.map((item) => (
+          {items.map((item) => (
             <Card
               key={item.id}
               className="relative flex h-full flex-col overflow-hidden hover:shadow-lg transition-shadow"
