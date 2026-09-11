@@ -11,6 +11,16 @@ const {
   inventoryCategoryToComponentType,
 } = require('../lib/partsRegistry');
 const { consumeInventoryStock, restoreStockDeductions } = require('../lib/inventoryStockOps');
+const {
+  applyInventoryItemListFilters,
+  applyInventoryPartListFilters,
+  applyInventoryItemPostFilters,
+  applyInventoryPartPostFilters,
+  inventoryItemNeedsPostFilter,
+  inventoryPartNeedsPostFilter,
+  parseInventoryListPagination,
+  buildInventoryPagination,
+} = require('../lib/inventoryListFilters');
 
 const router = express.Router();
 
@@ -348,88 +358,92 @@ async function assemblePartViews(supabase, parts, userId) {
   });
 }
 
-async function loadUserParts(supabase, userId, { category, q } = {}) {
-  let query = supabase
-    .from('parts')
-    .select('*')
-    .eq('user_id', userId)
-    .order('name', { ascending: true });
-
-  if (category && String(category).trim() !== '' && String(category) !== 'all') {
-    if (!ALLOWED_CATEGORIES.has(String(category))) {
-      const err = new Error('category no válida');
-      err.status = 400;
-      throw err;
-    }
-    query = query.eq('category', String(category));
+function assertValidInventoryCategory(category) {
+  if (!category || String(category).trim() === '' || String(category) === 'all') return;
+  if (!ALLOWED_CATEGORIES.has(String(category))) {
+    const err = new Error('category no válida');
+    err.status = 400;
+    throw err;
   }
+}
 
-  const searchQ = q != null && String(q).trim() !== '' ? String(q).trim() : null;
-  if (searchQ) {
-    const safe = searchQ.replace(/%/g, '').replace(/,/g, ' ').replace(/[()]/g, ' ').trim();
-    if (safe) {
-      const esc = safe.replace(/_/g, '\\_');
-      query = query.or(
-        `name.ilike.%${esc}%,reference.ilike.%${esc}%,manufacturer.ilike.%${esc}%`,
-      );
-    }
-  }
-
+async function loadUserParts(supabase, userId, params = {}) {
+  assertValidInventoryCategory(params.category);
+  const query = applyInventoryPartListFilters(
+    supabase.from('parts').select('*').eq('user_id', userId).order('name', { ascending: true }),
+    params,
+  );
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }
 
 /**
- * GET /api/inventory?category=&low_stock=true&vehicle_id=&q=
+ * GET /api/inventory?page=&limit=&category=&low_stock=true&vehicle_id=&q=
+ * Con page/limit: { items, pagination }. Sin ellos: array (picker EditVehicle).
  */
 router.get('/', async (req, res) => {
   try {
-    const { category, low_stock: lowStock, vehicle_id: vehicleId, q } = req.query;
+    try {
+      assertValidInventoryCategory(req.query.category);
+    } catch (err) {
+      if (err.status === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
 
-    let query = req.supabase
-      .from('inventory_items')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .order('created_at', { ascending: false });
+    const { paginate, page, limit, from } = parseInventoryListPagination(req.query);
+    const postFilter = inventoryItemNeedsPostFilter(req.query);
 
-    if (category && String(category).trim() !== '' && String(category) !== 'all') {
-      if (!ALLOWED_CATEGORIES.has(String(category))) {
-        return res.status(400).json({ error: 'category no válida' });
+    const listQuery = () =>
+      applyInventoryItemListFilters(
+        req.supabase.from('inventory_items').select('*').eq('user_id', req.user.id),
+        req.query,
+      ).order('created_at', { ascending: false });
+
+    if (!paginate || postFilter) {
+      const { data, error } = await listQuery();
+      if (error) {
+        console.error('Error al listar inventario:', error);
+        return res.status(500).json({ error: error.message });
       }
-      query = query.eq('category', String(category));
-    }
-
-    if (vehicleId && String(vehicleId).trim() !== '') {
-      query = query.eq('vehicle_id', String(vehicleId));
-    }
-
-    const searchQ = q != null && String(q).trim() !== '' ? String(q).trim() : null;
-    if (searchQ) {
-      // Evitar romper el operador .or de PostgREST (separador por comas)
-      const safe = searchQ.replace(/%/g, '').replace(/,/g, ' ').replace(/[()]/g, ' ').trim();
-      if (safe) {
-        const esc = safe.replace(/_/g, '\\_');
-        query = query.or(`name.ilike.%${esc}%,reference.ilike.%${esc}%`);
+      const rows = applyInventoryItemPostFilters(data || [], req.query);
+      if (!paginate) {
+        const enriched = await enrichInventoryRows(req.supabase, rows, req.user.id);
+        return res.json(enriched);
       }
+      const total = rows.length;
+      const pageRows = rows.slice(from, from + limit);
+      const enriched = await enrichInventoryRows(req.supabase, pageRows, req.user.id);
+      return res.json({
+        items: enriched,
+        pagination: buildInventoryPagination(total, page, limit),
+      });
     }
 
-    const { data, error } = await query;
+    const { count, error: countError } = await applyInventoryItemListFilters(
+      req.supabase
+        .from('inventory_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', req.user.id),
+      req.query,
+    );
+    if (countError) {
+      console.error('Error al contar inventario:', countError);
+      return res.status(500).json({ error: countError.message });
+    }
+    const total = count ?? 0;
+
+    const { data, error } = await listQuery().range(from, from + limit - 1);
     if (error) {
       console.error('Error al listar inventario:', error);
       return res.status(500).json({ error: error.message });
     }
 
-    let rows = data || [];
-
-    if (lowStock === 'true' || lowStock === '1') {
-      rows = rows.filter(
-        (r) => r.min_stock != null && Number(r.quantity) <= Number(r.min_stock),
-      );
-    }
-
-    const enriched = await enrichInventoryRows(req.supabase, rows, req.user.id);
-    res.json(enriched);
+    const enriched = await enrichInventoryRows(req.supabase, data || [], req.user.id);
+    res.json({
+      items: enriched,
+      pagination: buildInventoryPagination(total, page, limit),
+    });
   } catch (err) {
     console.error('GET /inventory:', err);
     res.status(500).json({ error: err.message });
@@ -476,23 +490,50 @@ router.get('/parts/match', async (req, res) => {
 });
 
 /**
- * GET /api/inventory/parts
- * Vista consolidada: stock + unidades montadas por identidad de pieza.
+ * GET /api/inventory/parts?page=&limit=&category=&low_stock=true&q=&only_mounted=true
+ * Con page/limit: { parts, pagination }. Sin ellos: array (compat).
  */
 router.get('/parts', async (req, res) => {
   try {
-    const { category, low_stock: lowStock, q, only_mounted: onlyMounted } = req.query;
-    const parts = await loadUserParts(req.supabase, req.user.id, { category, q });
-    let views = await assemblePartViews(req.supabase, parts, req.user.id);
+    const { paginate, page, limit, from } = parseInventoryListPagination(req.query);
+    const postFilter = inventoryPartNeedsPostFilter(req.query);
 
-    if (lowStock === 'true' || lowStock === '1') {
-      views = views.filter((v) => v.low_stock);
-    }
-    if (onlyMounted === 'true' || onlyMounted === '1') {
-      views = views.filter((v) => Number(v.mounted_qty) > 0);
+    if (!paginate || postFilter) {
+      const parts = await loadUserParts(req.supabase, req.user.id, req.query);
+      const views = applyInventoryPartPostFilters(
+        await assemblePartViews(req.supabase, parts, req.user.id),
+        req.query,
+      );
+      if (!paginate) return res.json(views);
+      const total = views.length;
+      return res.json({
+        parts: views.slice(from, from + limit),
+        pagination: buildInventoryPagination(total, page, limit),
+      });
     }
 
-    res.json(views);
+    assertValidInventoryCategory(req.query.category);
+
+    const { count, error: countError } = await applyInventoryPartListFilters(
+      req.supabase.from('parts').select('*', { count: 'exact', head: true }).eq('user_id', req.user.id),
+      req.query,
+    );
+    if (countError) throw countError;
+    const total = count ?? 0;
+
+    const { data: parts, error } = await applyInventoryPartListFilters(
+      req.supabase.from('parts').select('*').eq('user_id', req.user.id),
+      req.query,
+    )
+      .order('name', { ascending: true })
+      .range(from, from + limit - 1);
+    if (error) throw error;
+
+    const views = await assemblePartViews(req.supabase, parts || [], req.user.id);
+    res.json({
+      parts: views,
+      pagination: buildInventoryPagination(total, page, limit),
+    });
   } catch (err) {
     if (err.status === 400) return res.status(400).json({ error: err.message });
     console.error('GET /inventory/parts:', err);
