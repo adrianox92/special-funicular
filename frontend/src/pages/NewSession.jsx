@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Car, Check, ChevronDown, Flag, Plus, Search, Timer } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Spinner } from '../components/ui/spinner';
 import { TimeInput, TimeInputHint } from '../components/ui/TimeInput';
 import { cn } from '../lib/utils';
+import { SESSION_EVENTS, trackSessionEvent } from '../lib/analytics';
 import { formatLapTimeDisplay } from '../utils/formatUtils';
 import {
   buildSessionTimingPayload,
@@ -127,6 +128,37 @@ const NewSession = () => {
   const [summary, setSummary] = useState(null);
   const [lastUsedId, setLastUsedId] = useState(() => getLastSessionCircuitId());
 
+  const visitRef = useRef({
+    opened: false,
+    saved: false,
+    abandoned: false,
+    circuitCreated: false,
+    hasPriorCircuit: false,
+  });
+  const stepRef = useRef(step);
+  const captureRef = useRef(capture);
+  stepRef.current = step;
+  captureRef.current = capture;
+
+  const funnelFromVisit = (overrides = {}) => {
+    const cap = captureRef.current || {};
+    return {
+      step: stepRef.current,
+      hasPriorCircuit: visitRef.current.hasPriorCircuit,
+      circuitCreated: visitRef.current.circuitCreated,
+      laneSet: Boolean(cap.lane),
+      voltageSet: Boolean(String(cap.supplyVoltageVolts || '').trim()),
+      ...overrides,
+    };
+  };
+
+  const trackAbandonedIfNeeded = useCallback(() => {
+    const visit = visitRef.current;
+    if (visit.saved || visit.abandoned || !visit.opened) return;
+    visit.abandoned = true;
+    trackSessionEvent(SESSION_EVENTS.ABANDONED, funnelFromVisit());
+  }, []);
+
   const selectedCircuit = useMemo(
     () => circuits.find((c) => String(c.id) === String(circuitId)) || null,
     [circuits, circuitId],
@@ -175,12 +207,49 @@ const NewSession = () => {
       setCircuitId(nextCircuitId);
       setVehicleId(nextVehicleId);
 
+      const visit = visitRef.current;
+      visit.hasPriorCircuit = circuitList.length > 0;
+      let landingStep = 'circuit';
       if (nextCircuitId && nextVehicleId) {
+        landingStep = 'capture';
         setStep('capture');
       } else if (nextCircuitId && queryVehicleId) {
+        landingStep = 'vehicle';
         setStep('vehicle');
       }
+      if (!visit.opened) {
+        visit.opened = true;
+        trackSessionEvent(SESSION_EVENTS.MODE_OPENED, funnelFromVisit({
+          step: landingStep,
+          laneSet: false,
+          voltageSet: false,
+        }));
+        if (nextCircuitId && queryCircuitId && String(nextCircuitId) === String(queryCircuitId)) {
+          trackSessionEvent(SESSION_EVENTS.CIRCUIT_SELECTED, funnelFromVisit({
+            step: 'circuit',
+            laneSet: false,
+            voltageSet: false,
+          }));
+        }
+        if (nextVehicleId && queryVehicleId) {
+          trackSessionEvent(SESSION_EVENTS.VEHICLE_SELECTED, funnelFromVisit({
+            step: 'vehicle',
+            laneSet: false,
+            voltageSet: false,
+          }));
+        }
+      }
     } catch (err) {
+      const visit = visitRef.current;
+      if (!visit.opened) {
+        visit.opened = true;
+        trackSessionEvent(SESSION_EVENTS.MODE_OPENED, funnelFromVisit({
+          step: 'circuit',
+          hasPriorCircuit: false,
+          laneSet: false,
+          voltageSet: false,
+        }));
+      }
       setLoadError(err.response?.data?.error || err.message || 'Error');
     } finally {
       setLoading(false);
@@ -190,6 +259,17 @@ const NewSession = () => {
   useEffect(() => {
     loadLists();
   }, [loadLists]);
+
+  useEffect(() => {
+    const onLeave = () => trackAbandonedIfNeeded();
+    window.addEventListener('pagehide', onLeave);
+    window.addEventListener('beforeunload', onLeave);
+    return () => {
+      window.removeEventListener('pagehide', onLeave);
+      window.removeEventListener('beforeunload', onLeave);
+      onLeave();
+    };
+  }, [trackAbandonedIfNeeded]);
 
   const handleCreateCircuit = async (e) => {
     e.preventDefault();
@@ -220,6 +300,13 @@ const NewSession = () => {
       setLastSessionCircuitId(created.id);
       setLastUsedId(String(created.id));
       setCreateName('');
+      visitRef.current.circuitCreated = true;
+      trackSessionEvent(SESSION_EVENTS.CIRCUIT_CREATED, funnelFromVisit({
+        step: 'circuit',
+        circuitCreated: true,
+        laneSet: false,
+        voltageSet: false,
+      }));
       setStep('vehicle');
     } catch (err) {
       setCreateError(err.response?.data?.error || t('circuit.createError'));
@@ -232,11 +319,21 @@ const NewSession = () => {
     if (!circuitId) return;
     setLastSessionCircuitId(circuitId);
     setLastUsedId(String(circuitId));
+    trackSessionEvent(SESSION_EVENTS.CIRCUIT_SELECTED, funnelFromVisit({
+      step: 'circuit',
+      laneSet: false,
+      voltageSet: false,
+    }));
     setStep('vehicle');
   };
 
   const handleContinueFromVehicle = () => {
     if (!vehicleId) return;
+    trackSessionEvent(SESSION_EVENTS.VEHICLE_SELECTED, funnelFromVisit({
+      step: 'vehicle',
+      laneSet: false,
+      voltageSet: false,
+    }));
     setStep('capture');
   };
 
@@ -278,6 +375,12 @@ const NewSession = () => {
         supplyVoltageVolts: voltageRaw,
       });
       const { data } = await api.post('/timings', payload);
+      visitRef.current.saved = true;
+      trackSessionEvent(SESSION_EVENTS.TIMING_SAVED, funnelFromVisit({
+        step: 'capture',
+        laneSet: Boolean(payload.lane),
+        voltageSet: Boolean(voltageRaw),
+      }));
       setLastSessionCircuitId(circuitId);
       setLastUsedId(String(circuitId));
       setSummary({
@@ -307,6 +410,7 @@ const NewSession = () => {
   };
 
   const handleCancel = () => {
+    trackAbandonedIfNeeded();
     navigate('/dashboard');
   };
 

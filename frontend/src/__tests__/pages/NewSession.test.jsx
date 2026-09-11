@@ -1,8 +1,13 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { track } from '@vercel/analytics';
 import NewSession from '../../pages/NewSession';
 import api from '../../lib/axios';
+
+jest.mock('@vercel/analytics', () => ({
+  track: jest.fn(),
+}));
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
@@ -35,6 +40,10 @@ function renderSession(initial = '/session') {
   );
 }
 
+function trackedNames() {
+  return track.mock.calls.map((call) => call[0]);
+}
+
 describe('NewSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,6 +58,12 @@ describe('NewSession', () => {
     await screen.findByText(/Aún no tienes circuitos|You have no circuits yet|Du hast noch keine Strecken/i);
     expect(screen.getByLabelText(/Nombre|Name/i)).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(track).toHaveBeenCalledWith(
+        'session_mode_opened',
+        expect.objectContaining({ step: 'circuit', has_prior_circuit: false }),
+      );
+    });
   });
 
   test('sin vehículos no bloquea la app y ofrece alta/catálogo', async () => {
@@ -64,14 +79,54 @@ describe('NewSession', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  test('cancelar a mitad de flujo no guarda borrador', async () => {
+  test('cancelar a mitad de flujo no guarda borrador y dispara session_abandoned', async () => {
     mockLists();
     renderSession();
 
     await screen.findByRole('button', { name: /Cancelar|Cancel|Abbrechen/i });
+    await waitFor(() => {
+      expect(trackedNames()).toContain('session_mode_opened');
+    });
     fireEvent.click(screen.getByRole('button', { name: /Cancelar|Cancel|Abbrechen/i }));
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
     expect(api.post).not.toHaveBeenCalled();
+    expect(track).toHaveBeenCalledWith(
+      'session_abandoned',
+      expect.objectContaining({
+        step: 'circuit',
+        has_prior_circuit: true,
+        circuit_created: false,
+      }),
+    );
+    expect(trackedNames()).not.toContain('session_timing_saved');
+  });
+
+  test('crear circuito en el flujo dispara session_circuit_created', async () => {
+    mockLists({ circuits: [], vehicles: [vehicle] });
+    api.post.mockResolvedValue({
+      data: { id: 'cir-new', name: 'Casa', num_lanes: 2, lane_lengths: [0, 0] },
+    });
+    renderSession();
+
+    const nameInput = await screen.findByLabelText(/Nombre|Name/i);
+    fireEvent.change(nameInput, { target: { value: 'Casa' } });
+    fireEvent.click(screen.getByRole('button', { name: /Crear y usar|Create and use|Anlegen und verwenden/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/circuits',
+        expect.objectContaining({ name: 'Casa', num_lanes: 2 }),
+      );
+    });
+    expect(track).toHaveBeenCalledWith(
+      'session_circuit_created',
+      expect.objectContaining({
+        step: 'circuit',
+        circuit_created: true,
+        has_prior_circuit: false,
+      }),
+    );
+    await screen.findByTestId('session-step-vehicle');
   });
 
   test('guarda una sesión TRAINING por POST /timings', async () => {
@@ -126,5 +181,46 @@ describe('NewSession', () => {
     expect(body.lane).toBe('1');
 
     await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
+
+    expect(trackedNames()).toEqual([
+      'session_mode_opened',
+      'session_circuit_selected',
+      'session_vehicle_selected',
+      'session_timing_saved',
+    ]);
+    expect(track).toHaveBeenCalledWith(
+      'session_timing_saved',
+      expect.objectContaining({
+        step: 'capture',
+        has_prior_circuit: true,
+        circuit_created: false,
+        lane_set: true,
+        voltage_set: false,
+      }),
+    );
+    const savedProps = track.mock.calls.find((call) => call[0] === 'session_timing_saved')[1];
+    expect(savedProps).not.toHaveProperty('vehicle_name');
+    expect(savedProps).not.toHaveProperty('email');
+    expect(JSON.stringify(savedProps)).not.toMatch(/11\.324|Ferrari|veh-1/i);
+
+    track.mockClear();
+    window.dispatchEvent(new Event('beforeunload'));
+    expect(trackedNames()).not.toContain('session_abandoned');
+  });
+
+  test('beforeunload a mitad de flujo dispara session_abandoned una vez', async () => {
+    mockLists();
+    renderSession();
+    await waitFor(() => {
+      expect(trackedNames()).toContain('session_mode_opened');
+    });
+    track.mockClear();
+    window.dispatchEvent(new Event('beforeunload'));
+    window.dispatchEvent(new Event('pagehide'));
+    expect(trackedNames()).toEqual(['session_abandoned']);
+    expect(track).toHaveBeenCalledWith(
+      'session_abandoned',
+      expect.objectContaining({ step: 'circuit', has_prior_circuit: true }),
+    );
   });
 });
