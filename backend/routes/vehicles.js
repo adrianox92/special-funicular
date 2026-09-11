@@ -1678,7 +1678,7 @@ router.post('/:id/technical-specs', async (req, res) => {
     }
 
     // Obtener o crear las especificaciones base
-    const specs = await getOrCreateBaseSpecs(id);
+    const specs = await getOrCreateBaseSpecs(req.supabase, id);
     const targetSpec = is_modification ? specs.modification : specs.technical;
 
     // Crear los componentes asociados (con identidad canónica y descuento opcional)
@@ -1761,7 +1761,7 @@ router.post('/:id/technical-specs', async (req, res) => {
     }
 
     if (is_modification) {
-      await updateVehicleTotalPrice(id);
+      await updateVehicleTotalPrice(req.supabase, id);
     }
 
     res.status(201).json({
@@ -1929,7 +1929,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
 
     // Si es una modificación, actualizar el precio total del vehículo
     if (is_modification) {
-      await updateVehicleTotalPrice(id);
+      await updateVehicleTotalPrice(req.supabase, id);
     }
 
     // Obtener el componente actualizado
@@ -2050,7 +2050,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
 
     // Si era una modificación, actualizar el precio total
     if (existingSpec.is_modification) {
-      await updateVehicleTotalPrice(id);
+      await updateVehicleTotalPrice(req.supabase, id);
     }
 
     res.json({ message: 'Componente eliminado correctamente' });

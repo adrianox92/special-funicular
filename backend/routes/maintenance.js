@@ -1,9 +1,8 @@
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { createUserScopedClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
-const supabase = getAnonClient();
 
 const ALLOWED_KINDS = new Set([
   'limpieza_general',
@@ -19,6 +18,10 @@ const ALLOWED_KINDS = new Set([
 ]);
 
 router.use(authMiddleware);
+router.use((req, res, next) => {
+  req.supabase = createUserScopedClient(req.headers.authorization);
+  next();
+});
 
 function normalizeDate(val) {
   if (val == null || val === '') return null;
@@ -27,7 +30,12 @@ function normalizeDate(val) {
   return s;
 }
 
-async function assertVehicleOwned(vehicleId, userId) {
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} vehicleId
+ * @param {string} userId
+ */
+async function assertVehicleOwned(supabase, vehicleId, userId) {
   const { data, error } = await supabase
     .from('vehicles')
     .select('id')
@@ -48,12 +56,12 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'vehicle_id es requerido' });
     }
 
-    const owned = await assertVehicleOwned(vehicleId, req.user.id);
+    const owned = await assertVehicleOwned(req.supabase, vehicleId, req.user.id);
     if (!owned) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('vehicle_maintenance_log')
       .select('*')
       .eq('vehicle_id', vehicleId)
@@ -90,7 +98,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'kind no válido' });
     }
 
-    const owned = await assertVehicleOwned(vehicleId, req.user.id);
+    const owned = await assertVehicleOwned(req.supabase, vehicleId, req.user.id);
     if (!owned) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
@@ -105,7 +113,7 @@ router.post('/', async (req, res) => {
       next_due_at: nextDue,
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('vehicle_maintenance_log')
       .insert([row])
       .select()
@@ -131,7 +139,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { performed_at, kind, notes, next_due_at } = req.body;
 
-    const { data: existing, error: fetchErr } = await supabase
+    const { data: existing, error: fetchErr } = await req.supabase
       .from('vehicle_maintenance_log')
       .select('*')
       .eq('id', id)
@@ -171,7 +179,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'No hay campos para actualizar' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('vehicle_maintenance_log')
       .update(updates)
       .eq('id', id)
@@ -198,7 +206,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
       .from('vehicle_maintenance_log')
       .delete()
       .eq('id', id)

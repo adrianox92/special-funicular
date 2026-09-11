@@ -1,13 +1,13 @@
-const { getAnonClient } = require('./supabaseClients');
 const { modificationLineTotal } = require('./componentPricing');
-
-const supabase = getAnonClient();
 
 /**
  * Recalcula total_price y modified del vehículo a partir de modificaciones.
+ * Debe usarse el cliente autenticado (p. ej. req.supabase): el anon no supera RLS
+ * y el update queda en no-op silencioso.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} vehicleId
  */
-async function updateVehicleTotalPrice(vehicleId) {
+async function updateVehicleTotalPrice(supabase, vehicleId) {
   const { data: vehicle, error: vehicleError } = await supabase
     .from('vehicles')
     .select('price')
@@ -48,10 +48,12 @@ async function updateVehicleTotalPrice(vehicleId) {
 
 /**
  * Obtiene o crea las filas technical_specs (modificación y técnica) de un vehículo.
+ * Debe usarse el cliente autenticado (p. ej. req.supabase): el anon no supera RLS.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} vehicleId
  * @returns {Promise<{ modification: object, technical: object }>}
  */
-async function getOrCreateBaseSpecs(vehicleId) {
+async function getOrCreateBaseSpecs(supabase, vehicleId) {
   const { data: existingSpecs, error: fetchError } = await supabase
     .from('technical_specs')
     .select('*')
