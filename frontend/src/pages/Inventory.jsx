@@ -505,7 +505,9 @@ const Inventory = () => {
       closeMount();
       loadItems();
     } catch (err) {
-      setMountError(err.response?.data?.error || 'Error al montar');
+      const msg = err.response?.data?.error || 'Error al montar';
+      setMountError(msg);
+      toast.error(msg);
     } finally {
       setMountSaving(false);
     }

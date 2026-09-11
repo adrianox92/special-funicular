@@ -18,12 +18,11 @@ const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { updateVehicleTotalPrice, getOrCreateBaseSpecs } = require('../lib/vehicleSpecs');
 const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFromComponent');
-const { deductInventoryQuantity, restoreInventoryQuantity } = require('../lib/inventoryStockOps');
 const {
-  resolvePartId,
-  deductPartStockFifo,
-  restorePartStockDeductions,
-} = require('../lib/partsRegistry');
+  consumeInventoryStock,
+  restoreStockDeductions,
+} = require('../lib/inventoryStockOps');
+const { resolvePartId } = require('../lib/partsRegistry');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
 const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const { logDbError } = require('../lib/logDbError');
@@ -1681,9 +1680,8 @@ router.post('/:id/technical-specs', async (req, res) => {
     const specs = await getOrCreateBaseSpecs(req.supabase, id);
     const targetSpec = is_modification ? specs.modification : specs.technical;
 
-    // Crear los componentes asociados (con identidad canónica y descuento opcional)
+    // Crear los componentes asociados (con identidad canónica y descuento de inventario)
     let createdComponents = [];
-    const deductWarnings = [];
     const allDeductions = [];
     if (Array.isArray(components) && components.length > 0) {
       const compsToInsert = [];
@@ -1709,34 +1707,32 @@ router.post('/:id/technical-specs', async (req, res) => {
           description: picked.description,
         });
         if (!resolved.ok) {
-          await restorePartStockDeductions(req.supabase, req.user.id, allDeductions);
+          await restoreStockDeductions(req.supabase, req.user.id, allDeductions);
           return res.status(500).json({ error: resolved.error });
         }
 
         const wantDeduct =
-          c?.deduct_from_inventory === true || req.body.deduct_from_inventory === true;
+          c?.deduct_from_inventory === true ||
+          req.body.deduct_from_inventory === true ||
+          Boolean(c?.source_inventory_item_id);
 
         let sourceInventoryItemId = c?.source_inventory_item_id || null;
         if (wantDeduct) {
-          const fifo = await deductPartStockFifo(req.supabase, {
+          const consumed = await consumeInventoryStock(req.supabase, {
             userId: req.user.id,
             partId: resolved.part.id,
+            itemId: sourceInventoryItemId,
             qty: mountedQty,
           });
-          if (!fifo.ok) {
-            await restorePartStockDeductions(req.supabase, req.user.id, allDeductions);
-            return res.status(409).json({ error: fifo.error });
-          }
-          allDeductions.push(...fifo.deductions);
-          sourceInventoryItemId = fifo.sourceInventoryItemId || sourceInventoryItemId;
-          if (fifo.remainingUnfilled > 0) {
-            deductWarnings.push({
-              element: picked.element,
-              requested: mountedQty,
-              deducted: fifo.deductedQty,
-              missing: fifo.remainingUnfilled,
+          if (!consumed.ok) {
+            await restoreStockDeductions(req.supabase, req.user.id, allDeductions);
+            return res.status(consumed.status || 400).json({
+              error: consumed.error,
+              ...(consumed.code ? { code: consumed.code } : {}),
             });
           }
+          allDeductions.push(...consumed.deductions);
+          sourceInventoryItemId = consumed.sourceInventoryItemId || sourceInventoryItemId;
         }
 
         compsToInsert.push({
@@ -1754,7 +1750,7 @@ router.post('/:id/technical-specs', async (req, res) => {
         .insert(compsToInsert)
         .select();
       if (compsError) {
-        await restorePartStockDeductions(req.supabase, req.user.id, allDeductions);
+        await restoreStockDeductions(req.supabase, req.user.id, allDeductions);
         return res.status(500).json({ error: compsError.message });
       }
       createdComponents = comps;
@@ -1767,7 +1763,6 @@ router.post('/:id/technical-specs', async (req, res) => {
     res.status(201).json({
       ...targetSpec,
       components: createdComponents,
-      ...(deductWarnings.length ? { inventory_deduct_warnings: deductWarnings } : {}),
     });
   } catch (err) {
     console.error('Error al crear componente:', err);
@@ -1852,25 +1847,28 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
     const newQ = Math.max(1, parseInt(nextSnap.mounted_qty, 10) || 1);
 
     let deductMeta = null;
-    if (
-      is_modification === true &&
+    const cameFromInventory = Boolean(existingComponent.source_inventory_item_id);
+    const wantDeductIncrease =
+      (cameFromInventory || req.body.deduct_from_inventory === true) &&
       onlyMountedQtyChanged &&
-      newQ > oldQ &&
-      existingComponent.source_inventory_item_id
-    ) {
+      newQ > oldQ;
+    if (wantDeductIncrease) {
       const delta = newQ - oldQ;
-      const dres = await deductInventoryQuantity(req.supabase, {
+      const consumed = await consumeInventoryStock(req.supabase, {
         userId: req.user.id,
+        partId: existingComponent.part_id || nextPartId,
         itemId: existingComponent.source_inventory_item_id,
         qty: delta,
       });
-      if (!dres.ok) {
-        return res.status(409).json({ error: dres.error });
+      if (!consumed.ok) {
+        return res.status(consumed.status || 400).json({
+          error: consumed.error,
+          ...(consumed.code ? { code: consumed.code } : {}),
+        });
       }
       deductMeta = {
-        itemId: existingComponent.source_inventory_item_id,
-        qty: delta,
-        quantityAfter: dres.newQuantity,
+        deductions: consumed.deductions,
+        qty: consumed.deductedQty,
       };
     }
 
@@ -1891,12 +1889,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
         .single();
       if (histInsertError) {
         if (deductMeta) {
-          await restoreInventoryQuantity(req.supabase, {
-            userId: req.user.id,
-            itemId: deductMeta.itemId,
-            qty: deductMeta.qty,
-            quantityMustBe: deductMeta.quantityAfter,
-          });
+          await restoreStockDeductions(req.supabase, req.user.id, deductMeta.deductions);
         }
         return res.status(500).json({ error: histInsertError.message });
       }
@@ -1917,12 +1910,7 @@ router.put('/:id/technical-specs/:specId/components/:componentId', async (req, r
         await req.supabase.from('component_modification_history').delete().eq('id', insertedHistoryId);
       }
       if (deductMeta) {
-        await restoreInventoryQuantity(req.supabase, {
-          userId: req.user.id,
-          itemId: deductMeta.itemId,
-          qty: deductMeta.qty,
-          quantityMustBe: deductMeta.quantityAfter,
-        });
+        await restoreStockDeductions(req.supabase, req.user.id, deductMeta.deductions);
       }
       return res.status(500).json({ error: updateError.message });
     }
@@ -2019,7 +2007,7 @@ router.delete('/:id/technical-specs/:specId/components/:componentId', async (req
       return res.status(404).json({ error: 'Componente no encontrado' });
     }
 
-    if (existingSpec.is_modification && returnToInventory) {
+    if (returnToInventory) {
       const prevSnap = modificationSnapshotFromRow(existingComponent);
       const vehicleLabel =
         [existingVehicle.manufacturer, existingVehicle.model].filter(Boolean).join(' ').trim() || null;

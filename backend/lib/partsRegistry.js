@@ -1,9 +1,9 @@
 /**
  * Identidad canónica de recambios (`public.parts`).
  * Debe coincidir con public.part_identity_key en la migración.
+ *
+ * El descuento/restauración de stock vive en `inventoryStockOps.js`.
  */
-
-const { deductInventoryQuantity, restoreInventoryQuantity } = require('./inventoryStockOps');
 
 const ALLOWED_CATEGORIES = new Set([
   'pinion',
@@ -198,105 +198,10 @@ async function resolvePartId(supabase, userId, attrs) {
   return { ok: true, part, created };
 }
 
-/**
- * @returns {Promise<{ ok: true, lines: object[], stockQty: number } | { ok: false, error: string }>}
- */
-async function getPartStock(supabase, userId, partId) {
-  if (!partId) return { ok: true, lines: [], stockQty: 0 };
-  const { data, error } = await supabase
-    .from('inventory_items')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('part_id', partId)
-    .order('created_at', { ascending: true });
-  if (error) return { ok: false, error: error.message };
-  const lines = data || [];
-  const stockQty = lines.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
-  return { ok: true, lines, stockQty };
-}
-
-/**
- * Descuenta stock FIFO de las líneas de una pieza.
- * @returns {Promise<{
- *   ok: true,
- *   deductions: { itemId: string, qty: number, newQuantity: number }[],
- *   deductedQty: number,
- *   remainingUnfilled: number,
- *   sourceInventoryItemId: string|null
- * } | { ok: false, error: string }>}
- */
-async function deductPartStockFifo(supabase, { userId, partId, qty }) {
-  const want = parseInt(qty, 10);
-  if (!partId || Number.isNaN(want) || want <= 0) {
-    return {
-      ok: true,
-      deductions: [],
-      deductedQty: 0,
-      remainingUnfilled: Number.isNaN(want) ? 0 : Math.max(0, want),
-      sourceInventoryItemId: null,
-    };
-  }
-
-  const stock = await getPartStock(supabase, userId, partId);
-  if (!stock.ok) return stock;
-
-  const available = (stock.lines || []).filter((l) => Number(l.quantity) > 0);
-  let remaining = want;
-  const deductions = [];
-
-  for (const line of available) {
-    if (remaining <= 0) break;
-    const take = Math.min(Number(line.quantity), remaining);
-    const dres = await deductInventoryQuantity(supabase, {
-      userId,
-      itemId: line.id,
-      qty: take,
-    });
-    if (!dres.ok) {
-      for (let i = deductions.length - 1; i >= 0; i -= 1) {
-        const prev = deductions[i];
-        await restoreInventoryQuantity(supabase, {
-          userId,
-          itemId: prev.itemId,
-          qty: prev.qty,
-          quantityMustBe: prev.newQuantity,
-        });
-      }
-      return { ok: false, error: dres.error };
-    }
-    deductions.push({ itemId: line.id, qty: take, newQuantity: dres.newQuantity });
-    remaining -= take;
-  }
-
-  return {
-    ok: true,
-    deductions,
-    deductedQty: want - remaining,
-    remainingUnfilled: remaining,
-    sourceInventoryItemId: deductions[0]?.itemId || null,
-  };
-}
-
-async function restorePartStockDeductions(supabase, userId, deductions) {
-  if (!deductions?.length) return;
-  for (let i = deductions.length - 1; i >= 0; i -= 1) {
-    const prev = deductions[i];
-    await restoreInventoryQuantity(supabase, {
-      userId,
-      itemId: prev.itemId,
-      qty: prev.qty,
-      quantityMustBe: prev.newQuantity,
-    });
-  }
-}
-
 module.exports = {
   ALLOWED_CATEGORIES,
   buildPartIdentity,
   resolvePartId,
-  getPartStock,
-  deductPartStockFifo,
-  restorePartStockDeductions,
   componentTypeToInventoryCategory,
   inventoryCategoryToComponentType,
   normalizeOptionalText,

@@ -10,6 +10,7 @@ const {
   buildPartIdentity,
   inventoryCategoryToComponentType,
 } = require('../lib/partsRegistry');
+const { consumeInventoryStock, restoreStockDeductions } = require('../lib/inventoryStockOps');
 
 const router = express.Router();
 
@@ -1177,7 +1178,9 @@ router.put('/:id', async (req, res) => {
 
 /**
  * POST /api/inventory/:id/mount
- * Crea un componente en el vehículo y descuenta mount_qty unidades de stock (atómico con bloqueo optimista).
+ * Crea un componente en el vehículo y descuenta siempre mount_qty del cajón
+ * (FIFO por part_id si existe; si no, esta línea). is_modification solo elige
+ * ficha técnica vs modificaciones; no omite el descuento.
  */
 router.post('/:id/mount', async (req, res) => {
   try {
@@ -1216,10 +1219,6 @@ router.post('/:id/mount', async (req, res) => {
     }
     if (!item) {
       return res.status(404).json({ error: 'Item no encontrado' });
-    }
-    const shouldDeduct = isModification;
-    if (shouldDeduct && Number(item.quantity) < mountQty) {
-      return res.status(400).json({ error: 'Stock insuficiente' });
     }
 
     let vehicleId = null;
@@ -1284,6 +1283,19 @@ router.post('/:id/mount', async (req, res) => {
         .eq('user_id', req.user.id);
     }
 
+    const consumed = await consumeInventoryStock(req.supabase, {
+      userId: req.user.id,
+      partId,
+      itemId: inventoryId,
+      qty: mountQty,
+    });
+    if (!consumed.ok) {
+      return res.status(consumed.status || 400).json({
+        error: consumed.error,
+        ...(consumed.code ? { code: consumed.code } : {}),
+      });
+    }
+
     const row = {
       tech_spec_id: targetSpec.id,
       component_type: compType,
@@ -1303,7 +1315,7 @@ router.post('/:id/mount', async (req, res) => {
       sku: item.reference || null,
       description: mergeSpecText(description, item.description),
       mounted_qty: mountQty,
-      source_inventory_item_id: inventoryId,
+      source_inventory_item_id: consumed.sourceInventoryItemId || inventoryId,
       part_id: partId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1317,37 +1329,21 @@ router.post('/:id/mount', async (req, res) => {
 
     if (insErr) {
       console.error('mount insert component:', insErr);
+      await restoreStockDeductions(req.supabase, req.user.id, consumed.deductions);
       return res.status(500).json({ error: insErr.message });
-    }
-
-    let updatedInv = item;
-    if (shouldDeduct) {
-      const prevQty = Number(item.quantity);
-      const { data: deducted, error: updErr } = await req.supabase
-        .from('inventory_items')
-        .update({
-          quantity: prevQty - mountQty,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', inventoryId)
-        .eq('user_id', req.user.id)
-        .eq('quantity', prevQty)
-        .select('*')
-        .maybeSingle();
-
-      if (updErr || !deducted) {
-        await req.supabase.from('components').delete().eq('id', inserted.id);
-        return res.status(409).json({
-          error:
-            'No se pudo actualizar el stock (posible condición de carrera o stock agotado). Reintenta.',
-        });
-      }
-      updatedInv = deducted;
     }
 
     if (isModification) {
       await updateVehicleTotalPrice(req.supabase, vehicleId);
     }
+
+    const { data: refreshedItem } = await req.supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('id', inventoryId)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    const updatedInv = refreshedItem || item;
 
     const [enriched] = await enrichInventoryRows(req.supabase, [updatedInv], req.user.id);
     res.status(201).json({
