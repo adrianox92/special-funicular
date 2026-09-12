@@ -208,6 +208,34 @@ describe('NewSession', () => {
     expect(trackedNames()).not.toContain('session_abandoned');
   });
 
+  test('el promedio de captura redondea al ms (misma regla que EditVehicle)', async () => {
+    mockLists();
+    renderSession();
+
+    await screen.findByText(/Pista salón/i);
+    fireEvent.click(screen.getByRole('option', { name: /Pista salón/i }));
+    fireEvent.click(screen.getByTestId('session-continue-circuit'));
+
+    await screen.findByText(/Ferrari F1/i);
+    fireEvent.click(screen.getByRole('option', { name: /Ferrari F1/i }));
+    fireEvent.click(screen.getByTestId('session-continue-vehicle'));
+
+    await screen.findByLabelText(/Mejor vuelta|Best lap|Beste Runde/i);
+
+    const best = screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i);
+    fireEvent.change(best, { target: { value: '03000' } });
+    fireEvent.blur(best);
+
+    const total = screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i);
+    fireEvent.change(total, { target: { value: '10007' } });
+    fireEvent.blur(total);
+
+    fireEvent.change(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i), { target: { value: '3' } });
+
+    // 10.007 / 3 = 3.335666… → 00:03.336 (floor habría sido 00:03.335)
+    expect(screen.getByDisplayValue('00:03.336')).toBeInTheDocument();
+  });
+
   test('beforeunload a mitad de flujo dispara session_abandoned una vez', async () => {
     mockLists();
     renderSession();

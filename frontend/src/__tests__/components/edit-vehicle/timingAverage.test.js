@@ -1,8 +1,23 @@
 import { calculateAverageTime, averageTimeTimestamp } from '../../../components/edit-vehicle/timingAverage';
+import { calculateAverageTime as sharedCalculateAverageTime } from '../../../utils/averageLapTime';
 
 describe('timingAverage (EditVehicle)', () => {
-  test('promedio = total / vueltas con formato floor original', () => {
+  test('delega el promedio en el helper compartido (redondeo a ms)', () => {
     expect(calculateAverageTime('00:30.000', 3, '00:09.000')).toBe('00:10.000');
+    expect(calculateAverageTime('00:10.007', 3, '00:03.000')).toBe('00:03.336');
+  });
+
+  test('mismos inputs que NewSession producen el mismo average_time', () => {
+    const cases = [
+      ['00:30.000', 3, '00:09.000'],
+      ['00:10.007', 3, '00:03.000'],
+      ['02:00.000', 10, '00:11.324'],
+      ['00:20.000', 3, '00:09.000'],
+      ['01:02.501', 7, '00:08.900'],
+    ];
+    cases.forEach((args) => {
+      expect(calculateAverageTime(...args)).toBe(sharedCalculateAverageTime(...args));
+    });
   });
 
   test('vacío si faltan datos', () => {
@@ -18,12 +33,19 @@ describe('timingAverage (EditVehicle)', () => {
     calculateAverageTime('00:20.000', 3, '00:09.000', { t, setTimingNotice });
     expect(setTimingNotice).toHaveBeenCalledWith({
       variant: 'warning',
-      message: expect.stringContaining('edit.errors.totalTimeTooLow'),
+      message: 'edit.errors.totalTimeTooLow:00:27.000',
     });
 
     setTimingNotice.mockClear();
     calculateAverageTime('00:30.000', 3, '00:09.000', { t, setTimingNotice });
     expect(setTimingNotice).toHaveBeenCalledWith(null);
+  });
+
+  test('no toca el aviso si faltan datos para calcular', () => {
+    const setTimingNotice = jest.fn();
+    const t = (key) => key;
+    calculateAverageTime('', 3, '00:09.000', { t, setTimingNotice });
+    expect(setTimingNotice).not.toHaveBeenCalled();
   });
 
   test('averageTimeTimestamp parsea mm:ss.mmm', () => {

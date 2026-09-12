@@ -1,7 +1,9 @@
 import {
+  averageTimeTimestamp,
   buildSessionTimingPayload,
   calculateAverageTime,
   formatSecondsToLapTime,
+  getTotalTimeTooLowContext,
   isTotalTimeTooLow,
   isValidLapTime,
   parseLapTimeToSeconds,
@@ -14,18 +16,44 @@ describe('averageLapTime', () => {
     expect(parseLapTimeToSeconds('bad')).toBeNull();
   });
 
-  test('formatea segundos como EditVehicle (ms con floor)', () => {
+  test('formatea segundos redondeando al ms más cercano', () => {
     expect(formatSecondsToLapTime(11.324)).toBe('00:11.324');
     expect(formatSecondsToLapTime(62.5)).toBe('01:02.500');
+    // 3.335666…s → 3336 ms (antes EditVehicle hacía floor → 00:03.335)
+    expect(formatSecondsToLapTime(3.3356666666666666)).toBe('00:03.336');
+    expect(formatSecondsToLapTime(3.3354)).toBe('00:03.335');
+    expect(formatSecondsToLapTime(59.9996)).toBe('01:00.000');
   });
 
-  test('calcula el promedio como total / vueltas', () => {
+  test('calcula el promedio como total / vueltas con redondeo a ms', () => {
     expect(calculateAverageTime('00:30.000', 3, '00:09.000')).toBe('00:10.000');
+    expect(calculateAverageTime('02:00.000', 10, '00:11.324')).toBe('00:12.000');
+    // 10.007 / 3 = 3.335666… → round 00:03.336 (floor habría sido 00:03.335)
+    expect(calculateAverageTime('00:10.007', 3, '00:03.000')).toBe('00:03.336');
+  });
+
+  test('vacío si faltan datos o el formato no es mm:ss.mmm', () => {
+    expect(calculateAverageTime('', 3, '00:09.000')).toBe('');
+    expect(calculateAverageTime('00:30.000', 0, '00:09.000')).toBe('');
+    expect(calculateAverageTime('00:30.000', 3, '')).toBe('');
+    expect(calculateAverageTime('00:30.000', 3, 'bad')).toBe('');
   });
 
   test('detecta tiempo total por debajo del mínimo', () => {
     expect(isTotalTimeTooLow('00:20.000', 3, '00:09.000')).toBe(true);
     expect(isTotalTimeTooLow('00:30.000', 3, '00:09.000')).toBe(false);
+    expect(getTotalTimeTooLowContext('00:20.000', 3, '00:09.000')).toEqual({
+      total: '00:20.000',
+      minimum: '00:27.000',
+      laps: 3,
+      bestLap: '00:09.000',
+    });
+    expect(getTotalTimeTooLowContext('00:30.000', 3, '00:09.000')).toBeNull();
+  });
+
+  test('averageTimeTimestamp parsea el mm:ss.mmm ya redondeado', () => {
+    expect(averageTimeTimestamp('00:03.336')).toBeCloseTo(3.336, 3);
+    expect(averageTimeTimestamp('bad')).toBeNull();
   });
 
   test('buildSessionTimingPayload usa el contrato sync y TRAINING', () => {
