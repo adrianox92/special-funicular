@@ -19,9 +19,17 @@ import {
   calculateAverageTime,
   formatSecondsToLapTime,
   getTotalTimeTooLowContext,
-  isValidLapTime,
 } from '../utils/averageLapTime';
 import { getLastSessionCircuitId, pickDefaultCircuitId, setLastSessionCircuitId } from '../utils/sessionLastCircuit';
+import {
+  getLastSessionVehicleId,
+  pickDefaultVehicleId,
+  setLastSessionVehicleId,
+} from '../utils/sessionLastVehicle';
+import {
+  getSessionCaptureIssue,
+  isBlockingCaptureIssue,
+} from '../utils/sessionCaptureValidation';
 
 const VEHICLES_PAGE_LIMIT = 10000;
 const STEPS = ['circuit', 'vehicle', 'capture', 'summary'];
@@ -126,6 +134,14 @@ const NewSession = () => {
   const [saveError, setSaveError] = useState(null);
   const [summary, setSummary] = useState(null);
   const [lastUsedId, setLastUsedId] = useState(() => getLastSessionCircuitId());
+  const [lastUsedVehicleId, setLastUsedVehicleId] = useState(() => getLastSessionVehicleId());
+  const [invalidField, setInvalidField] = useState(null);
+
+  const bestLapRef = useRef(null);
+  const totalTimeRef = useRef(null);
+  const lapsRef = useRef(null);
+  const voltageRef = useRef(null);
+  const focusBestOnCaptureRef = useRef(false);
 
   const visitRef = useRef({
     opened: false,
@@ -198,18 +214,21 @@ const NewSession = () => {
       setCircuits(circuitList);
       setVehicles(vehicleList);
 
+      const rememberedVehicleId = getLastSessionVehicleId();
       const nextCircuitId = pickDefaultCircuitId(circuitList, queryCircuitId);
-      const nextVehicleId =
-        queryVehicleId && vehicleList.some((v) => String(v.id) === String(queryVehicleId))
-          ? String(queryVehicleId)
-          : '';
+      const nextVehicleId = pickDefaultVehicleId(vehicleList, queryVehicleId);
       setCircuitId(nextCircuitId);
       setVehicleId(nextVehicleId);
+      setLastUsedVehicleId(getLastSessionVehicleId());
 
       const visit = visitRef.current;
       visit.hasPriorCircuit = circuitList.length > 0;
+      const vehicleFromMemoryOrQuery = Boolean(
+        (queryVehicleId && nextVehicleId && String(nextVehicleId) === String(queryVehicleId))
+        || (rememberedVehicleId && nextVehicleId && String(nextVehicleId) === String(rememberedVehicleId)),
+      );
       let landingStep = 'circuit';
-      if (nextCircuitId && nextVehicleId) {
+      if (nextCircuitId && nextVehicleId && vehicleFromMemoryOrQuery) {
         landingStep = 'capture';
         setStep('capture');
       } else if (nextCircuitId && queryVehicleId) {
@@ -270,6 +289,12 @@ const NewSession = () => {
     };
   }, [trackAbandonedIfNeeded]);
 
+  useEffect(() => {
+    if (step !== 'capture' || !focusBestOnCaptureRef.current) return;
+    focusBestOnCaptureRef.current = false;
+    window.requestAnimationFrame(() => bestLapRef.current?.focus());
+  }, [step]);
+
   const handleCreateCircuit = async (e) => {
     e.preventDefault();
     const name = createName.trim();
@@ -326,8 +351,27 @@ const NewSession = () => {
     setStep('vehicle');
   };
 
+  const rememberVehicle = (id) => {
+    if (!id) return;
+    setLastSessionVehicleId(id);
+    setLastUsedVehicleId(String(id));
+  };
+
+  const focusCaptureField = (field) => {
+    const refs = {
+      bestLapTime: bestLapRef,
+      totalTime: totalTimeRef,
+      laps: lapsRef,
+      supplyVoltageVolts: voltageRef,
+    };
+    const node = refs[field]?.current;
+    if (!node || typeof node.focus !== 'function') return;
+    window.requestAnimationFrame(() => node.focus());
+  };
+
   const handleContinueFromVehicle = () => {
     if (!vehicleId) return;
+    rememberVehicle(vehicleId);
     trackSessionEvent(SESSION_EVENTS.VEHICLE_SELECTED, funnelFromVisit({
       step: 'vehicle',
       laneSet: false,
@@ -339,29 +383,28 @@ const NewSession = () => {
   const handleCaptureField = (name, value) => {
     setCapture((prev) => ({ ...prev, [name]: value }));
     setSaveError(null);
+    setInvalidField((current) => (current === name ? null : current));
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!isValidLapTime(capture.bestLapTime) || !isValidLapTime(capture.totalTime) || !parseInt(String(capture.laps), 10)) {
-      if (!capture.bestLapTime || !capture.totalTime || !capture.laps) {
-        setSaveError(t('capture.required'));
-      } else {
-        setSaveError(t('capture.invalidTime'));
-      }
+    const issue = getSessionCaptureIssue(capture);
+    if (isBlockingCaptureIssue(issue)) {
+      if (issue.openMore) setShowMore(true);
+      setInvalidField(issue.field);
+      const message = issue.params
+        ? t(`capture.${issue.code}`, issue.params)
+        : t(`capture.${issue.code}`);
+      setSaveError(message);
+      window.setTimeout(() => focusCaptureField(issue.field), issue.openMore ? 50 : 0);
       return;
     }
+
     const voltageRaw = String(capture.supplyVoltageVolts || '').trim();
-    if (voltageRaw) {
-      const n = parseFloat(voltageRaw.replace(',', '.'));
-      if (!Number.isFinite(n) || n < 0 || n > 30) {
-        setSaveError(t('capture.invalidVoltage'));
-        return;
-      }
-    }
 
     setSaving(true);
     setSaveError(null);
+    setInvalidField(null);
     try {
       const payload = buildSessionTimingPayload({
         vehicleId,
@@ -382,6 +425,7 @@ const NewSession = () => {
       }));
       setLastSessionCircuitId(circuitId);
       setLastUsedId(String(circuitId));
+      rememberVehicle(vehicleId);
       setSummary({
         timing: data,
         vehicle: selectedVehicle,
@@ -398,12 +442,25 @@ const NewSession = () => {
     }
   };
 
-  const handleAnotherSession = () => {
+  const handleAnotherLap = () => {
+    setCapture((prev) => ({
+      ...emptyCapture(),
+      lane: prev.lane,
+      supplyVoltageVolts: prev.supplyVoltageVolts,
+    }));
+    setSaveError(null);
+    setInvalidField(null);
+    setSummary(null);
+    focusBestOnCaptureRef.current = true;
+    setStep('capture');
+  };
+
+  const handleChangeCar = () => {
     setCapture(emptyCapture());
     setShowMore(false);
     setSaveError(null);
+    setInvalidField(null);
     setSummary(null);
-    setVehicleId('');
     setVehicleSearch('');
     setStep('vehicle');
   };
@@ -561,6 +618,9 @@ const NewSession = () => {
       {step === 'vehicle' ? (
         <section className="space-y-4" data-testid="session-step-vehicle">
           <h2 className="text-lg font-semibold">{t('vehicle.title')}</h2>
+          {vehicles.length > 0 ? (
+            <p className="text-sm text-muted-foreground">{t('vehicle.hint')}</p>
+          ) : null}
 
           {vehicles.length === 0 ? (
             <Card className="border-dashed">
@@ -598,6 +658,7 @@ const NewSession = () => {
                 <ul className="max-h-[min(24rem,55vh)] space-y-2 overflow-y-auto" role="listbox" aria-label={t('steps.vehicle')}>
                   {filteredVehicles.map((vehicle) => {
                     const selected = String(vehicle.id) === String(vehicleId);
+                    const isLast = String(vehicle.id) === String(lastUsedVehicleId);
                     return (
                       <li key={vehicle.id}>
                         <button
@@ -625,9 +686,10 @@ const NewSession = () => {
                           )}
                           <span className="min-w-0 flex-1">
                             <span className="block font-medium truncate">{vehicleLabel(vehicle)}</span>
-                            {vehicle.type ? (
-                              <span className="text-xs text-muted-foreground">{vehicle.type}</span>
-                            ) : null}
+                            <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                              {vehicle.type ? <span>{vehicle.type}</span> : null}
+                              {isLast ? <Badge variant="secondary">{t('vehicle.lastUsed')}</Badge> : null}
+                            </span>
                           </span>
                           {selected ? <Check className="size-4 shrink-0 text-primary" aria-hidden /> : null}
                         </button>
@@ -663,14 +725,17 @@ const NewSession = () => {
             <p className="mt-1 text-xs text-muted-foreground">{t('capture.todayHint')}</p>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSave}>
+          <form className="space-y-4" onSubmit={handleSave} noValidate>
             <TimeInputHint className="mb-1" />
             <div className="space-y-2">
               <Label htmlFor="session-best-lap">{t('capture.bestLap')}</Label>
               <TimeInput
                 id="session-best-lap"
+                ref={bestLapRef}
                 value={capture.bestLapTime}
                 onChange={(val) => handleCaptureField('bestLapTime', val)}
+                aria-invalid={invalidField === 'bestLapTime'}
+                aria-describedby={invalidField === 'bestLapTime' && saveError ? 'session-capture-error' : undefined}
                 required
               />
             </div>
@@ -678,8 +743,11 @@ const NewSession = () => {
               <Label htmlFor="session-total-time">{t('capture.totalTime')}</Label>
               <TimeInput
                 id="session-total-time"
+                ref={totalTimeRef}
                 value={capture.totalTime}
                 onChange={(val) => handleCaptureField('totalTime', val)}
+                aria-invalid={invalidField === 'totalTime'}
+                aria-describedby={invalidField === 'totalTime' && saveError ? 'session-capture-error' : undefined}
                 required
               />
             </div>
@@ -687,11 +755,14 @@ const NewSession = () => {
               <Label htmlFor="session-laps">{t('capture.laps')}</Label>
               <Input
                 id="session-laps"
+                ref={lapsRef}
                 type="number"
                 min="1"
                 inputMode="numeric"
                 value={capture.laps}
                 onChange={(e) => handleCaptureField('laps', e.target.value)}
+                aria-invalid={invalidField === 'laps'}
+                aria-describedby={invalidField === 'laps' && saveError ? 'session-capture-error' : undefined}
                 required
               />
             </div>
@@ -744,10 +815,13 @@ const NewSession = () => {
                   <Label htmlFor="session-voltage">{t('capture.voltage')}</Label>
                   <Input
                     id="session-voltage"
+                    ref={voltageRef}
                     inputMode="decimal"
                     placeholder={t('capture.voltagePlaceholder')}
                     value={capture.supplyVoltageVolts}
                     onChange={(e) => handleCaptureField('supplyVoltageVolts', e.target.value)}
+                    aria-invalid={invalidField === 'supplyVoltageVolts'}
+                    aria-describedby={invalidField === 'supplyVoltageVolts' && saveError ? 'session-capture-error' : undefined}
                   />
                 </div>
               ) : null}
@@ -755,7 +829,7 @@ const NewSession = () => {
 
             {saveError ? (
               <Alert variant="destructive">
-                <AlertDescription>{saveError}</AlertDescription>
+                <AlertDescription id="session-capture-error">{saveError}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -815,16 +889,24 @@ const NewSession = () => {
               ) : null}
             </CardContent>
           </Card>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button type="button" onClick={handleAnotherSession} data-testid="session-another">
-              {t('summary.another')}
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to={`/vehicles/${summary.vehicle?.id}`}>{t('summary.viewVehicle')}</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/timings">{t('summary.viewTimings')}</Link>
-            </Button>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-muted-foreground">{t('summary.anotherHint')}</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button type="button" onClick={handleAnotherLap} data-testid="session-another">
+                {t('summary.another')}
+              </Button>
+              <Button type="button" variant="outline" onClick={handleChangeCar} data-testid="session-change-car">
+                {t('summary.changeCar')}
+              </Button>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" asChild>
+                <Link to={`/vehicles/${summary.vehicle?.id}`}>{t('summary.viewVehicle')}</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/timings">{t('summary.viewTimings')}</Link>
+              </Button>
+            </div>
           </div>
         </section>
       ) : null}

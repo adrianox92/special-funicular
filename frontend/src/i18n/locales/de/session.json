@@ -15,7 +15,7 @@
   "saving": "Speichern…",
   "circuit": {
     "title": "Wo bist du gefahren?",
-    "hint": "Standard ist die zuletzt genutzte Strecke oder die erste in deiner Liste.",
+    "hint": "Standard ist die zuletzt genutzte Strecke oder die erste in deiner Liste. Ist das letzte Auto noch in der Garage, gehst du direkt zu den Zeiten.",
     "lastUsed": "Zuletzt genutzt",
     "emptyTitle": "Du hast noch keine Strecken",
     "emptyHint": "Lege eine minimale Strecke an, um die Session zu speichern. Ein Name reicht.",
@@ -32,6 +32,8 @@
   },
   "vehicle": {
     "title": "Welches Auto hast du genutzt?",
+    "hint": "Standard ist das zuletzt in der Session genutzte Auto, wenn es noch in deiner Garage ist.",
+    "lastUsed": "Zuletzt genutzt",
     "searchPlaceholder": "Nach Marke oder Modell suchen…",
     "emptyTitle": "Deine Garage ist leer",
     "emptyHint": "Füge ein Auto hinzu oder wähle eine Katalogreferenz. Du kannst das jetzt tun und später zurückkehren; es wird kein Entwurf gespeichert.",
@@ -55,7 +57,13 @@
     "todayHint": "Datum: heute · Typ: Training",
     "totalTooLow": "Die Gesamtzeit ({{total}}) liegt unter dem Minimum ({{minimum}}) für {{laps}} Runden mit bester Runde {{bestLap}}",
     "required": "Bitte beste Runde, Gesamtzeit und Runden ausfüllen.",
+    "requiredBest": "Bitte die beste Runde angeben.",
+    "requiredTotal": "Bitte die Gesamtzeit angeben.",
+    "requiredLaps": "Bitte die Rundenzahl angeben.",
     "invalidTime": "Bitte das Format mm:ss.mmm verwenden.",
+    "invalidBest": "Die beste Runde ist keine gültige Zeit (mm:ss.mmm).",
+    "invalidTotal": "Die Gesamtzeit ist keine gültige Zeit (mm:ss.mmm).",
+    "invalidLaps": "Runden müssen eine ganze Zahl größer als 0 sein.",
     "invalidVoltage": "Spannung muss zwischen 0 und 30 V liegen.",
     "saveError": "Session konnte nicht gespeichert werden"
   },
@@ -72,7 +80,9 @@
     "personalBest": "Neue persönliche Bestzeit",
     "deltaFaster": "{{time}} schneller als deine bisherige Bestzeit",
     "deltaSlower": "{{time}} langsamer als deine bisherige Bestzeit",
-    "another": "Weitere Session",
+    "another": "Weitere Runde",
+    "anotherHint": "Gleiche Strecke und gleiches Auto. Nur die Zeiten werden geleert.",
+    "changeCar": "Auto wechseln",
     "viewVehicle": "Fahrzeug ansehen",
     "viewTimings": "Zeiten ansehen"
   }
