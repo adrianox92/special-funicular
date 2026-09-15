@@ -1,3 +1,5 @@
+import { buildInventoryListQueryParams } from '../../utils/inventoryListQuery';
+
 /** Alineado con COMPONENT_PAYLOAD_KEYS del backend (cambio de modificación → historial). */
 export const VEHICLE_SPEC_SNAPSHOT_KEYS = [
   'component_type',
@@ -58,14 +60,38 @@ export function inventoryCategoryToVehicleType(cat) {
   return cat === 'otro' ? 'other' : cat;
 }
 
+export const INVENTORY_PICKER_PAGE_SIZE = 25;
+
 /**
  * Params for GET /inventory in the mount-from-inventory picker.
- * Must not send page/limit — the picker needs the unpaginated list.
+ * Always sends page/limit so the picker never dumps the full inventory.
  */
-export function inventoryPickerRequestParams(componentType) {
-  const params = {};
-  if (componentType) {
-    params.category = componentType === 'other' ? 'otro' : componentType;
-  }
-  return params;
+export function inventoryPickerRequestParams(
+  componentType,
+  { page = 1, limit = INVENTORY_PICKER_PAGE_SIZE, q } = {},
+) {
+  return buildInventoryListQueryParams({
+    page,
+    limit,
+    category: componentType ? (componentType === 'other' ? 'otro' : componentType) : undefined,
+    q,
+    inStock: true,
+  });
+}
+
+export function parseInventoryPickerResponse(data, { page = 1, limit = INVENTORY_PICKER_PAGE_SIZE } = {}) {
+  const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+  const pagination =
+    data?.pagination && typeof data.pagination === 'object'
+      ? data.pagination
+      : {
+          total: list.length,
+          page,
+          limit,
+          totalPages: Math.ceil(list.length / limit) || 0,
+        };
+  return {
+    items: list.filter((i) => Number(i.quantity) > 0),
+    pagination,
+  };
 }

@@ -34,6 +34,7 @@ function createQueryBuilder({ data = [], count = 0, error = null } = {}) {
     order: [],
     range: [],
     in: [],
+    gt: [],
   };
   const builder = {
     calls,
@@ -69,6 +70,10 @@ function createQueryBuilder({ data = [], count = 0, error = null } = {}) {
       calls.in.push([col, vals]);
       return builder;
     }),
+    gt: jest.fn((col, val) => {
+      calls.gt.push([col, val]);
+      return builder;
+    }),
     then(onFulfilled, onRejected) {
       return Promise.resolve({ data, error, count }).then(onFulfilled, onRejected);
     },
@@ -81,6 +86,7 @@ function filterFingerprint(builder) {
     eq: builder.calls.eq.filter(([col]) => col !== 'user_id'),
     or: [...builder.calls.or],
     not: [...builder.calls.not],
+    gt: [...builder.calls.gt],
   };
 }
 
@@ -106,7 +112,7 @@ describe('GET /api/inventory — filtros y paginación en servidor', () => {
     });
   });
 
-  test('sin page/limit: responde array (compat picker EditVehicle) y usa JWT', async () => {
+  test('sin page/limit: responde array (compat) y usa JWT', async () => {
     mockFrom({ table: 'inventory_items', data: [] });
 
     const response = await request(app).get('/api/inventory').set(AUTH);
@@ -212,6 +218,7 @@ describe('GET /api/inventory — filtros y paginación en servidor', () => {
       eq: [['category', 'crown']],
       or: ['name.ilike.%GT%,reference.ilike.%GT%'],
       not: [],
+      gt: [],
     });
 
     expect(response.body.pagination.total).toBe(FILTERED_COUNT);
@@ -241,6 +248,30 @@ describe('GET /api/inventory — filtros y paginación en servidor', () => {
       total: 3,
       page: 2,
       limit: 2,
+      totalPages: 2,
+    });
+  });
+
+  test('in_stock + página 2: quantity > 0 en count y lista, con range', async () => {
+    const builders = mockFrom({ table: 'inventory_items', count: 26, data: [] });
+
+    const response = await request(app)
+      .get('/api/inventory?page=2&limit=25&in_stock=true')
+      .set(AUTH);
+
+    expect(response.status).toBe(200);
+    expect(builders).toHaveLength(2);
+    const [countBuilder, listBuilder] = builders;
+
+    for (const b of [countBuilder, listBuilder]) {
+      expect(b.calls.gt).toEqual([['quantity', 0]]);
+    }
+    expect(listBuilder.calls.range).toEqual([[25, 49]]);
+    expect(countBuilder.calls.range).toEqual([]);
+    expect(response.body.pagination).toEqual({
+      total: 26,
+      page: 2,
+      limit: 25,
       totalPages: 2,
     });
   });

@@ -8,6 +8,7 @@
  *   q?: string,
  *   onlyMounted?: boolean,
  *   vehicleId?: string,
+ *   inStock?: boolean,
  * }} opts
  */
 export function buildInventoryListQueryParams({
@@ -18,6 +19,7 @@ export function buildInventoryListQueryParams({
   q,
   onlyMounted,
   vehicleId,
+  inStock,
 } = {}) {
   const params = {};
   if (page != null) params.page = page;
@@ -27,5 +29,6 @@ export function buildInventoryListQueryParams({
   if (q) params.q = q;
   if (onlyMounted) params.only_mounted = 'true';
   if (vehicleId) params.vehicle_id = vehicleId;
+  if (inStock) params.in_stock = 'true';
   return params;
 }

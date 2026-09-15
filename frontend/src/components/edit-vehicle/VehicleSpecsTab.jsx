@@ -54,8 +54,7 @@ export default function VehicleSpecsTab({ isModificationTab = false }) {
     selectedInventoryMountQty,
     setSelectedInventoryMountQty,
     selectedInventoryMaxQty,
-    setInventoryPickerOpen,
-    loadInventoryForPicker,
+    openInventoryPicker,
     clearInventoryLink,
     matchedPart,
     deductFromInventory,
@@ -90,10 +89,7 @@ export default function VehicleSpecsTab({ isModificationTab = false }) {
             variant="outline"
             size="sm"
             className="shrink-0"
-            onClick={() => {
-              setInventoryPickerOpen(true);
-              loadInventoryForPicker();
-            }}
+            onClick={openInventoryPicker}
           >
             <Package className="size-4 mr-2" aria-hidden />
             {t('edit.specs.fromInventory')}

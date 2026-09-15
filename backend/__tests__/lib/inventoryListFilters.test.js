@@ -23,6 +23,9 @@ function createQuery() {
     not: jest.fn(function not() {
       return query;
     }),
+    gt: jest.fn(function gt() {
+      return query;
+    }),
   };
   return query;
 }
@@ -35,6 +38,7 @@ describe('applyInventoryItemListFilters', () => {
     expect(query.eq).not.toHaveBeenCalled();
     expect(query.or).not.toHaveBeenCalled();
     expect(query.not).not.toHaveBeenCalled();
+    expect(query.gt).not.toHaveBeenCalled();
   });
 
   test('un solo filtro (categoría) usa eq', () => {
@@ -60,6 +64,13 @@ describe('applyInventoryItemListFilters', () => {
     const query = createQuery();
     applyInventoryItemListFilters(query, { low_stock: 'true' });
     expect(query.not).toHaveBeenCalledWith('min_stock', 'is', null);
+  });
+
+  test('in_stock aplica quantity > 0 en SQL', () => {
+    const query = createQuery();
+    applyInventoryItemListFilters(query, { in_stock: 'true' });
+    expect(query.gt).toHaveBeenCalledWith('quantity', 0);
+    expect(query.not).not.toHaveBeenCalled();
   });
 });
 
