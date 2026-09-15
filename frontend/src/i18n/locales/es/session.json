@@ -15,7 +15,7 @@
   "saving": "Guardando…",
   "circuit": {
     "title": "¿Dónde has rodado?",
-    "hint": "Se propone el último circuito usado o el primero de tu lista.",
+    "hint": "Se propone el último circuito usado o el primero de tu lista. Si también hay un último coche, pasas directo a los tiempos.",
     "lastUsed": "Último usado",
     "emptyTitle": "Aún no tienes circuitos",
     "emptyHint": "Crea uno mínimo para poder guardar la sesión. Solo hace falta el nombre.",
@@ -32,6 +32,8 @@
   },
   "vehicle": {
     "title": "¿Qué coche has usado?",
+    "hint": "Se propone el último coche usado en modo sesión si sigue en tu garaje.",
+    "lastUsed": "Último usado",
     "searchPlaceholder": "Buscar por marca o modelo…",
     "emptyTitle": "Tu garaje está vacío",
     "emptyHint": "Añade un coche o elige una referencia del catálogo. Puedes hacerlo ahora y volver cuando quieras; no se guarda ningún borrador.",
@@ -55,7 +57,13 @@
     "todayHint": "Fecha: hoy · Tipo: entrenamiento",
     "totalTooLow": "El tiempo total ({{total}}) es menor que el mínimo posible ({{minimum}}) para {{laps}} vueltas con mejor vuelta de {{bestLap}}",
     "required": "Completa mejor vuelta, tiempo total y vueltas.",
+    "requiredBest": "Indica la mejor vuelta.",
+    "requiredTotal": "Indica el tiempo total.",
+    "requiredLaps": "Indica el número de vueltas.",
     "invalidTime": "Usa el formato mm:ss.mmm.",
+    "invalidBest": "La mejor vuelta no es un tiempo válido (mm:ss.mmm).",
+    "invalidTotal": "El tiempo total no es un tiempo válido (mm:ss.mmm).",
+    "invalidLaps": "Las vueltas deben ser un número entero mayor que 0.",
     "invalidVoltage": "El voltaje debe estar entre 0 y 30 V.",
     "saveError": "No se pudo guardar la sesión"
   },
@@ -72,7 +80,9 @@
     "personalBest": "Nuevo récord personal",
     "deltaFaster": "{{time}} más rápido que tu mejor previa",
     "deltaSlower": "{{time}} más lento que tu mejor previa",
-    "another": "Otra sesión",
+    "another": "Otra manga",
+    "anotherHint": "Mismo circuito y mismo coche. Solo se vacían los tiempos.",
+    "changeCar": "Cambiar coche",
     "viewVehicle": "Ver vehículo",
     "viewTimings": "Ver tiempos"
   }

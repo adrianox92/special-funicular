@@ -15,7 +15,7 @@
   "saving": "Saving…",
   "circuit": {
     "title": "Where did you run?",
-    "hint": "Defaults to the last circuit you used, or the first in your list.",
+    "hint": "Defaults to the last circuit you used, or the first in your list. If the last car is still in your garage, you skip ahead to times.",
     "lastUsed": "Last used",
     "emptyTitle": "You have no circuits yet",
     "emptyHint": "Create a minimal one so you can save the session. A name is enough.",
@@ -32,6 +32,8 @@
   },
   "vehicle": {
     "title": "Which car did you use?",
+    "hint": "Defaults to the last car used in session mode if it is still in your garage.",
+    "lastUsed": "Last used",
     "searchPlaceholder": "Search by brand or model…",
     "emptyTitle": "Your garage is empty",
     "emptyHint": "Add a car or pick a catalogue reference. You can do that now and come back later; nothing is saved as a draft.",
@@ -55,7 +57,13 @@
     "todayHint": "Date: today · Type: training",
     "totalTooLow": "Total time ({{total}}) is below the minimum ({{minimum}}) for {{laps}} laps with a best lap of {{bestLap}}",
     "required": "Fill in best lap, total time and laps.",
+    "requiredBest": "Enter the best lap.",
+    "requiredTotal": "Enter the total time.",
+    "requiredLaps": "Enter the number of laps.",
     "invalidTime": "Use the mm:ss.mmm format.",
+    "invalidBest": "Best lap is not a valid time (mm:ss.mmm).",
+    "invalidTotal": "Total time is not a valid time (mm:ss.mmm).",
+    "invalidLaps": "Laps must be a whole number greater than 0.",
     "invalidVoltage": "Voltage must be between 0 and 30 V.",
     "saveError": "Could not save the session"
   },
@@ -72,7 +80,9 @@
     "personalBest": "New personal best",
     "deltaFaster": "{{time}} faster than your previous best",
     "deltaSlower": "{{time}} slower than your previous best",
-    "another": "Another session",
+    "another": "Another run",
+    "anotherHint": "Same circuit and same car. Only the times are cleared.",
+    "changeCar": "Change car",
     "viewVehicle": "View vehicle",
     "viewTimings": "View timings"
   }

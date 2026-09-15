@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { track } from '@vercel/analytics';
 import NewSession from '../../pages/NewSession';
 import api from '../../lib/axios';
+import { setLastSessionCircuitId } from '../../utils/sessionLastCircuit';
+import { getLastSessionVehicleId, setLastSessionVehicleId } from '../../utils/sessionLastVehicle';
 
 jest.mock('@vercel/analytics', () => ({
   track: jest.fn(),
@@ -23,6 +25,7 @@ jest.mock('react-router-dom', () => ({
 
 const circuit = { id: 'cir-1', name: 'Pista salón', num_lanes: 2, lane_lengths: [0, 0] };
 const vehicle = { id: 'veh-1', manufacturer: 'Scalextric', model: 'Ferrari F1', type: 'F1' };
+const vehicle2 = { id: 'veh-2', manufacturer: 'Ninco', model: 'Porsche GT', type: 'GT' };
 
 function mockLists({ circuits = [circuit], vehicles = [vehicle] } = {}) {
   api.get.mockImplementation((url) => {
@@ -42,6 +45,50 @@ function renderSession(initial = '/session') {
 
 function trackedNames() {
   return track.mock.calls.map((call) => call[0]);
+}
+
+async function goToCaptureFromWizard() {
+  await screen.findByText(/Pista salón/i);
+  fireEvent.click(screen.getByRole('option', { name: /Pista salón/i }));
+  fireEvent.click(screen.getByTestId('session-continue-circuit'));
+  await screen.findByText(/Ferrari F1/i);
+  fireEvent.click(screen.getByRole('option', { name: /Ferrari F1/i }));
+  fireEvent.click(screen.getByTestId('session-continue-vehicle'));
+  await screen.findByLabelText(/Mejor vuelta|Best lap|Beste Runde/i);
+}
+
+function fillCaptureTimes({
+  best = '11324',
+  total = '0200000',
+  laps = '10',
+  lane = '1',
+} = {}) {
+  const bestEl = screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i);
+  fireEvent.change(bestEl, { target: { value: best } });
+  fireEvent.blur(bestEl);
+  const totalEl = screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i);
+  fireEvent.change(totalEl, { target: { value: total } });
+  fireEvent.blur(totalEl);
+  fireEvent.change(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i), { target: { value: laps } });
+  const laneSelect = screen.queryByLabelText(/^Carril$|^Lane$|^Spur$/i);
+  if (laneSelect && lane != null && lane !== '') {
+    fireEvent.change(laneSelect, { target: { value: lane } });
+  }
+}
+
+async function saveTrainingSession() {
+  api.post.mockResolvedValue({
+    data: {
+      id: 't-1',
+      session_type: 'TRAINING',
+      best_lap_time: '00:11.324',
+      sync_meta: { previous_best_lap_seconds: 11.5, is_personal_best: true, delta_vs_pb_seconds: -0.176 },
+    },
+  });
+  await goToCaptureFromWizard();
+  fillCaptureTimes();
+  fireEvent.click(screen.getByTestId('session-save'));
+  await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
 }
 
 describe('NewSession', () => {
@@ -250,5 +297,129 @@ describe('NewSession', () => {
       'session_abandoned',
       expect.objectContaining({ step: 'circuit', has_prior_circuit: true }),
     );
+  });
+
+  test('con último circuito y último coche aterriza en captura', async () => {
+    mockLists({ circuits: [circuit], vehicles: [vehicle, vehicle2] });
+    setLastSessionCircuitId('cir-1');
+    setLastSessionVehicleId('veh-2');
+    renderSession();
+
+    await screen.findByTestId('session-step-capture');
+    expect(screen.getByText(/Porsche GT/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pista salón/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(track).toHaveBeenCalledWith(
+        'session_mode_opened',
+        expect.objectContaining({ step: 'capture', has_prior_circuit: true }),
+      );
+    });
+    expect(trackedNames()).not.toContain('session_circuit_selected');
+    expect(trackedNames()).not.toContain('session_vehicle_selected');
+  });
+
+  test('si el último coche ya no está en el garaje, no lo preselecciona y limpia el id', async () => {
+    mockLists({ circuits: [circuit], vehicles: [vehicle, vehicle2] });
+    setLastSessionCircuitId('cir-1');
+    setLastSessionVehicleId('veh-deleted');
+    renderSession();
+
+    await screen.findByTestId('session-step-circuit');
+    expect(getLastSessionVehicleId()).toBeNull();
+    expect(screen.queryByTestId('session-step-capture')).not.toBeInTheDocument();
+  });
+
+  test('con un solo coche, Continuar en vehículo ya está habilitado', async () => {
+    mockLists();
+    renderSession();
+
+    await screen.findByTestId('session-continue-circuit');
+    fireEvent.click(screen.getByTestId('session-continue-circuit'));
+    const continueVehicle = await screen.findByTestId('session-continue-vehicle');
+    expect(continueVehicle).not.toBeDisabled();
+    expect(screen.getByRole('option', { name: /Ferrari F1/i })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('otra manga mantiene circuito y coche y vacía los tiempos', async () => {
+    mockLists();
+    renderSession();
+    await saveTrainingSession();
+
+    expect(getLastSessionVehicleId()).toBe('veh-1');
+    fireEvent.click(screen.getByTestId('session-another'));
+
+    await screen.findByTestId('session-step-capture');
+    expect(screen.getByText(/Ferrari F1/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pista salón/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i)).toHaveValue('');
+    expect(screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i)).toHaveValue('');
+    expect(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i)).toHaveValue(null);
+  });
+
+  test('cambiar coche mantiene el circuito y vuelve al paso de vehículo', async () => {
+    mockLists({ circuits: [circuit], vehicles: [vehicle, vehicle2] });
+    renderSession();
+    await saveTrainingSession();
+
+    fireEvent.click(screen.getByTestId('session-change-car'));
+    await screen.findByTestId('session-step-vehicle');
+    expect(screen.getByRole('option', { name: /Ferrari F1/i })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('option', { name: /Porsche GT/i }));
+    fireEvent.click(screen.getByTestId('session-continue-vehicle'));
+    await screen.findByTestId('session-step-capture');
+    expect(screen.getByText(/Porsche GT/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pista salón/i)).toBeInTheDocument();
+  });
+
+  test('validación fallida no borra campos válidos y enfoca el primer TimeInput inválido', async () => {
+    mockLists();
+    renderSession();
+    await goToCaptureFromWizard();
+
+    const total = screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i);
+    fireEvent.change(total, { target: { value: '0200000' } });
+    fireEvent.blur(total);
+    fireEvent.change(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i), { target: { value: '10' } });
+    fireEvent.click(screen.getByTestId('session-save'));
+
+    expect(api.post).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Indica la mejor vuelta|Enter the best lap|Bitte die beste Runde/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i)).toHaveValue('02:00.000');
+    expect(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i)).toHaveValue(10);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i)).toHaveFocus();
+    });
+  });
+
+  test('si el POST falla, los tiempos rellenados se conservan', async () => {
+    mockLists();
+    api.post.mockRejectedValue({ response: { data: { error: 'No se pudo guardar la sesión' } } });
+    renderSession();
+    await goToCaptureFromWizard();
+    fillCaptureTimes();
+    fireEvent.click(screen.getByTestId('session-save'));
+
+    expect(await screen.findByText(/No se pudo guardar la sesión/i)).toBeInTheDocument();
+    expect(screen.getByTestId('session-step-capture')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i)).toHaveValue('00:11.324');
+    expect(screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i)).toHaveValue('02:00.000');
+    expect(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i)).toHaveValue(10);
+  });
+
+  test('tiempo total demasiado bajo avisa pero no impide guardar', async () => {
+    mockLists();
+    api.post.mockResolvedValue({
+      data: { id: 't-low', session_type: 'TRAINING', best_lap_time: '00:09.000', sync_meta: {} },
+    });
+    renderSession();
+    await goToCaptureFromWizard();
+    fillCaptureTimes({ best: '09000', total: '020000', laps: '3', lane: '1' });
+
+    expect(screen.getByText(/menor que el mínimo|below the minimum|liegt unter dem Minimum/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('session-save'));
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledTimes(1);
+    });
+    await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
   });
 });
