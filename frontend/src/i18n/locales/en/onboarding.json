@@ -1,5 +1,7 @@
 {
   "title": "Getting started",
+  "titleTiming": "Log your first lap time",
+  "timingHint": "You already have a car in the garage. A quick session (circuit → car → best lap) is the next step. If you have no circuit yet, you can create one there.",
   "progress": "{{done}}/{{total}} completed",
   "steps": {
     "vehicle": "Add your first vehicle",

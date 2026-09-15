@@ -10,11 +10,22 @@ import {
   isActivationNudgeDismissed,
 } from '../utils/activationNudge';
 
-const ActivationSessionNudge = ({ totalVehicles, totalTimings, timingsLast30Days }) => {
+const ActivationSessionNudge = ({
+  totalVehicles,
+  totalTimings,
+  timingsLast30Days,
+  suppressFirst = false,
+}) => {
   const { t } = useTranslation('dashboard');
   const variant = useMemo(
-    () => getActivationNudgeVariant({ totalVehicles, totalTimings, timingsLast30Days }),
-    [totalVehicles, totalTimings, timingsLast30Days],
+    () =>
+      getActivationNudgeVariant({
+        totalVehicles,
+        totalTimings,
+        timingsLast30Days,
+        suppressFirst,
+      }),
+    [totalVehicles, totalTimings, timingsLast30Days, suppressFirst],
   );
   const [dismissed, setDismissed] = useState(() => isActivationNudgeDismissed(variant));
 

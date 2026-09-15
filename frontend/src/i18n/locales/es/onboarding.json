@@ -1,5 +1,7 @@
 {
   "title": "Primeros pasos",
+  "titleTiming": "Registra tu primer tiempo",
+  "timingHint": "Ya tienes coche en el garaje. Una sesión rápida (circuito → coche → mejor vuelta) es el siguiente paso. Si aún no hay circuito, se puede crear ahí.",
   "progress": "{{done}}/{{total}} completados",
   "steps": {
     "vehicle": "Añadir tu primer vehículo",

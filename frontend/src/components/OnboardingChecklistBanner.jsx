@@ -15,12 +15,17 @@ const OnboardingChecklistBanner = () => {
     dismiss,
     loading,
     firstIncompleteStep,
+    primaryStep,
+    needsFirstTiming,
   } = useOnboardingStatus();
   const [dismissing, setDismissing] = useState(false);
 
   if (loading || !visible) {
     return null;
   }
+
+  const ctaStep = primaryStep || firstIncompleteStep;
+  const highlightStepId = ctaStep?.id;
 
   const handleDismiss = async () => {
     setDismissing(true);
@@ -35,19 +40,28 @@ const OnboardingChecklistBanner = () => {
 
   return (
     <div
-      className="mb-6 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3"
+      className={cn(
+        'mb-6 rounded-lg border bg-primary/5 px-4 py-3',
+        needsFirstTiming ? 'border-primary/40' : 'border-primary/20',
+      )}
       role="region"
-      aria-label={t('title')}
+      aria-label={needsFirstTiming ? t('titleTiming') : t('title')}
       data-testid="onboarding-checklist-banner"
+      data-emphasis={needsFirstTiming ? 'timing' : highlightStepId || undefined}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p className="text-sm font-semibold text-foreground">{t('title')}</p>
+            <p className="text-sm font-semibold text-foreground">
+              {needsFirstTiming ? t('titleTiming') : t('title')}
+            </p>
             <span className="text-xs text-muted-foreground">
               {t('progress', { done: completedCount, total: steps.length })}
             </span>
           </div>
+          {needsFirstTiming ? (
+            <p className="text-sm text-muted-foreground">{t('timingHint')}</p>
+          ) : null}
 
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {steps.map((step) => (
@@ -62,7 +76,7 @@ const OnboardingChecklistBanner = () => {
                   className={cn(
                     'hover:underline',
                     step.done ? 'text-muted-foreground line-through' : 'text-foreground',
-                    step.id === firstIncompleteStep?.id && 'font-medium',
+                    step.id === highlightStepId && 'font-medium',
                   )}
                 >
                   {t(`steps.${step.id}`)}
@@ -73,10 +87,10 @@ const OnboardingChecklistBanner = () => {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 self-end sm:self-start">
-          {firstIncompleteStep && (
+          {ctaStep && (
             <Button asChild size="sm" data-testid="onboarding-cta">
-              <Link to={firstIncompleteStep.path}>
-                {firstIncompleteStep.id === 'timing' ? t('ctaTiming') : t('cta')}
+              <Link to={ctaStep.path}>
+                {ctaStep.id === 'timing' ? t('ctaTiming') : t('cta')}
               </Link>
             </Button>
           )}

@@ -12,6 +12,17 @@ export const ONBOARDING_STEPS = [
 const STATUS_KEYS = ['hasVehicle', 'hasCircuit', 'hasTiming'];
 
 /**
+ * Si ya hay vehículo y ningún tiempo, el CTA es Nueva sesión (/session),
+ * aunque falte el circuito: el flujo de sesión puede crearlo.
+ */
+export function getOnboardingPrimaryStep(steps, { hasVehicle = false, hasTiming = false } = {}) {
+  if (hasVehicle && !hasTiming) {
+    return steps.find((s) => s.id === 'timing') ?? null;
+  }
+  return steps.find((s) => !s.done) ?? null;
+}
+
+/**
  * Estado del checklist de onboarding derivado de la API y user_metadata.
  */
 export function useOnboardingStatus() {
@@ -58,6 +69,10 @@ export function useOnboardingStatus() {
   const completedCount = steps.filter((s) => s.done).length;
   const completed = Boolean(status?.completed);
   const visible = Boolean(user && !loading && status && !completed && !dismissed);
+  const hasVehicle = Boolean(status?.hasVehicle);
+  const hasTiming = Boolean(status?.hasTiming);
+  /** Garaje listo y aún sin hábito de cronometraje: el CTA va a /session (crea circuito si hace falta). */
+  const needsFirstTiming = hasVehicle && !hasTiming;
 
   const dismiss = useCallback(async () => {
     const { error: dismissError } = await supabase.auth.updateUser({
@@ -68,6 +83,7 @@ export function useOnboardingStatus() {
   }, [refreshUser]);
 
   const firstIncompleteStep = steps.find((s) => !s.done) ?? null;
+  const primaryStep = getOnboardingPrimaryStep(steps, { hasVehicle, hasTiming });
 
   return {
     steps,
@@ -80,5 +96,9 @@ export function useOnboardingStatus() {
     error,
     refetch,
     firstIncompleteStep,
+    primaryStep,
+    needsFirstTiming,
+    hasVehicle,
+    hasTiming,
   };
 }

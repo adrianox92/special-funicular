@@ -1,5 +1,7 @@
 {
   "title": "Erste Schritte",
+  "titleTiming": "Erfasse deine erste Zeit",
+  "timingHint": "Du hast schon ein Auto in der Garage. Eine kurze Session (Strecke → Auto → beste Runde) ist der nächste Schritt. Fehlt noch eine Strecke, kannst du sie dort anlegen.",
   "progress": "{{done}}/{{total}} erledigt",
   "steps": {
     "vehicle": "Erstes Fahrzeug hinzufügen",

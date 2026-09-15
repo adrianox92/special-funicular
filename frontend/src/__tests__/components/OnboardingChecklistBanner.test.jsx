@@ -8,6 +8,8 @@ jest.mock('react-i18next', () => ({
       if (key === 'progress' && opts) return `${opts.done}/${opts.total} completados`;
       const map = {
         title: 'Primeros pasos',
+        titleTiming: 'Registra tu primer tiempo',
+        timingHint: 'Ya tienes coche en el garaje.',
         'steps.vehicle': 'Añadir tu primer vehículo',
         'steps.circuit': 'Crear tu primer circuito',
         'steps.timing': 'Registrar tu primer tiempo',
@@ -55,6 +57,8 @@ describe('OnboardingChecklistBanner', () => {
       dismiss: mockDismiss,
       loading: false,
       firstIncompleteStep: { id: 'vehicle', path: '/vehicles/new', done: false },
+      primaryStep: { id: 'vehicle', path: '/vehicles/new', done: false },
+      needsFirstTiming: false,
     });
 
     renderBanner();
@@ -75,6 +79,8 @@ describe('OnboardingChecklistBanner', () => {
       dismiss: mockDismiss,
       loading: false,
       firstIncompleteStep: null,
+      primaryStep: null,
+      needsFirstTiming: false,
     });
 
     renderBanner();
@@ -94,6 +100,8 @@ describe('OnboardingChecklistBanner', () => {
       dismiss: mockDismiss,
       loading: false,
       firstIncompleteStep: { id: 'vehicle', path: '/vehicles/new', done: false },
+      primaryStep: { id: 'vehicle', path: '/vehicles/new', done: false },
+      needsFirstTiming: false,
     });
 
     renderBanner();
@@ -101,7 +109,30 @@ describe('OnboardingChecklistBanner', () => {
     expect(screen.queryByTestId('onboarding-checklist-banner')).not.toBeInTheDocument();
   });
 
-  test('CTA apunta al primer paso incompleto', () => {
+  test('CTA apunta al alta de vehículo si aún no hay garaje', () => {
+    mockUseOnboardingStatus.mockReturnValue({
+      steps: [
+        { id: 'vehicle', path: '/vehicles/new', done: false },
+        { id: 'circuit', path: '/circuits', done: false },
+        { id: 'timing', path: '/session', done: false },
+      ],
+      completedCount: 0,
+      visible: true,
+      dismiss: mockDismiss,
+      loading: false,
+      firstIncompleteStep: { id: 'vehicle', path: '/vehicles/new', done: false },
+      primaryStep: { id: 'vehicle', path: '/vehicles/new', done: false },
+      needsFirstTiming: false,
+    });
+
+    renderBanner();
+
+    const cta = screen.getByTestId('onboarding-cta');
+    expect(cta).toHaveAttribute('href', '/vehicles/new');
+    expect(cta).toHaveTextContent('Continuar');
+  });
+
+  test('con vehículo y sin tiempos el CTA es Nueva sesión aunque falte circuito', () => {
     mockUseOnboardingStatus.mockReturnValue({
       steps: [
         { id: 'vehicle', path: '/vehicles/new', done: true },
@@ -113,13 +144,18 @@ describe('OnboardingChecklistBanner', () => {
       dismiss: mockDismiss,
       loading: false,
       firstIncompleteStep: { id: 'circuit', path: '/circuits', done: false },
+      primaryStep: { id: 'timing', path: '/session', done: false },
+      needsFirstTiming: true,
     });
 
     renderBanner();
 
+    expect(screen.getByTestId('onboarding-checklist-banner')).toHaveAttribute('data-emphasis', 'timing');
+    expect(screen.getByText('Registra tu primer tiempo')).toBeInTheDocument();
+    expect(screen.getByText('Ya tienes coche en el garaje.')).toBeInTheDocument();
     const cta = screen.getByTestId('onboarding-cta');
-    expect(cta).toHaveAttribute('href', '/circuits');
-    expect(cta).toHaveTextContent('Continuar');
+    expect(cta).toHaveAttribute('href', '/session');
+    expect(cta).toHaveTextContent('Nueva sesión');
   });
 
   test('el paso de primer tiempo apunta a /session con CTA Nueva sesión', () => {
@@ -134,6 +170,8 @@ describe('OnboardingChecklistBanner', () => {
       dismiss: mockDismiss,
       loading: false,
       firstIncompleteStep: { id: 'timing', path: '/session', done: false },
+      primaryStep: { id: 'timing', path: '/session', done: false },
+      needsFirstTiming: true,
     });
 
     renderBanner();
@@ -141,6 +179,8 @@ describe('OnboardingChecklistBanner', () => {
     const cta = screen.getByTestId('onboarding-cta');
     expect(cta).toHaveAttribute('href', '/session');
     expect(cta).toHaveTextContent('Nueva sesión');
+    expect(screen.getByText('Registra tu primer tiempo')).toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-checklist-banner')).toHaveAttribute('data-emphasis', 'timing');
     expect(screen.getByRole('link', { name: 'Registrar tu primer tiempo' })).toHaveAttribute('href', '/session');
   });
 });

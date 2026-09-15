@@ -4,18 +4,21 @@ export const ACTIVATION_NUDGE_STORAGE = {
 };
 
 /**
- * Usuarios con garaje y sin hábito de cronometraje.
- * - first: ≥1 vehículo y 0 tiempos
- * - stale: ≥1 vehículo, tiene tiempos históricos, 0 en los últimos 30 días
+ * Card de inicio, sin duplicar el checklist global de onboarding.
+ * - first: ≥1 vehículo y 0 tiempos, solo si el checklist no está a la vista
+ *   (p. ej. lo descartaron). Si el checklist es visible, él ya empuja a /session.
+ * - stale: ≥1 vehículo, tiempos históricos, 0 en los últimos 30 días
+ *   (onboarding ya está completado).
  */
 export function getActivationNudgeVariant({
   totalVehicles = 0,
   totalTimings = 0,
   timingsLast30Days = 0,
+  suppressFirst = false,
 } = {}) {
   if (Number(totalVehicles) < 1) return null;
   if (Number(timingsLast30Days) > 0) return null;
-  if (Number(totalTimings) < 1) return 'first';
+  if (Number(totalTimings) < 1) return suppressFirst ? null : 'first';
   return 'stale';
 }
 

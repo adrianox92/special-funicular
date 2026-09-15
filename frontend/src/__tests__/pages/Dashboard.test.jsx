@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import Dashboard from '../../pages/Dashboard';
 import api from '../../lib/axios';
 import i18n from '../../i18n';
+import { useAuth } from '../../context/AuthContext';
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
@@ -12,9 +13,7 @@ jest.mock('../../lib/axios', () => ({
 }));
 
 jest.mock('../../context/AuthContext', () => ({
-  useAuth: () => ({
-    user: { email: 'test@example.com', user_metadata: { full_name: 'Tester' } },
-  }),
+  useAuth: jest.fn(),
 }));
 
 jest.mock('../../components/DashboardActionBlocks', () => {
@@ -152,6 +151,9 @@ describe('Dashboard Component', () => {
     jest.clearAllMocks();
     localStorage.clear();
     await i18n.changeLanguage('es');
+    useAuth.mockReturnValue({
+      user: { email: 'test@example.com', user_metadata: { full_name: 'Tester' } },
+    });
     mockDashboardGets();
   });
 
@@ -235,7 +237,34 @@ describe('Dashboard Component', () => {
     });
   });
 
-  test('muestra el nudge de primer tiempo cuando hay vehículos y cero timings', async () => {
+  test('no duplica el primer tiempo si el checklist de onboarding sigue visible', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/dashboard/metrics') {
+        return Promise.resolve({
+          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, bestTimeVehicle: null },
+        });
+      }
+      if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
+      if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
+      if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
+      return Promise.reject(new Error(`Not found: ${url}`));
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Bienvenido/)).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();
+  });
+
+  test('muestra el nudge de primer tiempo si el checklist se descartó', async () => {
+    useAuth.mockReturnValue({
+      user: {
+        email: 'test@example.com',
+        user_metadata: { full_name: 'Tester', onboarding_dismissed_at: '2026-01-01T00:00:00.000Z' },
+      },
+    });
     api.get.mockImplementation((url) => {
       if (url === '/dashboard/metrics') {
         return Promise.resolve({

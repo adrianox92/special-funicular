@@ -42,6 +42,16 @@ describe('ActivationSessionNudge', () => {
     expect(screen.getByText('Registra tu primer tiempo')).toBeInTheDocument();
   });
 
+  test('no muestra el primer tiempo si el onboarding global ya cubre el CTA', () => {
+    renderNudge({
+      totalVehicles: 1,
+      totalTimings: 0,
+      timingsLast30Days: 0,
+      suppressFirst: true,
+    });
+    expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();
+  });
+
   test('no se muestra si hay tiempos en 30 días', () => {
     renderNudge({ totalVehicles: 2, totalTimings: 5, timingsLast30Days: 1 });
     expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();

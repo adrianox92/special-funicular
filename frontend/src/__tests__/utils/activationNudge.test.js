@@ -14,8 +14,30 @@ describe('getActivationNudgeVariant', () => {
     expect(getActivationNudgeVariant({ totalVehicles: 2, totalTimings: 0, timingsLast30Days: 0 })).toBe('first');
   });
 
+  test('no duplica el primer tiempo si el checklist de onboarding ya está visible', () => {
+    expect(
+      getActivationNudgeVariant({
+        totalVehicles: 2,
+        totalTimings: 0,
+        timingsLast30Days: 0,
+        suppressFirst: true,
+      }),
+    ).toBeNull();
+  });
+
   test('stale cuando hay tiempos históricos pero ninguno en 30 días', () => {
     expect(getActivationNudgeVariant({ totalVehicles: 1, totalTimings: 4, timingsLast30Days: 0 })).toBe('stale');
+  });
+
+  test('stale sigue visible aunque el checklist de onboarding esté activo', () => {
+    expect(
+      getActivationNudgeVariant({
+        totalVehicles: 1,
+        totalTimings: 4,
+        timingsLast30Days: 0,
+        suppressFirst: true,
+      }),
+    ).toBe('stale');
   });
 
   test('oculto si hay tiempos recientes', () => {
