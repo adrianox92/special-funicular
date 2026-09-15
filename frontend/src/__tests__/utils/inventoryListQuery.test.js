@@ -35,4 +35,15 @@ describe('inventoryListQuery', () => {
       only_mounted: 'true',
     });
   });
+
+  test('inStock envía in_stock=true para el picker con stock', () => {
+    expect(
+      buildInventoryListQueryParams({ page: 1, limit: 25, inStock: true, q: 'GT' }),
+    ).toEqual({
+      page: 1,
+      limit: 25,
+      q: 'GT',
+      in_stock: 'true',
+    });
+  });
 });

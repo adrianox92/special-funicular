@@ -379,8 +379,9 @@ async function loadUserParts(supabase, userId, params = {}) {
 }
 
 /**
- * GET /api/inventory?page=&limit=&category=&low_stock=true&vehicle_id=&q=
- * Con page/limit: { items, pagination }. Sin ellos: array (picker EditVehicle).
+ * GET /api/inventory?page=&limit=&category=&low_stock=true&in_stock=true&vehicle_id=&q=
+ * Con page/limit: { items, pagination }. Sin ellos: array (compat).
+ * in_stock=true: quantity > 0 en SQL (picker EditVehicle).
  */
 router.get('/', async (req, res) => {
   try {

@@ -2,6 +2,8 @@ import {
   getModificationSaveDialogInfo,
   inventoryCategoryToVehicleType,
   inventoryPickerRequestParams,
+  INVENTORY_PICKER_PAGE_SIZE,
+  parseInventoryPickerResponse,
   vehicleSpecSnapshotsDiffer,
 } from '../../../components/edit-vehicle/specSnapshot';
 
@@ -31,13 +33,54 @@ describe('specSnapshot', () => {
     expect(inventoryCategoryToVehicleType('motor')).toBe('motor');
   });
 
-  test('inventoryPickerRequestParams no incluye page ni limit', () => {
-    expect(inventoryPickerRequestParams('')).toEqual({});
-    expect(inventoryPickerRequestParams(undefined)).toEqual({});
-    expect(inventoryPickerRequestParams('motor')).toEqual({ category: 'motor' });
-    expect(inventoryPickerRequestParams('other')).toEqual({ category: 'otro' });
-    expect(inventoryPickerRequestParams('motor')).not.toHaveProperty('page');
-    expect(inventoryPickerRequestParams('motor')).not.toHaveProperty('limit');
+  test('inventoryPickerRequestParams siempre incluye page, limit e in_stock', () => {
+    expect(inventoryPickerRequestParams('')).toEqual({
+      page: 1,
+      limit: INVENTORY_PICKER_PAGE_SIZE,
+      in_stock: 'true',
+    });
+    expect(inventoryPickerRequestParams(undefined)).toEqual({
+      page: 1,
+      limit: INVENTORY_PICKER_PAGE_SIZE,
+      in_stock: 'true',
+    });
+    expect(inventoryPickerRequestParams('motor')).toEqual({
+      page: 1,
+      limit: INVENTORY_PICKER_PAGE_SIZE,
+      category: 'motor',
+      in_stock: 'true',
+    });
+    expect(inventoryPickerRequestParams('other')).toEqual({
+      page: 1,
+      limit: INVENTORY_PICKER_PAGE_SIZE,
+      category: 'otro',
+      in_stock: 'true',
+    });
+    expect(
+      inventoryPickerRequestParams('motor', { page: 2, limit: 25, q: 'Slot' }),
+    ).toEqual({
+      page: 2,
+      limit: 25,
+      category: 'motor',
+      q: 'Slot',
+      in_stock: 'true',
+    });
+  });
+
+  test('parseInventoryPickerResponse usa items paginados y omite cantidad 0', () => {
+    const parsed = parseInventoryPickerResponse(
+      {
+        items: [
+          { id: 'a', quantity: 2 },
+          { id: 'b', quantity: 0 },
+          { id: 'c', quantity: 1 },
+        ],
+        pagination: { total: 26, page: 1, limit: 25, totalPages: 2 },
+      },
+      { page: 1, limit: 25 },
+    );
+    expect(parsed.items.map((i) => i.id)).toEqual(['a', 'c']);
+    expect(parsed.pagination).toEqual({ total: 26, page: 1, limit: 25, totalPages: 2 });
   });
 
   test('vehicleSpecSnapshotsDiffer ignora equivalentes numéricos/string', () => {

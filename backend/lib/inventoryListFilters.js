@@ -3,12 +3,13 @@
 /**
  * Filtros del listado de inventario (ítems y vista consolidada de piezas).
  *
- * Query params de ítems: category, vehicle_id, q (nombre/referencia), low_stock.
+ * Query params de ítems: category, vehicle_id, q (nombre/referencia), low_stock, in_stock.
  * Query params de piezas: category, q (nombre/referencia/fabricante), low_stock, only_mounted.
  *
  * `low_stock` (ítems) aplica `min_stock IS NOT NULL` en PostgREST; la comparación
  * quantity <= min_stock es post-filtro (PostgREST no compara columna vs columna).
  * `low_stock` y `only_mounted` en piezas se aplican sobre la vista ensamblada.
+ * `in_stock` (ítems) aplica `quantity > 0` en SQL (no post-filtro).
  *
  * @param {object} query - builder de Supabase (chainable)
  * @param {object} [params] - típ. `req.query`
@@ -41,7 +42,7 @@ function applyInventoryCategoryFilter(query, category) {
 }
 
 function applyInventoryItemListFilters(query, params = {}) {
-  const { category, vehicle_id: vehicleId, q, low_stock: lowStock } = params || {};
+  const { category, vehicle_id: vehicleId, q, low_stock: lowStock, in_stock: inStock } = params || {};
 
   query = applyInventoryCategoryFilter(query, category);
   if (vehicleId && String(vehicleId).trim() !== '') {
@@ -50,6 +51,9 @@ function applyInventoryItemListFilters(query, params = {}) {
   query = applyInventoryTextSearch(query, q, ['name', 'reference']);
   if (isTruthyQueryFlag(lowStock)) {
     query = query.not('min_stock', 'is', null);
+  }
+  if (isTruthyQueryFlag(inStock)) {
+    query = query.gt('quantity', 0);
   }
   return query;
 }

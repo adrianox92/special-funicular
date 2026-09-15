@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import api from '../../lib/axios';
 import {
@@ -9,6 +9,8 @@ import {
   getModificationSaveDialogInfo,
   inventoryCategoryToVehicleType,
   inventoryPickerRequestParams,
+  INVENTORY_PICKER_PAGE_SIZE,
+  parseInventoryPickerResponse,
   vehicleSpecSnapshotsDiffer,
 } from './specSnapshot';
 
@@ -30,7 +32,12 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
   const [selectedInventoryMaxQty, setSelectedInventoryMaxQty] = useState(null);
   const [inventoryPickerOpen, setInventoryPickerOpen] = useState(false);
   const [inventoryPickerLoading, setInventoryPickerLoading] = useState(false);
+  const [inventoryPickerLoadingMore, setInventoryPickerLoadingMore] = useState(false);
   const [inventoryPickerItems, setInventoryPickerItems] = useState([]);
+  const [inventoryPickerPage, setInventoryPickerPage] = useState(1);
+  const [inventoryPickerHasMore, setInventoryPickerHasMore] = useState(false);
+  const [inventoryPickerQ, setInventoryPickerQ] = useState('');
+  const pickerRequestId = useRef(0);
   const [deductFromInventory, setDeductFromInventory] = useState(null);
   const [matchedPart, setMatchedPart] = useState(null);
 
@@ -135,20 +142,73 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
     setNewSpec({ ...EMPTY_SPEC });
   };
 
-  const loadInventoryForPicker = async () => {
-    setInventoryPickerLoading(true);
+  const loadInventoryForPicker = useCallback(async ({
+    page = 1,
+    q = '',
+    append = false,
+  } = {}) => {
+    const reqId = ++pickerRequestId.current;
+    if (append) setInventoryPickerLoadingMore(true);
+    else {
+      setInventoryPickerLoading(true);
+      setInventoryPickerItems([]);
+    }
     try {
-      const params = inventoryPickerRequestParams(newSpec.component_type);
+      const params = inventoryPickerRequestParams(newSpec.component_type, {
+        page,
+        limit: INVENTORY_PICKER_PAGE_SIZE,
+        q,
+      });
       const { data } = await api.get('/inventory', { params });
-      const list = Array.isArray(data) ? data : [];
-      setInventoryPickerItems(list.filter((i) => Number(i.quantity) > 0));
+      if (reqId !== pickerRequestId.current) return;
+      const { items, pagination } = parseInventoryPickerResponse(data, {
+        page,
+        limit: INVENTORY_PICKER_PAGE_SIZE,
+      });
+      const totalPages = pagination.totalPages || 0;
+      setInventoryPickerItems((prev) => (append ? [...prev, ...items] : items));
+      setInventoryPickerPage(page);
+      setInventoryPickerHasMore(page < totalPages);
+      setInventoryPickerQ(q);
     } catch (e) {
       console.error(e);
-      setInventoryPickerItems([]);
+      if (reqId !== pickerRequestId.current) return;
+      if (!append) setInventoryPickerItems([]);
+      setInventoryPickerHasMore(false);
     } finally {
-      setInventoryPickerLoading(false);
+      if (reqId === pickerRequestId.current) {
+        setInventoryPickerLoading(false);
+        setInventoryPickerLoadingMore(false);
+      }
     }
-  };
+  }, [newSpec.component_type]);
+
+  const openInventoryPicker = useCallback(() => {
+    setInventoryPickerOpen(true);
+    setInventoryPickerQ('');
+    loadInventoryForPicker({ page: 1, q: '', append: false });
+  }, [loadInventoryForPicker]);
+
+  const searchInventoryPicker = useCallback(
+    (q) => loadInventoryForPicker({ page: 1, q, append: false }),
+    [loadInventoryForPicker],
+  );
+
+  const loadMoreInventoryPicker = useCallback(() => {
+    if (inventoryPickerLoading || inventoryPickerLoadingMore || !inventoryPickerHasMore) return;
+    return loadInventoryForPicker({
+      page: inventoryPickerPage + 1,
+      q: inventoryPickerQ,
+      append: true,
+    });
+  }, [
+    inventoryPickerHasMore,
+    inventoryPickerLoading,
+    inventoryPickerLoadingMore,
+    inventoryPickerPage,
+    inventoryPickerQ,
+    loadInventoryForPicker,
+  ]);
 
   useEffect(() => {
     if (editingSpec || selectedInventoryItemId) {
@@ -491,7 +551,10 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
     inventoryPickerOpen,
     setInventoryPickerOpen,
     inventoryPickerLoading,
+    inventoryPickerLoadingMore,
     inventoryPickerItems,
+    inventoryPickerHasMore,
+    inventoryPickerQ,
     deductFromInventory,
     setDeductFromInventory,
     matchedPart,
@@ -499,6 +562,9 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
     handleEditSpec,
     handleCancelEdit,
     loadInventoryForPicker,
+    openInventoryPicker,
+    searchInventoryPicker,
+    loadMoreInventoryPicker,
     handlePickInventoryItem,
     clearInventoryLink,
     cancelModificationReturnDialog,

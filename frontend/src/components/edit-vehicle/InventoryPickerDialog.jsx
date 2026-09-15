@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Spinner } from '../ui/spinner';
 import {
   Dialog,
@@ -20,10 +21,33 @@ export default function InventoryPickerDialog() {
     inventoryPickerOpen,
     setInventoryPickerOpen,
     inventoryPickerLoading,
+    inventoryPickerLoadingMore,
     inventoryPickerItems,
+    inventoryPickerHasMore,
+    inventoryPickerQ,
     newSpec,
     handlePickInventoryItem,
+    searchInventoryPicker,
+    loadMoreInventoryPicker,
   } = useEditVehicle();
+
+  const [searchInput, setSearchInput] = useState('');
+  const committedQRef = useRef(inventoryPickerQ);
+  committedQRef.current = inventoryPickerQ;
+
+  useEffect(() => {
+    if (!inventoryPickerOpen) {
+      setSearchInput('');
+      return undefined;
+    }
+    const tmr = setTimeout(() => {
+      const next = searchInput.trim();
+      if (next !== committedQRef.current) {
+        searchInventoryPicker(next);
+      }
+    }, 350);
+    return () => clearTimeout(tmr);
+  }, [searchInput, inventoryPickerOpen, searchInventoryPicker]);
 
   return (
     <Dialog open={inventoryPickerOpen} onOpenChange={(open) => setInventoryPickerOpen(open)}>
@@ -32,50 +56,76 @@ export default function InventoryPickerDialog() {
           <DialogTitle>{t('modals.inventoryPickerTitle')}</DialogTitle>
           <DialogDescription>{t('modals.inventoryPickerDesc')}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2 max-h-[50vh] overflow-y-auto py-2">
-          {inventoryPickerLoading ? (
-            <div className="flex justify-center py-8">
-              <Spinner className="size-8" />
-            </div>
-          ) : inventoryPickerItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              {t('modals.noInventoryItems', {
-                categorySuffix: newSpec.component_type ? t('modals.categorySuffix') : '',
-              })}
-            </p>
-          ) : (
-            inventoryPickerItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatInventoryCategory(item.category)} · {t('modals.stock')}: {item.quantity}
-                    {item.purchase_price != null &&
-                      ` · ${Number(item.purchase_price).toFixed(2)} ${t('modals.unitPrice')}`}
-                  </p>
-                  {Array.isArray(item.mounted_vehicles) && item.mounted_vehicles.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
-                      {t('modals.mountedOn')}{' '}
-                      {item.mounted_vehicles.map((v, idx) => (
-                        <span key={v.id}>
-                          {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? t('edit.and') : ', ') : ''}
-                          <Link to={`/vehicles/${v.id}`} className="text-primary hover:underline font-medium">
-                            {v.manufacturer} {v.model}
-                          </Link>
-                        </span>
-                      ))}
-                    </p>
-                  )}
-                </div>
-                <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
-                  {t('modals.useThis')}
-                </Button>
+        <div className="space-y-2">
+          <Input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t('modals.inventoryPickerSearch')}
+            aria-label={t('modals.inventoryPickerSearch')}
+          />
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto py-2">
+            {inventoryPickerLoading ? (
+              <div className="flex justify-center py-8">
+                <Spinner className="size-8" />
               </div>
-            ))
-          )}
+            ) : inventoryPickerItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                {t('modals.noInventoryItems', {
+                  categorySuffix: newSpec.component_type ? t('modals.categorySuffix') : '',
+                })}
+              </p>
+            ) : (
+              <>
+                {inventoryPickerItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatInventoryCategory(item.category)} · {t('modals.stock')}: {item.quantity}
+                        {item.purchase_price != null &&
+                          ` · ${Number(item.purchase_price).toFixed(2)} ${t('modals.unitPrice')}`}
+                      </p>
+                      {Array.isArray(item.mounted_vehicles) && item.mounted_vehicles.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
+                          {t('modals.mountedOn')}{' '}
+                          {item.mounted_vehicles.map((v, idx) => (
+                            <span key={v.id}>
+                              {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? t('edit.and') : ', ') : ''}
+                              <Link to={`/vehicles/${v.id}`} className="text-primary hover:underline font-medium">
+                                {v.manufacturer} {v.model}
+                              </Link>
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                    </div>
+                    <Button type="button" size="sm" className="shrink-0" onClick={() => handlePickInventoryItem(item)}>
+                      {t('modals.useThis')}
+                    </Button>
+                  </div>
+                ))}
+                {inventoryPickerHasMore && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={inventoryPickerLoadingMore}
+                      onClick={loadMoreInventoryPicker}
+                    >
+                      {inventoryPickerLoadingMore
+                        ? t('modals.inventoryPickerLoadingMore')
+                        : t('modals.inventoryPickerLoadMore')}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setInventoryPickerOpen(false)}>
