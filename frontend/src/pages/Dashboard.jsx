@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import DashboardActionBlocks from '../components/DashboardActionBlocks';
+import ActivationSessionNudge from '../components/ActivationSessionNudge';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -358,6 +359,12 @@ const Dashboard = () => {
           </Button>
         </div>
       </div>
+
+      <ActivationSessionNudge
+        totalVehicles={metrics.totalVehicles}
+        totalTimings={metrics.totalTimings}
+        timingsLast30Days={metrics.timingsLast30Days}
+      />
 
       {maintenanceError ? (
         <Alert variant="destructive">

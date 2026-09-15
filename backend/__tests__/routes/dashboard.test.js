@@ -151,6 +151,53 @@ describe('Dashboard Routes', () => {
       expect(response.body).toHaveProperty('digitalVehicles', 2);
       expect(response.body).toHaveProperty('museoVehicles', 1);
       expect(response.body).toHaveProperty('tallerVehicles', 1);
+      expect(response.body).toHaveProperty('totalTimings', 1);
+      expect(response.body).toHaveProperty('timingsLast30Days', 0);
+    });
+
+    test('cuenta tiempos embebidos y la ventana de 30 días', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const mockVehicles = [
+        {
+          id: 1,
+          type: 'F1',
+          modified: false,
+          price: 100,
+          total_price: 100,
+          digital: false,
+          museo: false,
+          taller: false,
+          vehicle_timings: [
+            { best_lap_time: '5.123', timing_date: today, circuit: 'Salón', laps: 10, lane: '1' },
+            { best_lap_time: '5.200', timing_date: '2020-01-01', circuit: 'Salón', laps: 10, lane: '1' },
+          ],
+        },
+      ];
+
+      mockSupabase.from.mockImplementation((table) => {
+        if (table === 'vehicles') {
+          const b = createQueryBuilder();
+          b.eq.mockReturnThis();
+          b.limit.mockImplementation(() => Promise.resolve({ data: mockVehicles, error: null }));
+          return b;
+        }
+        if (table === 'vehicle_timings') {
+          const b = createQueryBuilder();
+          b.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+          b.gte.mockImplementation(() => Promise.resolve({ data: [], error: null }));
+          return b;
+        }
+        return createQueryBuilder();
+      });
+
+      const response = await request(app)
+        .get('/api/dashboard/metrics')
+        .set('Authorization', 'Bearer test-token');
+
+      expect(response.status).toBe(200);
+      expect(response.body.totalVehicles).toBe(1);
+      expect(response.body.totalTimings).toBe(2);
+      expect(response.body.timingsLast30Days).toBe(1);
     });
 
     test('maneja errores de base de datos correctamente', async () => {

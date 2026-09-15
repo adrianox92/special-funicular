@@ -57,11 +57,13 @@
       "steps": [
         "Abre Inicio desde el menú lateral para cargar el dashboard.",
         "Revisa los gráficos y tarjetas: se alimentan de vehículos, componentes y tiempos que hayas registrado.",
-        "Usa los enlaces rápidos para saltar a Vehículos, Tiempos u otras secciones sin volver al menú."
+        "Usa los enlaces rápidos para saltar a Vehículos, Tiempos u otras secciones sin volver al menú.",
+        "Para el primer cronometraje usa «Nueva sesión»: circuito, coche y tiempos mínimos, sin abrir la ficha del vehículo."
       ],
       "tips": [
         "Los datos dependen de lo que registres en vehículos, componentes y tiempos.",
-        "Si algo falla al cargar, revisa la conexión; parte de la información viene de varias peticiones al servidor."
+        "Si algo falla al cargar, revisa la conexión; parte de la información viene de varias peticiones al servidor.",
+        "Si ya tienes coches y ningún tiempo (o ninguno en 30 días), Inicio muestra un acceso destacado a «Nueva sesión» (/session)."
       ],
       "gotchas": [],
       "linkTo": "/dashboard",

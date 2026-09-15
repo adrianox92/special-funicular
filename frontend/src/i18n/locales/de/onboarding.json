@@ -1,0 +1,12 @@
+{
+  "title": "Erste Schritte",
+  "progress": "{{done}}/{{total}} erledigt",
+  "steps": {
+    "vehicle": "Erstes Fahrzeug hinzufügen",
+    "circuit": "Erste Strecke anlegen",
+    "timing": "Erste Zeit erfassen"
+  },
+  "cta": "Weiter",
+  "ctaTiming": "Neue Session",
+  "dismiss": "Checkliste ausblenden"
+}

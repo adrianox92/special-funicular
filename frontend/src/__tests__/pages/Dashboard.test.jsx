@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Dashboard from '../../pages/Dashboard';
 import api from '../../lib/axios';
+import i18n from '../../i18n';
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
@@ -123,6 +124,8 @@ const mockMetricsData = {
   investmentHistory: [],
   performanceByType: {},
   trends: {},
+  totalTimings: 8,
+  timingsLast30Days: 3,
 };
 
 const mockChartsData = {
@@ -145,8 +148,10 @@ function mockDashboardGets() {
 }
 
 describe('Dashboard Component', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    localStorage.clear();
+    await i18n.changeLanguage('es');
     mockDashboardGets();
   });
 
@@ -228,5 +233,35 @@ describe('Dashboard Component', () => {
     await waitFor(() => {
       expect(screen.getByTestId('metric-card-Total Vehículos')).toHaveTextContent('20');
     });
+  });
+
+  test('muestra el nudge de primer tiempo cuando hay vehículos y cero timings', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/dashboard/metrics') {
+        return Promise.resolve({
+          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, bestTimeVehicle: null },
+        });
+      }
+      if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
+      if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
+      if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
+      return Promise.reject(new Error(`Not found: ${url}`));
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('activation-session-nudge')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('activation-session-nudge-cta')).toHaveAttribute('href', '/session');
+  });
+
+  test('no muestra el nudge si hay tiempos en los últimos 30 días', async () => {
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Bienvenido/)).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();
   });
 });

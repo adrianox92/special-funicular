@@ -213,5 +213,13 @@
     "lane": "carril {{lane}}",
     "lapProgress": "PB actual {{current}} → objetivo {{target}}",
     "consistencyProgress": "Consistencia {{current}}% → objetivo ≤ {{target}}"
+  },
+  "activationNudge": {
+    "firstTitle": "Registra tu primer tiempo",
+    "firstBody": "Ya tienes coche en el garaje. Una sesión rápida (circuito → coche → mejor vuelta) es el siguiente paso para ver evolución y récords.",
+    "staleTitle": "Hace más de 30 días que no ruedas",
+    "staleBody": "Abre una sesión corta para volver a cronometrar. Solo necesitas circuito, coche y los tiempos mínimos.",
+    "cta": "Nueva sesión",
+    "dismiss": "Ahora no"
   }
 }

@@ -75,7 +75,9 @@ const OnboardingChecklistBanner = () => {
         <div className="flex shrink-0 items-center gap-2 self-end sm:self-start">
           {firstIncompleteStep && (
             <Button asChild size="sm" data-testid="onboarding-cta">
-              <Link to={firstIncompleteStep.path}>{t('cta')}</Link>
+              <Link to={firstIncompleteStep.path}>
+                {firstIncompleteStep.id === 'timing' ? t('ctaTiming') : t('cta')}
+              </Link>
             </Button>
           )}
           <Button

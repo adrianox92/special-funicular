@@ -7,5 +7,6 @@
     "timing": "Log your first lap time"
   },
   "cta": "Continue",
+  "ctaTiming": "New session",
   "dismiss": "Hide checklist"
 }
