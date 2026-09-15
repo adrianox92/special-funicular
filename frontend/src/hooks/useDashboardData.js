@@ -18,6 +18,8 @@ const defaultMetrics = {
   performanceByType: {},
   trends: {},
   activeCompetitions: 0,
+  totalTimings: 0,
+  timingsLast30Days: 0,
 };
 
 const defaultCharts = {

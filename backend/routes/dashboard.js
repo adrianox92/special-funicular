@@ -8,6 +8,7 @@ const { evaluateGoalProgress } = require('../lib/trainingGoals');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
 const { logDbError } = require('../lib/logDbError');
 const { fetchVehicleTimingsForVehicleIds } = require('../lib/fetchVehicleTimingsForVehicleIds');
+const { countTimingActivity } = require('../lib/timingActivityCounts');
 
 const supabase = getAnonClient();
 
@@ -660,6 +661,11 @@ router.get('/metrics', async (req, res) => {
       (s) => s.participants_count > 0 && !s.is_completed,
     ).length;
 
+    const timingActivity = countTimingActivity(vehicles);
+    if (timingActivity.totalTimings === 0 && bestTimeVehicle) {
+      timingActivity.totalTimings = 1;
+    }
+
     res.json({
       totalVehicles,
       modifiedVehicles,
@@ -679,7 +685,9 @@ router.get('/metrics', async (req, res) => {
       performanceByType: typePerformance,
       investmentHistory,
       trends,
-      activeCompetitions: activeCompetitionsCount
+      activeCompetitions: activeCompetitionsCount,
+      totalTimings: timingActivity.totalTimings,
+      timingsLast30Days: timingActivity.timingsLast30Days,
     });
   } catch (error) {
     console.error('Error al obtener métricas del dashboard:', error);

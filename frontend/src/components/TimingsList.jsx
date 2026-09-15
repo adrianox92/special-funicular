@@ -46,6 +46,7 @@ import { cn } from '../lib/utils';
 import { isLapTimerSession, getRecordedFromLabel } from '../utils/recordedFromLabel';
 import LapTimerTrainingLink from './LapTimerTrainingLink';
 import SessionTimeline from './SessionTimeline';
+import TimingsEmptyState from './TimingsEmptyState';
 
 /** Igual que VehicleList: GET /vehicles está paginado (25 por defecto). */
 const TIMINGS_VEHICLES_PAGE_LIMIT = 10000;
@@ -697,6 +698,10 @@ const TimingsList = () => {
         </div>
       </div>
 
+      {timings.length === 0 ? (
+        <TimingsEmptyState hasVehicles={Object.keys(vehicles).length > 0} />
+      ) : (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div ref={vehiclePickerRef} className="relative space-y-2">
           <Label>{t('filterVehicle')}</Label>
@@ -828,7 +833,7 @@ const TimingsList = () => {
 
       <div className="md:hidden space-y-3">
         {filteredGroups.length === 0 ? (
-          <p className="text-center py-8 text-muted-foreground rounded-md border">{t('empty')}</p>
+          <p className="text-center py-8 text-muted-foreground rounded-md border">{t('emptyFiltered')}</p>
         ) : (
           filteredGroups.map((group) => (
             <TimingMobileGroupCard
@@ -874,7 +879,7 @@ const TimingsList = () => {
             {filteredGroups.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
-                  {t('empty')}
+                  {t('emptyFiltered')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -1051,6 +1056,8 @@ const TimingsList = () => {
           </TableBody>
         </Table>
       </div>
+      </>
+      )}
 
       {timings.length > 0 && <SessionTimeline sessions={timings} />}
 

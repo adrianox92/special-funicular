@@ -213,5 +213,13 @@
     "lane": "lane {{lane}}",
     "lapProgress": "Current PB {{current}} → target {{target}}",
     "consistencyProgress": "Consistency {{current}}% → target ≤ {{target}}"
+  },
+  "activationNudge": {
+    "firstTitle": "Log your first lap time",
+    "firstBody": "You already have a car in the garage. A quick session (circuit → car → best lap) is the next step to see progress and records.",
+    "staleTitle": "No sessions in the last 30 days",
+    "staleBody": "Open a short session to start timing again. You only need a circuit, a car and the minimum lap fields.",
+    "cta": "New session",
+    "dismiss": "Not now"
   }
 }

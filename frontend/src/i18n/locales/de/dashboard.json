@@ -213,5 +213,13 @@
     "lane": "Spur {{lane}}",
     "lapProgress": "Aktuelle PB {{current}} → Ziel {{target}}",
     "consistencyProgress": "Konstanz {{current}}% → Ziel ≤ {{target}}"
+  },
+  "activationNudge": {
+    "firstTitle": "Erfasse deine erste Zeit",
+    "firstBody": "Du hast schon ein Auto in der Garage. Eine kurze Session (Strecke → Auto → beste Runde) ist der nächste Schritt für Verlauf und Rekorde.",
+    "staleTitle": "Seit über 30 Tagen keine Session",
+    "staleBody": "Öffne eine kurze Session, um wieder zu stoppen. Du brauchst nur Strecke, Auto und die Mindestdaten.",
+    "cta": "Neue Session",
+    "dismiss": "Jetzt nicht"
   }
 }
