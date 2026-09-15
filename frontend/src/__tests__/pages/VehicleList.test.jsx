@@ -48,7 +48,7 @@ function mockApiGets() {
       return Promise.resolve({ data: { scaleFactors: [] } });
     }
     if (String(url).startsWith('/vehicles/manufacturers')) {
-      return Promise.resolve({ data: { manufacturers: [] } });
+      return Promise.resolve({ data: { manufacturers: ['Ninco', 'Slot.it'] } });
     }
     if (String(url).startsWith('/vehicles?')) {
       return Promise.resolve({
@@ -106,6 +106,51 @@ describe('VehicleList — filtros en querystring', () => {
       const withModel = listUrls().filter((u) => u.includes('model=GT'));
       expect(withModel.length).toBeGreaterThan(0);
       expect(withModel.every((u) => /limit=25/.test(u) && !/limit=10000/.test(u))).toBe(true);
+    });
+  });
+
+  test('escribir fabricante envía manufacturer en la query con paginación normal', async () => {
+    render(
+      <MemoryRouter initialEntries={['/vehicles']}>
+        <VehicleList />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(listUrls().length).toBeGreaterThan(0);
+    });
+
+    const manufacturerInput = screen.getByLabelText('manufacturer');
+    await userEvent.type(manufacturerInput, 'Ninco');
+
+    await waitFor(() => {
+      const withMfg = listUrls().filter((u) => u.includes('manufacturer=Ninco'));
+      expect(withMfg.length).toBeGreaterThan(0);
+      expect(withMfg.every((u) => /limit=25/.test(u) && !/limit=10000/.test(u))).toBe(true);
+    });
+  });
+
+  test('elegir un fabricante de la lista envía el valor exacto (p. ej. Slot.it)', async () => {
+    render(
+      <MemoryRouter initialEntries={['/vehicles']}>
+        <VehicleList />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(api.get.mock.calls.some(([url]) => String(url).startsWith('/vehicles/manufacturers'))).toBe(
+        true,
+      );
+    });
+
+    const manufacturerInput = screen.getByLabelText('manufacturer');
+    await userEvent.click(manufacturerInput);
+    const slotIt = await screen.findByRole('button', { name: 'Slot.it' });
+    await userEvent.click(slotIt);
+
+    await waitFor(() => {
+      const withSlot = listUrls().filter((u) => decodeURIComponent(u).includes('manufacturer=Slot.it'));
+      expect(withSlot.length).toBeGreaterThan(0);
     });
   });
 });

@@ -11,6 +11,35 @@
  * @param {object} [params] - típ. `req.query`
  * @returns {object} el mismo builder con los filtros aplicados
  */
+
+/**
+ * Patrón ilike de "contiene" seguro para PostgREST + PostgreSQL.
+ *
+ * - Escapa `\`, `%` y `_` (comodines SQL LIKE), como el filtro cliente `includes()`.
+ * - Envuelve en comillas dobles para que `.` `,` `:` `()` (p. ej. "Slot.it") no
+ *   se parseen como gramática de filtros PostgREST (`ilike.%Slot.it%` → 400).
+ *
+ * @param {unknown} raw
+ * @returns {string|null}
+ */
+function buildIlikeContainsPattern(raw) {
+  if (raw == null) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  const escaped = trimmed
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/"/g, '\\"');
+  return `"%${escaped}%"`;
+}
+
+function applyIlikeContains(query, column, raw) {
+  const pattern = buildIlikeContainsPattern(raw);
+  if (!pattern) return query;
+  return query.ilike(column, pattern);
+}
+
 function applyVehicleListFilters(query, params = {}) {
   const {
     manufacturer,
@@ -24,12 +53,8 @@ function applyVehicleListFilters(query, params = {}) {
     scale_factor,
   } = params || {};
 
-  if (manufacturer && String(manufacturer).trim()) {
-    query = query.ilike('manufacturer', `%${String(manufacturer).trim()}%`);
-  }
-  if (model && String(model).trim()) {
-    query = query.ilike('model', `%${String(model).trim()}%`);
-  }
+  query = applyIlikeContains(query, 'manufacturer', manufacturer);
+  query = applyIlikeContains(query, 'model', model);
   if (type && String(type).trim()) {
     query = query.eq('type', String(type).trim());
   }
@@ -68,4 +93,5 @@ const applyVehicleExportFilters = applyVehicleListFilters;
 module.exports = {
   applyVehicleListFilters,
   applyVehicleExportFilters,
+  buildIlikeContainsPattern,
 };

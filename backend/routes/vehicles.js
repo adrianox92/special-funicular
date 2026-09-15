@@ -28,6 +28,7 @@ const { fetchTimingIdsWithLaps } = require('../lib/timingLapsHelper');
 const { logDbError } = require('../lib/logDbError');
 const { fetchVehicleImagesForVehicleIds } = require('../lib/fetchVehicleImagesForVehicleIds');
 const { applyVehicleListFilters } = require('../lib/vehicleListFilters');
+const { fetchDistinctVehicleManufacturers } = require('../lib/vehicleManufacturers');
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
 const { resolveBaselineTimings, sortTimingsByBestLap } = require('../lib/syncTimingsQuery');
@@ -760,21 +761,7 @@ router.get('/export-pdf', async (req, res) => {
 // Fabricantes distintos en la colección del usuario (autocompletado de filtro)
 router.get('/manufacturers', async (req, res) => {
   try {
-    const { data, error } = await req.supabase
-      .from('vehicles')
-      .select('manufacturer')
-      .eq('user_id', req.user.id);
-
-    if (error) throw error;
-
-    const set = new Set();
-    for (const row of data || []) {
-      const m = row?.manufacturer;
-      if (m != null && String(m).trim() !== '') set.add(String(m).trim());
-    }
-    const manufacturers = Array.from(set).sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: 'base' }),
-    );
+    const manufacturers = await fetchDistinctVehicleManufacturers(req.supabase, req.user.id);
     res.json({ manufacturers });
   } catch (err) {
     console.error('Error en /vehicles/manufacturers:', err);

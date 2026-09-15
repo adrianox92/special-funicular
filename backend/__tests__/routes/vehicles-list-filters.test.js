@@ -143,12 +143,26 @@ describe('GET /api/vehicles — filtros en servidor', () => {
 
     for (const b of [countBuilder, listBuilder]) {
       expect(b.calls.eq).toEqual([['user_id', USER_ID]]);
-      expect(b.calls.ilike).toEqual([['manufacturer', '%Ninco%']]);
+      expect(b.calls.ilike).toEqual([['manufacturer', '"%Ninco%"']]);
       expect(b.calls.or).toEqual([]);
     }
     expect(listBuilder.calls.range).toEqual([[0, 9]]);
     expect(response.body.pagination.total).toBe(3);
     expect(response.body.pagination.totalPages).toBe(1);
+  });
+
+  test('manufacturer con punto (Slot.it) cita el patrón ilike en count y página', async () => {
+    const builders = mockVehiclesFrom({ count: 2, data: [] });
+
+    const response = await request(app)
+      .get('/api/vehicles?page=1&limit=10&manufacturer=Slot.it')
+      .set(AUTH);
+
+    expect(response.status).toBe(200);
+    expect(builders).toHaveLength(2);
+    for (const b of builders) {
+      expect(b.calls.ilike).toEqual([['manufacturer', '"%Slot.it%"']]);
+    }
   });
 
   test('varios filtros + página 2: range sobre el conjunto filtrado y OR museo/taller', async () => {
@@ -170,7 +184,7 @@ describe('GET /api/vehicles — filtros en servidor', () => {
         ['type', 'GT'],
         ['modified', true],
       ]);
-      expect(b.calls.ilike).toEqual([['manufacturer', '%Ninco%']]);
+      expect(b.calls.ilike).toEqual([['manufacturer', '"%Ninco%"']]);
       expect(b.calls.or).toEqual(['museo.eq.true,taller.eq.true']);
     }
 
@@ -202,7 +216,7 @@ describe('GET /api/vehicles — filtros en servidor', () => {
         ['digital', true],
         ['scale_factor', 32],
       ],
-      ilike: [['model', '%Ferrari%']],
+      ilike: [['model', '"%Ferrari%"']],
       or: [],
     });
 
