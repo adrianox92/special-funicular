@@ -7,6 +7,7 @@ const express = require('express');
 const { getServiceClient } = require('../lib/supabaseClients');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
 const { normalizePromoCode, formatPromoCode } = require('../lib/promoCodeGenerator');
+const { notifyPromoRedeemed } = require('../lib/promoRedeemMailer');
 
 const router = express.Router();
 
@@ -65,7 +66,7 @@ router.post('/redeem', apiKeyAuth, async (req, res) => {
 
     const { data: promoRow, error: promoErr } = await supabase
       .from('promo_codes')
-      .select('id, code, assigned_email, redeemed_by_user_id')
+      .select('id, code, assigned_email, note, redeemed_by_user_id')
       .eq('code', canonicalCode)
       .maybeSingle();
 
@@ -140,6 +141,15 @@ router.post('/redeem', apiKeyAuth, async (req, res) => {
         .eq('redeemed_by_user_id', userId);
       return res.status(500).json({ error: 'Error al activar Premium', code: 'SERVER_ERROR' });
     }
+
+    void notifyPromoRedeemed({
+      promoId: promoRow.id,
+      code: canonicalCode,
+      assignedEmail: userEmail,
+      userId,
+      note: promoRow.note,
+      redeemedAt: new Date().toISOString(),
+    });
 
     return res.json({ success: true });
   } catch (err) {
