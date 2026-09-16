@@ -125,6 +125,7 @@ const mockMetricsData = {
   trends: {},
   totalTimings: 8,
   timingsLast30Days: 3,
+  timingsLast14Days: 3,
 };
 
 const mockChartsData = {
@@ -241,7 +242,7 @@ describe('Dashboard Component', () => {
     api.get.mockImplementation((url) => {
       if (url === '/dashboard/metrics') {
         return Promise.resolve({
-          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, bestTimeVehicle: null },
+          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, timingsLast14Days: 0, bestTimeVehicle: null },
         });
       }
       if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
@@ -268,7 +269,7 @@ describe('Dashboard Component', () => {
     api.get.mockImplementation((url) => {
       if (url === '/dashboard/metrics') {
         return Promise.resolve({
-          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, bestTimeVehicle: null },
+          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, timingsLast14Days: 0, bestTimeVehicle: null },
         });
       }
       if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
@@ -285,12 +286,33 @@ describe('Dashboard Component', () => {
     expect(screen.getByTestId('activation-session-nudge-cta')).toHaveAttribute('href', '/session');
   });
 
-  test('no muestra el nudge si hay tiempos en los últimos 30 días', async () => {
+  test('no muestra el nudge si hay tiempos en los últimos 14 días', async () => {
     renderDashboard();
 
     await waitFor(() => {
       expect(screen.getByText(/Bienvenido/)).toBeInTheDocument();
     });
     expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();
+  });
+
+  test('muestra el nudge suave si hay tiempos en 30 días pero no en 14', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/dashboard/metrics') {
+        return Promise.resolve({
+          data: { ...mockMetricsData, timingsLast30Days: 2, timingsLast14Days: 0 },
+        });
+      }
+      if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
+      if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
+      if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
+      return Promise.reject(new Error(`Not found: ${url}`));
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('activation-session-nudge')).toHaveAttribute('data-variant', 'quiet');
+    });
+    expect(screen.getByTestId('activation-session-nudge-cta')).toHaveAttribute('href', '/session');
   });
 });

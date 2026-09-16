@@ -219,6 +219,24 @@
     "firstBody": "You already have a car in the garage. A quick session (circuit → car → best lap) is the next step to see progress and records.",
     "staleTitle": "No sessions in the last 30 days",
     "staleBody": "Open a short session to start timing again. You only need a circuit, a car and the minimum lap fields.",
+    "quiet": {
+      "week": {
+        "title": "Take the track this week?",
+        "body": "A short session is enough to keep the rhythm. The hobby habit is 1–2 times a month."
+      },
+      "rhythm": {
+        "title": "The garage is missing a lap time",
+        "body": "If you have not timed in a couple of weeks, a short run gets the habit going again."
+      },
+      "short": {
+        "title": "A short run this week?",
+        "body": "No long session needed: circuit, car and a best lap. You can continue whenever you like."
+      },
+      "holiday": {
+        "title": "Between holidays, a short session still counts",
+        "body": "If you have a spare moment, a short session keeps the habit without extra fuss."
+      }
+    },
     "cta": "New session",
     "dismiss": "Not now"
   }

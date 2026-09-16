@@ -219,6 +219,24 @@
     "firstBody": "Du hast schon ein Auto in der Garage. Eine kurze Session (Strecke → Auto → beste Runde) ist der nächste Schritt für Verlauf und Rekorde.",
     "staleTitle": "Seit über 30 Tagen keine Session",
     "staleBody": "Öffne eine kurze Session, um wieder zu stoppen. Du brauchst nur Strecke, Auto und die Mindestdaten.",
+    "quiet": {
+      "week": {
+        "title": "Diese Woche auf die Bahn?",
+        "body": "Eine kurze Session reicht, um den Rhythmus zu halten. Als Hobby reichen 1–2 Mal im Monat."
+      },
+      "rhythm": {
+        "title": "Der Garage fehlt eine Zeit",
+        "body": "Wenn du seit ein paar Wochen nicht gestoppt hast, bringt eine kurze Session den Rhythmus zurück."
+      },
+      "short": {
+        "title": "Eine kurze Session diese Woche?",
+        "body": "Keine lange Session nötig: Strecke, Auto und die beste Runde. Danach kannst du weitermachen, wann du willst."
+      },
+      "holiday": {
+        "title": "Zwischen den Feiertagen zählt auch eine kurze Session",
+        "body": "Wenn du ein Fenster hast, hält eine kurze Session die Gewohnheit ohne Extraaufwand."
+      }
+    },
     "cta": "Neue Session",
     "dismiss": "Jetzt nicht"
   }

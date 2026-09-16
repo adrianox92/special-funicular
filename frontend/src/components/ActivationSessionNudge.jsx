@@ -7,14 +7,42 @@ import { Card, CardContent } from './ui/card';
 import {
   dismissActivationNudge,
   getActivationNudgeVariant,
+  getQuietCopyKey,
   isActivationNudgeDismissed,
 } from '../utils/activationNudge';
+
+function nudgeCardClass(variant) {
+  if (variant === 'first') return 'border-primary/30 bg-primary/5 shadow-sm';
+  if (variant === 'quiet') return 'border-border/60 bg-card shadow-sm';
+  return 'border-border/80 bg-muted/30 shadow-sm';
+}
+
+function nudgeCopy(variant, t, copyKey) {
+  if (variant === 'first') {
+    return {
+      title: t('activationNudge.firstTitle'),
+      body: t('activationNudge.firstBody'),
+    };
+  }
+  if (variant === 'quiet') {
+    return {
+      title: t(`activationNudge.quiet.${copyKey}.title`),
+      body: t(`activationNudge.quiet.${copyKey}.body`),
+    };
+  }
+  return {
+    title: t('activationNudge.staleTitle'),
+    body: t('activationNudge.staleBody'),
+  };
+}
 
 const ActivationSessionNudge = ({
   totalVehicles,
   totalTimings,
   timingsLast30Days,
+  timingsLast14Days,
   suppressFirst = false,
+  now,
 }) => {
   const { t } = useTranslation('dashboard');
   const variant = useMemo(
@@ -23,32 +51,32 @@ const ActivationSessionNudge = ({
         totalVehicles,
         totalTimings,
         timingsLast30Days,
+        timingsLast14Days,
         suppressFirst,
       }),
-    [totalVehicles, totalTimings, timingsLast30Days, suppressFirst],
+    [totalVehicles, totalTimings, timingsLast30Days, timingsLast14Days, suppressFirst],
   );
-  const [dismissed, setDismissed] = useState(() => isActivationNudgeDismissed(variant));
+  const clock = now ?? new Date();
+  const copyKey = getQuietCopyKey(clock);
+  const [dismissed, setDismissed] = useState(() => isActivationNudgeDismissed(variant, clock));
 
-  if (!variant || dismissed || isActivationNudgeDismissed(variant)) {
+  if (!variant || dismissed || isActivationNudgeDismissed(variant, clock)) {
     return null;
   }
 
   const handleDismiss = () => {
-    dismissActivationNudge(variant);
+    dismissActivationNudge(variant, clock);
     setDismissed(true);
   };
 
-  const isFirst = variant === 'first';
+  const { title, body } = nudgeCopy(variant, t, copyKey);
 
   return (
     <Card
-      className={
-        isFirst
-          ? 'border-primary/30 bg-primary/5 shadow-sm'
-          : 'border-border/80 bg-muted/30 shadow-sm'
-      }
+      className={nudgeCardClass(variant)}
       data-testid="activation-session-nudge"
       data-variant={variant}
+      data-copy={variant === 'quiet' ? copyKey : undefined}
     >
       <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 gap-3">
@@ -59,12 +87,8 @@ const ActivationSessionNudge = ({
             <Clock className="size-4 text-primary" />
           </div>
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-semibold text-foreground">
-              {isFirst ? t('activationNudge.firstTitle') : t('activationNudge.staleTitle')}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {isFirst ? t('activationNudge.firstBody') : t('activationNudge.staleBody')}
-            </p>
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            <p className="text-sm text-muted-foreground">{body}</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 self-end sm:self-start">

@@ -364,6 +364,7 @@ const Dashboard = () => {
         totalVehicles={metrics.totalVehicles}
         totalTimings={metrics.totalTimings}
         timingsLast30Days={metrics.timingsLast30Days}
+        timingsLast14Days={metrics.timingsLast14Days}
         suppressFirst={!user?.user_metadata?.onboarding_dismissed_at}
       />
 
