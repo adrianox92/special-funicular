@@ -13,13 +13,14 @@ import { Spinner } from '../components/ui/spinner';
 import { TimeInput, TimeInputHint } from '../components/ui/TimeInput';
 import { cn } from '../lib/utils';
 import { SESSION_EVENTS, trackSessionEvent } from '../lib/analytics';
-import { formatLapTimeDisplay } from '../utils/formatUtils';
 import {
   buildSessionTimingPayload,
   calculateAverageTime,
-  formatSecondsToLapTime,
   getTotalTimeTooLowContext,
 } from '../utils/averageLapTime';
+import { buildSessionSummaryComparisons } from '../utils/sessionSummaryComparisons';
+import SessionSummaryComparisons from '../components/SessionSummaryComparisons';
+import { Separator } from '../components/ui/separator';
 import { getLastSessionCircuitId, pickDefaultCircuitId, setLastSessionCircuitId } from '../utils/sessionLastCircuit';
 import {
   getLastSessionVehicleId,
@@ -45,12 +46,6 @@ function clubName(circuit) {
   if (!nested) return null;
   if (typeof nested === 'string') return nested;
   return nested.name || null;
-}
-
-function formatDeltaAbs(seconds) {
-  const abs = Math.abs(Number(seconds));
-  if (!Number.isFinite(abs)) return '';
-  return formatSecondsToLapTime(abs);
 }
 
 const emptyCapture = () => ({
@@ -405,6 +400,9 @@ const NewSession = () => {
     setSaving(true);
     setSaveError(null);
     setInvalidField(null);
+
+    let savedTiming = null;
+    let syncMeta = {};
     try {
       const payload = buildSessionTimingPayload({
         vehicleId,
@@ -426,19 +424,53 @@ const NewSession = () => {
       setLastSessionCircuitId(circuitId);
       setLastUsedId(String(circuitId));
       rememberVehicle(vehicleId);
+
+      savedTiming = {
+        ...data,
+        best_lap_time: data?.best_lap_time || payload.best_lap_time,
+        best_lap_timestamp: data?.best_lap_timestamp ?? payload.best_lap_timestamp,
+        circuit_id: data?.circuit_id || selectedCircuit?.id,
+        circuit: data?.circuit || selectedCircuit?.name,
+        lane: data?.lane || payload.lane || '',
+        session_type: data?.session_type || 'TRAINING',
+      };
+      syncMeta = data?.sync_meta || {};
       setSummary({
-        timing: data,
+        timing: savedTiming,
         vehicle: selectedVehicle,
         circuit: selectedCircuit,
         lane: payload.lane || '',
         bestLap: payload.best_lap_time,
-        syncMeta: data?.sync_meta || {},
+        syncMeta,
+        comparisons: buildSessionSummaryComparisons({
+          current: savedTiming,
+          history: null,
+          syncMeta,
+        }),
       });
       setStep('summary');
     } catch (err) {
       setSaveError(err.response?.data?.error || t('capture.saveError'));
+      return;
     } finally {
       setSaving(false);
+    }
+
+    try {
+      const { data: timings } = await api.get(`/vehicles/${vehicleId}/timings`);
+      setSummary((prev) => {
+        if (!prev || prev.timing?.id !== savedTiming.id) return prev;
+        return {
+          ...prev,
+          comparisons: buildSessionSummaryComparisons({
+            current: savedTiming,
+            history: Array.isArray(timings) ? timings : [],
+            syncMeta,
+          }),
+        };
+      });
+    } catch {
+      // El guardado ya está hecho; el resumen se queda con sync_meta.
     }
   };
 
@@ -865,28 +897,12 @@ const NewSession = () => {
                   {summary.lane ? t('summary.lane', { lane: summary.lane }) : t('summary.noLane')}
                 </span>
               </div>
-              <div className="flex justify-between gap-3">
+              <div className="flex justify-between gap-3 items-baseline" data-testid="session-summary-best">
                 <span className="text-muted-foreground">{t('summary.bestLap')}</span>
-                <span className="font-mono font-medium">{summary.bestLap}</span>
+                <span className="font-mono text-lg font-semibold">{summary.bestLap}</span>
               </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{t('summary.previousBest')}</span>
-                <span className="font-mono font-medium text-right">
-                  {summary.syncMeta?.previous_best_lap_seconds != null
-                    ? formatLapTimeDisplay(summary.syncMeta.previous_best_lap_seconds)
-                    : t('summary.noPrevious')}
-                </span>
-              </div>
-              {summary.syncMeta?.is_personal_best ? (
-                <Badge>{t('summary.personalBest')}</Badge>
-              ) : null}
-              {summary.syncMeta?.delta_vs_pb_seconds != null && Number.isFinite(Number(summary.syncMeta.delta_vs_pb_seconds)) ? (
-                <p className="text-xs text-muted-foreground">
-                  {Number(summary.syncMeta.delta_vs_pb_seconds) <= 0
-                    ? t('summary.deltaFaster', { time: formatDeltaAbs(summary.syncMeta.delta_vs_pb_seconds) })
-                    : t('summary.deltaSlower', { time: formatDeltaAbs(summary.syncMeta.delta_vs_pb_seconds) })}
-                </p>
-              ) : null}
+              <Separator />
+              <SessionSummaryComparisons comparisons={summary.comparisons} />
             </CardContent>
           </Card>
           <div className="flex flex-col gap-2">
