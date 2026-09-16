@@ -688,6 +688,8 @@ router.get('/metrics', async (req, res) => {
       activeCompetitions: activeCompetitionsCount,
       totalTimings: timingActivity.totalTimings,
       timingsLast30Days: timingActivity.timingsLast30Days,
+      timingsLast14Days: timingActivity.timingsLast14Days,
+      quietWindowDays: timingActivity.quietWindowDays,
     });
   } catch (error) {
     console.error('Error al obtener métricas del dashboard:', error);

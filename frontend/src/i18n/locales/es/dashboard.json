@@ -219,6 +219,24 @@
     "firstBody": "Ya tienes coche en el garaje. Una sesión rápida (circuito → coche → mejor vuelta) es el siguiente paso para ver evolución y récords.",
     "staleTitle": "Hace más de 30 días que no ruedas",
     "staleBody": "Abre una sesión corta para volver a cronometrar. Solo necesitas circuito, coche y los tiempos mínimos.",
+    "quiet": {
+      "week": {
+        "title": "¿Sacas la pista esta semana?",
+        "body": "Una sesión corta basta para no perder el ritmo. El hábito hobby es 1–2 al mes."
+      },
+      "rhythm": {
+        "title": "El garaje echa de menos un tiempo",
+        "body": "Si hace un par de semanas que no cronometras, una tanda corta vuelve a poner el hábito en marcha."
+      },
+      "short": {
+        "title": "¿Una tanda corta esta semana?",
+        "body": "No hace falta una sesión larga: circuito, coche y el mejor tiempo. Luego sigues cuando quieras."
+      },
+      "holiday": {
+        "title": "Entre fiestas, un rato de pista también cuenta",
+        "body": "Si tienes un hueco, una sesión corta mantiene el hábito sin complicarte."
+      }
+    },
     "cta": "Nueva sesión",
     "dismiss": "Ahora no"
   }
