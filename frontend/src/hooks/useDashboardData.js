@@ -20,6 +20,14 @@ const defaultMetrics = {
   activeCompetitions: 0,
   totalTimings: 0,
   timingsLast30Days: 0,
+  timingsLast14Days: 0,
+  progress: {
+    sessionsThisMonth: 0,
+    sessionsLastMonth: 0,
+    lastSessionDate: null,
+    daysSinceLastSession: null,
+    consecutiveWeeksWithSession: 0,
+  },
 };
 
 const defaultCharts = {

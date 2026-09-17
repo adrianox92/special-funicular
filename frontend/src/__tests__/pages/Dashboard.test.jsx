@@ -126,6 +126,13 @@ const mockMetricsData = {
   totalTimings: 8,
   timingsLast30Days: 3,
   timingsLast14Days: 3,
+  progress: {
+    sessionsThisMonth: 2,
+    sessionsLastMonth: 1,
+    lastSessionDate: '2026-09-10',
+    daysSinceLastSession: 7,
+    consecutiveWeeksWithSession: 2,
+  },
 };
 
 const mockChartsData = {
@@ -137,12 +144,17 @@ const mockChartsData = {
   storeDistribution: [],
 };
 
-function mockDashboardGets() {
+function mockDashboardGets(metricsOverride) {
   api.get.mockImplementation((url) => {
-    if (url === '/dashboard/metrics') return Promise.resolve({ data: mockMetricsData });
+    if (url === '/dashboard/metrics') {
+      return Promise.resolve({
+        data: metricsOverride ? { ...mockMetricsData, ...metricsOverride } : mockMetricsData,
+      });
+    }
     if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
     if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
     if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
+    if (url === '/dashboard/training-goals-summary') return Promise.resolve({ data: { goals: [] } });
     return Promise.reject(new Error(`Not found: ${url}`));
   });
 }
@@ -228,6 +240,7 @@ describe('Dashboard Component', () => {
       if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
       if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
       if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
+      if (url === '/dashboard/training-goals-summary') return Promise.resolve({ data: { goals: [] } });
       return Promise.reject(new Error(`Not found: ${url}`));
     });
 
@@ -239,16 +252,18 @@ describe('Dashboard Component', () => {
   });
 
   test('no duplica el primer tiempo si el checklist de onboarding sigue visible', async () => {
-    api.get.mockImplementation((url) => {
-      if (url === '/dashboard/metrics') {
-        return Promise.resolve({
-          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, timingsLast14Days: 0, bestTimeVehicle: null },
-        });
-      }
-      if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
-      if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
-      if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
-      return Promise.reject(new Error(`Not found: ${url}`));
+    mockDashboardGets({
+      totalTimings: 0,
+      timingsLast30Days: 0,
+      timingsLast14Days: 0,
+      bestTimeVehicle: null,
+      progress: {
+        sessionsThisMonth: 0,
+        sessionsLastMonth: 0,
+        lastSessionDate: null,
+        daysSinceLastSession: null,
+        consecutiveWeeksWithSession: 0,
+      },
     });
 
     renderDashboard();
@@ -257,6 +272,8 @@ describe('Dashboard Component', () => {
       expect(screen.getByText(/Bienvenido/)).toBeInTheDocument();
     });
     expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('my-progress-card')).toBeInTheDocument();
+    expect(screen.getByTestId('my-progress-cta')).toHaveAttribute('href', '/session');
   });
 
   test('muestra el nudge de primer tiempo si el checklist se descartó', async () => {
@@ -266,16 +283,18 @@ describe('Dashboard Component', () => {
         user_metadata: { full_name: 'Tester', onboarding_dismissed_at: '2026-01-01T00:00:00.000Z' },
       },
     });
-    api.get.mockImplementation((url) => {
-      if (url === '/dashboard/metrics') {
-        return Promise.resolve({
-          data: { ...mockMetricsData, totalTimings: 0, timingsLast30Days: 0, timingsLast14Days: 0, bestTimeVehicle: null },
-        });
-      }
-      if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
-      if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
-      if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
-      return Promise.reject(new Error(`Not found: ${url}`));
+    mockDashboardGets({
+      totalTimings: 0,
+      timingsLast30Days: 0,
+      timingsLast14Days: 0,
+      bestTimeVehicle: null,
+      progress: {
+        sessionsThisMonth: 0,
+        sessionsLastMonth: 0,
+        lastSessionDate: null,
+        daysSinceLastSession: null,
+        consecutiveWeeksWithSession: 0,
+      },
     });
 
     renderDashboard();
@@ -296,17 +315,7 @@ describe('Dashboard Component', () => {
   });
 
   test('muestra el nudge suave si hay tiempos en 30 días pero no en 14', async () => {
-    api.get.mockImplementation((url) => {
-      if (url === '/dashboard/metrics') {
-        return Promise.resolve({
-          data: { ...mockMetricsData, timingsLast30Days: 2, timingsLast14Days: 0 },
-        });
-      }
-      if (url === '/dashboard/charts') return Promise.resolve({ data: mockChartsData });
-      if (url === '/dashboard/action-items') return Promise.resolve({ data: mockActionItems });
-      if (url === '/dashboard/maintenance-summary') return Promise.resolve({ data: mockMaintenance });
-      return Promise.reject(new Error(`Not found: ${url}`));
-    });
+    mockDashboardGets({ timingsLast30Days: 2, timingsLast14Days: 0 });
 
     renderDashboard();
 
@@ -314,5 +323,47 @@ describe('Dashboard Component', () => {
       expect(screen.getByTestId('activation-session-nudge')).toHaveAttribute('data-variant', 'quiet');
     });
     expect(screen.getByTestId('activation-session-nudge-cta')).toHaveAttribute('href', '/session');
+  });
+
+  test('muestra Mi progreso con sesiones y delta, sin CTA extra', async () => {
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('my-progress-card')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('my-progress-sessions')).toHaveTextContent('2');
+    expect(screen.getByTestId('my-progress-delta')).toHaveTextContent('+1');
+    expect(screen.queryByTestId('my-progress-cta')).not.toBeInTheDocument();
+  });
+
+  test('Mi progreso en cero no duplica el CTA si el nudge de primer tiempo está visible', async () => {
+    useAuth.mockReturnValue({
+      user: {
+        email: 'test@example.com',
+        user_metadata: { full_name: 'Tester', onboarding_dismissed_at: '2026-01-01T00:00:00.000Z' },
+      },
+    });
+    mockDashboardGets({
+      totalTimings: 0,
+      timingsLast30Days: 0,
+      timingsLast14Days: 0,
+      bestTimeVehicle: null,
+      progress: {
+        sessionsThisMonth: 0,
+        sessionsLastMonth: 0,
+        lastSessionDate: null,
+        daysSinceLastSession: null,
+        consecutiveWeeksWithSession: 0,
+      },
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('activation-session-nudge')).toBeInTheDocument();
+      expect(screen.getByTestId('my-progress-card')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('activation-session-nudge-cta')).toHaveAttribute('href', '/session');
+    expect(screen.queryByTestId('my-progress-cta')).not.toBeInTheDocument();
   });
 });

@@ -239,5 +239,24 @@
     },
     "cta": "New session",
     "dismiss": "Not now"
+  },
+  "myProgress": {
+    "title": "My progress",
+    "desc": "A comfortable hobby rhythm is 1 or 2 sessions a month. No pressure.",
+    "sessionsThisMonth": "Sessions this month",
+    "vsLastMonth": "Vs last month",
+    "deltaUp": "+{{count}}",
+    "deltaDown": "−{{count}}",
+    "deltaSame": "Same",
+    "lastSessionLabel": "Last session",
+    "lastSessionToday": "Last session today",
+    "lastSessionDays_one": "Last session {{count}} day ago",
+    "lastSessionDays_other": "Last session {{count}} days ago",
+    "lastSessionNever": "You have not timed a session yet",
+    "weekStreak_one": "{{count}} week in a row with a session",
+    "weekStreak_other": "{{count}} weeks in a row with a session",
+    "zeroBody": "Whenever you like, a short run is enough to get started. Circuit, car and a best lap.",
+    "emptyHint": "No sessions this month yet. A short run keeps the habit going.",
+    "cta": "New session"
   }
 }

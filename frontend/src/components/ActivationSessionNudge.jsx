@@ -43,6 +43,7 @@ const ActivationSessionNudge = ({
   timingsLast14Days,
   suppressFirst = false,
   now,
+  onDismiss,
 }) => {
   const { t } = useTranslation('dashboard');
   const variant = useMemo(
@@ -67,6 +68,7 @@ const ActivationSessionNudge = ({
   const handleDismiss = () => {
     dismissActivationNudge(variant, clock);
     setDismissed(true);
+    if (typeof onDismiss === 'function') onDismiss(variant);
   };
 
   const { title, body } = nudgeCopy(variant, t, copyKey);

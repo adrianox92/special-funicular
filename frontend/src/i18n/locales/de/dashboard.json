@@ -239,5 +239,24 @@
     },
     "cta": "Neue Session",
     "dismiss": "Jetzt nicht"
+  },
+  "myProgress": {
+    "title": "Mein Fortschritt",
+    "desc": "Ein entspannter Hobby-Rhythmus sind 1–2 Sessions im Monat. Ohne Druck.",
+    "sessionsThisMonth": "Sessions in diesem Monat",
+    "vsLastMonth": "Vs. Vormonat",
+    "deltaUp": "+{{count}}",
+    "deltaDown": "−{{count}}",
+    "deltaSame": "Unverändert",
+    "lastSessionLabel": "Letzte Session",
+    "lastSessionToday": "Letzte Session heute",
+    "lastSessionDays_one": "Letzte Session vor {{count}} Tag",
+    "lastSessionDays_other": "Letzte Session vor {{count}} Tagen",
+    "lastSessionNever": "Du hast noch keine Session gestoppt",
+    "weekStreak_one": "{{count}} Woche in Folge mit Session",
+    "weekStreak_other": "{{count}} Wochen in Folge mit Session",
+    "zeroBody": "Wann du magst reicht eine kurze Session zum Start. Strecke, Auto und die beste Runde.",
+    "emptyHint": "Diesen Monat noch keine Sessions. Eine kurze Fahrt hält die Gewohnheit.",
+    "cta": "Neue Session"
   }
 }

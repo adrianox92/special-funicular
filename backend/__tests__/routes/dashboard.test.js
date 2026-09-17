@@ -155,6 +155,14 @@ describe('Dashboard Routes', () => {
       expect(response.body).toHaveProperty('timingsLast30Days', 0);
       expect(response.body).toHaveProperty('timingsLast14Days', 0);
       expect(response.body).toHaveProperty('quietWindowDays', 14);
+      expect(response.body).toHaveProperty('progress');
+      expect(response.body.progress).toMatchObject({
+        sessionsThisMonth: 0,
+        sessionsLastMonth: 0,
+        lastSessionDate: null,
+        daysSinceLastSession: null,
+        consecutiveWeeksWithSession: 0,
+      });
     });
 
     test('cuenta tiempos embebidos y las ventanas de 30 y 14 días', async () => {
@@ -162,6 +170,10 @@ describe('Dashboard Routes', () => {
       const twentyDaysAgo = new Date();
       twentyDaysAgo.setUTCDate(twentyDaysAgo.getUTCDate() - 20);
       const twentyDaysAgoIso = twentyDaysAgo.toISOString().slice(0, 10);
+      const previousMonth = new Date();
+      previousMonth.setUTCDate(1);
+      previousMonth.setUTCMonth(previousMonth.getUTCMonth() - 1);
+      const previousMonthIso = previousMonth.toISOString().slice(0, 10);
       const mockVehicles = [
         {
           id: 1,
@@ -175,6 +187,7 @@ describe('Dashboard Routes', () => {
           vehicle_timings: [
             { best_lap_time: '5.123', timing_date: today, circuit: 'Salón', laps: 10, lane: '1' },
             { best_lap_time: '5.180', timing_date: twentyDaysAgoIso, circuit: 'Salón', laps: 8, lane: '1' },
+            { best_lap_time: '5.200', timing_date: previousMonthIso, circuit: 'Salón', laps: 8, lane: '1' },
             { best_lap_time: '5.200', timing_date: '2020-01-01', circuit: 'Salón', laps: 10, lane: '1' },
           ],
         },
@@ -202,10 +215,14 @@ describe('Dashboard Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.totalVehicles).toBe(1);
-      expect(response.body.totalTimings).toBe(3);
-      expect(response.body.timingsLast30Days).toBe(2);
+      expect(response.body.totalTimings).toBe(4);
+      expect(response.body.timingsLast30Days).toBeGreaterThanOrEqual(2);
       expect(response.body.timingsLast14Days).toBe(1);
       expect(response.body.quietWindowDays).toBe(14);
+      expect(response.body.progress.sessionsThisMonth).toBeGreaterThanOrEqual(1);
+      expect(response.body.progress.sessionsLastMonth).toBeGreaterThanOrEqual(1);
+      expect(response.body.progress.lastSessionDate).toBe(today);
+      expect(response.body.progress.daysSinceLastSession).toBe(0);
     });
 
     test('maneja errores de base de datos correctamente', async () => {

@@ -8,7 +8,7 @@ const { evaluateGoalProgress } = require('../lib/trainingGoals');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
 const { logDbError } = require('../lib/logDbError');
 const { fetchVehicleTimingsForVehicleIds } = require('../lib/fetchVehicleTimingsForVehicleIds');
-const { countTimingActivity } = require('../lib/timingActivityCounts');
+const { countTimingActivity, countHobbyProgress } = require('../lib/timingActivityCounts');
 
 const supabase = getAnonClient();
 
@@ -458,6 +458,7 @@ router.get('/metrics', async (req, res) => {
         vehicle_timings (
           best_lap_time,
           timing_date,
+          created_at,
           circuit,
           laps,
           lane
@@ -665,6 +666,7 @@ router.get('/metrics', async (req, res) => {
     if (timingActivity.totalTimings === 0 && bestTimeVehicle) {
       timingActivity.totalTimings = 1;
     }
+    const progress = countHobbyProgress(vehicles);
 
     res.json({
       totalVehicles,
@@ -690,6 +692,7 @@ router.get('/metrics', async (req, res) => {
       timingsLast30Days: timingActivity.timingsLast30Days,
       timingsLast14Days: timingActivity.timingsLast14Days,
       quietWindowDays: timingActivity.quietWindowDays,
+      progress,
     });
   } catch (error) {
     console.error('Error al obtener métricas del dashboard:', error);
