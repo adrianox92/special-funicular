@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Car, Check, ChevronDown, Flag, Plus, Search, Timer } from 'lucide-react';
+import { Car, Check, ChevronDown, Flag, Minus, Plus, Search, Timer } from 'lucide-react';
 import api from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,9 +14,12 @@ import { TimeInput, TimeInputHint } from '../components/ui/TimeInput';
 import { cn } from '../lib/utils';
 import { SESSION_EVENTS, trackSessionEvent } from '../lib/analytics';
 import {
+  MAX_SESSION_LAP_ROWS,
   buildSessionTimingPayload,
   calculateAverageTime,
   getTotalTimeTooLowContext,
+  mergeDerivedLapAggregates,
+  resizeLapTimeRows,
 } from '../utils/averageLapTime';
 import { buildSessionSummaryComparisons } from '../utils/sessionSummaryComparisons';
 import SessionSummaryComparisons from '../components/SessionSummaryComparisons';
@@ -54,6 +57,7 @@ const emptyCapture = () => ({
   laps: '',
   lane: '',
   supplyVoltageVolts: '',
+  lapTimes: [],
 });
 
 function CircuitCreateForm({
@@ -125,6 +129,7 @@ const NewSession = () => {
 
   const [capture, setCapture] = useState(emptyCapture);
   const [showMore, setShowMore] = useState(false);
+  const [showLapTimes, setShowLapTimes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -376,9 +381,62 @@ const NewSession = () => {
   };
 
   const handleCaptureField = (name, value) => {
-    setCapture((prev) => ({ ...prev, [name]: value }));
+    setCapture((prev) => {
+      if (name === 'laps') {
+        const lapTimes = resizeLapTimeRows(prev.lapTimes, value);
+        return mergeDerivedLapAggregates({ ...prev, laps: value }, lapTimes);
+      }
+      return { ...prev, [name]: value };
+    });
     setSaveError(null);
     setInvalidField((current) => (current === name ? null : current));
+  };
+
+  const handleToggleLapTimes = () => {
+    if (showLapTimes) {
+      setShowLapTimes(false);
+      return;
+    }
+    setShowLapTimes(true);
+    setCapture((prev) => {
+      const n = parseInt(String(prev.laps || ''), 10);
+      if (Number.isFinite(n) && n >= 1) {
+        return { ...prev, lapTimes: resizeLapTimeRows(prev.lapTimes, n) };
+      }
+      if (!Array.isArray(prev.lapTimes) || prev.lapTimes.length === 0) {
+        return { ...prev, lapTimes: ['', '', ''] };
+      }
+      return prev;
+    });
+  };
+
+  const handleLapTimeChange = (index, value) => {
+    setCapture((prev) => {
+      const lapTimes = Array.isArray(prev.lapTimes) ? [...prev.lapTimes] : [];
+      while (lapTimes.length <= index) lapTimes.push('');
+      lapTimes[index] = value;
+      return mergeDerivedLapAggregates(prev, lapTimes);
+    });
+    setSaveError(null);
+  };
+
+  const addLapRow = () => {
+    setCapture((prev) => {
+      const current = Array.isArray(prev.lapTimes) ? [...prev.lapTimes] : [];
+      if (current.length >= MAX_SESSION_LAP_ROWS) return prev;
+      const lapTimes = [...current, ''];
+      return mergeDerivedLapAggregates({ ...prev, laps: String(lapTimes.length) }, lapTimes);
+    });
+  };
+
+  const removeLapRow = () => {
+    setCapture((prev) => {
+      const current = Array.isArray(prev.lapTimes) ? [...prev.lapTimes] : [];
+      if (current.length === 0) return prev;
+      const lapTimes = current.slice(0, -1);
+      const nextLaps = lapTimes.length > 0 ? String(lapTimes.length) : '';
+      return mergeDerivedLapAggregates({ ...prev, laps: nextLaps }, lapTimes);
+    });
   };
 
   const handleSave = async (e) => {
@@ -413,6 +471,7 @@ const NewSession = () => {
         totalTime: capture.totalTime,
         laps: capture.laps,
         supplyVoltageVolts: voltageRaw,
+        lapTimes: capture.lapTimes,
       });
       const { data } = await api.post('/timings', payload);
       visitRef.current.saved = true;
@@ -480,6 +539,7 @@ const NewSession = () => {
       lane: prev.lane,
       supplyVoltageVolts: prev.supplyVoltageVolts,
     }));
+    setShowLapTimes(false);
     setSaveError(null);
     setInvalidField(null);
     setSummary(null);
@@ -490,6 +550,7 @@ const NewSession = () => {
   const handleChangeCar = () => {
     setCapture(emptyCapture());
     setShowMore(false);
+    setShowLapTimes(false);
     setSaveError(null);
     setInvalidField(null);
     setSummary(null);
@@ -829,6 +890,60 @@ const NewSession = () => {
                 </AlertDescription>
               </Alert>
             ) : null}
+
+            <div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="px-0"
+                aria-expanded={showLapTimes}
+                data-testid="session-lap-times-toggle"
+                onClick={handleToggleLapTimes}
+              >
+                <ChevronDown className={cn('size-4 mr-1 transition-transform', showLapTimes && 'rotate-180')} aria-hidden />
+                {t('capture.individualLaps')}
+              </Button>
+              {showLapTimes ? (
+                <div className="mt-2 space-y-3" data-testid="session-lap-times">
+                  <p className="text-xs text-muted-foreground">{t('capture.individualLapsHint')}</p>
+                  {(capture.lapTimes || []).map((time, i) => (
+                    <div key={i} className="space-y-1">
+                      <Label htmlFor={`session-lap-${i}`}>{t('capture.lapN', { n: i + 1 })}</Label>
+                      <TimeInput
+                        id={`session-lap-${i}`}
+                        value={time}
+                        onChange={(val) => handleLapTimeChange(i, val)}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid="session-add-lap"
+                      onClick={addLapRow}
+                      disabled={(capture.lapTimes || []).length >= MAX_SESSION_LAP_ROWS}
+                    >
+                      <Plus className="size-4 mr-1" aria-hidden />
+                      {t('capture.addLap')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid="session-remove-lap"
+                      onClick={removeLapRow}
+                      disabled={(capture.lapTimes || []).length === 0}
+                    >
+                      <Minus className="size-4 mr-1" aria-hidden />
+                      {t('capture.removeLap')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
             <div>
               <Button

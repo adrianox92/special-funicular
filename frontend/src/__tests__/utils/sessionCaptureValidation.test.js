@@ -57,11 +57,17 @@ describe('sessionCaptureValidation', () => {
     expect(isBlockingCaptureIssue(issue)).toBe(false);
   });
 
-  test('captura válida sin avisos', () => {
+  test('captura válida sin avisos aunque haya vueltas individuales vacías', () => {
     expect(getSessionCaptureIssue({
       bestLapTime: '00:09.000',
       totalTime: '00:30.000',
       laps: '3',
+    })).toBeNull();
+    expect(getSessionCaptureIssue({
+      bestLapTime: '00:09.000',
+      totalTime: '00:30.000',
+      laps: '3',
+      lapTimes: ['', '', ''],
     })).toBeNull();
   });
 });

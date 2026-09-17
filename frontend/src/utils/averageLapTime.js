@@ -83,6 +83,112 @@ export function isValidLapTime(timeStr) {
   return parseLapTimeToSeconds(timeStr) != null;
 }
 
+/** Tope de filas en captura opcional (móvil / rendimiento). */
+export const MAX_SESSION_LAP_ROWS = 80;
+
+/**
+ * Ajusta el array de TimeInput al número de vueltas declarado. Conserva valores al crecer/encoger.
+ * Si `lapsCount` no es un entero ≥ 1, deja las filas como están.
+ * @param {string[]|undefined|null} rows
+ * @param {string|number|null|undefined} lapsCount
+ * @param {number} [maxRows]
+ * @returns {string[]}
+ */
+export function resizeLapTimeRows(rows, lapsCount, maxRows = MAX_SESSION_LAP_ROWS) {
+  const current = Array.isArray(rows) ? rows.map((v) => String(v ?? '')) : [];
+  const n = parseInt(String(lapsCount ?? ''), 10);
+  if (!Number.isFinite(n) || n < 1) return current;
+  const size = Math.min(n, maxRows);
+  if (current.length === size) return current;
+  if (current.length > size) return current.slice(0, size);
+  return current.concat(Array(size - current.length).fill(''));
+}
+
+/**
+ * Vueltas válidas para POST /timings (mismo contrato que sync): omite vacías e inválidas.
+ * Conserva el índice 1-based original como `lap_number`.
+ * @param {unknown} texts
+ * @returns {Array<{ lap_number: number, time_seconds: number, lap_time_seconds: number, time_text: string }>}
+ */
+export function buildLapTimesFromTexts(texts) {
+  if (!Array.isArray(texts)) return [];
+  const out = [];
+  texts.forEach((text, idx) => {
+    const time_text = String(text ?? '').trim();
+    if (!time_text) return;
+    const sec = parseLapTimeToSeconds(time_text);
+    if (sec == null || sec <= 0) return;
+    out.push({
+      lap_number: idx + 1,
+      time_seconds: sec,
+      lap_time_seconds: sec,
+      time_text,
+    });
+  });
+  return out;
+}
+
+/**
+ * Agregados solo si **todas** las filas tienen un tiempo válido (lista completa).
+ * @param {unknown} texts
+ * @returns {{ bestLapTime: string, totalTime: string, laps: number, averageTime: string } | null}
+ */
+export function deriveCaptureFromLapTimes(texts) {
+  if (!Array.isArray(texts) || texts.length === 0) return null;
+  const parsed = [];
+  for (const text of texts) {
+    const trimmed = String(text ?? '').trim();
+    if (!trimmed) return null;
+    const sec = parseLapTimeToSeconds(trimmed);
+    if (sec == null || sec <= 0) return null;
+    parsed.push(sec);
+  }
+  const totalSec = parsed.reduce((a, b) => a + b, 0);
+  const bestSec = Math.min(...parsed);
+  return {
+    laps: parsed.length,
+    bestLapTime: formatSecondsToLapTime(bestSec),
+    totalTime: formatSecondsToLapTime(totalSec),
+    averageTime: formatSecondsToLapTime(totalSec / parsed.length),
+  };
+}
+
+/**
+ * Rellena mejor/total/vueltas desde la lista completa sin pisar lo que el usuario ya escribió
+ * (salvo valores que salieron de una derivación anterior y no ha tocado).
+ * @param {object} prev
+ * @param {string[]} lapTimes
+ */
+export function mergeDerivedLapAggregates(prev, lapTimes) {
+  const next = { ...prev, lapTimes };
+  const derived = deriveCaptureFromLapTimes(lapTimes);
+  if (!derived) return next;
+
+  const last = prev.derivedFromLaps || null;
+  const bestEmpty = !String(prev.bestLapTime || '').trim();
+  const totalEmpty = !String(prev.totalTime || '').trim();
+  const lapsEmpty = !String(prev.laps || '').trim();
+  const bestFromUs = Boolean(last && prev.bestLapTime === last.bestLapTime);
+  const totalFromUs = Boolean(last && prev.totalTime === last.totalTime);
+  const lapsFromUs = Boolean(last && String(prev.laps) === String(last.laps));
+
+  const derivedFromLaps = { ...(last || {}) };
+  if (bestEmpty || bestFromUs) {
+    next.bestLapTime = derived.bestLapTime;
+    derivedFromLaps.bestLapTime = derived.bestLapTime;
+  }
+  if (totalEmpty || totalFromUs) {
+    next.totalTime = derived.totalTime;
+    derivedFromLaps.totalTime = derived.totalTime;
+  }
+  if (lapsEmpty || lapsFromUs) {
+    next.laps = String(derived.laps);
+    derivedFromLaps.laps = derived.laps;
+  }
+  next.derivedFromLaps = derivedFromLaps;
+  return next;
+}
+
 /** Timestamp numérico del promedio mostrado (parsea el mm:ss.mmm ya redondeado). */
 export function averageTimeTimestamp(averageTime) {
   return parseLapTimeToSeconds(averageTime);
@@ -100,6 +206,7 @@ export function averageTimeTimestamp(averageTime) {
  *   laps: string|number,
  *   supplyVoltageVolts?: string|number|null,
  *   timingDate?: string,
+ *   lapTimes?: string[],
  * }} input
  */
 export function buildSessionTimingPayload(input) {
@@ -129,6 +236,9 @@ export function buildSessionTimingPayload(input) {
     const n = parseFloat(String(input.supplyVoltageVolts).replace(',', '.'));
     if (Number.isFinite(n)) payload.supply_voltage_volts = n;
   }
+
+  const lap_times = buildLapTimesFromTexts(input.lapTimes);
+  if (lap_times.length > 0) payload.lap_times = lap_times;
 
   return payload;
 }

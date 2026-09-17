@@ -238,6 +238,7 @@ describe('NewSession', () => {
     expect(body.laps).toBe(10);
     expect(body.average_time).toBe('00:12.000');
     expect(body.lane).toBe('1');
+    expect(body).not.toHaveProperty('lap_times');
 
     await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
 
@@ -366,6 +367,8 @@ describe('NewSession', () => {
     expect(screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i)).toHaveValue('');
     expect(screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i)).toHaveValue('');
     expect(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i)).toHaveValue(null);
+    expect(screen.getByTestId('session-lap-times-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('session-lap-times')).not.toBeInTheDocument();
   });
 
   test('cambiar coche mantiene el circuito y vuelve al paso de vehículo', async () => {
@@ -513,5 +516,83 @@ describe('NewSession', () => {
 
     expect(await screen.findByTestId('session-summary-consistency')).toHaveTextContent('4.20%');
     expect(screen.getByTestId('session-summary-worst')).toHaveTextContent(/00:12\.100/);
+  });
+
+  test('la sección de vueltas individuales está plegada y no alarga el camino feliz', async () => {
+    mockLists();
+    renderSession();
+    await goToCaptureFromWizard();
+
+    expect(screen.getByTestId('session-lap-times-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('session-lap-times')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Vuelta 1$|^Lap 1$|^Runde 1$/i)).not.toBeInTheDocument();
+  });
+
+  test('vueltas individuales opcionales se envían en el POST cuando hay ≥3 válidas', async () => {
+    mockLists();
+    api.post.mockResolvedValue({
+      data: savedTimingResponse({
+        id: 't-laps',
+        best_lap_time: '00:09.000',
+        best_lap_timestamp: 9,
+        consistency_score: 4.2,
+        worst_lap_timestamp: 11,
+        sync_meta: {},
+      }),
+    });
+    renderSession();
+    await goToCaptureFromWizard();
+    fillCaptureTimes({ best: '09000', total: '030000', laps: '3', lane: '1' });
+
+    fireEvent.click(screen.getByTestId('session-lap-times-toggle'));
+    await screen.findByTestId('session-lap-times');
+    expect(screen.getByLabelText(/^Vuelta 1$|^Lap 1$|^Runde 1$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Vuelta 3$|^Lap 3$|^Runde 3$/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Vuelta 4$|^Lap 4$|^Runde 4$/i)).not.toBeInTheDocument();
+
+    const fillLap = (label, digits) => {
+      const el = screen.getByLabelText(label);
+      fireEvent.change(el, { target: { value: digits } });
+      fireEvent.blur(el);
+    };
+    fillLap(/^Vuelta 1$|^Lap 1$|^Runde 1$/i, '09000');
+    fillLap(/^Vuelta 2$|^Lap 2$|^Runde 2$/i, '10000');
+    fillLap(/^Vuelta 3$|^Lap 3$|^Runde 3$/i, '11000');
+
+    fireEvent.click(screen.getByTestId('session-save'));
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledTimes(1);
+    });
+    const body = api.post.mock.calls[0][1];
+    expect(body.session_type).toBe('TRAINING');
+    expect(body.lap_times).toHaveLength(3);
+    expect(body.lap_times[0]).toMatchObject({ lap_number: 1, time_seconds: 9, time_text: '00:09.000' });
+    expect(body.lap_times[1].time_seconds).toBe(10);
+    expect(body.lap_times[2].lap_number).toBe(3);
+    await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
+    expect(screen.getByTestId('session-summary-consistency')).toHaveTextContent('4.20%');
+    expect(screen.getByTestId('session-summary-worst')).toHaveTextContent(/00:11\.000/);
+  });
+
+  test('rellenar vueltas individuales primero deriva mejor, total y número de vueltas', async () => {
+    mockLists();
+    renderSession();
+    await goToCaptureFromWizard();
+
+    fireEvent.click(screen.getByTestId('session-lap-times-toggle'));
+    await screen.findByTestId('session-lap-times');
+    const fillLap = (label, digits) => {
+      const el = screen.getByLabelText(label);
+      fireEvent.change(el, { target: { value: digits } });
+      fireEvent.blur(el);
+    };
+    fillLap(/^Vuelta 1$|^Lap 1$|^Runde 1$/i, '09000');
+    fillLap(/^Vuelta 2$|^Lap 2$|^Runde 2$/i, '10000');
+    fillLap(/^Vuelta 3$|^Lap 3$|^Runde 3$/i, '11000');
+
+    expect(screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i)).toHaveValue('00:09.000');
+    expect(screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i)).toHaveValue('00:30.000');
+    expect(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/Promedio|Average|Schnitt/i)).toHaveValue('00:10.000');
   });
 });
