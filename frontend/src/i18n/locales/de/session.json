@@ -96,7 +96,9 @@
     "another": "Weitere Runde",
     "anotherHint": "Gleiche Strecke und gleiches Auto. Nur die Zeiten werden geleert.",
     "changeCar": "Auto wechseln",
-    "viewVehicle": "Fahrzeug ansehen",
-    "viewTimings": "Zeiten ansehen"
+    "shortcutsLabel": "Weiter erkunden",
+    "circuitHistory": "Historie dieser Strecke",
+    "vehicleSheet": "Fahrzeugakte",
+    "vehicleOnCircuit": "Zeiten dieses Autos auf dieser Strecke"
   }
 }

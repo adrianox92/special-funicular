@@ -470,6 +470,32 @@ describe('NewSession', () => {
     ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  test('los atajos del resumen usan los ids de circuito y vehículo guardados', async () => {
+    mockLists();
+    renderSession();
+    await saveTrainingSession();
+
+    const shortcuts = screen.getByTestId('session-summary-shortcuts');
+    expect(shortcuts.compareDocumentPosition(screen.getByTestId('session-summary-comparisons'))
+      & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(screen.getByTestId('session-another')).toBeInTheDocument();
+    expect(screen.getByTestId('session-change-car')).toBeInTheDocument();
+
+    const circuitLink = screen.getByTestId('session-shortcut-circuit');
+    expect(circuitLink).toHaveAttribute('href', '/timings?circuit_id=cir-1');
+    expect(circuitLink).toHaveTextContent(/Historial de este circuito|History for this circuit|Historie dieser Strecke/);
+
+    const vehicleLink = screen.getByTestId('session-shortcut-vehicle');
+    expect(vehicleLink).toHaveAttribute('href', '/vehicles/veh-1?tab=timings');
+    expect(vehicleLink).toHaveTextContent(/Ficha del coche|Car sheet|Fahrzeugakte/);
+
+    const vehicleCircuitLink = screen.getByTestId('session-shortcut-vehicle-circuit');
+    expect(vehicleCircuitLink).toHaveAttribute('href', '/timings?circuit_id=cir-1&vehicle=veh-1');
+    expect(vehicleCircuitLink).toHaveTextContent(
+      /Tiempos de este coche en este circuito|This car.s times on this circuit|Zeiten dieses Autos auf dieser Strecke/,
+    );
+  });
+
   test('si el GET de historial falla, el resumen sigue con el PB de sync_meta', async () => {
     api.get.mockImplementation((url) => {
       if (url === '/circuits') return Promise.resolve({ data: [circuit] });

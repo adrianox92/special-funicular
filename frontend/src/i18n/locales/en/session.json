@@ -96,7 +96,9 @@
     "another": "Another run",
     "anotherHint": "Same circuit and same car. Only the times are cleared.",
     "changeCar": "Change car",
-    "viewVehicle": "View vehicle",
-    "viewTimings": "View timings"
+    "shortcutsLabel": "Keep exploring",
+    "circuitHistory": "History for this circuit",
+    "vehicleSheet": "Car sheet",
+    "vehicleOnCircuit": "This car's times on this circuit"
   }
 }
