@@ -72,9 +72,9 @@ Para enviar resúmenes semanales por Discord/Telegram:
 
 Tabla auxiliar `digest_send_log` evita reenvíos duplicados en la misma semana.
 
-### Informe diario de huecos de catálogo (Render Cron)
+### Informe de huecos de catálogo (lunes y jueves, Render Cron)
 
-Cada día a las **9:00 Europe/Madrid** se envía un correo con:
+Los **lunes y jueves** a las **9:00 Europe/Madrid** se envía un correo con:
 
 - cobertura global (`catalog_item_id` / total de vehículos)
 - las referencias de garaje **que no existen en el catálogo**, ordenadas por más vehículos **sin asignar**
@@ -82,11 +82,11 @@ Cada día a las **9:00 Europe/Madrid** se envía un correo con:
 Destinatario por defecto: `adrianpalomera17@gmail.com` (`CATALOG_GAP_REPORT_TO`).
 
 1. En el **Web Service** de la API: `RESEND_API_KEY`, `RESEND_FROM` (dominio verificado), `FRONTEND_URL`, `CRON_SECRET` y opcionalmente `CATALOG_GAP_REPORT_TO`.
-2. Cron Job con schedule **`0 7,8 * * *`** (UTC: 07:00 y 08:00). El endpoint solo envía cuando en Madrid son las 9 (así cubre CEST y CET).
+2. Cron Job con schedule **`0 7,8 * * 1,4`** (UTC: 07:00 y 08:00, lunes y jueves). El endpoint solo envía cuando en Madrid son las 9:00 de un lunes o jueves (así cubre CEST y CET; si el cron quedara en diario, no spamea).
 3. Comando:
    `POST https://special-funicular-3q60.onrender.com/api/cron/catalog-gap-report`
    con header `Authorization: Bearer <CRON_SECRET>`.
-4. Prueba inmediata: el mismo POST con `?force=1`.
+4. Prueba inmediata: el mismo POST con `?force=1` (salta hora y día).
 
 El listado usa el RPC `admin_vehicle_refs_missing_catalog` (`only_unlinked=true`). El dashboard de plataforma (`/admin/dashboard`) muestra la misma tabla.
 
