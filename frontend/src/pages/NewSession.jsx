@@ -22,6 +22,7 @@ import {
   resizeLapTimeRows,
 } from '../utils/averageLapTime';
 import { buildSessionSummaryComparisons } from '../utils/sessionSummaryComparisons';
+import { buildSessionSummaryShortcuts } from '../utils/sessionSummaryShortcuts';
 import SessionSummaryComparisons from '../components/SessionSummaryComparisons';
 import { Separator } from '../components/ui/separator';
 import { getLastSessionCircuitId, pickDefaultCircuitId, setLastSessionCircuitId } from '../utils/sessionLastCircuit';
@@ -181,6 +182,14 @@ const NewSession = () => {
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => String(v.id) === String(vehicleId)) || null,
     [vehicles, vehicleId],
+  );
+  const summaryShortcuts = useMemo(
+    () =>
+      buildSessionSummaryShortcuts({
+        vehicleId: summary?.vehicle?.id,
+        circuitId: summary?.circuit?.id,
+      }),
+    [summary?.vehicle?.id, summary?.circuit?.id],
   );
 
   const showLane = Number(selectedCircuit?.num_lanes) > 1;
@@ -1030,14 +1039,31 @@ const NewSession = () => {
                 {t('summary.changeCar')}
               </Button>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button variant="outline" asChild>
-                <Link to={`/vehicles/${summary.vehicle?.id}`}>{t('summary.viewVehicle')}</Link>
+            <nav
+              className="flex flex-col gap-1 pt-1"
+              aria-label={t('summary.shortcutsLabel')}
+              data-testid="session-summary-shortcuts"
+            >
+              <Button variant="link" size="sm" asChild className="h-auto justify-start px-0 whitespace-normal">
+                <Link to={summaryShortcuts.circuitHistory} data-testid="session-shortcut-circuit">
+                  {t('summary.circuitHistory')}
+                </Link>
               </Button>
-              <Button variant="outline" asChild>
-                <Link to="/timings">{t('summary.viewTimings')}</Link>
-              </Button>
-            </div>
+              {summaryShortcuts.vehicleSheet ? (
+                <Button variant="link" size="sm" asChild className="h-auto justify-start px-0 whitespace-normal">
+                  <Link to={summaryShortcuts.vehicleSheet} data-testid="session-shortcut-vehicle">
+                    {t('summary.vehicleSheet')}
+                  </Link>
+                </Button>
+              ) : null}
+              {summaryShortcuts.vehicleOnCircuit ? (
+                <Button variant="link" size="sm" asChild className="h-auto justify-start px-0 whitespace-normal">
+                  <Link to={summaryShortcuts.vehicleOnCircuit} data-testid="session-shortcut-vehicle-circuit">
+                    {t('summary.vehicleOnCircuit')}
+                  </Link>
+                </Button>
+              ) : null}
+            </nav>
           </div>
         </section>
       ) : null}

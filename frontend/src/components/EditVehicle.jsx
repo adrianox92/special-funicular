@@ -51,6 +51,9 @@ function EditVehicleShell() {
     if (q.get('tab') === 'palmares' || location.hash === '#palmares') {
       setActiveTab('palmares');
     }
+    if (q.get('tab') === 'timings' || location.hash === '#timings') {
+      setActiveTab('timings');
+    }
   }, [location.search, location.hash]);
 
   const vehicleTabOptions = useMemo(

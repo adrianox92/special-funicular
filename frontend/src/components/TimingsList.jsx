@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Wrench, GitCompare, BarChart3, Trash2 } from 'lucide-react';
 import api from '../lib/axios';
@@ -47,6 +47,7 @@ import { isLapTimerSession, getRecordedFromLabel } from '../utils/recordedFromLa
 import LapTimerTrainingLink from './LapTimerTrainingLink';
 import SessionTimeline from './SessionTimeline';
 import TimingsEmptyState from './TimingsEmptyState';
+import { parseTimingsListFilterFromSearch } from '../utils/timingsListQuery';
 
 /** Igual que VehicleList: GET /vehicles está paginado (25 por defecto). */
 const TIMINGS_VEHICLES_PAGE_LIMIT = 10000;
@@ -453,6 +454,7 @@ function TimingMobileGroupCard({
 const TimingsList = () => {
   const { t } = useTranslation('timings');
   const { t: tCommon } = useTranslation('common');
+  const [searchParams] = useSearchParams();
   const [timings, setTimings] = useState([]);
   const [vehicles, setVehicles] = useState({});
   const [circuits, setCircuits] = useState([]);
@@ -471,13 +473,14 @@ const TimingsList = () => {
     vehicleId: null,
     timingId: null,
   });
-  const [filter, setFilter] = useState({
+  const [filter, setFilter] = useState(() => ({
     vehicle: '',
     dateFrom: '',
     dateTo: '',
     circuit_id: '',
-    lane: ''
-  });
+    lane: '',
+    ...parseTimingsListFilterFromSearch(searchParams),
+  }));
   const [vehiclePickerOpen, setVehiclePickerOpen] = useState(false);
   const [vehicleSearch, setVehicleSearch] = useState('');
   const vehiclePickerRef = useRef(null);
@@ -712,6 +715,7 @@ const TimingsList = () => {
             aria-haspopup="listbox"
             className="h-9 w-full justify-between font-normal"
             type="button"
+            data-testid="timings-filter-vehicle"
             onClick={() => setVehiclePickerOpen((o) => !o)}
           >
             <span className="truncate text-left">{vehicleFilterLabel}</span>
@@ -804,7 +808,7 @@ const TimingsList = () => {
         <div className="space-y-2">
           <Label>{t('filterCircuit')}</Label>
           <Select value={filter.circuit_id || '__all__'} onValueChange={(v) => setFilter(prev => ({ ...prev, circuit_id: v === '__all__' ? '' : v }))}>
-            <SelectTrigger>
+            <SelectTrigger data-testid="timings-filter-circuit">
               <SelectValue placeholder={t('allCircuits')} />
             </SelectTrigger>
             <SelectContent>

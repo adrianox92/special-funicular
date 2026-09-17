@@ -96,7 +96,9 @@
     "another": "Otra manga",
     "anotherHint": "Mismo circuito y mismo coche. Solo se vacían los tiempos.",
     "changeCar": "Cambiar coche",
-    "viewVehicle": "Ver vehículo",
-    "viewTimings": "Ver tiempos"
+    "shortcutsLabel": "Seguir explorando",
+    "circuitHistory": "Historial de este circuito",
+    "vehicleSheet": "Ficha del coche",
+    "vehicleOnCircuit": "Tiempos de este coche en este circuito"
   }
 }
