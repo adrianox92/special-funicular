@@ -19,6 +19,8 @@ import {
   Landmark,
   Warehouse,
   RefreshCw,
+  MoreHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import DashboardActionBlocks from '../components/DashboardActionBlocks';
@@ -32,6 +34,13 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { Tabs, TabsContent } from '../components/ui/tabs';
 import { ResponsiveTabsNav } from '../components/ui/responsive-tabs-nav';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { cn } from '../lib/utils';
 import api from '../lib/axios';
 import {
@@ -124,7 +133,6 @@ function TrainingGoalsDashboardWidget() {
   );
 }
 
-/** Agrupa tarjetas de métricas con una etiqueta compacta */
 const MetricSubGroup = ({ label, children, className }) => (
   <div className={cn('space-y-3', className)}>
     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
@@ -140,6 +148,300 @@ const TabSectionIntro = ({ title, description, id }) => (
     {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
   </div>
 );
+
+function vehicleDisplayName(row, t) {
+  return (
+    [row?.manufacturer, row?.model].filter(Boolean).join(' ') ||
+    t('vehicleFallback', { id: row?.vehicle_id || row?.id })
+  );
+}
+
+const KpiChip = ({ to, icon: Icon, label, value }) => {
+  const className =
+    'inline-flex items-center gap-2 rounded-lg border border-border/70 bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border hover:bg-muted/40';
+  const inner = (
+    <>
+      {Icon ? <Icon className="size-3.5 text-muted-foreground" aria-hidden /> : null}
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold tabular-nums text-foreground">{value}</span>
+    </>
+  );
+  if (to) {
+    return (
+      <Link to={to} className={className}>
+        {inner}
+      </Link>
+    );
+  }
+  return <div className={className}>{inner}</div>;
+};
+
+function DashboardPageHeader({
+  displayName,
+  todayLabel,
+  contextLine,
+  hint,
+  primaryCta,
+  secondaryCtas = [],
+  menuItems = [],
+  t,
+}) {
+  const PrimaryIcon = primaryCta.icon;
+  return (
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight">
+          {displayName ? t('welcomeNamed', { name: displayName }) : t('welcome')}
+        </h1>
+        <p className="mt-1 capitalize text-muted-foreground">{todayLabel}</p>
+        {contextLine ? <p className="mt-2 text-sm text-muted-foreground">{contextLine}</p> : null}
+        {hint ? <p className="mt-3 max-w-xl text-sm text-muted-foreground">{hint}</p> : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('quickActionsAria')}>
+        <Button size="default" asChild>
+          <Link to={primaryCta.to} data-testid="dashboard-primary-cta">
+            {PrimaryIcon ? <PrimaryIcon className="size-4 mr-2" aria-hidden /> : null}
+            {primaryCta.label}
+          </Link>
+        </Button>
+        {secondaryCtas.map((cta) => {
+          const SecondaryIcon = cta.icon;
+          return (
+            <Button key={cta.to} variant="outline" size="default" asChild>
+              <Link to={cta.to} data-testid={cta.testId}>
+                {SecondaryIcon ? <SecondaryIcon className="size-4 mr-2" aria-hidden /> : null}
+                {cta.label}
+              </Link>
+            </Button>
+          );
+        })}
+        {menuItems.length > 0 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="default"
+                data-testid="dashboard-more-actions"
+                aria-label={t('moreActionsAria')}
+              >
+                <MoreHorizontal className="size-4" aria-hidden />
+                <span className="hidden sm:inline">{t('moreActions')}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              {menuItems.map((item, index) => {
+                if (item.type === 'separator') {
+                  return <DropdownMenuSeparator key={`sep-${index}`} />;
+                }
+                const ItemIcon = item.icon;
+                if (item.type === 'button') {
+                  return (
+                    <DropdownMenuItem
+                      key={item.label}
+                      disabled={item.disabled}
+                      onSelect={item.onSelect}
+                      className="cursor-pointer"
+                    >
+                      {ItemIcon ? <ItemIcon className="size-4" aria-hidden /> : null}
+                      {item.label}
+                    </DropdownMenuItem>
+                  );
+                }
+                return (
+                  <DropdownMenuItem key={item.to} asChild>
+                    <Link to={item.to} className="flex items-center gap-2 cursor-pointer">
+                      {ItemIcon ? <ItemIcon className="size-4" aria-hidden /> : null}
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DashboardNowZone({
+  t,
+  metrics,
+  user,
+  sessionNudgeVisible,
+  setSessionNudgeDismissed,
+  actionItems,
+  actionItemsError,
+}) {
+  return (
+    <section className="space-y-4" aria-labelledby="dash-now-heading" data-testid="dashboard-now-section">
+      <div className="space-y-1">
+        <h2 id="dash-now-heading" className="text-lg font-semibold tracking-tight">
+          {t('nowTitle')}
+        </h2>
+        <p className="text-sm text-muted-foreground">{t('nowDesc')}</p>
+      </div>
+      <div className="space-y-4">
+        <ActivationSessionNudge
+          totalVehicles={metrics.totalVehicles}
+          totalTimings={metrics.totalTimings}
+          timingsLast30Days={metrics.timingsLast30Days}
+          timingsLast14Days={metrics.timingsLast14Days}
+          suppressFirst={!user?.user_metadata?.onboarding_dismissed_at}
+          onDismiss={() => setSessionNudgeDismissed(true)}
+        />
+        <MyProgressCard
+          progress={metrics.progress}
+          totalTimings={metrics.totalTimings}
+          sessionNudgeVisible={sessionNudgeVisible}
+        />
+        <DashboardActionBlocks data={actionItems} loadError={actionItemsError} embedded />
+        <TrainingGoalsDashboardWidget />
+      </div>
+    </section>
+  );
+}
+
+function CompactMaintenanceSummary({ summary, t }) {
+  const pendingTotal = summary.vehiclesWithoutRecentMaintenanceTotal ?? 0;
+  const stalePreview = (summary.vehiclesWithoutRecentMaintenance || []).slice(0, 3);
+  const recentPreview = (summary.recent || []).slice(0, 3);
+  const upcomingAll = summary.upcomingScheduled || [];
+  const upcomingPreview = upcomingAll.slice(0, 3);
+  const upcomingTotal = upcomingAll.length;
+  const recentTotal = summary.recent?.length ?? 0;
+  const remainingRecent = Math.max(0, recentTotal - recentPreview.length);
+  const remainingStale = Math.max(0, pendingTotal - stalePreview.length);
+  const remainingUpcoming = Math.max(0, upcomingTotal - upcomingPreview.length);
+
+  return (
+    <section aria-labelledby="dash-maintenance" className="space-y-3" data-testid="dashboard-maintenance">
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="flex flex-col gap-3 border-b border-border/60 bg-muted/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <CardTitle id="dash-maintenance" className="text-base">
+              {t('garageCompactTitle')}
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              {t('maintenanceDesc', { days: summary.staleDaysThreshold ?? '—' })}
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" asChild>
+            <Link to="/vehicles">{t('garage')}</Link>
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t('pendingReview')}
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">{pendingTotal}</p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t('upcomingShort')}
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">{upcomingTotal}</p>
+            </div>
+            <div className="col-span-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5 sm:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t('recentRecords')}
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">{recentTotal}</p>
+            </div>
+          </div>
+
+          {upcomingPreview.length ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                {t('upcomingMaintenance')}
+              </p>
+              <ul className="mt-2 space-y-1.5 text-sm">
+                {upcomingPreview.map((row) => (
+                  <li key={`${row.vehicle_id}-${row.next_due_at}`} className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
+                    <Link
+                      to={`/vehicles/${row.vehicle_id}?tab=maintenance`}
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      {vehicleDisplayName(row, t)}
+                    </Link>
+                    <span className="text-xs text-muted-foreground sm:text-end sm:shrink-0">
+                      {formatMaintenanceKind(row.kind)}
+                      {row.next_due_at
+                        ? ` · ${new Date(String(row.next_due_at).slice(0, 10)).toLocaleDateString(getIntlLocale())}`
+                        : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {remainingUpcoming > 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">{t('andMore', { count: remainingUpcoming })}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t('staleShort')}
+              </p>
+              {stalePreview.length ? (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {stalePreview.map((row) => (
+                    <li key={row.id}>
+                      <Link
+                        to={`/vehicles/${row.id}`}
+                        className="font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        {vehicleDisplayName(row, t)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{t('noStaleVehicles')}</p>
+              )}
+              {remainingStale > 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">{t('andMore', { count: remainingStale })}</p>
+              ) : null}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t('recentRecords')}
+              </p>
+              {recentPreview.length ? (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {recentPreview.map((row) => (
+                    <li key={row.id} className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+                      <Link
+                        to={`/vehicles/${row.vehicle_id}`}
+                        className="font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        {vehicleDisplayName(row, t)}
+                      </Link>
+                      <span className="text-xs text-muted-foreground sm:shrink-0 sm:text-end">
+                        {formatMaintenanceKind(row.kind)}
+                        {row.performed_at
+                          ? ` · ${new Date(row.performed_at).toLocaleDateString(getIntlLocale())}`
+                          : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{t('noMaintenanceRecords')}</p>
+              )}
+              {remainingRecent > 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">{t('andMore', { count: remainingRecent })}</p>
+              ) : null}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
 
 const Dashboard = () => {
   const { t } = useTranslation('dashboard');
@@ -261,68 +563,40 @@ const Dashboard = () => {
   }
 
   const isEmpty = !metrics.totalVehicles;
+  const nowZone = (
+    <DashboardNowZone
+      t={t}
+      metrics={metrics}
+      user={user}
+      sessionNudgeVisible={sessionNudgeVisible}
+      setSessionNudgeDismissed={setSessionNudgeDismissed}
+      actionItems={actionItems}
+      actionItemsError={actionItemsError}
+    />
+  );
 
   if (isEmpty) {
     return (
       <div className="space-y-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {displayName ? t('welcomeNamed', { name: displayName }) : t('welcome')}
-            </h1>
-            <p className="mt-1 capitalize text-muted-foreground">{todayLabel}</p>
-            <p className="mt-3 max-w-xl text-sm text-muted-foreground">{t('emptyHint')}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="lg" asChild>
-              <Link to="/vehicles/new">
-                <Plus className="size-4 mr-2" aria-hidden />
-                {t('addFirstVehicle')}
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link to="/session">
-                <Clock className="size-4 mr-2" aria-hidden />
-                {t('newSession')}
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link to="/competitions">
-                <Trophy className="size-4 mr-2" aria-hidden />
-                {t('competitions')}
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-        <MyProgressCard
-          progress={metrics.progress}
-          totalTimings={metrics.totalTimings}
-          sessionNudgeVisible={sessionNudgeVisible}
+        <DashboardPageHeader
+          displayName={displayName}
+          todayLabel={todayLabel}
+          hint={t('emptyHint')}
+          primaryCta={{ to: '/vehicles/new', label: t('addFirstVehicle'), icon: Plus }}
+          secondaryCtas={[
+            {
+              to: '/session',
+              label: t('newSession'),
+              icon: Clock,
+              testId: 'dashboard-secondary-session-cta',
+            },
+          ]}
+          menuItems={[
+            { to: '/competitions', label: t('competitions'), icon: Trophy },
+          ]}
+          t={t}
         />
-
-        <DashboardActionBlocks data={actionItems} loadError={actionItemsError} />
-
-        <Card className="border-dashed bg-muted/30">
-          <CardContent className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
-            <div
-              className="flex size-20 items-center justify-center rounded-full bg-muted"
-              aria-hidden
-            >
-              <Car className="size-10 text-muted-foreground" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold">{t('garageWaiting')}</h2>
-              <p className="max-w-md text-sm text-muted-foreground">
-                {t('garageHint')}
-              </p>
-            </div>
-            <Button asChild size="lg">
-              <Link to="/vehicles/new">{t('startNow')}</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
+        {nowZone}
       </div>
     );
   }
@@ -331,78 +605,36 @@ const Dashboard = () => {
   const digitalCount = metrics.digitalVehicles ?? 0;
   const museoCount = metrics.museoVehicles ?? 0;
   const tallerCount = metrics.tallerVehicles ?? 0;
+  const fleetLine = `${t('vehicleCount', { count: metrics.totalVehicles })}${
+    metrics.activeCompetitions != null
+      ? ` · ${t('activeCompetitions', { count: metrics.activeCompetitions })}`
+      : ''
+  }`;
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {displayName ? t('welcomeNamed', { name: displayName }) : t('welcome')}
-          </h1>
-          <p className="mt-1 capitalize text-muted-foreground">{todayLabel}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t('vehicleCount', { count: metrics.totalVehicles })}
-            {metrics.activeCompetitions != null
-              ? ` · ${t('activeCompetitions', { count: metrics.activeCompetitions })}`
-              : ''}
-          </p>
-        </div>
-        <div
-          className="flex flex-wrap gap-2"
-          role="group"
-          aria-label={t('quickActionsAria')}
-        >
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            disabled={isRefreshing}
-            onClick={() => refetch()}
-          >
-            <RefreshCw className={`size-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden />
-            {t('refresh')}
-          </Button>
-          <Button size="default" asChild>
-            <Link to="/session">
-              <Clock className="size-4 mr-2" aria-hidden />
-              {t('newSession')}
-            </Link>
-          </Button>
-          <Button variant="outline" size="default" asChild>
-            <Link to="/competitions">
-              <Plus className="size-4 mr-2" aria-hidden />
-              {t('newCompetition')}
-            </Link>
-          </Button>
-          <Button variant="outline" size="default" asChild>
-            <Link to="/vehicles">
-              <Car className="size-4 mr-2" aria-hidden />
-              {t('vehicles')}
-            </Link>
-          </Button>
-          <Button variant="outline" size="default" asChild>
-            <Link to="/timings">
-              <Clock className="size-4 mr-2" aria-hidden />
-              {t('timings')}
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      <ActivationSessionNudge
-        totalVehicles={metrics.totalVehicles}
-        totalTimings={metrics.totalTimings}
-        timingsLast30Days={metrics.timingsLast30Days}
-        timingsLast14Days={metrics.timingsLast14Days}
-        suppressFirst={!user?.user_metadata?.onboarding_dismissed_at}
-        onDismiss={() => setSessionNudgeDismissed(true)}
+      <DashboardPageHeader
+        displayName={displayName}
+        todayLabel={todayLabel}
+        contextLine={fleetLine}
+        primaryCta={{ to: '/session', label: t('newSession'), icon: Clock }}
+        menuItems={[
+          {
+            type: 'button',
+            label: t('refresh'),
+            icon: RefreshCw,
+            disabled: isRefreshing,
+            onSelect: () => refetch(),
+          },
+          { type: 'separator' },
+          { to: '/competitions', label: t('newCompetition'), icon: Plus },
+          { to: '/vehicles', label: t('vehicles'), icon: Car },
+          { to: '/timings', label: t('timings'), icon: Clock },
+        ]}
+        t={t}
       />
 
-      <MyProgressCard
-        progress={metrics.progress}
-        totalTimings={metrics.totalTimings}
-        sessionNudgeVisible={sessionNudgeVisible}
-      />
+      {nowZone}
 
       {maintenanceError ? (
         <Alert variant="destructive">
@@ -410,135 +642,99 @@ const Dashboard = () => {
         </Alert>
       ) : null}
 
-      <div className="space-y-6">
-        <DashboardActionBlocks data={actionItems} loadError={actionItemsError} />
-        <TrainingGoalsDashboardWidget />
+      {maintenanceSummary ? <CompactMaintenanceSummary summary={maintenanceSummary} t={t} /> : null}
 
-        {maintenanceSummary ? (
-          <section aria-labelledby="dash-maintenance" className="space-y-4">
-            <Card className="border-border/80 shadow-sm">
-              <CardHeader className="flex flex-col gap-3 border-b border-border/60 bg-muted/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-1">
-                  <CardTitle id="dash-maintenance" className="text-base">
-                    {t('maintenance')}
-                  </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    {t('maintenanceDesc', { days: maintenanceSummary.staleDaysThreshold ?? '—' })}
-                  </CardDescription>
-                </div>
-                <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" asChild>
-                  <Link to="/vehicles">{t('garage')}</Link>
-                </Button>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5">
-                <div className="grid gap-5 lg:grid-cols-12 lg:gap-6 lg:items-start">
-                  <div className="rounded-lg border border-border/60 bg-muted/10 p-4 lg:col-span-4 xl:col-span-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {t('pendingReview')}
-                    </p>
-                    <p className="mt-1 text-3xl font-bold tabular-nums">
-                      {maintenanceSummary.vehiclesWithoutRecentMaintenanceTotal ?? 0}
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {t('pendingReviewHint')}
-                    </p>
-                  </div>
-                  <div className="min-w-0 lg:col-span-8 xl:col-span-9">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {t('recentRecords')}
-                    </p>
-                    {maintenanceSummary.recent?.length ? (
-                      <ul className="mt-3 max-h-[min(16rem,40vh)] space-y-0 overflow-y-auto text-sm lg:max-h-[min(20rem,45vh)]">
-                        {maintenanceSummary.recent.slice(0, 12).map((row) => (
-                          <li
-                            key={row.id}
-                            className="flex flex-col gap-0.5 border-b border-border/40 py-2.5 last:border-0 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <Link
-                              to={`/vehicles/${row.vehicle_id}`}
-                              className="font-medium text-primary underline-offset-4 hover:underline"
-                            >
-                              {[row.manufacturer, row.model].filter(Boolean).join(' ') ||
-                                t('vehicleFallback', { id: row.vehicle_id })}
-                            </Link>
-                            <span className="text-xs text-muted-foreground sm:shrink-0 sm:text-end">
-                              {formatMaintenanceKind(row.kind)}
-                              {row.performed_at
-                                ? ` · ${new Date(row.performed_at).toLocaleDateString(getIntlLocale())}`
-                                : ''}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-3 text-sm text-muted-foreground">
-                        {t('noMaintenanceRecords')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      <section aria-labelledby="dash-metrics-heading" className="space-y-3" data-testid="dashboard-kpi-strip">
+        <div className="space-y-1">
+          <h2 id="dash-metrics-heading" className="text-lg font-semibold tracking-tight">
+            {t('kpiTitle')}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t('kpiDescCompact')}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            compact
+            title={t('metrics.totalVehicles')}
+            value={metrics.totalVehicles}
+            icon={<Truck />}
+            valueColor="primary"
+            to="/vehicles"
+          />
+          <MetricCard
+            compact
+            title={t('metrics.totalInvestment')}
+            value={formatCurrencyEur(metrics.totalInvestment)}
+            subtitle={t('metrics.averageLabel', { value: formatCurrencyEur(metrics.averageInvestmentPerVehicle) })}
+            icon={<Euro />}
+            valueColor="warning"
+          />
+          <MetricCard
+            compact
+            title={t('metrics.activeCompetitions')}
+            value={metrics.activeCompetitions || 0}
+            subtitle={t('metrics.inProgress')}
+            icon={<Trophy />}
+            valueColor="primary"
+          />
+          <MetricCard
+            compact
+            title={t('metrics.bestTime')}
+            value={metrics.bestTimeVehicle?.best_lap_time}
+            subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)}
+            icon={<Clock />}
+            detailsMode="tooltip-only"
+            details={{
+              [t('details.lastUpdate')]: metrics.bestTimeVehicle?.timing_date,
+              [t('details.circuit')]: metrics.bestTimeVehicle?.circuit,
+              [t('details.laps')]: metrics.bestTimeVehicle?.laps,
+              [t('details.lane')]: metrics.bestTimeVehicle?.lane,
+            }}
+            formatValue={formatLapTimeDisplay}
+            valueColor="success"
+            threshold={{ good: 10, warning: 12 }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2" data-testid="dashboard-kpi-chips">
+          <KpiChip
+            to="/vehicles?digital=Digital"
+            icon={Smartphone}
+            label={t('metrics.digital')}
+            value={digitalCount}
+          />
+          <KpiChip
+            to="/vehicles?filterMuseo=true"
+            icon={Landmark}
+            label={t('metrics.museo')}
+            value={museoCount}
+          />
+          <KpiChip
+            to="/vehicles?filterTaller=true"
+            icon={Warehouse}
+            label={t('metrics.taller')}
+            value={tallerCount}
+          />
+          <KpiChip
+            to="/vehicles?modified=Sí"
+            icon={Wrench}
+            label={t('metrics.modifiedVehicles')}
+            value={metrics.modifiedVehicles}
+          />
+          <KpiChip
+            to="/vehicles?modified=No"
+            icon={Car}
+            label={t('metrics.stockVehicles')}
+            value={metrics.stockVehicles}
+          />
+        </div>
 
-            {maintenanceSummary.upcomingScheduled?.length ? (
-              <Card className="border-amber-500/40 shadow-sm" aria-labelledby="dash-maintenance-upcoming">
-                <CardHeader className="border-b border-border/60 bg-amber-500/5 pb-4">
-                  <CardTitle id="dash-maintenance-upcoming" className="text-base">
-                    {t('upcomingMaintenance')}
-                  </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    {t('upcomingMaintenanceDesc')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-5">
-                  <ul className="space-y-0 divide-y divide-border/40 text-sm">
-                    {maintenanceSummary.upcomingScheduled.map((row) => (
-                      <li key={`${row.vehicle_id}-${row.next_due_at}`} className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
-                        <Link
-                          to={`/vehicles/${row.vehicle_id}?tab=maintenance`}
-                          className="font-medium text-primary underline-offset-4 hover:underline"
-                        >
-                          {[row.manufacturer, row.model].filter(Boolean).join(' ') ||
-                            t('vehicleFallback', { id: row.vehicle_id })}
-                        </Link>
-                        <span className="text-xs text-muted-foreground sm:text-end sm:shrink-0">
-                          {formatMaintenanceKind(row.kind)}
-                          {row.next_due_at
-                            ? ` · ${new Date(String(row.next_due_at).slice(0, 10)).toLocaleDateString(getIntlLocale())}`
-                            : ''}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ) : null}
-          </section>
-        ) : null}
-      </div>
-
-      <section aria-labelledby="dash-metrics-heading">
-        <Card className="overflow-hidden border-border/80 shadow-sm">
-          <CardHeader className="border-b border-border/60 bg-muted/15 py-4 sm:py-5">
-            <CardTitle id="dash-metrics-heading" className="text-base sm:text-lg">
-              {t('kpiTitle')}
-            </CardTitle>
-            <CardDescription>
-              {t('kpiDesc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8 p-4 sm:p-6">
+        <details className="group rounded-xl border border-border/70 bg-card shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            <span>{t('moreMetrics')}</span>
+            <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="space-y-6 border-t border-border/60 px-4 py-4 sm:px-5">
             <MetricSubGroup label={t('subgroupFleet')}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
-                <MetricCard
-                  title={t('metrics.totalVehicles')}
-                  value={metrics.totalVehicles}
-                  icon={<Truck />}
-                  valueColor="primary"
-                  trend={metrics.trends?.totalVehicles?.trend || 'stable'}
-                  trendValue={metrics.trends?.totalVehicles?.value || t('metrics.noData')}
-                  to="/vehicles"
-                />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <MetricCard
                   title={t('metrics.modifiedVehicles')}
                   value={metrics.modifiedVehicles}
@@ -559,20 +755,10 @@ const Dashboard = () => {
                   trendValue={metrics.trends?.stockVehicles?.value || t('metrics.noData')}
                   to="/vehicles?modified=No"
                 />
-                <MetricCard
-                  title={t('metrics.totalInvestment')}
-                  value={formatCurrencyEur(metrics.totalInvestment)}
-                  subtitle={t('metrics.averageLabel', { value: formatCurrencyEur(metrics.averageInvestmentPerVehicle) })}
-                  icon={<Euro />}
-                  valueColor="warning"
-                  trend={metrics.trends?.totalInvestment?.trend || 'stable'}
-                  trendValue={metrics.trends?.totalInvestment?.value || t('metrics.noData')}
-                />
               </div>
             </MetricSubGroup>
-
             <MetricSubGroup label={t('subgroupClassification')}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <MetricCard
                   title={t('metrics.digital')}
                   value={digitalCount}
@@ -605,9 +791,8 @@ const Dashboard = () => {
                 />
               </div>
             </MetricSubGroup>
-
             <MetricSubGroup label={t('subgroupActivity')}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <MetricCard
                   title={t('metrics.avgIncrement')}
                   value={formatPercentEs(metrics.averagePriceIncrement)}
@@ -626,35 +811,10 @@ const Dashboard = () => {
                   trend={metrics.trends?.lastUpdate?.trend || 'stable'}
                   trendValue={metrics.trends?.lastUpdate?.value || t('metrics.systemActive')}
                 />
-                <MetricCard
-                  title={t('metrics.activeCompetitions')}
-                  value={metrics.activeCompetitions || 0}
-                  subtitle={t('metrics.inProgress')}
-                  icon={<Trophy />}
-                  valueColor="primary"
-                  trend={metrics.trends?.activeCompetitions?.trend || 'stable'}
-                  trendValue={metrics.trends?.activeCompetitions?.value || t('metrics.noData')}
-                />
-                <MetricCard
-                  title={t('metrics.bestTime')}
-                  value={metrics.bestTimeVehicle?.best_lap_time}
-                  subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)}
-                  icon={<Clock />}
-                  detailsMode="tooltip-only"
-                  details={{
-                    [t('details.lastUpdate')]: metrics.bestTimeVehicle?.timing_date,
-                    [t('details.circuit')]: metrics.bestTimeVehicle?.circuit,
-                    [t('details.laps')]: metrics.bestTimeVehicle?.laps,
-                    [t('details.lane')]: metrics.bestTimeVehicle?.lane,
-                  }}
-                  formatValue={formatLapTimeDisplay}
-                  valueColor="success"
-                  threshold={{ good: 10, warning: 12 }}
-                />
               </div>
             </MetricSubGroup>
-          </CardContent>
-        </Card>
+          </div>
+        </details>
       </section>
 
       <section className="space-y-4" aria-labelledby="dash-analytics-heading">

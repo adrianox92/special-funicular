@@ -302,6 +302,12 @@ describe('Dashboard Component', () => {
     await waitFor(() => {
       expect(screen.getByTestId('activation-session-nudge')).toBeInTheDocument();
     });
+    const now = screen.getByTestId('dashboard-now-section');
+    const nudge = screen.getByTestId('activation-session-nudge');
+    const progress = screen.getByTestId('my-progress-card');
+    expect(now).toContainElement(nudge);
+    expect(now).toContainElement(progress);
+    expect(nudge.compareDocumentPosition(progress) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
     expect(screen.getByTestId('activation-session-nudge-cta')).toHaveAttribute('href', '/session');
   });
 
@@ -334,6 +340,62 @@ describe('Dashboard Component', () => {
     expect(screen.getByTestId('my-progress-sessions')).toHaveTextContent('2');
     expect(screen.getByTestId('my-progress-delta')).toHaveTextContent('+1');
     expect(screen.queryByTestId('my-progress-cta')).not.toBeInTheDocument();
+  });
+
+  test('CTA primario Nueva sesión y zona Ahora en el orden correcto', async () => {
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dashboard-primary-cta')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('dashboard-primary-cta')).toHaveAttribute('href', '/session');
+    expect(screen.getByTestId('dashboard-primary-cta')).toHaveTextContent('Nueva sesión');
+
+    const now = screen.getByTestId('dashboard-now-section');
+    expect(now).toHaveTextContent('Ahora');
+    const progress = screen.getByTestId('my-progress-card');
+    const actions = screen.getByTestId('dashboard-action-blocks');
+    expect(now).toContainElement(progress);
+    expect(now).toContainElement(actions);
+    expect(progress.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
+    expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();
+  });
+
+  test('garaje vacío prioriza añadir vehículo y mantiene la zona Ahora', async () => {
+    mockDashboardGets({
+      totalVehicles: 0,
+      modifiedVehicles: 0,
+      stockVehicles: 0,
+      digitalVehicles: 0,
+      museoVehicles: 0,
+      tallerVehicles: 0,
+      totalInvestment: 0,
+      averageInvestmentPerVehicle: 0,
+      totalTimings: 0,
+      timingsLast30Days: 0,
+      timingsLast14Days: 0,
+      bestTimeVehicle: null,
+      progress: {
+        sessionsThisMonth: 0,
+        sessionsLastMonth: 0,
+        lastSessionDate: null,
+        daysSinceLastSession: null,
+        consecutiveWeeksWithSession: 0,
+      },
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dashboard-primary-cta')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('dashboard-primary-cta')).toHaveAttribute('href', '/vehicles/new');
+    expect(screen.getByTestId('dashboard-secondary-session-cta')).toHaveAttribute('href', '/session');
+    expect(screen.getByTestId('dashboard-now-section')).toContainElement(screen.getByTestId('my-progress-card'));
+    expect(screen.getByTestId('dashboard-now-section')).toContainElement(screen.getByTestId('dashboard-action-blocks'));
+    expect(screen.queryByText('Tu garaje te está esperando')).not.toBeInTheDocument();
   });
 
   test('Mi progreso en cero no duplica el CTA si el nudge de primer tiempo está visible', async () => {
