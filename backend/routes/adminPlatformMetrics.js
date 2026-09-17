@@ -4,6 +4,7 @@
 const express = require('express');
 const { getServiceClient } = require('../lib/supabaseClients');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
+const { fetchTimingRetentionKpi } = require('../lib/timingRetentionKpi');
 
 const router = express.Router();
 
@@ -109,6 +110,29 @@ router.get('/platform-metrics', async (req, res) => {
     });
   } catch (err) {
     console.error('adminPlatformMetrics:', err);
+    res.status(500).json({ error: err?.message || 'Error interno' });
+  }
+});
+
+/**
+ * GET /timing-retention
+ * KPI rolling 30d (independiente del periodo del dashboard). Misma definición que la rutina SQL semanal.
+ */
+router.get('/timing-retention', async (req, res) => {
+  try {
+    if (!assertLicenseAdmin(req, res)) return;
+
+    const supabaseAdmin = getServiceClient();
+    if (!supabaseAdmin) {
+      return res.status(503).json({
+        error: 'Servicio de métricas no disponible: falta SUPABASE_SERVICE_ROLE_KEY en el servidor.',
+      });
+    }
+
+    const kpi = await fetchTimingRetentionKpi(supabaseAdmin);
+    res.json(kpi);
+  } catch (err) {
+    console.error('timing-retention:', err);
     res.status(500).json({ error: err?.message || 'Error interno' });
   }
 });
