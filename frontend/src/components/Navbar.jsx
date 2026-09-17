@@ -237,8 +237,15 @@ const Navbar = () => {
   const navItems = [
     { path: '/dashboard', label: t('home'), icon: Home },
     { path: '/vehicles', label: t('vehicles'), icon: Car },
-    { path: '/session', label: t('newSession'), icon: Timer },
-    { path: '/timings', label: t('timings'), icon: Clock },
+    {
+      path: '/timings',
+      label: t('timings'),
+      icon: Clock,
+      children: [
+        { path: '/session', label: t('newSession'), icon: Timer },
+        { path: '/timings', label: t('timingsList'), icon: Clock },
+      ],
+    },
     { path: '/circuits', label: t('circuits'), icon: Flag },
     { path: '/inventory', label: t('inventory'), icon: Package },
     {
