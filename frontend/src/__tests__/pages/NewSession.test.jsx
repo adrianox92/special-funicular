@@ -27,10 +27,13 @@ const circuit = { id: 'cir-1', name: 'Pista salón', num_lanes: 2, lane_lengths:
 const vehicle = { id: 'veh-1', manufacturer: 'Scalextric', model: 'Ferrari F1', type: 'F1' };
 const vehicle2 = { id: 'veh-2', manufacturer: 'Ninco', model: 'Porsche GT', type: 'GT' };
 
-function mockLists({ circuits = [circuit], vehicles = [vehicle] } = {}) {
+function mockLists({ circuits = [circuit], vehicles = [vehicle], timings = [] } = {}) {
   api.get.mockImplementation((url) => {
     if (url === '/circuits') return Promise.resolve({ data: circuits });
     if (url === '/vehicles') return Promise.resolve({ data: { vehicles } });
+    if (typeof url === 'string' && /\/vehicles\/[^/]+\/timings$/.test(url)) {
+      return Promise.resolve({ data: timings });
+    }
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });
 }
@@ -76,15 +79,24 @@ function fillCaptureTimes({
   }
 }
 
+function savedTimingResponse(overrides = {}) {
+  return {
+    id: 't-1',
+    session_type: 'TRAINING',
+    vehicle_id: 'veh-1',
+    circuit_id: 'cir-1',
+    circuit: 'Pista salón',
+    lane: '1',
+    best_lap_time: '00:11.324',
+    best_lap_timestamp: 11.324,
+    timing_date: '2026-09-16',
+    sync_meta: { previous_best_lap_seconds: 11.5, is_personal_best: true, delta_vs_pb_seconds: -0.176 },
+    ...overrides,
+  };
+}
+
 async function saveTrainingSession() {
-  api.post.mockResolvedValue({
-    data: {
-      id: 't-1',
-      session_type: 'TRAINING',
-      best_lap_time: '00:11.324',
-      sync_meta: { previous_best_lap_seconds: 11.5, is_personal_best: true, delta_vs_pb_seconds: -0.176 },
-    },
-  });
+  api.post.mockResolvedValue({ data: savedTimingResponse() });
   await goToCaptureFromWizard();
   fillCaptureTimes();
   fireEvent.click(screen.getByTestId('session-save'));
@@ -355,6 +367,8 @@ describe('NewSession', () => {
     expect(screen.getByLabelText(/Mejor vuelta|Best lap|Beste Runde/i)).toHaveValue('');
     expect(screen.getByLabelText(/Tiempo total|Total time|Gesamtzeit/i)).toHaveValue('');
     expect(screen.getByLabelText(/^Vueltas$|^Laps$|^Runden$/i)).toHaveValue(null);
+    expect(screen.getByTestId('session-lap-times-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('session-lap-times')).not.toBeInTheDocument();
   });
 
   test('cambiar coche mantiene el circuito y vuelve al paso de vehículo', async () => {
@@ -424,6 +438,86 @@ describe('NewSession', () => {
     await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
   });
 
+  test('el resumen muestra PB de circuito, contexto de 30 días y sesión anterior', async () => {
+    mockLists({
+      timings: [
+        savedTimingResponse(),
+        {
+          id: 't-prev',
+          circuit_id: 'cir-1',
+          lane: '1',
+          best_lap_time: '00:11.500',
+          best_lap_timestamp: 11.5,
+          timing_date: '2026-09-10',
+          created_at: '2026-09-10T10:00:00.000Z',
+          session_type: 'TRAINING',
+        },
+      ],
+    });
+    renderSession();
+    await saveTrainingSession();
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/vehicles/veh-1/timings');
+    });
+    expect(screen.getByTestId('session-summary-best')).toHaveTextContent('00:11.324');
+    expect(screen.getByTestId('session-summary-circuit-pb')).toHaveTextContent(/00:11\.500/);
+    expect(screen.getByTestId('session-summary-circuit-pb')).toHaveTextContent(/más rápido|faster|schneller/);
+    expect(screen.getByTestId('session-summary-month-pb')).toHaveTextContent(/00:11\.500/);
+    expect(screen.getByTestId('session-summary-last')).toHaveTextContent(/00:11\.500/);
+    expect(screen.getByTestId('session-another').compareDocumentPosition(
+      screen.getByTestId('session-change-car'),
+    ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('si el GET de historial falla, el resumen sigue con el PB de sync_meta', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/circuits') return Promise.resolve({ data: [circuit] });
+      if (url === '/vehicles') return Promise.resolve({ data: { vehicles: [vehicle] } });
+      if (typeof url === 'string' && /\/vehicles\/[^/]+\/timings$/.test(url)) {
+        return Promise.reject(new Error('network'));
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    renderSession();
+    await saveTrainingSession();
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/vehicles/veh-1/timings');
+    });
+    expect(screen.getByTestId('session-step-summary')).toBeInTheDocument();
+    expect(screen.getByTestId('session-summary-circuit-pb')).toHaveTextContent(/00:11\.500/);
+    expect(screen.getByTestId('session-summary-circuit-pb')).toHaveTextContent(/más rápido|faster|schneller/);
+    expect(screen.queryByTestId('session-summary-month-pb')).not.toBeInTheDocument();
+  });
+
+  test('sin historial en el circuito muestra empty state', async () => {
+    mockLists({ timings: [savedTimingResponse()] });
+    renderSession();
+    await saveTrainingSession();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-summary-circuit-pb')).toHaveTextContent(
+        /Primera sesión en este circuito|First session on this circuit|Erste Session auf dieser Strecke/,
+      );
+    });
+    expect(screen.queryByTestId('session-summary-month-pb')).not.toBeInTheDocument();
+  });
+
+  test('muestra consistencia y peor vuelta si el POST las devuelve', async () => {
+    mockLists();
+    api.post.mockResolvedValue({
+      data: savedTimingResponse({ consistency_score: 4.2, worst_lap_timestamp: 12.1 }),
+    });
+    renderSession();
+    await goToCaptureFromWizard();
+    fillCaptureTimes();
+    fireEvent.click(screen.getByTestId('session-save'));
+
+    expect(await screen.findByTestId('session-summary-consistency')).toHaveTextContent('4.20%');
+    expect(screen.getByTestId('session-summary-worst')).toHaveTextContent(/00:12\.100/);
+  });
+
   test('la sección de vueltas individuales está plegada y no alarga el camino feliz', async () => {
     mockLists();
     renderSession();
@@ -437,7 +531,14 @@ describe('NewSession', () => {
   test('vueltas individuales opcionales se envían en el POST cuando hay ≥3 válidas', async () => {
     mockLists();
     api.post.mockResolvedValue({
-      data: { id: 't-laps', session_type: 'TRAINING', best_lap_time: '00:09.000', sync_meta: {} },
+      data: savedTimingResponse({
+        id: 't-laps',
+        best_lap_time: '00:09.000',
+        best_lap_timestamp: 9,
+        consistency_score: 4.2,
+        worst_lap_timestamp: 11,
+        sync_meta: {},
+      }),
     });
     renderSession();
     await goToCaptureFromWizard();
@@ -469,6 +570,8 @@ describe('NewSession', () => {
     expect(body.lap_times[1].time_seconds).toBe(10);
     expect(body.lap_times[2].lap_number).toBe(3);
     await screen.findByText(/Sesión guardada|Session saved|Session gespeichert/i);
+    expect(screen.getByTestId('session-summary-consistency')).toHaveTextContent('4.20%');
+    expect(screen.getByTestId('session-summary-worst')).toHaveTextContent(/00:11\.000/);
   });
 
   test('rellenar vueltas individuales primero deriva mejor, total y número de vueltas', async () => {
