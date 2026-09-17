@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { formatInventoryCategory } from '../utils/formatUtils';
 import { competitionDetailPath } from '../utils/competitionRoutes';
+import { cn } from '../lib/utils';
 
 const BlockCard = ({ icon: Icon, title, children, footer }) => (
   <Card className="flex flex-col h-full border-border/80 shadow-sm">
@@ -22,8 +23,9 @@ const BlockCard = ({ icon: Icon, title, children, footer }) => (
   </Card>
 );
 
-const DashboardActionBlocks = ({ data, loadError }) => {
+const DashboardActionBlocks = ({ data, loadError, embedded = false }) => {
   const { t } = useTranslation('dashboard');
+  const HeadingTag = embedded ? 'h3' : 'h2';
 
   if (loadError) {
     return (
@@ -47,10 +49,16 @@ const DashboardActionBlocks = ({ data, loadError }) => {
   } = data;
 
   return (
-    <section className="space-y-3" aria-labelledby="dash-action-blocks-heading">
-      <h2 id="dash-action-blocks-heading" className="text-lg font-semibold tracking-tight">
+    <section className="space-y-3" aria-labelledby="dash-action-blocks-heading" data-testid="dashboard-action-blocks">
+      <HeadingTag
+        id="dash-action-blocks-heading"
+        className={cn(
+          'font-semibold tracking-tight',
+          embedded ? 'text-base' : 'text-lg',
+        )}
+      >
         {t('actionBlocks.title')}
-      </h2>
+      </HeadingTag>
       <p className="text-sm text-muted-foreground -mt-1">
         <Trans
           i18nKey="actionBlocks.desc"
