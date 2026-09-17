@@ -2,6 +2,7 @@ const express = require('express');
 const cronAuth = require('../middleware/cronAuth');
 const authMiddleware = require('../middleware/auth');
 const { runWeeklyDigest, buildWeeklyDigestForUser } = require('../lib/weeklyDigest');
+const { runCatalogGapReport } = require('../lib/catalogGapReport');
 const { getServiceClient } = require('../lib/supabaseClients');
 const { sendWeeklyDigestNotification } = require('../lib/notifier');
 
@@ -40,6 +41,24 @@ router.post('/weekly-digest/test', authMiddleware, async (req, res) => {
     }
     console.error('[cron] weekly-digest/test:', e);
     res.status(500).json({ error: e.message || 'Error al enviar digest de prueba' });
+  }
+});
+
+/**
+ * POST /api/cron/catalog-gap-report
+ * Header: Authorization: Bearer ${CRON_SECRET}
+ * Query: force=1 (enviar aunque no sean las 9:00 Europe/Madrid)
+ *
+ * Render Cron: `0 7,8 * * *` (UTC). El job solo envía cuando en Madrid son las 9.
+ */
+router.post('/catalog-gap-report', cronAuth, async (req, res) => {
+  try {
+    const force = req.query.force === '1' || req.query.force === 'true';
+    const result = await runCatalogGapReport({ force });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('[cron] catalog-gap-report:', e);
+    res.status(500).json({ error: e.message || 'Error al enviar informe de catálogo' });
   }
 });
 
