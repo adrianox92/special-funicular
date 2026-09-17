@@ -23,6 +23,7 @@ import {
 import MetricCard from '../components/MetricCard';
 import DashboardActionBlocks from '../components/DashboardActionBlocks';
 import ActivationSessionNudge from '../components/ActivationSessionNudge';
+import MyProgressCard from '../components/MyProgressCard';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -41,6 +42,7 @@ import {
   formatMaintenanceKind,
   getIntlLocale,
 } from '../utils/formatUtils';
+import { getActivationNudgeVariant, isActivationNudgeDismissed } from '../utils/activationNudge';
 
 const BrandDistributionChart = lazy(() => import('../components/charts/BrandDistributionChart'));
 const StoreDistributionChart = lazy(() => import('../components/charts/StoreDistributionChart'));
@@ -185,6 +187,27 @@ const Dashboard = () => {
   const formatBestTimeSubtitle = formatIncrementSubtitle;
 
   const [analyticsTab, setAnalyticsTab] = useState('coleccion');
+  const [sessionNudgeDismissed, setSessionNudgeDismissed] = useState(false);
+
+  const sessionNudgeVisible = useMemo(() => {
+    if (sessionNudgeDismissed) return false;
+    const variant = getActivationNudgeVariant({
+      totalVehicles: metrics.totalVehicles,
+      totalTimings: metrics.totalTimings,
+      timingsLast30Days: metrics.timingsLast30Days,
+      timingsLast14Days: metrics.timingsLast14Days,
+      suppressFirst: !user?.user_metadata?.onboarding_dismissed_at,
+    });
+    if (!variant) return false;
+    return !isActivationNudgeDismissed(variant);
+  }, [
+    sessionNudgeDismissed,
+    metrics.totalVehicles,
+    metrics.totalTimings,
+    metrics.timingsLast30Days,
+    metrics.timingsLast14Days,
+    user?.user_metadata?.onboarding_dismissed_at,
+  ]);
   const analyticsTabOptions = useMemo(
     () => [
       {
@@ -271,6 +294,12 @@ const Dashboard = () => {
             </Button>
           </div>
         </div>
+
+        <MyProgressCard
+          progress={metrics.progress}
+          totalTimings={metrics.totalTimings}
+          sessionNudgeVisible={sessionNudgeVisible}
+        />
 
         <DashboardActionBlocks data={actionItems} loadError={actionItemsError} />
 
@@ -366,6 +395,13 @@ const Dashboard = () => {
         timingsLast30Days={metrics.timingsLast30Days}
         timingsLast14Days={metrics.timingsLast14Days}
         suppressFirst={!user?.user_metadata?.onboarding_dismissed_at}
+        onDismiss={() => setSessionNudgeDismissed(true)}
+      />
+
+      <MyProgressCard
+        progress={metrics.progress}
+        totalTimings={metrics.totalTimings}
+        sessionNudgeVisible={sessionNudgeVisible}
       />
 
       {maintenanceError ? (
