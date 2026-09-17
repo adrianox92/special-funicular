@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { LayoutDashboard, RefreshCw, Users, UserCheck, Car, Trophy, Timer } from 'lucide-react';
+import { LayoutDashboard, RefreshCw, Search, Users, UserCheck, Car, Trophy, Timer } from 'lucide-react';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
@@ -39,6 +39,38 @@ import {
 } from '../components/ui/dialog';
 
 const REFS_PAGE_SIZE = 25;
+const REFS_SEARCH_MAX = 100;
+
+/** Deep-link: ?ref=FOO (alias ?q=). Contains sobre ref normalizada (trim + lower) en el API. */
+function readAdminRefsQueryFromSearch(search) {
+  const raw = typeof search === 'string' ? search : '';
+  const sp = new URLSearchParams(raw.startsWith('?') ? raw.slice(1) : raw);
+  const value = (sp.get('ref') || sp.get('q') || '').trim();
+  return value.slice(0, REFS_SEARCH_MAX);
+}
+
+function withAdminRefsQueryParam(search, q) {
+  const raw = typeof search === 'string' ? search : '';
+  const sp = new URLSearchParams(raw.startsWith('?') ? raw.slice(1) : raw);
+  const next = String(q || '').trim().slice(0, REFS_SEARCH_MAX);
+  if (next) sp.set('ref', next);
+  else sp.delete('ref');
+  sp.delete('q');
+  return sp.toString();
+}
+
+function syncAdminRefsQueryInUrl(q) {
+  if (typeof window === 'undefined') return;
+  const qs = withAdminRefsQueryParam(window.location.search, q);
+  const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState(null, '', next);
+}
+
+function uniqueCatalogMatch(row) {
+  if (!row?.in_catalog) return false;
+  const count = Number(row.catalog_item_count);
+  return count === 1 && !!row.catalog_manufacturer_id;
+}
 
 const PRESETS = [
   { value: '7d', label: 'Últimos 7 días', ms: 7 * 24 * 60 * 60 * 1000 },
@@ -105,6 +137,12 @@ const AdminPlatformDashboard = () => {
 
   const [refsPage, setRefsPage] = useState(1);
   const [refsOnlyUnlinked, setRefsOnlyUnlinked] = useState(false);
+  const [refsSearchInput, setRefsSearchInput] = useState(() =>
+    readAdminRefsQueryFromSearch(typeof window !== 'undefined' ? window.location.search : ''),
+  );
+  const [refsQuery, setRefsQuery] = useState(() =>
+    readAdminRefsQueryFromSearch(typeof window !== 'undefined' ? window.location.search : ''),
+  );
   const [refsData, setRefsData] = useState(null);
   const [refsLoading, setRefsLoading] = useState(false);
   const [refsError, setRefsError] = useState(null);
@@ -165,6 +203,7 @@ const AdminPlatformDashboard = () => {
           limit: REFS_PAGE_SIZE,
           offset,
           only_unlinked: refsOnlyUnlinked ? 'true' : 'false',
+          ...(refsQuery ? { q: refsQuery } : {}),
         },
       });
       setRefsData(res);
@@ -176,7 +215,15 @@ const AdminPlatformDashboard = () => {
     } finally {
       setRefsLoading(false);
     }
-  }, [isAdmin, refsPage, refsOnlyUnlinked]);
+  }, [isAdmin, refsPage, refsOnlyUnlinked, refsQuery]);
+
+  const applyRefsSearch = (raw) => {
+    const next = String(raw || '').trim().slice(0, REFS_SEARCH_MAX);
+    setRefsSearchInput(next);
+    setRefsQuery(next);
+    setRefsPage(1);
+    syncAdminRefsQueryInUrl(next);
+  };
 
   const linkPreviewCounts = (row, restrictMfg) => {
     if (!row) return { vehicles: 0, users: 0 };
@@ -197,8 +244,13 @@ const AdminPlatformDashboard = () => {
     setRefsLinkBanner(null);
     setLinkFeedback(null);
     setLinkDialogRow(row);
-    setLinkCatalogManufacturerId('');
-    setLinkCatalogReference('');
+    if (uniqueCatalogMatch(row)) {
+      setLinkCatalogManufacturerId(String(row.catalog_manufacturer_id));
+      setLinkCatalogReference(String(row.catalog_reference || row.reference || ''));
+    } else {
+      setLinkCatalogManufacturerId('');
+      setLinkCatalogReference('');
+    }
     setLinkRestrictMfg(!!(row.sample_manufacturer && String(row.sample_manufacturer).trim()));
   };
 
@@ -534,34 +586,87 @@ const AdminPlatformDashboard = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="text-base">Referencias de garaje ausentes del catálogo</CardTitle>
           <CardDescription>
-            Agrupadas por referencia normalizada (espacios y mayúsculas/minúsculas). Si algún ítem del
-            catálogo público comparte la misma referencia normalizada, no aparece aquí. Ejemplares y
-            usuarios muestran solo vehículos sin enlace a catálogo (
-            <span className="font-mono">catalog_item_id</span> vacío), alineados con la acción Enlazar. No
-            depende del periodo de fechas de arriba.
+            {refsQuery ? (
+              <>
+                Búsqueda: contains sobre la referencia de garaje normalizada (espacios y
+                mayúsculas/minúsculas). Incluye grupos que ya existen en el catálogo para poder enlazar
+                vehículos con <span className="font-mono">catalog_item_id</span> vacío. El match exacto sale
+                primero.
+              </>
+            ) : (
+              <>
+                Agrupadas por referencia normalizada (espacios y mayúsculas/minúsculas). Si algún ítem del
+                catálogo público comparte la misma referencia normalizada, no aparece aquí — usa la búsqueda
+                para localizarlas y enlazar. Ejemplares y usuarios muestran solo vehículos sin enlace a
+                catálogo (<span className="font-mono">catalog_item_id</span> vacío), alineados con la acción
+                Enlazar. No depende del periodo de fechas de arriba.
+              </>
+            )}
           </CardDescription>
-          <div className="flex flex-wrap items-center gap-3 pt-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="refs-only-unlinked"
-                checked={refsOnlyUnlinked}
-                onCheckedChange={(v) => setRefsOnlyUnlinked(!!v)}
-              />
-              <Label htmlFor="refs-only-unlinked" className="text-sm font-normal cursor-pointer">
-                Sólo vehículos sin enlace a catálogo (<span className="font-mono">catalog_item_id</span>{' '}
-                vacío)
-              </Label>
+          <form
+            className="flex flex-col gap-3 pt-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              applyRefsSearch(refsSearchInput);
+            }}
+          >
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-2 min-w-[220px] flex-1 max-w-sm">
+                <Label htmlFor="refs-search">Buscar referencia</Label>
+                <Input
+                  id="refs-search"
+                  type="search"
+                  value={refsSearchInput}
+                  onChange={(e) => setRefsSearchInput(e.target.value)}
+                  placeholder="ej. AV52802"
+                  maxLength={REFS_SEARCH_MAX}
+                  className="font-mono"
+                  autoComplete="off"
+                />
+              </div>
+              <Button type="submit" variant="secondary" size="sm" disabled={refsLoading}>
+                <Search className="size-4" aria-hidden />
+                Buscar
+              </Button>
+              {refsQuery ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => applyRefsSearch('')}
+                  disabled={refsLoading}
+                >
+                  Limpiar
+                </Button>
+              ) : null}
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void fetchRefsReport()}
-              disabled={refsLoading}
-            >
-              Actualizar listado
-            </Button>
-          </div>
+            <p className="text-xs text-muted-foreground">
+              Deep-link: <span className="font-mono">/admin/dashboard?ref=FOO</span>. Sin texto se muestra el
+              ranking de huecos; con texto también salen refs ya presentes en el catálogo.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="refs-only-unlinked"
+                  checked={refsOnlyUnlinked}
+                  onCheckedChange={(v) => setRefsOnlyUnlinked(!!v)}
+                />
+                <Label htmlFor="refs-only-unlinked" className="text-sm font-normal cursor-pointer">
+                  Sólo vehículos sin enlace a catálogo (<span className="font-mono">catalog_item_id</span>{' '}
+                  vacío)
+                </Label>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void fetchRefsReport()}
+                disabled={refsLoading}
+              >
+                Actualizar listado
+              </Button>
+            </div>
+          </form>
         </CardHeader>
         <CardContent className="space-y-4">
           {refsError && (
@@ -584,8 +689,10 @@ const AdminPlatformDashboard = () => {
             <>
               <p className="text-sm text-muted-foreground">
                 {refsData.total === 0
-                  ? 'Ningún grupo cumple los criterios.'
-                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables).`}
+                  ? refsQuery
+                    ? 'Ningún grupo de garaje coincide con esa referencia.'
+                    : 'Ningún grupo cumple los criterios.'
+                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables${refsQuery ? '; exactos primero' : ''}).`}
               </p>
               {refsData.total > 0 && (
                 <div className="rounded-md border">
@@ -594,6 +701,7 @@ const AdminPlatformDashboard = () => {
                       <TableRow>
                         <TableHead className="text-right w-[110px]">Ejemplares</TableHead>
                         <TableHead>Referencia</TableHead>
+                        {refsQuery ? <TableHead className="w-[140px]">Catálogo</TableHead> : null}
                         <TableHead className="text-right w-[100px]">Usuarios</TableHead>
                         <TableHead>Fabricante (ej.)</TableHead>
                         <TableHead>Modelo (ej.)</TableHead>
@@ -610,6 +718,7 @@ const AdminPlatformDashboard = () => {
                           !refsOnlyUnlinked &&
                           Number.isFinite(totalVehicles) &&
                           totalVehicles > linkableVehicles;
+                        const catalogCount = Number(row.catalog_item_count) || 0;
                         return (
                         <TableRow key={`${refsData.offset}-${idx}`}>
                           <TableCell className="text-right tabular-nums font-semibold">
@@ -621,13 +730,30 @@ const AdminPlatformDashboard = () => {
                             )}
                           </TableCell>
                           <TableCell className="font-mono text-sm">{row.reference || '—'}</TableCell>
+                          {refsQuery ? (
+                            <TableCell>
+                              {row.in_catalog ? (
+                                <Badge variant="secondary">
+                                  {catalogCount > 1 ? `En catálogo (${catalogCount})` : 'En catálogo'}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">Ausente</Badge>
+                              )}
+                            </TableCell>
+                          ) : null}
                           <TableCell className="text-right tabular-nums">
                             {linkableUsers}
                           </TableCell>
                           <TableCell className="text-sm">{row.sample_manufacturer ?? '—'}</TableCell>
                           <TableCell className="text-sm">{row.sample_model ?? '—'}</TableCell>
                           <TableCell className="text-right">
-                            <Button type="button" variant="outline" size="sm" onClick={() => openLinkDialog(row)}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={linkableVehicles <= 0}
+                              onClick={() => openLinkDialog(row)}
+                            >
                               Enlazar
                             </Button>
                           </TableCell>
@@ -698,6 +824,21 @@ const AdminPlatformDashboard = () => {
                     Sólo vehículos con fabricante «{String(linkDialogRow.sample_manufacturer).trim()}» (recomendado)
                   </Label>
                 </div>
+              )}
+              {uniqueCatalogMatch(linkDialogRow) && (
+                <p className="text-xs text-muted-foreground">
+                  Hay un ítem único en el catálogo
+                  {linkDialogRow.catalog_manufacturer
+                    ? ` (${linkDialogRow.catalog_manufacturer} ${linkDialogRow.catalog_reference || ''})`
+                    : ''}
+                  ; se han prellenado marca y referencia.
+                </p>
+              )}
+              {linkDialogRow.in_catalog && Number(linkDialogRow.catalog_item_count) > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  Hay {linkDialogRow.catalog_item_count} ítems de catálogo con esta referencia; elige la marca
+                  correcta.
+                </p>
               )}
               <CatalogBrandSelect
                 id="admin-gap-link-catalog-brand"

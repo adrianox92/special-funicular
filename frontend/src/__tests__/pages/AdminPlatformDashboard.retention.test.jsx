@@ -28,6 +28,19 @@ jest.mock('../../components/CatalogBrandSelect', () => ({
   default: () => null,
 }));
 
+jest.mock('../../components/ui/switch', () => ({
+  Switch: ({ id, checked, onCheckedChange }) => (
+    <input
+      id={id}
+      type="checkbox"
+      role="switch"
+      aria-checked={!!checked}
+      checked={!!checked}
+      onChange={(e) => onCheckedChange(e.target.checked)}
+    />
+  ),
+}));
+
 const RETENTION = {
   window_days: 30,
   registered_users: 91,
