@@ -73,8 +73,9 @@ AS $$
     SELECT
       lower(trim(i.reference)) AS ref_norm,
       count(*)::int AS catalog_item_count,
-      min(i.id) AS catalog_item_id_min,
-      min(i.manufacturer_id) AS catalog_manufacturer_id_min,
+      -- PG no tiene min(uuid); pick determinista. Solo se usa si count = 1.
+      (array_agg(i.id ORDER BY i.id::text))[1] AS catalog_item_id_min,
+      (array_agg(i.manufacturer_id ORDER BY i.id::text))[1] AS catalog_manufacturer_id_min,
       min(trim(i.reference))::text AS catalog_reference_sample,
       min(b.name)::text AS catalog_manufacturer_name_sample
     FROM public.slot_catalog_items i
