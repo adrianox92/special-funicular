@@ -8,17 +8,19 @@ import { formatInventoryCategory } from '../utils/formatUtils';
 import { competitionDetailPath } from '../utils/competitionRoutes';
 import { cn } from '../lib/utils';
 
-const BlockCard = ({ icon: Icon, title, children, footer }) => (
-  <Card className="flex flex-col h-full border-border/80 shadow-sm">
-    <CardHeader className="pb-2">
-      <CardTitle className="text-base font-semibold flex items-center gap-2">
-        {Icon ? <Icon className="size-4 text-primary shrink-0" aria-hidden /> : null}
+const BlockCard = ({ icon: Icon, title, children, footer, compact = false }) => (
+  <Card className={cn('flex h-full flex-col border-border/70', compact ? 'shadow-none' : 'shadow-sm')}>
+    <CardHeader className={cn(compact ? 'px-4 py-3 pb-1.5' : 'pb-2')}>
+      <CardTitle className={cn('flex items-center gap-2 font-semibold', compact ? 'text-sm' : 'text-base')}>
+        {Icon ? <Icon className="size-4 shrink-0 text-primary" aria-hidden /> : null}
         {title}
       </CardTitle>
     </CardHeader>
-    <CardContent className="flex flex-1 flex-col gap-3 pt-0">
-      <div className="flex-1 text-sm text-muted-foreground min-h-[4rem]">{children}</div>
-      {footer ? <div className="pt-1 border-t border-border/60">{footer}</div> : null}
+    <CardContent className={cn('flex flex-1 flex-col pt-0', compact ? 'gap-2 px-4 pb-3' : 'gap-3')}>
+      <div className={cn('flex-1 text-sm text-muted-foreground', compact ? 'min-h-0' : 'min-h-[4rem]')}>
+        {children}
+      </div>
+      {footer ? <div className="border-t border-border/60 pt-1">{footer}</div> : null}
     </CardContent>
   </Card>
 );
@@ -49,17 +51,17 @@ const DashboardActionBlocks = ({ data, loadError, embedded = false }) => {
   } = data;
 
   return (
-    <section className="space-y-3" aria-labelledby="dash-action-blocks-heading" data-testid="dashboard-action-blocks">
+    <section className="space-y-2.5" aria-labelledby="dash-action-blocks-heading" data-testid="dashboard-action-blocks">
       <HeadingTag
         id="dash-action-blocks-heading"
         className={cn(
           'font-semibold tracking-tight',
-          embedded ? 'text-base' : 'text-lg',
+          embedded ? 'text-sm' : 'text-lg',
         )}
       >
         {t('actionBlocks.title')}
       </HeadingTag>
-      <p className="text-sm text-muted-foreground -mt-1">
+      <p className={cn('text-muted-foreground -mt-0.5', embedded ? 'text-xs' : 'text-sm')}>
         <Trans
           i18nKey="actionBlocks.desc"
           ns="dashboard"
@@ -75,8 +77,9 @@ const DashboardActionBlocks = ({ data, loadError, embedded = false }) => {
           }}
         />
       </p>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className={cn('grid grid-cols-1 md:grid-cols-2', embedded ? 'gap-3' : 'gap-4')}>
         <BlockCard
+          compact={embedded}
           icon={Trophy}
           title={t('actionBlocks.nextCompetition')}
           footer={
@@ -114,6 +117,7 @@ const DashboardActionBlocks = ({ data, loadError, embedded = false }) => {
         </BlockCard>
 
         <BlockCard
+          compact={embedded}
           icon={Clock}
           title={t('actionBlocks.openTimings')}
           footer={
@@ -151,6 +155,7 @@ const DashboardActionBlocks = ({ data, loadError, embedded = false }) => {
         </BlockCard>
 
         <BlockCard
+          compact={embedded}
           icon={Car}
           title={t('actionBlocks.usualCircuit')}
           footer={
@@ -204,6 +209,7 @@ const DashboardActionBlocks = ({ data, loadError, embedded = false }) => {
         </BlockCard>
 
         <BlockCard
+          compact={embedded}
           icon={Package}
           title={t('actionBlocks.lowStock')}
           footer={

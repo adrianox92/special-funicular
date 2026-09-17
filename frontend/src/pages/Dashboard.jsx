@@ -5,11 +5,9 @@ import {
   Truck,
   Wrench,
   Euro,
-  TrendingUp,
   Trophy,
   Clock,
   Car,
-  Settings,
   Plus,
   LayoutDashboard,
   BarChart3,
@@ -94,15 +92,15 @@ function TrainingGoalsDashboardWidget() {
   if (loading || goals.length === 0) return null;
 
   return (
-    <Card className="border-border/80 shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
+    <Card className="border-border/70 shadow-none">
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <Gauge className="size-4" />
           {t('trainingGoals.title')}
         </CardTitle>
-        <CardDescription>{t('trainingGoals.desc')}</CardDescription>
+        <CardDescription className="text-xs">{t('trainingGoals.desc')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 p-4 pt-2">
         {goals.map((g) => (
           <div key={g.id} className="space-y-1.5">
             <div className="flex justify-between gap-2 text-sm">
@@ -133,13 +131,6 @@ function TrainingGoalsDashboardWidget() {
   );
 }
 
-const MetricSubGroup = ({ label, children, className }) => (
-  <div className={cn('space-y-3', className)}>
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-    {children}
-  </div>
-);
-
 const TabSectionIntro = ({ title, description, id }) => (
   <div className="mb-4 space-y-1">
     <h3 id={id} className="text-sm font-semibold text-foreground">
@@ -158,10 +149,10 @@ function vehicleDisplayName(row, t) {
 
 const KpiChip = ({ to, icon: Icon, label, value }) => {
   const className =
-    'inline-flex items-center gap-2 rounded-lg border border-border/70 bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:border-border hover:bg-muted/40';
+    'inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs transition-colors hover:border-border hover:bg-muted/50';
   const inner = (
     <>
-      {Icon ? <Icon className="size-3.5 text-muted-foreground" aria-hidden /> : null}
+      {Icon ? <Icon className="size-3 text-muted-foreground" aria-hidden /> : null}
       <span className="text-muted-foreground">{label}</span>
       <span className="font-semibold tabular-nums text-foreground">{value}</span>
     </>
@@ -176,6 +167,50 @@ const KpiChip = ({ to, icon: Icon, label, value }) => {
   return <div className={className}>{inner}</div>;
 };
 
+const KpiStat = ({ to, icon: Icon, label, value, subtitle, testId }) => {
+  const inner = (
+    <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-3 sm:px-4" data-testid={testId}>
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden /> : null}
+        <span className="truncate">{label}</span>
+      </p>
+      <p className="truncate text-xl font-bold tabular-nums tracking-tight text-foreground sm:text-2xl">{value}</p>
+      {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
+    </div>
+  );
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="min-w-0 flex-1 rounded-lg transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return inner;
+};
+
+const ExtraMetricRow = ({ label, value, hint, to, testId }) => {
+  const row = (
+    <div className="flex items-baseline justify-between gap-3 py-2" data-testid={testId}>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      </div>
+      <p className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{value}</p>
+    </div>
+  );
+  if (to) {
+    return (
+      <Link to={to} className="block rounded-md px-1 -mx-1 hover:bg-muted/40">
+        {row}
+      </Link>
+    );
+  }
+  return <div className="px-1 -mx-1">{row}</div>;
+};
+
 function DashboardPageHeader({
   displayName,
   todayLabel,
@@ -184,18 +219,23 @@ function DashboardPageHeader({
   primaryCta,
   secondaryCtas = [],
   menuItems = [],
+  onRefresh,
+  isRefreshing = false,
   t,
 }) {
   const PrimaryIcon = primaryCta.icon;
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">
+    <header
+      className="flex flex-col gap-4 border-b border-border/70 pb-5 lg:flex-row lg:items-end lg:justify-between"
+      data-testid="dashboard-header"
+    >
+      <div className="min-w-0 space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">
           {displayName ? t('welcomeNamed', { name: displayName }) : t('welcome')}
         </h1>
-        <p className="mt-1 capitalize text-muted-foreground">{todayLabel}</p>
-        {contextLine ? <p className="mt-2 text-sm text-muted-foreground">{contextLine}</p> : null}
-        {hint ? <p className="mt-3 max-w-xl text-sm text-muted-foreground">{hint}</p> : null}
+        <p className="text-sm capitalize text-muted-foreground">{todayLabel}</p>
+        {contextLine ? <p className="text-sm text-muted-foreground">{contextLine}</p> : null}
+        {hint ? <p className="max-w-xl text-sm text-muted-foreground">{hint}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('quickActionsAria')}>
         <Button size="default" asChild>
@@ -215,17 +255,30 @@ function DashboardPageHeader({
             </Button>
           );
         })}
+        {onRefresh ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            aria-label={t('refresh')}
+            data-testid="dashboard-refresh"
+          >
+            <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} aria-hidden />
+          </Button>
+        ) : null}
         {menuItems.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="outline"
-                size="default"
+                variant="ghost"
+                size="icon"
                 data-testid="dashboard-more-actions"
                 aria-label={t('moreActionsAria')}
               >
                 <MoreHorizontal className="size-4" aria-hidden />
-                <span className="hidden sm:inline">{t('moreActions')}</span>
+                <span className="sr-only">{t('moreActions')}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
@@ -260,7 +313,7 @@ function DashboardPageHeader({
           </DropdownMenu>
         ) : null}
       </div>
-    </div>
+    </header>
   );
 }
 
@@ -274,14 +327,14 @@ function DashboardNowZone({
   actionItemsError,
 }) {
   return (
-    <section className="space-y-4" aria-labelledby="dash-now-heading" data-testid="dashboard-now-section">
+    <section className="space-y-3" aria-labelledby="dash-now-heading" data-testid="dashboard-now-section">
       <div className="space-y-1">
         <h2 id="dash-now-heading" className="text-lg font-semibold tracking-tight">
           {t('nowTitle')}
         </h2>
         <p className="text-sm text-muted-foreground">{t('nowDesc')}</p>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3 rounded-2xl bg-muted/20 p-3 sm:p-4">
         <ActivationSessionNudge
           totalVehicles={metrics.totalVehicles}
           totalTimings={metrics.totalTimings}
@@ -304,139 +357,116 @@ function DashboardNowZone({
 
 function CompactMaintenanceSummary({ summary, t }) {
   const pendingTotal = summary.vehiclesWithoutRecentMaintenanceTotal ?? 0;
-  const stalePreview = (summary.vehiclesWithoutRecentMaintenance || []).slice(0, 3);
-  const recentPreview = (summary.recent || []).slice(0, 3);
   const upcomingAll = summary.upcomingScheduled || [];
-  const upcomingPreview = upcomingAll.slice(0, 3);
   const upcomingTotal = upcomingAll.length;
   const recentTotal = summary.recent?.length ?? 0;
-  const remainingRecent = Math.max(0, recentTotal - recentPreview.length);
-  const remainingStale = Math.max(0, pendingTotal - stalePreview.length);
-  const remainingUpcoming = Math.max(0, upcomingTotal - upcomingPreview.length);
+  const staleRows = summary.vehiclesWithoutRecentMaintenance || [];
+  const recentRows = summary.recent || [];
+
+  const topItems = [];
+  for (const row of upcomingAll) {
+    if (topItems.length >= 3) break;
+    topItems.push({
+      key: `up-${row.vehicle_id}-${row.next_due_at}`,
+      to: `/vehicles/${row.vehicle_id}?tab=maintenance`,
+      name: vehicleDisplayName(row, t),
+      meta: [
+        formatMaintenanceKind(row.kind),
+        row.next_due_at
+          ? new Date(String(row.next_due_at).slice(0, 10)).toLocaleDateString(getIntlLocale())
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      tone: 'upcoming',
+    });
+  }
+  for (const row of staleRows) {
+    if (topItems.length >= 3) break;
+    topItems.push({
+      key: `stale-${row.id}`,
+      to: `/vehicles/${row.id}`,
+      name: vehicleDisplayName(row, t),
+      meta: t('staleShort'),
+      tone: 'stale',
+    });
+  }
+  if (topItems.length === 0) {
+    for (const row of recentRows.slice(0, 3)) {
+      topItems.push({
+        key: `recent-${row.id}`,
+        to: `/vehicles/${row.vehicle_id}`,
+        name: vehicleDisplayName(row, t),
+        meta: [
+          formatMaintenanceKind(row.kind),
+          row.performed_at ? new Date(row.performed_at).toLocaleDateString(getIntlLocale()) : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        tone: 'recent',
+      });
+    }
+  }
+
+  const notableCount = upcomingTotal + pendingTotal;
+  const shownNotable = topItems.filter((item) => item.tone !== 'recent').length;
+  const remaining =
+    notableCount > 0
+      ? Math.max(0, notableCount - shownNotable)
+      : Math.max(0, recentTotal - topItems.length);
 
   return (
-    <section aria-labelledby="dash-maintenance" className="space-y-3" data-testid="dashboard-maintenance">
-      <Card className="border-border/80 shadow-sm">
-        <CardHeader className="flex flex-col gap-3 border-b border-border/60 bg-muted/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 space-y-1">
-            <CardTitle id="dash-maintenance" className="text-base">
-              {t('garageCompactTitle')}
-            </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              {t('maintenanceDesc', { days: summary.staleDaysThreshold ?? '—' })}
-            </CardDescription>
-          </div>
-          <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" asChild>
-            <Link to="/vehicles">{t('garage')}</Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4 p-4 sm:p-5">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t('pendingReview')}
+    <section aria-labelledby="dash-maintenance" data-testid="dashboard-maintenance">
+      <Card className="border-border/70 shadow-sm">
+        <CardContent className="space-y-3 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-1">
+              <h2 id="dash-maintenance" className="text-base font-semibold tracking-tight">
+                {t('garageCompactTitle')}
+              </h2>
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                {t('garageCounts', {
+                  pending: pendingTotal,
+                  upcoming: upcomingTotal,
+                  recent: recentTotal,
+                })}
               </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums">{pendingTotal}</p>
             </div>
-            <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t('upcomingShort')}
-              </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums">{upcomingTotal}</p>
-            </div>
-            <div className="col-span-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5 sm:col-span-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t('recentRecords')}
-              </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums">{recentTotal}</p>
-            </div>
+            <Button variant="ghost" size="sm" className="shrink-0 self-start" asChild>
+              <Link to="/vehicles">{t('garage')}</Link>
+            </Button>
           </div>
 
-          {upcomingPreview.length ? (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-                {t('upcomingMaintenance')}
-              </p>
-              <ul className="mt-2 space-y-1.5 text-sm">
-                {upcomingPreview.map((row) => (
-                  <li key={`${row.vehicle_id}-${row.next_due_at}`} className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
-                    <Link
-                      to={`/vehicles/${row.vehicle_id}?tab=maintenance`}
-                      className="font-medium text-primary underline-offset-4 hover:underline"
-                    >
-                      {vehicleDisplayName(row, t)}
-                    </Link>
-                    <span className="text-xs text-muted-foreground sm:text-end sm:shrink-0">
-                      {formatMaintenanceKind(row.kind)}
-                      {row.next_due_at
-                        ? ` · ${new Date(String(row.next_due_at).slice(0, 10)).toLocaleDateString(getIntlLocale())}`
-                        : ''}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {remainingUpcoming > 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground">{t('andMore', { count: remainingUpcoming })}</p>
-              ) : null}
-            </div>
+          {topItems.length ? (
+            <ul className="divide-y divide-border/60 rounded-lg border border-border/60">
+              {topItems.map((item) => (
+                <li key={item.key} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <Link
+                    to={item.to}
+                    className="min-w-0 truncate font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {item.name}
+                  </Link>
+                  <span
+                    className={cn(
+                      'shrink-0 text-xs',
+                      item.tone === 'upcoming'
+                        ? 'text-amber-700 dark:text-amber-300'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {item.meta}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('garageAllClear')}</p>
+          )}
+
+          {remaining > 0 ? (
+            <p className="text-xs text-muted-foreground">{t('andMore', { count: remaining })}</p>
           ) : null}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t('staleShort')}
-              </p>
-              {stalePreview.length ? (
-                <ul className="mt-2 space-y-1.5 text-sm">
-                  {stalePreview.map((row) => (
-                    <li key={row.id}>
-                      <Link
-                        to={`/vehicles/${row.id}`}
-                        className="font-medium text-primary underline-offset-4 hover:underline"
-                      >
-                        {vehicleDisplayName(row, t)}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">{t('noStaleVehicles')}</p>
-              )}
-              {remainingStale > 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground">{t('andMore', { count: remainingStale })}</p>
-              ) : null}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t('recentRecords')}
-              </p>
-              {recentPreview.length ? (
-                <ul className="mt-2 space-y-1.5 text-sm">
-                  {recentPreview.map((row) => (
-                    <li key={row.id} className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-                      <Link
-                        to={`/vehicles/${row.vehicle_id}`}
-                        className="font-medium text-primary underline-offset-4 hover:underline"
-                      >
-                        {vehicleDisplayName(row, t)}
-                      </Link>
-                      <span className="text-xs text-muted-foreground sm:shrink-0 sm:text-end">
-                        {formatMaintenanceKind(row.kind)}
-                        {row.performed_at
-                          ? ` · ${new Date(row.performed_at).toLocaleDateString(getIntlLocale())}`
-                          : ''}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">{t('noMaintenanceRecords')}</p>
-              )}
-              {remainingRecent > 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground">{t('andMore', { count: remainingRecent })}</p>
-              ) : null}
-            </div>
-          </div>
         </CardContent>
       </Card>
     </section>
@@ -594,6 +624,8 @@ const Dashboard = () => {
           menuItems={[
             { to: '/competitions', label: t('competitions'), icon: Trophy },
           ]}
+          onRefresh={() => refetch()}
+          isRefreshing={isRefreshing}
           t={t}
         />
         {nowZone}
@@ -619,18 +651,12 @@ const Dashboard = () => {
         contextLine={fleetLine}
         primaryCta={{ to: '/session', label: t('newSession'), icon: Clock }}
         menuItems={[
-          {
-            type: 'button',
-            label: t('refresh'),
-            icon: RefreshCw,
-            disabled: isRefreshing,
-            onSelect: () => refetch(),
-          },
-          { type: 'separator' },
           { to: '/competitions', label: t('newCompetition'), icon: Plus },
           { to: '/vehicles', label: t('vehicles'), icon: Car },
           { to: '/timings', label: t('timings'), icon: Clock },
         ]}
+        onRefresh={() => refetch()}
+        isRefreshing={isRefreshing}
         t={t}
       />
 
@@ -651,50 +677,39 @@ const Dashboard = () => {
           </h2>
           <p className="text-sm text-muted-foreground">{t('kpiDescCompact')}</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            compact
-            title={t('metrics.totalVehicles')}
-            value={metrics.totalVehicles}
-            icon={<Truck />}
-            valueColor="primary"
-            to="/vehicles"
-          />
-          <MetricCard
-            compact
-            title={t('metrics.totalInvestment')}
-            value={formatCurrencyEur(metrics.totalInvestment)}
-            subtitle={t('metrics.averageLabel', { value: formatCurrencyEur(metrics.averageInvestmentPerVehicle) })}
-            icon={<Euro />}
-            valueColor="warning"
-          />
-          <MetricCard
-            compact
-            title={t('metrics.activeCompetitions')}
-            value={metrics.activeCompetitions || 0}
-            subtitle={t('metrics.inProgress')}
-            icon={<Trophy />}
-            valueColor="primary"
-          />
-          <MetricCard
-            compact
-            title={t('metrics.bestTime')}
-            value={metrics.bestTimeVehicle?.best_lap_time}
-            subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)}
-            icon={<Clock />}
-            detailsMode="tooltip-only"
-            details={{
-              [t('details.lastUpdate')]: metrics.bestTimeVehicle?.timing_date,
-              [t('details.circuit')]: metrics.bestTimeVehicle?.circuit,
-              [t('details.laps')]: metrics.bestTimeVehicle?.laps,
-              [t('details.lane')]: metrics.bestTimeVehicle?.lane,
-            }}
-            formatValue={formatLapTimeDisplay}
-            valueColor="success"
-            threshold={{ good: 10, warning: 12 }}
-          />
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+          <div className="grid grid-cols-1 divide-y divide-border/60 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
+            <KpiStat
+              to="/vehicles"
+              icon={Truck}
+              label={t('metrics.totalVehicles')}
+              value={metrics.totalVehicles}
+              testId="kpi-stat-vehicles"
+            />
+            <KpiStat
+              icon={Euro}
+              label={t('metrics.totalInvestment')}
+              value={formatCurrencyEur(metrics.totalInvestment)}
+              subtitle={t('metrics.averageLabel', { value: formatCurrencyEur(metrics.averageInvestmentPerVehicle) })}
+              testId="kpi-stat-investment"
+            />
+            <KpiStat
+              icon={Trophy}
+              label={t('metrics.activeCompetitions')}
+              value={metrics.activeCompetitions || 0}
+              subtitle={t('metrics.inProgress')}
+              testId="kpi-stat-competitions"
+            />
+            <KpiStat
+              icon={Clock}
+              label={t('metrics.bestTime')}
+              value={formatLapTimeDisplay(metrics.bestTimeVehicle?.best_lap_time)}
+              subtitle={formatBestTimeSubtitle(metrics.bestTimeVehicle)}
+              testId="kpi-stat-best-time"
+            />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2" data-testid="dashboard-kpi-chips">
+        <div className="flex flex-wrap gap-1.5" data-testid="dashboard-kpi-chips">
           <KpiChip
             to="/vehicles?digital=Digital"
             icon={Smartphone}
@@ -727,92 +742,54 @@ const Dashboard = () => {
           />
         </div>
 
-        <details className="group rounded-xl border border-border/70 bg-card shadow-sm">
+        <details className="group rounded-xl border border-border/70 bg-card">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
             <span>{t('moreMetrics')}</span>
             <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
           </summary>
-          <div className="space-y-6 border-t border-border/60 px-4 py-4 sm:px-5">
-            <MetricSubGroup label={t('subgroupFleet')}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <MetricCard
-                  title={t('metrics.modifiedVehicles')}
-                  value={metrics.modifiedVehicles}
-                  subtitle={pctLabel(metrics.modifiedVehicles, total)}
-                  icon={<Wrench />}
-                  valueColor="success"
-                  trend={metrics.trends?.modifiedVehicles?.trend || 'stable'}
-                  trendValue={metrics.trends?.modifiedVehicles?.value || t('metrics.noData')}
-                  to="/vehicles?modified=Sí"
-                />
-                <MetricCard
-                  title={t('metrics.stockVehicles')}
-                  value={metrics.stockVehicles}
-                  subtitle={pctLabel(metrics.stockVehicles, total)}
-                  icon={<Car />}
-                  valueColor="info"
-                  trend={metrics.trends?.stockVehicles?.trend || 'stable'}
-                  trendValue={metrics.trends?.stockVehicles?.value || t('metrics.noData')}
-                  to="/vehicles?modified=No"
-                />
-              </div>
-            </MetricSubGroup>
-            <MetricSubGroup label={t('subgroupClassification')}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <MetricCard
-                  title={t('metrics.digital')}
-                  value={digitalCount}
-                  subtitle={pctLabel(digitalCount, total)}
-                  icon={<Smartphone />}
-                  valueColor="primary"
-                  trend={metrics.trends?.digitalVehicles?.trend || 'stable'}
-                  trendValue={metrics.trends?.digitalVehicles?.value || t('metrics.noData')}
-                  to="/vehicles?digital=Digital"
-                />
-                <MetricCard
-                  title={t('metrics.museo')}
-                  value={museoCount}
-                  subtitle={pctLabel(museoCount, total)}
-                  icon={<Landmark />}
-                  valueColor="info"
-                  trend={metrics.trends?.museoVehicles?.trend || 'stable'}
-                  trendValue={metrics.trends?.museoVehicles?.value || t('metrics.noData')}
-                  to="/vehicles?filterMuseo=true"
-                />
-                <MetricCard
-                  title={t('metrics.taller')}
-                  value={tallerCount}
-                  subtitle={pctLabel(tallerCount, total)}
-                  icon={<Warehouse />}
-                  valueColor="secondary"
-                  trend={metrics.trends?.tallerVehicles?.trend || 'stable'}
-                  trendValue={metrics.trends?.tallerVehicles?.value || t('metrics.noData')}
-                  to="/vehicles?filterTaller=true"
-                />
-              </div>
-            </MetricSubGroup>
-            <MetricSubGroup label={t('subgroupActivity')}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <MetricCard
-                  title={t('metrics.avgIncrement')}
-                  value={formatPercentEs(metrics.averagePriceIncrement)}
-                  subtitle={formatIncrementSubtitle(metrics.highestIncrementVehicle)}
-                  icon={<TrendingUp />}
-                  valueColor="success"
-                  trend={metrics.trends?.averagePriceIncrement?.trend || 'stable'}
-                  trendValue={metrics.trends?.averagePriceIncrement?.value || t('metrics.noData')}
-                />
-                <MetricCard
-                  title={t('metrics.lastUpdate')}
-                  value={formatDashboardMetricDate(metrics.lastUpdate)}
-                  subtitle={t('metrics.syncSubtitle')}
-                  icon={<Settings />}
-                  valueColor="secondary"
-                  trend={metrics.trends?.lastUpdate?.trend || 'stable'}
-                  trendValue={metrics.trends?.lastUpdate?.value || t('metrics.systemActive')}
-                />
-              </div>
-            </MetricSubGroup>
+          <div className="grid grid-cols-1 gap-x-8 border-t border-border/60 px-4 py-3 sm:grid-cols-2 sm:px-5">
+            <ExtraMetricRow
+              label={t('metrics.modifiedVehicles')}
+              value={metrics.modifiedVehicles}
+              hint={`${pctLabel(metrics.modifiedVehicles, total)} · ${metrics.trends?.modifiedVehicles?.value || t('metrics.noData')}`}
+              to="/vehicles?modified=Sí"
+            />
+            <ExtraMetricRow
+              label={t('metrics.stockVehicles')}
+              value={metrics.stockVehicles}
+              hint={`${pctLabel(metrics.stockVehicles, total)} · ${metrics.trends?.stockVehicles?.value || t('metrics.noData')}`}
+              to="/vehicles?modified=No"
+            />
+            <ExtraMetricRow
+              label={t('metrics.digital')}
+              value={digitalCount}
+              hint={`${pctLabel(digitalCount, total)} · ${metrics.trends?.digitalVehicles?.value || t('metrics.noData')}`}
+              to="/vehicles?digital=Digital"
+            />
+            <ExtraMetricRow
+              label={t('metrics.museo')}
+              value={museoCount}
+              hint={`${pctLabel(museoCount, total)} · ${metrics.trends?.museoVehicles?.value || t('metrics.noData')}`}
+              to="/vehicles?filterMuseo=true"
+            />
+            <ExtraMetricRow
+              label={t('metrics.taller')}
+              value={tallerCount}
+              hint={`${pctLabel(tallerCount, total)} · ${metrics.trends?.tallerVehicles?.value || t('metrics.noData')}`}
+              to="/vehicles?filterTaller=true"
+            />
+            <ExtraMetricRow
+              label={t('metrics.avgIncrement')}
+              value={formatPercentEs(metrics.averagePriceIncrement)}
+              hint={`${formatIncrementSubtitle(metrics.highestIncrementVehicle)} · ${metrics.trends?.averagePriceIncrement?.value || t('metrics.noData')}`}
+              testId="kpi-extra-avg-increment"
+            />
+            <ExtraMetricRow
+              label={t('metrics.lastUpdate')}
+              value={formatDashboardMetricDate(metrics.lastUpdate)}
+              hint={metrics.trends?.lastUpdate?.value || t('metrics.systemActive')}
+              testId="kpi-extra-last-update"
+            />
           </div>
         </details>
       </section>

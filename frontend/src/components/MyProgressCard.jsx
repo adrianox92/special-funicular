@@ -18,6 +18,13 @@ function deltaCopy(delta, t) {
   return t('myProgress.deltaSame');
 }
 
+const StatCell = ({ label, children }) => (
+  <div className="min-w-0 px-3 py-2.5 sm:px-4">
+    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div className="mt-1">{children}</div>
+  </div>
+);
+
 const MyProgressCard = ({
   progress,
   totalTimings = 0,
@@ -39,24 +46,24 @@ const MyProgressCard = ({
 
   return (
     <Card
-      className="border-border/80 shadow-sm"
+      className="border-border/70 shadow-none"
       data-testid="my-progress-card"
       aria-labelledby="dash-my-progress"
     >
-      <CardHeader className="flex flex-col gap-1 border-b border-border/60 bg-muted/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
+      <CardHeader className="flex flex-col gap-1 p-4 pb-2 sm:flex-row sm:items-start sm:justify-between sm:p-4 sm:pb-2">
         <div className="min-w-0 space-y-1">
           <CardTitle id="dash-my-progress" className="flex items-center gap-2 text-base">
             <Activity className="size-4" aria-hidden />
             {t('myProgress.title')}
           </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">{t('myProgress.desc')}</CardDescription>
+          <CardDescription className="text-xs">{t('myProgress.desc')}</CardDescription>
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-5">
+      <CardContent className="p-4 pt-2">
         {neverTimed ? (
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <p className="text-3xl font-bold tabular-nums">0</p>
+              <p className="text-2xl font-bold tabular-nums">0</p>
               <p className="text-sm text-muted-foreground">{t('myProgress.zeroBody')}</p>
             </div>
             {showCta ? (
@@ -69,50 +76,35 @@ const MyProgressCard = ({
             ) : null}
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {t('myProgress.sessionsThisMonth')}
-                </p>
-                <p
-                  className="mt-1 text-3xl font-bold tabular-nums"
-                  data-testid="my-progress-sessions"
-                >
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <StatCell label={t('myProgress.sessionsThisMonth')}>
+                <p className="text-2xl font-bold tabular-nums" data-testid="my-progress-sessions">
                   {sessionsThisMonth}
                 </p>
                 {sessionsThisMonth === 0 ? (
-                  <p className="mt-2 text-xs text-muted-foreground">{t('myProgress.emptyHint')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('myProgress.emptyHint')}</p>
                 ) : null}
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {t('myProgress.vsLastMonth')}
-                </p>
-                <p
-                  className="mt-1 text-2xl font-semibold tabular-nums"
-                  data-testid="my-progress-delta"
-                >
+              </StatCell>
+              <StatCell label={t('myProgress.vsLastMonth')}>
+                <p className="text-xl font-semibold tabular-nums" data-testid="my-progress-delta">
                   {deltaCopy(delta, t)}
                 </p>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {t('myProgress.lastSessionLabel')}
-                </p>
-                <p className="mt-1 text-sm font-medium leading-snug" data-testid="my-progress-last">
+              </StatCell>
+              <StatCell label={t('myProgress.lastSessionLabel')}>
+                <p className="text-sm font-medium leading-snug" data-testid="my-progress-last">
                   {lastSessionCopy(data.daysSinceLastSession, t)}
                 </p>
                 {weekStreak >= 2 ? (
-                  <p className="mt-2 text-xs text-muted-foreground" data-testid="my-progress-streak">
+                  <p className="mt-1 text-xs text-muted-foreground" data-testid="my-progress-streak">
                     {t('myProgress.weekStreak', { count: weekStreak })}
                   </p>
                 ) : null}
-              </div>
+              </StatCell>
             </div>
             {showCta ? (
               <div className="flex justify-end">
-                <Button asChild size="sm" data-testid="my-progress-cta">
+                <Button asChild size="sm" variant="outline" data-testid="my-progress-cta">
                   <Link to="/session">
                     <Clock className="mr-2 size-4" aria-hidden />
                     {t('myProgress.cta')}
