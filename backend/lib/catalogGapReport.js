@@ -5,6 +5,9 @@ const { getServiceClient } = require('./supabaseClients');
 const DEFAULT_TO = 'adrianpalomera17@gmail.com';
 const DEFAULT_LIMIT = 40;
 const MADRID_TZ = 'Europe/Madrid';
+/** JS getDay(): 0 domingo … 6 sábado. Informe: lunes y jueves. */
+const WEEKDAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const CATALOG_GAP_WEEKDAYS = new Set([1, 4]);
 
 function escapeHtml(value) {
   return String(value)
@@ -44,6 +47,20 @@ function hourInMadrid(now = new Date()) {
     hourCycle: 'h23',
   }).format(now);
   return Number.parseInt(formatted, 10);
+}
+
+/** Día de la semana 0–6 (domingo–sábado) en Europe/Madrid, no UTC. */
+function weekdayInMadrid(now = new Date()) {
+  const formatted = new Intl.DateTimeFormat('en-US', {
+    timeZone: MADRID_TZ,
+    weekday: 'short',
+  }).format(now);
+  const idx = WEEKDAY_INDEX[formatted];
+  return Number.isInteger(idx) ? idx : -1;
+}
+
+function isCatalogGapWeekday(now = new Date()) {
+  return CATALOG_GAP_WEEKDAYS.has(weekdayInMadrid(now));
 }
 
 function madridDateIso(now = new Date()) {
@@ -121,7 +138,7 @@ function buildEmail({ coverage, missing, now }) {
   const subject = `Catálogo: referencias sin ficha — cobertura ${pct} — ${dateLabel}`;
 
   const textLines = [
-    `Informe diario de huecos de catálogo (${dateLabel}).`,
+    `Informe de huecos de catálogo (lunes y jueves, ${dateLabel}).`,
     '',
     `Vehículos totales: ${coverage.total}`,
     `Con catálogo asociado: ${coverage.linked} (${pct})`,
@@ -200,7 +217,7 @@ function buildEmail({ coverage, missing, now }) {
         : '<p>No hay referencias pendientes en este recorte.</p>'
     }
     ${dashboardUrl ? `<p><a href="${escapeHtml(dashboardUrl)}">Abrir dashboard de plataforma</a></p>` : ''}
-    <p style="color:#666;font-size:13px;">Slot Database · informe automático diario (9:00 Europe/Madrid)</p>
+    <p style="color:#666;font-size:13px;">Slot Database · informe automático lunes y jueves (9:00 Europe/Madrid)</p>
   </div>
 </body>
 </html>`;
@@ -252,12 +269,21 @@ async function sendCatalogGapEmail({ coverage, missing, now, force = false }) {
 }
 
 /**
- * Genera y envía el informe. Pensado para Render Cron a las 07:00 y 08:00 UTC;
- * solo envía cuando en Europe/Madrid son las 9 (salvo force).
+ * Genera y envía el informe. Pensado para Render Cron `0 7,8 * * 1,4`
+ * (07:00 y 08:00 UTC, lunes y jueves). Solo envía cuando en Europe/Madrid
+ * son las 9:00 de un lunes o jueves (salvo force). El día se evalúa en
+ * Madrid para ser DST-safe (no se usa el weekday UTC).
  */
 async function runCatalogGapReport({ force = false, now = new Date(), admin } = {}) {
   if (!force && hourInMadrid(now) !== 9) {
     return { skipped: true, reason: 'not_nine_am_madrid', madridHour: hourInMadrid(now) };
+  }
+  if (!force && !isCatalogGapWeekday(now)) {
+    return {
+      skipped: true,
+      reason: 'not_monday_or_thursday_madrid',
+      madridWeekday: weekdayInMadrid(now),
+    };
   }
 
   const client = admin || getServiceClient();
@@ -289,6 +315,7 @@ async function runCatalogGapReport({ force = false, now = new Date(), admin } = 
 module.exports = {
   DEFAULT_TO,
   hourInMadrid,
+  weekdayInMadrid,
   madridDateIso,
   formatPct,
   buildEmail,

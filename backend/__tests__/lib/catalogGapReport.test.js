@@ -1,5 +1,6 @@
 const {
   hourInMadrid,
+  weekdayInMadrid,
   formatPct,
   buildEmail,
   runCatalogGapReport,
@@ -33,7 +34,7 @@ describe('catalogGapReport', () => {
   });
 
   it('hourInMadrid es 9 a las 07:00 UTC en CEST (verano)', () => {
-    // 17 sep 2026 07:00 UTC = 09:00 Europe/Madrid
+    // 17 sep 2026 07:00 UTC = 09:00 Europe/Madrid (jueves)
     expect(hourInMadrid(new Date('2026-09-17T07:00:00.000Z'))).toBe(9);
     expect(hourInMadrid(new Date('2026-09-17T08:00:00.000Z'))).toBe(10);
   });
@@ -43,12 +44,38 @@ describe('catalogGapReport', () => {
     expect(hourInMadrid(new Date('2026-01-15T07:00:00.000Z'))).toBe(8);
   });
 
+  it('weekdayInMadrid usa el día en Europe/Madrid, no UTC', () => {
+    // jueves 17 sep 2026
+    expect(weekdayInMadrid(new Date('2026-09-17T07:00:00.000Z'))).toBe(4);
+    // lunes 14 sep 2026
+    expect(weekdayInMadrid(new Date('2026-09-14T07:00:00.000Z'))).toBe(1);
+    // miércoles 16 sep 2026
+    expect(weekdayInMadrid(new Date('2026-09-16T07:00:00.000Z'))).toBe(3);
+    // jueves 15 ene 2026 (CET)
+    expect(weekdayInMadrid(new Date('2026-01-15T08:00:00.000Z'))).toBe(4);
+  });
+
   it('no envía fuera de las 9:00 Madrid salvo force', async () => {
+    // jueves 12:00 Madrid — día correcto, hora incorrecta
     const result = await runCatalogGapReport({
       now: new Date('2026-09-17T10:00:00.000Z'),
       admin: {},
     });
     expect(result).toMatchObject({ skipped: true, reason: 'not_nine_am_madrid' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('no envía un miércoles a las 9:00 Madrid salvo force', async () => {
+    // 16 sep 2026 07:00 UTC = 09:00 Europe/Madrid, miércoles
+    const result = await runCatalogGapReport({
+      now: new Date('2026-09-16T07:00:00.000Z'),
+      admin: {},
+    });
+    expect(result).toMatchObject({
+      skipped: true,
+      reason: 'not_monday_or_thursday_madrid',
+      madridWeekday: 3,
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -108,9 +135,11 @@ describe('catalogGapReport', () => {
     expect(body.html).toContain('&lt;script&gt;');
     expect(body.html).toContain('https://slotdatabase.example/admin/dashboard');
     expect(body.text).toContain('NIN-123');
+    expect(body.text).toContain('lunes y jueves');
+    expect(body.html).toContain('informe automático lunes y jueves');
   });
 
-  it('envía a las 9:00 Madrid sin force (07:00 UTC en CEST)', async () => {
+  it('envía a las 9:00 Madrid sin force un jueves (07:00 UTC en CEST)', async () => {
     const admin = mockAdmin({
       total: 10,
       linked: 2,
@@ -126,6 +155,40 @@ describe('catalogGapReport', () => {
     expect(key).toBe('catalog-gap-report/2026-09-17');
   });
 
+  it('envía a las 9:00 Madrid sin force un lunes (07:00 UTC en CEST)', async () => {
+    const admin = mockAdmin({
+      total: 10,
+      linked: 2,
+      missing: { total: 0, rows: [] },
+    });
+    const result = await runCatalogGapReport({
+      now: new Date('2026-09-14T07:00:00.000Z'),
+      admin,
+    });
+    expect(result.sent).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const key = fetchMock.mock.calls[0][1].headers['Idempotency-Key'];
+    expect(key).toBe('catalog-gap-report/2026-09-14');
+  });
+
+  it('force envía aunque no sea lunes/jueves ni las 9:00 Madrid', async () => {
+    const admin = mockAdmin({
+      total: 10,
+      linked: 2,
+      missing: { total: 0, rows: [] },
+    });
+    // miércoles 16 sep 2026 14:00 Europe/Madrid
+    const result = await runCatalogGapReport({
+      force: true,
+      now: new Date('2026-09-16T12:00:00.000Z'),
+      admin,
+    });
+    expect(result.sent).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const key = fetchMock.mock.calls[0][1].headers['Idempotency-Key'];
+    expect(key).toMatch(/^catalog-gap-report\/2026-09-16\/force-/);
+  });
+
   it('omite el envío si falta RESEND_API_KEY', async () => {
     delete process.env.RESEND_API_KEY;
     const admin = mockAdmin({
@@ -139,8 +202,8 @@ describe('catalogGapReport', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('buildEmail incluye filas y cobertura', () => {
-    const { subject, text } = buildEmail({
+  it('buildEmail incluye filas, cobertura y cadencia lunes/jueves', () => {
+    const { subject, text, html } = buildEmail({
       coverage: { total: 10, linked: 2 },
       missing: {
         total: 1,
@@ -159,6 +222,10 @@ describe('catalogGapReport', () => {
     expect(subject).toContain('20,0%');
     expect(text).toContain('ABC');
     expect(text).toContain('3 vehículos');
+    expect(text).toContain('lunes y jueves');
+    expect(text).not.toContain('diario');
+    expect(html).toContain('informe automático lunes y jueves (9:00 Europe/Madrid)');
+    expect(html).not.toContain('diario');
   });
 });
 

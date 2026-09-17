@@ -47,9 +47,10 @@ router.post('/weekly-digest/test', authMiddleware, async (req, res) => {
 /**
  * POST /api/cron/catalog-gap-report
  * Header: Authorization: Bearer ${CRON_SECRET}
- * Query: force=1 (enviar aunque no sean las 9:00 Europe/Madrid)
+ * Query: force=1 (enviar aunque no sean las 9:00 Europe/Madrid de un lunes o jueves)
  *
- * Render Cron: `0 7,8 * * *` (UTC). El job solo envía cuando en Madrid son las 9.
+ * Render Cron: `0 7,8 * * 1,4` (UTC: 07:00 y 08:00, lunes y jueves).
+ * El job solo envía cuando en Madrid son las 9:00 de un lunes o jueves.
  */
 router.post('/catalog-gap-report', cronAuth, async (req, res) => {
   try {
