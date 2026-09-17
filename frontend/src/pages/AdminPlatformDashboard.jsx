@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { LayoutDashboard, RefreshCw, Users, UserCheck, Car, Trophy } from 'lucide-react';
+import { LayoutDashboard, RefreshCw, Users, UserCheck, Car, Trophy, Timer } from 'lucide-react';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
@@ -10,6 +10,7 @@ import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
+import { Badge } from '../components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -71,6 +72,12 @@ function formatRangeLabel(from, to) {
   }
 }
 
+function formatEsPercent(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return `${n.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
+}
+
 const AdminPlatformDashboard = () => {
   const { user } = useAuth();
   const isAdmin = isLicenseAdminUser(user);
@@ -91,6 +98,10 @@ const AdminPlatformDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const [retention, setRetention] = useState(null);
+  const [retentionLoading, setRetentionLoading] = useState(false);
+  const [retentionError, setRetentionError] = useState(null);
 
   const [refsPage, setRefsPage] = useState(1);
   const [refsOnlyUnlinked, setRefsOnlyUnlinked] = useState(false);
@@ -126,6 +137,22 @@ const AdminPlatformDashboard = () => {
       setLoading(false);
     }
   }, [range]);
+
+  const fetchRetention = useCallback(async () => {
+    setRetentionLoading(true);
+    setRetentionError(null);
+    try {
+      const { data: res } = await api.get('/admin/timing-retention');
+      setRetention(res);
+    } catch (err) {
+      const msg =
+        err.response?.data?.error || err.message || 'Error al cargar retención de timings';
+      setRetentionError(msg);
+      setRetention(null);
+    } finally {
+      setRetentionLoading(false);
+    }
+  }, []);
 
   const fetchRefsReport = useCallback(async () => {
     if (!isAdmin) return;
@@ -219,6 +246,10 @@ const AdminPlatformDashboard = () => {
   }, [isAdmin, range, fetchMetrics]);
 
   useEffect(() => {
+    if (isAdmin) void fetchRetention();
+  }, [isAdmin, fetchRetention]);
+
+  useEffect(() => {
     if (isAdmin) void fetchRefsReport();
   }, [isAdmin, fetchRefsReport]);
 
@@ -288,13 +319,109 @@ const AdminPlatformDashboard = () => {
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => void fetchMetrics()}
-          disabled={loading || !range}
+          onClick={() => {
+            void fetchMetrics();
+            void fetchRetention();
+          }}
+          disabled={loading || retentionLoading || !range}
         >
-          <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
+          <RefreshCw className={loading || retentionLoading ? 'size-4 animate-spin' : 'size-4'} />
           Actualizar
         </Button>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between space-y-0 pb-2">
+          <div className="space-y-1">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Timer className="size-4 text-muted-foreground" aria-hidden />
+              Retención timings (30d)
+            </CardTitle>
+            <CardDescription>
+              Ventana móvil de 30 días (independiente del periodo de abajo). Misma definición que la
+              rutina SQL semanal:{' '}
+              <span className="font-mono">
+                coalesce(timing_date::timestamptz, created_at) &gt;= now() - 30 days
+              </span>
+              , join timings → vehicles.
+            </CardDescription>
+          </div>
+          {retention && (
+            <Badge
+              variant={
+                Number(retention.timing_30d_pct) >= (retention.goal?.target_min_pct ?? 8)
+                  ? 'default'
+                  : 'secondary'
+              }
+            >
+              {Number(retention.timing_30d_pct) >= (retention.goal?.target_min_pct ?? 8)
+                ? 'En objetivo'
+                : 'Por debajo del objetivo'}
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {retentionError && (
+            <Alert variant="destructive">
+              <AlertDescription>{retentionError}</AlertDescription>
+            </Alert>
+          )}
+          {retentionLoading && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Spinner className="size-5" />
+              Cargando retención…
+            </div>
+          )}
+          {retention && !retentionLoading && (
+            <>
+              <div>
+                <div className="text-3xl font-bold tabular-nums">
+                  {formatEsPercent(retention.timing_30d_pct)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {retention.users_with_timing_30d} de {retention.registered_users} usuarios
+                  registrados con ≥1 timing en 30 días.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  {
+                    label: 'Registrados',
+                    value: retention.registered_users,
+                    hint: 'auth.users',
+                  },
+                  {
+                    label: 'Con ≥1 vehículo',
+                    value: retention.users_with_vehicle,
+                    hint: formatEsPercent(retention.users_with_vehicle_pct),
+                  },
+                  {
+                    label: 'Con timing alguna vez',
+                    value: retention.users_with_timing_ever,
+                    hint: formatEsPercent(retention.users_with_timing_ever_pct),
+                  },
+                  {
+                    label: 'Con timing 30d',
+                    value: retention.users_with_timing_30d,
+                    hint: formatEsPercent(retention.timing_30d_pct),
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="rounded-md border px-3 py-2">
+                    <p className="text-xs text-muted-foreground">{row.label}</p>
+                    <p className="text-xl font-semibold tabular-nums">{row.value}</p>
+                    <p className="text-xs text-muted-foreground">{row.hint}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Baseline {formatEsPercent(retention.goal?.baseline_2026_09_11_pct)} (11/09/2026) /{' '}
+                {formatEsPercent(retention.goal?.baseline_2026_09_15_pct)} (15/09/2026). Objetivo ≥{' '}
+                {retention.goal?.target_min_pct ?? 8}–{retention.goal?.target_max_pct ?? 10} %.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
