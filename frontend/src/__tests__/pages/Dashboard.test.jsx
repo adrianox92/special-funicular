@@ -213,9 +213,9 @@ describe('Dashboard Component', () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getByTestId('metric-card-Total Vehículos')).toBeInTheDocument();
-      expect(screen.getByTestId('metric-card-Inversión Total')).toBeInTheDocument();
-      expect(screen.getByTestId('metric-card-Incremento Promedio')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-stat-vehicles')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-stat-investment')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-extra-avg-increment')).toBeInTheDocument();
     });
   });
 
@@ -223,8 +223,8 @@ describe('Dashboard Component', () => {
     renderDashboard();
 
     await waitFor(() => {
-      const metricCards = screen.getAllByTestId(/metric-card-/);
-      expect(metricCards.length).toBeGreaterThan(0);
+      expect(screen.getByTestId('kpi-stat-investment')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-extra-avg-increment')).toBeInTheDocument();
     });
   });
 
@@ -247,7 +247,7 @@ describe('Dashboard Component', () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getByTestId('metric-card-Total Vehículos')).toHaveTextContent('20');
+      expect(screen.getByTestId('kpi-stat-vehicles')).toHaveTextContent('20');
     });
   });
 
@@ -349,8 +349,11 @@ describe('Dashboard Component', () => {
       expect(screen.getByTestId('dashboard-primary-cta')).toBeInTheDocument();
     });
 
+    expect(screen.getByTestId('dashboard-header')).toBeInTheDocument();
     expect(screen.getByTestId('dashboard-primary-cta')).toHaveAttribute('href', '/session');
     expect(screen.getByTestId('dashboard-primary-cta')).toHaveTextContent('Nueva sesión');
+    expect(screen.getByTestId('dashboard-refresh')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-more-actions')).toBeInTheDocument();
 
     const now = screen.getByTestId('dashboard-now-section');
     expect(now).toHaveTextContent('Ahora');
@@ -360,6 +363,14 @@ describe('Dashboard Component', () => {
     expect(now).toContainElement(actions);
     expect(progress.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
     expect(screen.queryByTestId('activation-session-nudge')).not.toBeInTheDocument();
+
+    const header = screen.getByTestId('dashboard-header');
+    expect(header.compareDocumentPosition(now) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
+    expect(now.compareDocumentPosition(screen.getByTestId('dashboard-maintenance')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
+    expect(
+      screen.getByTestId('dashboard-maintenance').compareDocumentPosition(screen.getByTestId('dashboard-kpi-strip'))
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeGreaterThan(0);
   });
 
   test('garaje vacío prioriza añadir vehículo y mantiene la zona Ahora', async () => {
@@ -396,6 +407,23 @@ describe('Dashboard Component', () => {
     expect(screen.getByTestId('dashboard-now-section')).toContainElement(screen.getByTestId('my-progress-card'));
     expect(screen.getByTestId('dashboard-now-section')).toContainElement(screen.getByTestId('dashboard-action-blocks'));
     expect(screen.queryByText('Tu garaje te está esperando')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-kpi-strip')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-maintenance')).not.toBeInTheDocument();
+  });
+
+  test('garaje compacto: conteos y enlace, sin muro de paneles', async () => {
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dashboard-maintenance')).toBeInTheDocument();
+    });
+
+    const garage = screen.getByTestId('dashboard-maintenance');
+    expect(garage).toHaveTextContent('0 pendientes');
+    expect(garage).toHaveTextContent('0 programados');
+    expect(garage.querySelector('a[href="/vehicles"]')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-kpi-strip')).toContainElement(screen.getByTestId('kpi-stat-vehicles'));
+    expect(screen.getByTestId('dashboard-kpi-strip')).toContainElement(screen.getByTestId('kpi-extra-avg-increment'));
   });
 
   test('Mi progreso en cero no duplica el CTA si el nudge de primer tiempo está visible', async () => {
