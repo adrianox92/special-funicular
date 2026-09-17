@@ -996,6 +996,8 @@ Los estilos están organizados en:
 
 ## Deploy en Vercel
 
+Flujo de ramas y promoción a producción (`staging` → `master`): **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
 El proyecto incluye configuración para desplegar el frontend en Vercel:
 
 - **[frontend/vercel.json](frontend/vercel.json)**: pensado para Vercel con **Root Directory** = `frontend` (recomendado). Usa `npm install`, `npm run build` y `outputDirectory: build` sin `cd frontend`. Si despliegas desde la raíz del monorepo sin Root Directory, tendrías que definir comandos con `cd frontend && …` y salida `frontend/build` (solo si no usas subcarpeta en el dashboard).
