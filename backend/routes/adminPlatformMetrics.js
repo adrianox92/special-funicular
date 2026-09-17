@@ -5,36 +5,14 @@ const express = require('express');
 const { getServiceClient } = require('../lib/supabaseClients');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const { fetchTimingRetentionKpi } = require('../lib/timingRetentionKpi');
+const {
+  parseRefsGapQuery,
+  buildMissingCatalogRpcParams,
+} = require('../lib/adminVehicleRefsQuery');
 
 const router = express.Router();
 
 const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000;
-
-const REFS_GAP_MIN_LIMIT = 1;
-const REFS_GAP_MAX_LIMIT = 100;
-
-function parseRefsGapQuery(req) {
-  const limRaw = req.query.limit;
-  const offRaw = req.query.offset;
-  const lim =
-    limRaw === undefined || limRaw === ''
-      ? 25
-      : Number.parseInt(String(limRaw), 10);
-  const off =
-    offRaw === undefined || offRaw === ''
-      ? 0
-      : Number.parseInt(String(offRaw), 10);
-  if (!Number.isFinite(lim) || !Number.isFinite(off)) {
-    return { error: 'limit y offset deben ser enteros.' };
-  }
-  const limit = Math.min(REFS_GAP_MAX_LIMIT, Math.max(REFS_GAP_MIN_LIMIT, lim));
-  const offset = Math.max(0, off);
-  const only =
-    req.query.only_unlinked === true ||
-    req.query.only_unlinked === 'true' ||
-    req.query.only_unlinked === '1';
-  return { limit, offset, only_unlinked: only };
-}
 
 function parseIsoDate(s) {
   if (!s || typeof s !== 'string') return null;
@@ -138,8 +116,10 @@ router.get('/timing-retention', async (req, res) => {
 });
 
 /**
- * GET /vehicle-refs-not-in-catalog?limit=&offset=&only_unlinked=
- * Referencias de garaje sin equivalencia en catálogo (normalización trim + lower).
+ * GET /vehicle-refs-not-in-catalog?limit=&offset=&only_unlinked=&q=
+ * Sin q: referencias de garaje sin equivalencia en catálogo (trim + lower).
+ * Con q / reference / ref: contains sobre ref normalizada; incluye grupos ya presentes
+ * en catálogo (in_catalog, catalog_item_id si el match de catálogo es único).
  */
 router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
   try {
@@ -152,16 +132,15 @@ router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
       });
     }
 
-    const parsed = parseRefsGapQuery(req);
+    const parsed = parseRefsGapQuery(req.query);
     if (parsed.error) {
       return res.status(400).json({ error: parsed.error });
     }
 
-    const { data, error } = await supabaseAdmin.rpc('admin_vehicle_refs_missing_catalog', {
-      p_limit: parsed.limit,
-      p_offset: parsed.offset,
-      p_only_unlinked: parsed.only_unlinked,
-    });
+    const { data, error } = await supabaseAdmin.rpc(
+      'admin_vehicle_refs_missing_catalog',
+      buildMissingCatalogRpcParams(parsed),
+    );
 
     if (error) {
       console.error('admin_vehicle_refs_missing_catalog:', error);
@@ -178,6 +157,7 @@ router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
       limit: typeof payload.limit === 'number' ? payload.limit : parsed.limit,
       offset: typeof payload.offset === 'number' ? payload.offset : parsed.offset,
       only_unlinked: !!payload.only_unlinked,
+      q: typeof payload.q === 'string' ? payload.q : parsed.q || null,
       rows: Array.isArray(payload.rows) ? payload.rows : [],
     });
   } catch (err) {
