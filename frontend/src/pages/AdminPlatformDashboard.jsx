@@ -41,27 +41,43 @@ import {
 const REFS_PAGE_SIZE = 25;
 const REFS_SEARCH_MAX = 100;
 
-/** Deep-link: ?ref=FOO (alias ?q=). Contains sobre ref normalizada (trim + lower) en el API. */
-function readAdminRefsQueryFromSearch(search) {
+function adminRefsSearchParams(search) {
   const raw = typeof search === 'string' ? search : '';
-  const sp = new URLSearchParams(raw.startsWith('?') ? raw.slice(1) : raw);
-  const value = (sp.get('ref') || sp.get('q') || '').trim();
-  return value.slice(0, REFS_SEARCH_MAX);
+  return new URLSearchParams(raw.startsWith('?') ? raw.slice(1) : raw);
 }
 
-function withAdminRefsQueryParam(search, q) {
-  const raw = typeof search === 'string' ? search : '';
-  const sp = new URLSearchParams(raw.startsWith('?') ? raw.slice(1) : raw);
-  const next = String(q || '').trim().slice(0, REFS_SEARCH_MAX);
-  if (next) sp.set('ref', next);
+function clipRefsFilter(value) {
+  return String(value || '').trim().slice(0, REFS_SEARCH_MAX);
+}
+
+/** Deep-link: ?ref=FOO (alias ?q=). Contains sobre ref normalizada (trim + lower) en el API. */
+function readAdminRefsQueryFromSearch(search) {
+  const sp = adminRefsSearchParams(search);
+  return clipRefsFilter(sp.get('ref') || sp.get('q') || '');
+}
+
+/** Deep-link: ?manufacturer=Ninco (alias ?mfg=). Contains sobre fabricante de garaje. */
+function readAdminRefsManufacturerFromSearch(search) {
+  const sp = adminRefsSearchParams(search);
+  return clipRefsFilter(sp.get('manufacturer') || sp.get('mfg') || '');
+}
+
+function withAdminRefsQueryParams(search, { q, manufacturer }) {
+  const sp = adminRefsSearchParams(search);
+  const nextQ = clipRefsFilter(q);
+  const nextMfg = clipRefsFilter(manufacturer);
+  if (nextQ) sp.set('ref', nextQ);
   else sp.delete('ref');
   sp.delete('q');
+  if (nextMfg) sp.set('manufacturer', nextMfg);
+  else sp.delete('manufacturer');
+  sp.delete('mfg');
   return sp.toString();
 }
 
-function syncAdminRefsQueryInUrl(q) {
+function syncAdminRefsQueryInUrl({ q, manufacturer }) {
   if (typeof window === 'undefined') return;
-  const qs = withAdminRefsQueryParam(window.location.search, q);
+  const qs = withAdminRefsQueryParams(window.location.search, { q, manufacturer });
   const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
   window.history.replaceState(null, '', next);
 }
@@ -143,6 +159,16 @@ const AdminPlatformDashboard = () => {
   const [refsQuery, setRefsQuery] = useState(() =>
     readAdminRefsQueryFromSearch(typeof window !== 'undefined' ? window.location.search : ''),
   );
+  const [refsManufacturerInput, setRefsManufacturerInput] = useState(() =>
+    readAdminRefsManufacturerFromSearch(
+      typeof window !== 'undefined' ? window.location.search : '',
+    ),
+  );
+  const [refsManufacturer, setRefsManufacturer] = useState(() =>
+    readAdminRefsManufacturerFromSearch(
+      typeof window !== 'undefined' ? window.location.search : '',
+    ),
+  );
   const [refsData, setRefsData] = useState(null);
   const [refsLoading, setRefsLoading] = useState(false);
   const [refsError, setRefsError] = useState(null);
@@ -204,6 +230,7 @@ const AdminPlatformDashboard = () => {
           offset,
           only_unlinked: refsOnlyUnlinked ? 'true' : 'false',
           ...(refsQuery ? { q: refsQuery } : {}),
+          ...(refsManufacturer ? { manufacturer: refsManufacturer } : {}),
         },
       });
       setRefsData(res);
@@ -215,14 +242,17 @@ const AdminPlatformDashboard = () => {
     } finally {
       setRefsLoading(false);
     }
-  }, [isAdmin, refsPage, refsOnlyUnlinked, refsQuery]);
+  }, [isAdmin, refsPage, refsOnlyUnlinked, refsQuery, refsManufacturer]);
 
-  const applyRefsSearch = (raw) => {
-    const next = String(raw || '').trim().slice(0, REFS_SEARCH_MAX);
-    setRefsSearchInput(next);
-    setRefsQuery(next);
+  const applyRefsSearch = ({ q = refsSearchInput, manufacturer = refsManufacturerInput } = {}) => {
+    const nextQ = clipRefsFilter(q);
+    const nextMfg = clipRefsFilter(manufacturer);
+    setRefsSearchInput(nextQ);
+    setRefsQuery(nextQ);
+    setRefsManufacturerInput(nextMfg);
+    setRefsManufacturer(nextMfg);
     setRefsPage(1);
-    syncAdminRefsQueryInUrl(next);
+    syncAdminRefsQueryInUrl({ q: nextQ, manufacturer: nextMfg });
   };
 
   const linkPreviewCounts = (row, restrictMfg) => {
@@ -592,14 +622,27 @@ const AdminPlatformDashboard = () => {
                 mayúsculas/minúsculas). Incluye grupos que ya existen en el catálogo para poder enlazar
                 vehículos con <span className="font-mono">catalog_item_id</span> vacío. El match exacto sale
                 primero.
+                {refsManufacturer ? (
+                  <>
+                    {' '}
+                    El fabricante filtra el texto libre de garaje y agrupa cada marca por separado.
+                  </>
+                ) : null}
+              </>
+            ) : refsManufacturer ? (
+              <>
+                Ranking de huecos filtrado por fabricante de garaje (contains, espacios y
+                mayúsculas/minúsculas). Los grupos son <span className="font-mono">referencia + marca</span>{' '}
+                para ir resolviendo una marca cada vez.
               </>
             ) : (
               <>
                 Agrupadas por referencia normalizada (espacios y mayúsculas/minúsculas). Si algún ítem del
                 catálogo público comparte la misma referencia normalizada, no aparece aquí — usa la búsqueda
-                para localizarlas y enlazar. Ejemplares y usuarios muestran solo vehículos sin enlace a
-                catálogo (<span className="font-mono">catalog_item_id</span> vacío), alineados con la acción
-                Enlazar. No depende del periodo de fechas de arriba.
+                para localizarlas y enlazar. Filtra por fabricante para agrupar por marca. Ejemplares y
+                usuarios muestran solo vehículos sin enlace a catálogo (
+                <span className="font-mono">catalog_item_id</span> vacío), alineados con la acción Enlazar. No
+                depende del periodo de fechas de arriba.
               </>
             )}
           </CardDescription>
@@ -607,7 +650,7 @@ const AdminPlatformDashboard = () => {
             className="flex flex-col gap-3 pt-3"
             onSubmit={(e) => {
               e.preventDefault();
-              applyRefsSearch(refsSearchInput);
+              applyRefsSearch();
             }}
           >
             <div className="flex flex-wrap items-end gap-2">
@@ -624,16 +667,28 @@ const AdminPlatformDashboard = () => {
                   autoComplete="off"
                 />
               </div>
+              <div className="space-y-2 min-w-[200px] flex-1 max-w-sm">
+                <Label htmlFor="refs-manufacturer">Fabricante</Label>
+                <Input
+                  id="refs-manufacturer"
+                  type="search"
+                  value={refsManufacturerInput}
+                  onChange={(e) => setRefsManufacturerInput(e.target.value)}
+                  placeholder="ej. Ninco"
+                  maxLength={REFS_SEARCH_MAX}
+                  autoComplete="off"
+                />
+              </div>
               <Button type="submit" variant="secondary" size="sm" disabled={refsLoading}>
                 <Search className="size-4" aria-hidden />
                 Buscar
               </Button>
-              {refsQuery ? (
+              {refsQuery || refsManufacturer ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => applyRefsSearch('')}
+                  onClick={() => applyRefsSearch({ q: '', manufacturer: '' })}
                   disabled={refsLoading}
                 >
                   Limpiar
@@ -641,8 +696,10 @@ const AdminPlatformDashboard = () => {
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
-              Deep-link: <span className="font-mono">/admin/dashboard?ref=FOO</span>. Sin texto se muestra el
-              ranking de huecos; con texto también salen refs ya presentes en el catálogo.
+              Deep-link:{' '}
+              <span className="font-mono">/admin/dashboard?ref=FOO&amp;manufacturer=Ninco</span>. Sin
+              referencia se muestra el ranking de huecos; con referencia también salen refs ya presentes en el
+              catálogo. El fabricante es opcional y se combina con la referencia.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
@@ -689,10 +746,10 @@ const AdminPlatformDashboard = () => {
             <>
               <p className="text-sm text-muted-foreground">
                 {refsData.total === 0
-                  ? refsQuery
-                    ? 'Ningún grupo de garaje coincide con esa referencia.'
+                  ? refsQuery || refsManufacturer
+                    ? 'Ningún grupo de garaje coincide con esos filtros.'
                     : 'Ningún grupo cumple los criterios.'
-                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables${refsQuery ? '; exactos primero' : ''}).`}
+                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables${refsQuery ? '; exactos primero' : ''}${refsManufacturer ? '; agrupados por marca' : ''}).`}
               </p>
               {refsData.total > 0 && (
                 <div className="rounded-md border">

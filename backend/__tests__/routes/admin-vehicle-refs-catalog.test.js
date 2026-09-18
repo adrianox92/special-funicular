@@ -149,4 +149,44 @@ describe('GET /api/admin/vehicle-refs-not-in-catalog', () => {
       expect.objectContaining({ p_q: 'FOO' }),
     );
   });
+
+  test('con manufacturer pasa p_manufacturer y no p_q', async () => {
+    mockSupabase.rpc.mockResolvedValue({
+      data: {
+        total: 1,
+        limit: 25,
+        offset: 0,
+        only_unlinked: false,
+        q: null,
+        manufacturer: 'ninco',
+        rows: [{ ...IN_CATALOG_ROW, in_catalog: false, sample_manufacturer: 'Ninco' }],
+      },
+      error: null,
+    });
+
+    const response = await request(app)
+      .get('/api/admin/vehicle-refs-not-in-catalog?manufacturer=Ninco')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(response.status).toBe(200);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('admin_vehicle_refs_missing_catalog', {
+      p_limit: 25,
+      p_offset: 0,
+      p_only_unlinked: false,
+      p_manufacturer: 'Ninco',
+    });
+    expect(response.body.manufacturer).toBe('ninco');
+    expect(response.body.rows[0].sample_manufacturer).toBe('Ninco');
+  });
+
+  test('alias ?mfg= se envía como p_manufacturer', async () => {
+    await request(app)
+      .get('/api/admin/vehicle-refs-not-in-catalog?mfg=Slot.it')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith(
+      'admin_vehicle_refs_missing_catalog',
+      expect.objectContaining({ p_manufacturer: 'Slot.it' }),
+    );
+  });
 });
