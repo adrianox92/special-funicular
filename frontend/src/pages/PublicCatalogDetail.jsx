@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
@@ -127,10 +127,14 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
     });
   }, [id]);
 
+  const itemRef = useRef(item);
+  itemRef.current = item;
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!item || String(item.id) !== String(id)) {
+      const current = itemRef.current;
+      if (!current || String(current.id) !== String(id)) {
         setLoading(true);
       }
       setError(null);
@@ -148,7 +152,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
     return () => {
       cancelled = true;
     };
-  }, [loadItem]); // item: solo evita spinner si el HTML SSR ya trae esta ficha
+  }, [id, loadItem]);
 
   useEffect(() => {
     if (!user || !id) {
