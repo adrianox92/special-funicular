@@ -6,6 +6,34 @@
     {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
+    },
+    {
+      "source": "/sitemap-:name.xml",
+      "destination": "/api/sitemap?name=:name"
+    },
+    {
+      "source": "/catalogo",
+      "destination": "/api/catalog-ssr?ssrPath=/catalogo"
+    },
+    {
+      "source": "/catalogo/:path*",
+      "destination": "/api/catalog-ssr?ssrPath=/catalogo/:path*"
+    },
+    {
+      "source": "/en/catalog",
+      "destination": "/api/catalog-ssr?ssrPath=/en/catalog"
+    },
+    {
+      "source": "/en/catalog/:path*",
+      "destination": "/api/catalog-ssr?ssrPath=/en/catalog/:path*"
+    },
+    {
+      "source": "/de/katalog",
+      "destination": "/api/catalog-ssr?ssrPath=/de/katalog"
+    },
+    {
+      "source": "/de/katalog/:path*",
+      "destination": "/api/catalog-ssr?ssrPath=/de/katalog/:path*"
     }
   ]
 }

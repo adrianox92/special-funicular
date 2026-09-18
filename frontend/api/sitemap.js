@@ -1,25 +1,12 @@
 /**
  * Proxy del sitemap hacia la API Express (Render).
- * Evita un hostname ficticio en vercel.json y usa variables de entorno de Vercel.
+ * Cubre /sitemap.xml (índice) y /sitemap-static.xml, /sitemap-catalog-N.xml.
  */
-function resolveBackendSitemapUrl() {
-  const explicit = process.env.SITEMAP_BACKEND_URL;
-  if (explicit) return String(explicit).trim();
-
-  const apiUrl = process.env.REACT_APP_API_URL;
-  if (!apiUrl) return '';
-
-  try {
-    const u = new URL(apiUrl);
-    return `${u.origin}/sitemap.xml`;
-  } catch {
-    return '';
-  }
-}
+const { getBackendOrigin, sitemapBackendPath } = require('./_lib/backendUrls');
 
 module.exports = async function handler(req, res) {
-  const target = resolveBackendSitemapUrl();
-  if (!target) {
+  const origin = getBackendOrigin();
+  if (!origin) {
     res.status(503)
       .setHeader('Content-Type', 'text/plain; charset=utf-8')
       .send(
@@ -27,6 +14,14 @@ module.exports = async function handler(req, res) {
       );
     return;
   }
+
+  const path = sitemapBackendPath(req.query && req.query.name);
+  if (!path) {
+    res.status(404).setHeader('Content-Type', 'text/plain; charset=utf-8').send('Sitemap not found');
+    return;
+  }
+
+  const target = `${origin}${path}`;
 
   try {
     const upstream = await fetch(target, {
