@@ -102,9 +102,16 @@ function mockGets({ refs = { total: 0, rows: [] } } = {}) {
     }
     if (url === '/admin/vehicle-refs-not-in-catalog') {
       const q = config?.params?.q;
-      if (q) {
+      const manufacturer = config?.params?.manufacturer;
+      if (q || manufacturer) {
+        const rows = refs.rows ?? (q ? [IN_CATALOG_ROW] : [{ ...IN_CATALOG_ROW, in_catalog: false }]);
         return Promise.resolve({
-          data: { total: refs.total ?? 1, q, rows: refs.rows ?? [IN_CATALOG_ROW] },
+          data: {
+            total: refs.total ?? rows.length,
+            q: q || null,
+            manufacturer: manufacturer || null,
+            rows,
+          },
         });
       }
       return Promise.resolve({ data: { total: 0, rows: [] } });
@@ -142,6 +149,7 @@ describe('AdminPlatformDashboard — búsqueda y enlace de refs de garaje', () =
     });
     const last = refsGetCalls().at(-1);
     expect(last[1].params.q).toBeUndefined();
+    expect(last[1].params.manufacturer).toBeUndefined();
   });
 
   it('deep-link ?ref= pide el API con q e incluye refs ya en catálogo', async () => {
@@ -199,5 +207,60 @@ describe('AdminPlatformDashboard — búsqueda y enlace de refs de garaje', () =
       });
     });
     expect(await screen.findByText(/Enlazados 2 vehículo/)).toBeInTheDocument();
+  });
+
+  it('filtra por fabricante y lo combina con la referencia', async () => {
+    mockGets({
+      refs: {
+        total: 1,
+        rows: [{ ...IN_CATALOG_ROW, sample_manufacturer: 'Ninco' }],
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <AdminPlatformDashboard />
+      </MemoryRouter>,
+    );
+
+    const mfg = await screen.findByLabelText('Fabricante');
+    await userEvent.type(mfg, 'Ninco');
+    await userEvent.type(screen.getByLabelText('Buscar referencia'), 'AV52802');
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+
+    await waitFor(() => {
+      expect(window.location.search).toContain('ref=AV52802');
+      expect(window.location.search).toContain('manufacturer=Ninco');
+    });
+    await waitFor(() => {
+      const withBoth = refsGetCalls().filter(
+        ([, cfg]) => cfg?.params?.q === 'AV52802' && cfg?.params?.manufacturer === 'Ninco',
+      );
+      expect(withBoth.length).toBeGreaterThan(0);
+    });
+    expect(await screen.findByText(/agrupados por marca/i)).toBeInTheDocument();
+  });
+
+  it('deep-link ?manufacturer= pide el API con manufacturer', async () => {
+    window.history.replaceState(null, '', '/admin/dashboard?manufacturer=Ninco');
+    mockGets({
+      refs: {
+        total: 1,
+        rows: [{ ...IN_CATALOG_ROW, in_catalog: false, sample_manufacturer: 'Ninco' }],
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <AdminPlatformDashboard />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByDisplayValue('Ninco')).toBeInTheDocument();
+    await waitFor(() => {
+      const withMfg = refsGetCalls().filter(([, cfg]) => cfg?.params?.manufacturer === 'Ninco');
+      expect(withMfg.length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText(/agrupados por marca/i)).toBeInTheDocument();
   });
 });

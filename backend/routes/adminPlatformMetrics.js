@@ -120,6 +120,7 @@ router.get('/timing-retention', async (req, res) => {
  * Sin q: referencias de garaje sin equivalencia en catálogo (trim + lower).
  * Con q / reference / ref: contains sobre ref normalizada; incluye grupos ya presentes
  * en catálogo (in_catalog, catalog_item_id si el match de catálogo es único).
+ * manufacturer / mfg / brand: contains sobre fabricante de garaje; agrupa por marca.
  */
 router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
   try {
@@ -158,6 +159,10 @@ router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
       offset: typeof payload.offset === 'number' ? payload.offset : parsed.offset,
       only_unlinked: !!payload.only_unlinked,
       q: typeof payload.q === 'string' ? payload.q : parsed.q || null,
+      manufacturer:
+        typeof payload.manufacturer === 'string'
+          ? payload.manufacturer
+          : parsed.manufacturer || null,
       rows: Array.isArray(payload.rows) ? payload.rows : [],
     });
   } catch (err) {
