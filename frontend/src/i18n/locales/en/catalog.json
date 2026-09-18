@@ -1,4 +1,6 @@
 {
   "title": "Reference catalog",
-  "browse": "Browse catalog"
+  "browse": "Browse catalog",
+  "previous": "Previous",
+  "next": "Next"
 }

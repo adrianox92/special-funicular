@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import { cn } from './ui/utils';
 
 /**
  * Paginación con ventana de números, primera/última página y anterior/siguiente.
  * Misma lógica responsive que VehicleList (max 3 botones en viewport estrecho).
+ * Si se pasa `getPageHref`, los controles son <a href> reales (rastreables).
  */
-function PageRangePagination({ page, totalPages, onPageChange, disabled = false, className }) {
+function PageRangePagination({
+  page,
+  totalPages,
+  onPageChange,
+  disabled = false,
+  className,
+  getPageHref,
+}) {
   const [narrow, setNarrow] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false
   );
@@ -31,46 +40,54 @@ function PageRangePagination({ page, totalPages, onPageChange, disabled = false,
 
   const nums = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
+  const renderControl = (targetPage, label, extra = {}) => {
+    const href = getPageHref && !disabled ? getPageHref(targetPage) : null;
+    if (href) {
+      return (
+        <Button variant={extra.variant || 'outline'} size="sm" asChild>
+          <Link to={href} aria-current={extra['aria-current']}>
+            {label}
+          </Link>
+        </Button>
+      );
+    }
+    return (
+      <Button
+        variant={extra.variant || 'outline'}
+        size="sm"
+        disabled={disabled || extra.disabled}
+        onClick={() => onPageChange(targetPage)}
+        aria-current={extra['aria-current']}
+      >
+        {label}
+      </Button>
+    );
+  };
+
   return (
     <nav aria-label="Paginación" className={cn('flex flex-wrap items-center justify-center gap-2', className)}>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={disabled || safePage <= 1}
-        onClick={() => onPageChange(safePage - 1)}
-      >
-        Anterior
-      </Button>
-      {startPage > 1 && (
-        <Button variant="outline" size="sm" disabled={disabled} onClick={() => onPageChange(1)}>
-          1
-        </Button>
+      {safePage <= 1
+        ? (
+          <Button variant="outline" size="sm" disabled>
+            Anterior
+          </Button>
+        )
+        : renderControl(safePage - 1, 'Anterior')}
+      {startPage > 1 && renderControl(1, '1')}
+      {nums.map((n) =>
+        renderControl(n, String(n), {
+          variant: n === safePage ? 'default' : 'outline',
+          'aria-current': n === safePage ? 'page' : undefined,
+        }),
       )}
-      {nums.map((n) => (
-        <Button
-          key={n}
-          variant={n === safePage ? 'default' : 'outline'}
-          size="sm"
-          disabled={disabled}
-          onClick={() => onPageChange(n)}
-          aria-current={n === safePage ? 'page' : undefined}
-        >
-          {n}
-        </Button>
-      ))}
-      {endPage < totalPages && (
-        <Button variant="outline" size="sm" disabled={disabled} onClick={() => onPageChange(totalPages)}>
-          {totalPages}
-        </Button>
-      )}
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={disabled || safePage >= totalPages}
-        onClick={() => onPageChange(safePage + 1)}
-      >
-        Siguiente
-      </Button>
+      {endPage < totalPages && renderControl(totalPages, String(totalPages))}
+      {safePage >= totalPages
+        ? (
+          <Button variant="outline" size="sm" disabled>
+            Siguiente
+          </Button>
+        )
+        : renderControl(safePage + 1, 'Siguiente')}
     </nav>
   );
 }
