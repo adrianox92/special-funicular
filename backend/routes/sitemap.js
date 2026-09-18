@@ -1,45 +1,18 @@
 /**
- * Sitemap XML multilingüe para el sitio público (catálogo).
+ * Sitemap XML: índice en /sitemap.xml y hijos chunked.
+ *
+ * robots.txt apunta a https://slotdatabase.es/sitemap.xml (índice).
  */
 const { getAnonClient } = require('../lib/supabaseClients');
+const {
+  CATALOG_CHUNK_SIZE,
+  buildSitemapIndexXml,
+  buildStaticSitemapXml,
+  buildCatalogChunkXml,
+  parseSitemapRequestPath,
+} = require('../lib/sitemapBuilder');
 
 const PAGE_SIZE = 1000;
-const LOCALES = [
-  { code: 'es', home: '/', catalog: '/catalogo' },
-  { code: 'en', home: '/en', catalog: '/en/catalog' },
-  { code: 'de', home: '/de', catalog: '/de/katalog' },
-];
-
-function catalogSlugify(text) {
-  const s = String(text || '')
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 80);
-  return s || 'item';
-}
-
-function escapeXml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function toLastmodW3cDate(iso) {
-  if (iso == null || iso === '') return '';
-  try {
-    const d = new Date(String(iso));
-    if (Number.isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
-  } catch {
-    return '';
-  }
-}
 
 function getPublicSiteOrigin() {
   const raw = process.env.PUBLIC_SITE_ORIGIN;
@@ -48,18 +21,19 @@ function getPublicSiteOrigin() {
   return '';
 }
 
-function catalogItemPaths(itemId, slug) {
-  return LOCALES.map((loc) => {
-    const base = loc.catalog.replace(/\/$/, '');
-    return `${base}/${itemId}/${slug}`;
-  });
+function sendXml(res, body) {
+  res
+    .status(200)
+    .type('application/xml; charset=utf-8')
+    .set('Cache-Control', 'public, max-age=3600')
+    .send(body);
 }
 
 /**
- * @param {import('express').Request} _req
+ * @param {import('express').Request} req
  * @param {import('express').Response} res
  */
-function sitemapHandler(_req, res) {
+function sitemapHandler(req, res) {
   (async () => {
     const origin = getPublicSiteOrigin();
     if (!origin) {
@@ -74,75 +48,72 @@ function sitemapHandler(_req, res) {
       return;
     }
 
-    const supabase = getAnonClient();
-
-    /** @type {{ loc: string, lastmod: string, alternates?: { hreflang: string, href: string }[] }[]} */
-    const urls = [];
-
-    for (const loc of LOCALES) {
-      urls.push({ loc: `${origin}${loc.home}`, lastmod: '' });
-      urls.push({ loc: `${origin}${loc.catalog}`, lastmod: '' });
+    const parsed = parseSitemapRequestPath(req.path);
+    if (parsed.kind === 'unknown') {
+      res.status(404).type('text/plain; charset=utf-8').send('Sitemap not found');
+      return;
     }
 
-    let from = 0;
-    for (;;) {
-      const to = from + PAGE_SIZE - 1;
+    const supabase = getAnonClient();
+
+    if (parsed.kind === 'index') {
+      const { count, error } = await supabase
+        .from('slot_catalog_items_with_ratings')
+        .select('id', { count: 'exact', head: true });
+      if (error) {
+        console.error('[sitemap]', error.message);
+        res.status(500).type('text/plain; charset=utf-8').send('Sitemap generation failed');
+        return;
+      }
+      sendXml(res, buildSitemapIndexXml({ origin, itemCount: count ?? 0, chunkSize: CATALOG_CHUNK_SIZE }));
+      return;
+    }
+
+    if (parsed.kind === 'static') {
+      const { data, error } = await supabase
+        .from('slot_catalog_brands')
+        .select('slug')
+        .order('slug', { ascending: true });
+      if (error) {
+        console.error('[sitemap]', error.message);
+        res.status(500).type('text/plain; charset=utf-8').send('Sitemap generation failed');
+        return;
+      }
+      sendXml(res, buildStaticSitemapXml({ origin, brands: data ?? [] }));
+      return;
+    }
+
+    const chunk = parsed.chunk;
+    const from = (chunk - 1) * CATALOG_CHUNK_SIZE;
+    const to = from + CATALOG_CHUNK_SIZE - 1;
+
+    const rows = [];
+    let pageFrom = from;
+    while (pageFrom <= to) {
+      const pageTo = Math.min(pageFrom + PAGE_SIZE - 1, to);
       const { data, error } = await supabase
         .from('slot_catalog_items_with_ratings')
         .select('id, model_name, reference, updated_at')
         .order('id', { ascending: true })
-        .range(from, to);
+        .range(pageFrom, pageTo);
 
       if (error) {
         console.error('[sitemap]', error.message);
         res.status(500).type('text/plain; charset=utf-8').send('Sitemap generation failed');
         return;
       }
-
       if (!data || data.length === 0) break;
-
-      for (const row of data) {
-        const slug = catalogSlugify(row.model_name || row.reference);
-        const paths = catalogItemPaths(row.id, slug);
-        const lastmod = toLastmodW3cDate(row.updated_at);
-        const alternates = paths.map((path, idx) => ({
-          hreflang: LOCALES[idx].code,
-          href: `${origin}${path}`,
-        }));
-        alternates.push({
-          hreflang: 'x-default',
-          href: `${origin}${paths[0]}`,
-        });
-        paths.forEach((path) => {
-          urls.push({ loc: `${origin}${path}`, lastmod, alternates });
-        });
-      }
-
-      if (data.length < PAGE_SIZE) break;
-      from += PAGE_SIZE;
+      rows.push(...data);
+      if (data.length < pageTo - pageFrom + 1) break;
+      pageFrom += PAGE_SIZE;
     }
 
-    const body =
-      '<?xml version="1.0" encoding="UTF-8"?>\n' +
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' +
-      urls
-        .map((u) => {
-          const lm = u.lastmod ? `\n    <lastmod>${escapeXml(u.lastmod)}</lastmod>` : '';
-          const alt =
-            u.alternates?.map(
-              (a) =>
-                `\n    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" href="${escapeXml(a.href)}" />`,
-            ).join('') || '';
-          return `  <url>\n    <loc>${escapeXml(u.loc)}</loc>${lm}${alt}\n  </url>`;
-        })
-        .join('\n') +
-      '\n</urlset>';
+    if (rows.length === 0) {
+      res.status(404).type('text/plain; charset=utf-8').send('Sitemap chunk is empty');
+      return;
+    }
 
-    res
-      .status(200)
-      .type('application/xml; charset=utf-8')
-      .set('Cache-Control', 'public, max-age=3600')
-      .send(body);
+    sendXml(res, buildCatalogChunkXml({ origin, rows }));
   })().catch((e) => {
     console.error('[sitemap]', e);
     res.status(500).type('text/plain; charset=utf-8').send('Sitemap generation failed');

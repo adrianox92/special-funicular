@@ -38,6 +38,16 @@ import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
 import CatalogTractionSelect from '../components/CatalogTractionSelect';
+import CatalogPrevNext from '../components/CatalogPrevNext';
+
+function readItemBootstrap(expectedId) {
+  if (typeof window === 'undefined' || !expectedId) return null;
+  const boot = window.__PUBLIC_CATALOG_BOOTSTRAP__;
+  if (boot?.kind !== 'item' || !boot.item || String(boot.item.id) !== String(expectedId)) {
+    return null;
+  }
+  return boot.item;
+}
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -61,8 +71,8 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
   const id = catalogItemId ?? params.id;
   const slugParam = catalogSlug ?? params.slug;
   const { user } = useAuth();
-  const [item, setItem] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [item, setItem] = useState(() => readItemBootstrap(catalogItemId ?? params.id));
+  const [loading, setLoading] = useState(() => item == null);
   const [error, setError] = useState(null);
   const [myRating, setMyRating] = useState(null);
   const [myRatingLoading, setMyRatingLoading] = useState(false);
@@ -71,6 +81,12 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
   const [suggestForm, setSuggestForm] = useState({});
   const [suggestImage, setSuggestImage] = useState(null);
   const [catalogImageZoomOpen, setCatalogImageZoomOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.__PUBLIC_CATALOG_BOOTSTRAP__?.kind === 'item') {
+      window.__PUBLIC_CATALOG_BOOTSTRAP__ = undefined;
+    }
+  }, []);
 
   const closeCatalogImageZoom = useCallback(() => {
     setCatalogImageZoomOpen(false);
@@ -114,7 +130,9 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      if (!item || String(item.id) !== String(id)) {
+        setLoading(true);
+      }
       setError(null);
       try {
         await loadItem();
@@ -130,7 +148,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
     return () => {
       cancelled = true;
     };
-  }, [loadItem]);
+  }, [loadItem]); // item: solo evita spinner si el HTML SSR ya trae esta ficha
 
   useEffect(() => {
     if (!user || !id) {
@@ -324,6 +342,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               </>
             )}
           </p>
+          <CatalogPrevNext neighbors={item.neighbors} />
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {ratingAvgStr != null ? (
               <span className="inline-flex items-center gap-1 text-foreground">

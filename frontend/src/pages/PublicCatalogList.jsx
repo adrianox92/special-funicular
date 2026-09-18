@@ -37,6 +37,8 @@ import {
 } from '../utils/catalogFilterSlugs';
 import { labelMotorPosition } from '../data/motorPosition';
 import { Package, Search, Star, X } from 'lucide-react';
+import { localizePath } from '../i18n/localeUtils';
+import { useLocale } from '../hooks/useLocale';
 
 const EMPTY   = '__all__';
 const PAGE_SIZE = 24;
@@ -62,6 +64,7 @@ function PublicCatalogList() {
   const params         = useParams();
   const navigate       = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { locale }     = useLocale();
 
   // --- Parseo del path SEO ---
   const pathSegments = useMemo(() => {
@@ -194,11 +197,11 @@ function PublicCatalogList() {
   // ---- Helpers para cambiar filtros del PATH ----
   const setPathFilter = useCallback((key, value) => {
     const next = { ...pathFilters, [key]: value || null };
-    const path = buildCatalogPath(next);
+    const path = localizePath(locale, buildCatalogPath(next));
     const qs   = new URLSearchParams(searchParams);
     qs.delete('page');
     navigate(`${path}${qs.toString() ? `?${qs.toString()}` : ''}`, { replace: true });
-  }, [pathFilters, searchParams, navigate]);
+  }, [pathFilters, searchParams, navigate, locale]);
 
   useEffect(() => {
     setPathYearDraft(pathFilters.year != null ? String(pathFilters.year) : '');
@@ -237,9 +240,18 @@ function PublicCatalogList() {
   }, [setSearchParams]);
 
   const clearAllFilters = () => {
-    navigate('/catalogo', { replace: true });
+    navigate(localizePath(locale, '/catalogo'), { replace: true });
     setQInput('');
   };
+
+  const getPageHref = useCallback((p) => {
+    const path = localizePath(locale, buildCatalogPath(pathFilters));
+    const qs = new URLSearchParams(searchParams);
+    if (p <= 1) qs.delete('page');
+    else qs.set('page', String(p));
+    const s = qs.toString();
+    return s ? `${path}?${s}` : path;
+  }, [locale, pathFilters, searchParams]);
 
   // ---- Opciones de los desplegables ----
   const manufacturerOptions = useMemo(() => brands, [brands]);
@@ -545,8 +557,9 @@ function PublicCatalogList() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {items.map((row) => {
                 const slug = catalogSlugify(row.model_name || row.reference);
+                const href = localizePath(locale, `/catalogo/${row.id}/${slug}`);
                 return (
-                  <Link key={row.id} to={`/catalogo/${row.id}/${slug}`} className="group block">
+                  <Link key={row.id} to={href} className="group block">
                     <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
                       <div className="aspect-[4/3] bg-muted relative overflow-hidden">
                         {row.image_url ? (
@@ -613,6 +626,7 @@ function PublicCatalogList() {
               page={pageParam}
               totalPages={totalPages}
               onPageChange={setPage}
+              getPageHref={getPageHref}
               disabled={loading}
             />
           </>

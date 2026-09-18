@@ -182,6 +182,8 @@ app.get('/', (_req, res) => {
 
 const sitemapHandler = require('./routes/sitemap');
 app.get('/sitemap.xml', sitemapHandler);
+app.get('/sitemap-static.xml', sitemapHandler);
+app.get('/sitemap-catalog-:chunk.xml', sitemapHandler);
 
 // ==================== RUTAS PÚBLICAS (SIN AUTENTICACIÓN) ====================
 const publicCompetitionsRoute = require('./routes/publicCompetitions');

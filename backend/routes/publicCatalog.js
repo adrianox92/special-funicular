@@ -4,6 +4,7 @@
 const express = require('express');
 const { getAnonClient } = require('../lib/supabaseClients');
 const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
+const { fetchCatalogNeighbors } = require('../lib/catalogNeighbors');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -284,7 +285,15 @@ router.get('/items/:id', async (req, res) => {
       registered_user_count = Number(countVal);
     }
 
-    res.json({ ...data, registered_user_count });
+    let neighbors = { prev: null, next: null };
+    try {
+      // Orden estable: manufacturer ASC (nulls last), reference ASC, id ASC (igual que sort=manufacturer).
+      neighbors = await fetchCatalogNeighbors(supabase, data);
+    } catch (neighborErr) {
+      console.warn('[publicCatalog] neighbors', neighborErr.message);
+    }
+
+    res.json({ ...data, registered_user_count, neighbors });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
