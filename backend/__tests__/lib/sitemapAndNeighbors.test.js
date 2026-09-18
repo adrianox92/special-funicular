@@ -8,6 +8,9 @@ const {
   buildCatalogChunkXml,
   catalogChunkCount,
   parseSitemapRequestPath,
+  normalizePublicSiteOrigin,
+  CATALOG_CHUNK_SIZE,
+  CANONICAL_PUBLIC_ORIGIN,
 } = require('../../lib/sitemapBuilder');
 
 describe('compareCatalogOrder / neighborsFromList', () => {
@@ -40,20 +43,36 @@ describe('compareCatalogOrder / neighborsFromList', () => {
 });
 
 describe('sitemapBuilder', () => {
-  const origin = 'https://slotdatabase.es';
+  const origin = CANONICAL_PUBLIC_ORIGIN;
 
-  test('índice lista static + chunks de 5000', () => {
+  test('normaliza origen público a https://www.slotdatabase.es', () => {
+    expect(normalizePublicSiteOrigin('https://slotdatabase.es')).toBe(origin);
+    expect(normalizePublicSiteOrigin('https://slotdatabase.es/')).toBe(origin);
+    expect(normalizePublicSiteOrigin('http://www.slotdatabase.es')).toBe(origin);
+    expect(normalizePublicSiteOrigin('https://www.slotdatabase.es/')).toBe(origin);
+    expect(normalizePublicSiteOrigin('slotdatabase.es')).toBe(origin);
+    expect(normalizePublicSiteOrigin('http://localhost:3000/')).toBe('http://localhost:3000');
+    expect(normalizePublicSiteOrigin('https://preview.example.vercel.app')).toBe(
+      'https://preview.example.vercel.app',
+    );
+    expect(normalizePublicSiteOrigin('')).toBe('');
+  });
+
+  test('índice lista static + chunks de 2000', () => {
+    expect(CATALOG_CHUNK_SIZE).toBe(2000);
     expect(catalogChunkCount(0)).toBe(0);
-    expect(catalogChunkCount(5000)).toBe(1);
-    expect(catalogChunkCount(5001)).toBe(2);
-    expect(catalogChunkCount(19410)).toBe(4);
+    expect(catalogChunkCount(2000)).toBe(1);
+    expect(catalogChunkCount(2001)).toBe(2);
+    expect(catalogChunkCount(19410)).toBe(10);
 
     const xml = buildSitemapIndexXml({ origin, itemCount: 6468 });
     expect(xml).toContain('<sitemapindex');
     expect(xml).toContain(`${origin}/sitemap-static.xml`);
     expect(xml).toContain(`${origin}/sitemap-catalog-1.xml`);
     expect(xml).toContain(`${origin}/sitemap-catalog-2.xml`);
-    expect(xml).not.toContain('sitemap-catalog-3');
+    expect(xml).toContain(`${origin}/sitemap-catalog-4.xml`);
+    expect(xml).not.toContain('sitemap-catalog-5');
+    expect(xml).not.toContain('://slotdatabase.es/');
   });
 
   test('static incluye home, catálogo y marcas con hreflang', () => {
@@ -82,10 +101,19 @@ describe('sitemapBuilder', () => {
         },
       ],
     });
-    expect(xml).toContain('/catalogo/11111111-1111-4111-8111-111111111111/porsche-911</loc>');
+    expect(xml).toContain(
+      `<loc>${origin}/catalogo/11111111-1111-4111-8111-111111111111/porsche-911</loc>`,
+    );
     expect(xml).toContain('<lastmod>2024-06-01</lastmod>');
-    expect(xml).toContain('/en/catalog/11111111-1111-4111-8111-111111111111/porsche-911');
-    expect(xml).toContain('/de/katalog/11111111-1111-4111-8111-111111111111/porsche-911');
+    expect(xml).toContain(
+      `hreflang="en" href="${origin}/en/catalog/11111111-1111-4111-8111-111111111111/porsche-911"`,
+    );
+    expect(xml).toContain(
+      `hreflang="de" href="${origin}/de/katalog/11111111-1111-4111-8111-111111111111/porsche-911"`,
+    );
+    expect(xml).toContain(
+      `hreflang="x-default" href="${origin}/catalogo/11111111-1111-4111-8111-111111111111/porsche-911"`,
+    );
     expect((xml.match(/<url>/g) || []).length).toBe(1);
   });
 

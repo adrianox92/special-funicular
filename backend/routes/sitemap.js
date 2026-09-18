@@ -1,11 +1,14 @@
 /**
  * Sitemap XML: índice en /sitemap.xml y hijos chunked.
  *
- * robots.txt apunta a https://slotdatabase.es/sitemap.xml (índice).
+ * robots.txt y Search Console deben usar https://www.slotdatabase.es/sitemap.xml (índice).
+ * En Render, PUBLIC_SITE_ORIGIN debería ser https://www.slotdatabase.es (sin barra final);
+ * getPublicSiteOrigin() también reescribe el apex slotdatabase.es a www.
  */
 const { getAnonClient } = require('../lib/supabaseClients');
 const {
   CATALOG_CHUNK_SIZE,
+  normalizePublicSiteOrigin,
   buildSitemapIndexXml,
   buildStaticSitemapXml,
   buildCatalogChunkXml,
@@ -16,7 +19,7 @@ const PAGE_SIZE = 1000;
 
 function getPublicSiteOrigin() {
   const raw = process.env.PUBLIC_SITE_ORIGIN;
-  if (raw) return String(raw).replace(/\/$/, '');
+  if (raw) return normalizePublicSiteOrigin(raw);
   if (process.env.NODE_ENV !== 'production') return 'http://localhost:3000';
   return '';
 }

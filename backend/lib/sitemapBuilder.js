@@ -14,7 +14,35 @@ const LOCALES = [
   { code: 'de', home: '/de', catalog: '/de/katalog' },
 ];
 
-const CATALOG_CHUNK_SIZE = 5000;
+/** Ítems por hijo sitemap-catalog-N.xml. 2000 (~1.7 MB) es más fiable para Googlebot que 5000 (~4 MB). */
+const CATALOG_CHUNK_SIZE = 2000;
+
+/** Host canónico público (apex redirige 307 a www). Sin barra final. */
+const CANONICAL_PUBLIC_ORIGIN = 'https://www.slotdatabase.es';
+const CANONICAL_PUBLIC_HOSTS = new Set(['www.slotdatabase.es', 'slotdatabase.es']);
+
+/**
+ * Origen absoluto para <loc> / hreflang / canonical.
+ * Unifica apex `slotdatabase.es` a `https://www.slotdatabase.es` y recorta la barra final.
+ * Otros hosts (localhost, previews) se dejan intactos salvo el slash.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function normalizePublicSiteOrigin(raw) {
+  const trimmed = String(raw || '')
+    .trim()
+    .replace(/\/+$/, '');
+  if (!trimmed) return '';
+  try {
+    const withScheme = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const url = new URL(withScheme);
+    const hostname = url.hostname.toLowerCase();
+    if (CANONICAL_PUBLIC_HOSTS.has(hostname)) return CANONICAL_PUBLIC_ORIGIN;
+    return `${url.protocol}//${url.host}`.replace(/\/+$/, '');
+  } catch {
+    return trimmed;
+  }
+}
 
 function escapeXml(s) {
   return String(s)
@@ -160,8 +188,10 @@ function parseSitemapRequestPath(pathname) {
 module.exports = {
   LOCALES,
   CATALOG_CHUNK_SIZE,
+  CANONICAL_PUBLIC_ORIGIN,
   catalogSlugify,
   catalogChunkCount,
+  normalizePublicSiteOrigin,
   buildSitemapIndexXml,
   buildStaticSitemapXml,
   buildCatalogChunkXml,

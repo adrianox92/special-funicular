@@ -34,12 +34,32 @@ const FETCH_MS = 8000;
 let spaShellCache = null;
 const SPA_SHELL_TTL_MS = 5 * 60 * 1000;
 
+const CANONICAL_PUBLIC_ORIGIN = 'https://www.slotdatabase.es';
+const CANONICAL_PUBLIC_HOSTS = new Set(['www.slotdatabase.es', 'slotdatabase.es']);
+
+/** Misma regla que el sitemap: apex → www, sin barra final. */
+function normalizePublicSiteOrigin(raw) {
+  const trimmed = String(raw || '')
+    .trim()
+    .replace(/\/+$/, '');
+  if (!trimmed) return '';
+  try {
+    const withScheme = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const url = new URL(withScheme);
+    const hostname = url.hostname.toLowerCase();
+    if (CANONICAL_PUBLIC_HOSTS.has(hostname)) return CANONICAL_PUBLIC_ORIGIN;
+    return `${url.protocol}//${url.host}`.replace(/\/+$/, '');
+  } catch {
+    return trimmed;
+  }
+}
+
 function publicOrigin(req) {
   const fromEnv = process.env.REACT_APP_SITE_URL;
-  if (fromEnv) return String(fromEnv).replace(/\/$/, '');
+  if (fromEnv) return normalizePublicSiteOrigin(fromEnv);
   const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'slotdatabase.es';
-  return `${proto}://${host}`.replace(/\/$/, '');
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'www.slotdatabase.es';
+  return normalizePublicSiteOrigin(`${proto}://${host}`);
 }
 
 function originalPathname(req) {
