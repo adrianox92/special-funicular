@@ -73,7 +73,7 @@ describe('catalogSeoHtml', () => {
     const html = renderItemBody({
       item,
       locale: 'es',
-      origin: 'https://slotdatabase.es',
+      origin: 'https://www.slotdatabase.es',
       slug,
       neighbors: item.neighbors,
     });
@@ -95,13 +95,13 @@ describe('catalogSeoHtml', () => {
       '</head><body><div id="root"></div></body></html>';
     const title = buildCatalogItemPageTitle(item);
     const description = buildCatalogItemMetaDescription(item);
-    const canonical = `https://slotdatabase.es${catalogItemPath('es', item.id, 'porsche-911-gt3')}`;
+    const canonical = `https://www.slotdatabase.es${catalogItemPath('es', item.id, 'porsche-911-gt3')}`;
     const headTags = buildHeadTags({
       locale: 'es',
       title,
       description,
       canonicalUrl: canonical,
-      hreflangs: hreflangForItem('https://slotdatabase.es', item.id, 'porsche-911-gt3'),
+      hreflangs: hreflangForItem('https://www.slotdatabase.es', item.id, 'porsche-911-gt3'),
       imageUrl: item.image_url,
       jsonLd: { '@type': 'Product', name: item.model_name, sku: item.reference },
     });
@@ -111,7 +111,7 @@ describe('catalogSeoHtml', () => {
       rootHtml: renderItemBody({
         item,
         locale: 'es',
-        origin: 'https://slotdatabase.es',
+        origin: 'https://www.slotdatabase.es',
         slug: 'porsche-911-gt3',
         neighbors: item.neighbors,
       }),
@@ -124,6 +124,9 @@ describe('catalogSeoHtml', () => {
     expect(out).toContain('Porsche 911 GT3');
     expect(out).toContain('hreflang="de"');
     expect(out).toContain('/de/katalog/');
+    expect(out).toContain(`rel="canonical" href="${canonical}"`);
+    expect(out).toContain(`property="og:url" content="${canonical}"`);
+    expect(canonical).toMatch(/^https:\/\/www\.slotdatabase\.es\//);
   });
 });
 

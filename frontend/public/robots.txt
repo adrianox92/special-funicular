@@ -1,5 +1,5 @@
 # https://www.robotstxt.org/robotstxt.html
-# Origen canónico del sitio: https://slotdatabase.es
+# Origen canónico del sitio: https://www.slotdatabase.es
 User-agent: *
 Allow: /
 
@@ -18,4 +18,4 @@ Disallow: /settings
 Disallow: /help
 Disallow: /admin/
 
-Sitemap: https://slotdatabase.es/sitemap.xml
+Sitemap: https://www.slotdatabase.es/sitemap.xml
