@@ -1,7 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import CatalogPrevNext from '../../components/CatalogPrevNext';
+
+jest.mock('../../hooks/useLocale', () => ({
+  useLocale: () => ({ locale: 'es' }),
+}));
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -9,9 +12,10 @@ jest.mock('react-i18next', () => ({
       const map = { previous: 'Anterior', next: 'Siguiente' };
       return map[key] ?? key;
     },
-    i18n: { language: 'es', changeLanguage: jest.fn() },
   }),
 }));
+
+import CatalogPrevNext from '../../components/CatalogPrevNext';
 
 const prev = {
   id: '11111111-1111-4111-8111-111111111111',
