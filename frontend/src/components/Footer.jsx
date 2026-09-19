@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCookieConsent } from '../context/CookieConsentContext';
 import LanguageSelector from './LanguageSelector';
+import { useLocale } from '../hooks/useLocale';
+import { localizePath } from '../i18n/localeUtils';
 
 const linkClass =
   'text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm';
@@ -11,6 +13,7 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
   const { openSettings } = useCookieConsent();
   const { t } = useTranslation('common');
+  const { locale } = useLocale();
 
   return (
     <footer className="border-t bg-muted/50 mt-auto">
@@ -33,7 +36,7 @@ const Footer = () => {
             <Link to="/contacto" className={linkClass}>
               {t('footer.contact')}
             </Link>
-            <Link to="/catalogo" className={linkClass}>
+            <Link to={localizePath(locale, '/catalogo')} className={linkClass}>
               {t('footer.catalog')}
             </Link>
           </nav>

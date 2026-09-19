@@ -29,7 +29,7 @@ const PrivateRoute = ({ children }) => {
         }
       }
     }
-    return <Navigate to="/login" replace />;
+    return <Navigate to={`/login?returnUrl=${encodeURIComponent(`${location.pathname}${location.search}`)}`} replace />;
   }
 
   return children;

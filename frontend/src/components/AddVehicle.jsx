@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -29,6 +29,7 @@ const AddVehicle = () => {
   const { t } = useTranslation('vehicles');
   const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [entryMode, setEntryMode] = useState('manual');
@@ -110,6 +111,26 @@ const AddVehicle = () => {
     }));
     if (error) setError(null);
   };
+
+  useEffect(() => {
+    const fromCatalog = searchParams.get('catalogItemId');
+    if (!user || !fromCatalog) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(fromCatalog)}`);
+        if (cancelled || !data?.id) return;
+        setEntryMode('catalog');
+        applyCatalogItem(data);
+      } catch {
+        /* ignore: user can still search manually */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Prefill once when landing from catalog; applyCatalogItem is stable enough for this mount.
+  }, [searchParams, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;

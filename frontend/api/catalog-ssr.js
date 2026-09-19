@@ -209,12 +209,12 @@ async function renderItem(req, res, parsed, spaHtml) {
     return;
   }
 
-  const title = buildCatalogItemPageTitle(item);
-  const description = buildCatalogItemMetaDescription(item);
+  const title = buildCatalogItemPageTitle(item, locale);
+  const description = buildCatalogItemMetaDescription(item, locale);
   const canonicalUrl = `${origin}${catalogItemPath(locale, item.id, slug)}`;
   const imageUrl = item.image_url && String(item.image_url).trim() ? String(item.image_url) : '';
-  const imageAlt = buildCatalogItemImageAlt(item);
-  const jsonLd = buildItemJsonLd({ item, origin, canonicalUrl, description, imageUrl });
+  const imageAlt = buildCatalogItemImageAlt(item, locale);
+  const jsonLd = buildItemJsonLd({ item, origin, canonicalUrl, description, imageUrl, locale });
   const neighbors = item.neighbors || { prev: null, next: null };
 
   const headTags = buildHeadTags({
@@ -224,7 +224,7 @@ async function renderItem(req, res, parsed, spaHtml) {
     canonicalUrl,
     hreflangs: hreflangForItem(origin, item.id, slug),
     imageUrl: imageUrl || `${origin}/logo512.png`,
-    imageAlt: imageUrl ? imageAlt : `Catálogo público · Slot Database`,
+    imageAlt: imageUrl ? imageAlt : t.ogImageAlt,
     jsonLd,
   });
   const rootHtml = renderItemBody({ item, locale, origin, slug, neighbors });
@@ -316,7 +316,7 @@ async function renderList(req, res, parsed, spaHtml) {
     canonicalUrl,
     hreflangs: hreflangForList(origin, parsed.listPathEs),
     imageUrl: `${origin}/logo512.png`,
-    imageAlt: `Catálogo público · Slot Database`,
+    imageAlt: t.ogImageAlt,
     jsonLd: {
       '@context': 'https://schema.org',
       '@type': 'ItemList',

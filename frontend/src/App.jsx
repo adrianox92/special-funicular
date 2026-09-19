@@ -2,7 +2,7 @@ import React from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import PrivateRoute from './components/PrivateRoute';
@@ -39,7 +39,7 @@ import PublicPilotProfile from './pages/PublicPilotProfile';
 import SettingsPage from './pages/SettingsPage';
 import DebugDataPathPage from './pages/DebugDataPathPage';
 import HelpPage from './pages/HelpPage';
-import Login from './components/Login';
+import { LoginOrRedirect } from './components/Login';
 import ResetPassword from './components/ResetPassword';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
@@ -163,7 +163,7 @@ const AppContent = () => {
         <Route path="/" element={<HomeRoute />} />
         <Route path="/en" element={<HomeRoute />} />
         <Route path="/de" element={<HomeRoute />} />
-        <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+        <Route path="/login" element={<LoginOrRedirect />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacidad" element={<PrivacyPolicy />} />
         <Route path="/terminos" element={<TermsOfService />} />
