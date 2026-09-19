@@ -152,7 +152,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
     return () => {
       cancelled = true;
     };
-  }, [id, loadItem]);
+  }, [id, loadItem, t]);
 
   useEffect(() => {
     if (!user || !id) {
