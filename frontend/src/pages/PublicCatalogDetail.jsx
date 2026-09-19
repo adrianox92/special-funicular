@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import PublicCatalogShell from '../components/PublicCatalogShell';
@@ -39,6 +40,9 @@ import { toast } from 'sonner';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
 import CatalogTractionSelect from '../components/CatalogTractionSelect';
 import CatalogPrevNext from '../components/CatalogPrevNext';
+import { useLocale } from '../hooks/useLocale';
+import { localizePath } from '../i18n/localeUtils';
+import { buildLoginPath, withIntent } from '../utils/authReturnUrl';
 
 function readItemBootstrap(expectedId) {
   if (typeof window === 'undefined' || !expectedId) return null;
@@ -47,16 +51,6 @@ function readItemBootstrap(expectedId) {
     return null;
   }
   return boot.item;
-}
-
-function formatDate(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('es-ES', { dateStyle: 'medium' });
-  } catch {
-    return '—';
-  }
 }
 
 function formatRatingAvg(avg) {
@@ -71,6 +65,12 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
   const id = catalogItemId ?? params.id;
   const slugParam = catalogSlug ?? params.slug;
   const { user } = useAuth();
+  const { t } = useTranslation('catalog');
+  const { locale, formatDate } = useLocale();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const garageCtaRef = useRef(null);
+  const ratingCardRef = useRef(null);
   const [item, setItem] = useState(() => readItemBootstrap(catalogItemId ?? params.id));
   const [loading, setLoading] = useState(() => item == null);
   const [error, setError] = useState(null);
@@ -142,7 +142,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
         await loadItem();
       } catch (err) {
         if (!cancelled) {
-          setError(err.response?.data?.error || err.message || 'No encontrado');
+          setError(err.response?.data?.error || err.message || t('detail.loadError'));
           setItem(null);
         }
       } finally {
@@ -182,7 +182,28 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
     return () => {
       clearCatalogItemPageSeo();
     };
-  }, [item, id]);
+  }, [item, id, locale]);
+
+  const catalogListHref = localizePath(locale, '/catalogo');
+  const homeHref = locale === 'es' ? '/' : `/${locale}`;
+
+  const goAuth = (intent) =>
+    buildLoginPath({
+      register: true,
+      returnUrl: withIntent(location.pathname, location.search, intent),
+    });
+  const postAuthIntent = new URLSearchParams(location.search).get('intent');
+  const garageHighlight =
+    postAuthIntent === 'addToGarage' ? ' ring-2 ring-primary ring-offset-2 ring-offset-background' : '';
+
+  useEffect(() => {
+    const intent = new URLSearchParams(location.search).get('intent');
+    if (!user || !intent) return;
+    const target = intent === 'rate' ? ratingCardRef.current : garageCtaRef.current;
+    if (target?.scrollIntoView) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [user, location.search, item]);
 
   const submitRating = async (value) => {
     if (!user) return;
@@ -191,9 +212,9 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       setMyRating(value);
       const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(id)}`);
       setItem(data);
-      toast.success('Valoración guardada');
+      toast.success(t('detail.ratingSaved'));
     } catch (e) {
-      toast.error(e.response?.data?.error || 'No se pudo guardar la valoración');
+      toast.error(e.response?.data?.error || t('detail.ratingSaveError'));
     }
   };
 
@@ -204,9 +225,9 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       setMyRating(null);
       const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(id)}`);
       setItem(data);
-      toast.success('Valoración eliminada');
+      toast.success(t('detail.ratingCleared'));
     } catch (e) {
-      toast.error(e.response?.data?.error || 'Error al eliminar');
+      toast.error(e.response?.data?.error || t('detail.ratingClearError'));
     }
   };
 
@@ -214,7 +235,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
     e.preventDefault();
     if (!user) return;
     if (!suggestForm.manufacturer_id?.trim()) {
-      toast.error('Selecciona una marca registrada.');
+      toast.error(t('detail.suggestBrandRequired'));
       return;
     }
     setSuggestSaving(true);
@@ -242,11 +263,11 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       fd.append('real_race_photos_url', suggestForm.real_race_photos_url?.trim() ?? '');
       if (suggestImage) fd.append('image', suggestImage);
       await api.post(`/catalog/items/${encodeURIComponent(id)}/change-requests`, fd);
-      toast.success('Sugerencia enviada. El equipo la revisará.');
+      toast.success(t('detail.suggestSent'));
       setSuggestOpen(false);
       setSuggestImage(null);
     } catch (err) {
-      toast.error(err.response?.data?.error || err.message || 'Error al enviar');
+      toast.error(err.response?.data?.error || err.message || t('detail.suggestSendError'));
     } finally {
       setSuggestSaving(false);
     }
@@ -267,11 +288,11 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       <PublicCatalogShell>
         <div className="max-w-2xl mx-auto px-4 py-16">
           <Alert variant="destructive">
-            <AlertDescription>{error || 'Ítem no encontrado'}</AlertDescription>
+            <AlertDescription>{error || t('detail.notFound')}</AlertDescription>
           </Alert>
           <p className="mt-4 text-center">
-            <Link to="/catalogo" className="text-primary underline">
-              Volver al catálogo
+            <Link to={localizePath(locale, '/catalogo')} className="text-primary underline">
+              {t('detail.backToCatalog')}
             </Link>
           </p>
         </div>
@@ -281,19 +302,19 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
 
   const canonicalSlug = catalogSlugify(item.model_name || item.reference);
   if (slugParam !== canonicalSlug) {
-    return <Navigate to={`/catalogo/${id}/${canonicalSlug}`} replace />;
+    return <Navigate to={localizePath(locale, `/catalogo/${id}/${canonicalSlug}`)} replace />;
   }
 
   const ratingAvgStr = formatRatingAvg(item.rating_avg);
   const ratingCount = Number(item.rating_count) || 0;
-  const imageAlt = buildCatalogItemImageAlt(item);
+  const imageAlt = buildCatalogItemImageAlt(item, locale);
   const registeredUserCount = Number(item.registered_user_count) || 0;
   const collectionBlurb =
     registeredUserCount === 0
-      ? 'Ningún usuario ha registrado aún este modelo en su colección.'
+      ? t('detail.collectionNone')
       : registeredUserCount === 1
-        ? '1 usuario tiene este modelo en su colección.'
-        : `${registeredUserCount} usuarios tienen este modelo en su colección.`;
+        ? t('detail.collectionOne')
+        : t('detail.collectionMany', { count: registeredUserCount });
 
   const publicRaceResultsUrl =
     item.real_race_results_url != null && String(item.real_race_results_url).trim() !== ''
@@ -309,18 +330,18 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <nav
           className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground"
-          aria-label="Migas de pan"
+          aria-label={t('detail.breadcrumbAria')}
         >
-          <Link to="/" className="hover:text-foreground transition-colors">
-            Inicio
+          <Link to={homeHref} className="hover:text-foreground transition-colors">
+            {t('detail.home')}
           </Link>
           <ChevronRight className="size-4 shrink-0 opacity-60" />
-          <Link to="/catalogo" className="hover:text-foreground transition-colors">
-            Catálogo
+          <Link to={catalogListHref} className="hover:text-foreground transition-colors">
+            {t('detail.catalog')}
           </Link>
           <ChevronRight className="size-4 shrink-0 opacity-60" />
           <Link
-            to={`/catalogo?manufacturer=${encodeURIComponent(item.manufacturer)}`}
+            to={`${catalogListHref}?manufacturer=${encodeURIComponent(item.manufacturer)}`}
             className="text-foreground font-medium truncate max-w-[12rem] sm:max-w-none hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             {item.manufacturer}
@@ -341,7 +362,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               <>
                 <span aria-hidden>·</span>
                 <span>
-                  Dorsal <span className="text-foreground font-medium tabular-nums">{String(item.dorsal).trim()}</span>
+                  {t('detail.dorsal')} <span className="text-foreground font-medium tabular-nums">{String(item.dorsal).trim()}</span>
                 </span>
               </>
             )}
@@ -352,10 +373,10 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               <span className="inline-flex items-center gap-1 text-foreground">
                 <Star className="size-4 fill-amber-400 text-amber-500" aria-hidden />
                 <span className="font-medium">{ratingAvgStr}</span>
-                <span>({ratingCount} valoración{ratingCount === 1 ? '' : 'es'})</span>
+                <span>{t('detail.ratingCount', { count: ratingCount })}</span>
               </span>
             ) : (
-              <span>Sin valoraciones aún</span>
+              <span>{t('detail.noRatings')}</span>
             )}
           </div>
         </header>
@@ -364,21 +385,21 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
           {user ? (
             <>
               <Button type="button" variant="secondary" size="sm" onClick={() => setSuggestOpen(true)}>
-                Sugerir corrección
+                {t('detail.suggestCorrection')}
               </Button>
               <Button type="button" variant="outline" size="sm" asChild>
-                <Link to="/proponer-alta-catalogo">Proponer nuevo modelo</Link>
+                <Link to="/proponer-alta-catalogo">{t('detail.proposeNew')}</Link>
               </Button>
               <Button type="button" variant="ghost" size="sm" asChild>
-                <Link to="/mis-sugerencias-catalogo">Mis sugerencias</Link>
+                <Link to="/mis-sugerencias-catalogo">{t('detail.mySuggestions')}</Link>
               </Button>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              <Link to="/login" className="text-primary underline">
-                Inicia sesión
+              <Link to={goAuth()} className="text-primary underline">
+                {t('detail.guestLoginLink')}
               </Link>{' '}
-              para valorar, sugerir correcciones o proponer altas.
+              {t('detail.guestHint')}
             </p>
           )}
         </div>
@@ -414,7 +435,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                   <div
                     role="dialog"
                     aria-modal="true"
-                    aria-label="Vista ampliada de la imagen"
+                    aria-label={t('detail.imageZoomAria')}
                     className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 bg-background/70 backdrop-blur-sm animate-in fade-in-0 duration-200"
                     onClick={(e) => {
                       if (e.target === e.currentTarget) closeCatalogImageZoom();
@@ -430,7 +451,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                           e.stopPropagation();
                           closeCatalogImageZoom();
                         }}
-                        aria-label="Cerrar vista ampliada"
+                        aria-label={t('detail.closeZoom')}
                       >
                         <X className="size-5" aria-hidden />
                       </Button>
@@ -448,7 +469,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8 rounded-xl overflow-hidden">
                 <div className="flex flex-col items-center gap-2 text-muted-foreground py-12">
                   <Package className="size-16 opacity-40" />
-                  <span className="text-sm">Sin imagen en catálogo</span>
+                  <span className="text-sm">{t('detail.noImage')}</span>
                 </div>
               </div>
             )}
@@ -456,38 +477,41 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
 
           <Card>
             <CardHeader className="pb-2">
-              <h2 className="text-xl font-semibold leading-none tracking-tight">Detalles técnicos</h2>
+              <h2 className="text-xl font-semibold leading-none tracking-tight">{t('detail.specsTitle')}</h2>
             </CardHeader>
             <CardContent>
               <dl className="space-y-0 divide-y divide-border">
-                <DetailRow label="Referencia" value={item.reference} mono />
-                <DetailRow label="Marca" value={item.manufacturer} />
-                <DetailRow label="Nombre / modelo" value={item.model_name} />
-                <DetailRow label="Tipo" value={item.vehicle_type || '—'} />
-                <DetailRow label="Tracción" value={item.traction || '—'} />
-                <DetailRow label="Posición del motor" value={labelMotorPosition(item.motor_position)} />
+                <DetailRow label={t('detail.fieldReference')} value={item.reference} mono />
+                <DetailRow label={t('detail.fieldBrand')} value={item.manufacturer} />
+                <DetailRow label={t('detail.fieldName')} value={item.model_name} />
+                <DetailRow label={t('detail.fieldType')} value={item.vehicle_type || '—'} />
+                <DetailRow label={t('detail.fieldTraction')} value={item.traction || '—'} />
+                <DetailRow label={t('detail.fieldMotor')} value={labelMotorPosition(item.motor_position)} />
                 <DetailRow
-                  label="Año de comercialización"
+                  label={t('detail.fieldYear')}
                   value={item.commercial_release_year != null ? String(item.commercial_release_year) : '—'}
                 />
                 <DetailRow
-                  label="Dorsal"
+                  label={t('detail.fieldDorsal')}
                   value={
                     item.dorsal != null && String(item.dorsal).trim() !== ''
                       ? String(item.dorsal).trim()
                       : '—'
                   }
                 />
-                <DetailRow label="Edición limitada" value={item.limited_edition ? 'Sí' : 'No'} />
+                <DetailRow label={t('detail.fieldLimited')} value={item.limited_edition ? t('detail.yes') : t('detail.no')} />
                 {item.limited_edition && item.limited_edition_total != null && (
                   <DetailRow
-                    label="Tirada (unidades)"
+                    label={t('detail.fieldLimitedTotal')}
                     value={String(item.limited_edition_total)}
                   />
                 )}
-                <DetailRow label="Descatalogado" value={item.discontinued ? 'Sí' : 'No'} />
-                <DetailRow label="Próximo lanzamiento" value={item.upcoming_release ? 'Sí' : 'No'} />
-                <DetailRow label="Última actualización" value={formatDate(item.updated_at)} />
+                <DetailRow label={t('detail.fieldDiscontinued')} value={item.discontinued ? t('detail.yes') : t('detail.no')} />
+                <DetailRow label={t('detail.fieldUpcoming')} value={item.upcoming_release ? t('detail.yes') : t('detail.no')} />
+                <DetailRow
+                  label={t('detail.fieldUpdated')}
+                  value={item.updated_at ? formatDate(item.updated_at, { dateStyle: 'medium' }) : '—'}
+                />
               </dl>
             </CardContent>
           </Card>
@@ -496,7 +520,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
         {(publicRaceResultsUrl || publicRacePhotosUrl) && (
           <Card>
             <CardHeader className="pb-2">
-              <h2 className="text-xl font-semibold leading-none tracking-tight">Competición real</h2>
+              <h2 className="text-xl font-semibold leading-none tracking-tight">{t('detail.realRacing')}</h2>
             </CardHeader>
             <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               {publicRaceResultsUrl && (
@@ -507,7 +531,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                   className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   <ExternalLink className="size-4 shrink-0" aria-hidden />
-                  Resultados en la prueba real
+                  {t('detail.raceResults')}
                 </a>
               )}
               {publicRacePhotosUrl && (
@@ -518,55 +542,99 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                   className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                 >
                   <ExternalLink className="size-4 shrink-0" aria-hidden />
-                  Fotos del vehículo en la prueba
+                  {t('detail.racePhotos')}
                 </a>
               )}
             </CardContent>
           </Card>
         )}
 
-        {user && (
-          <Card>
+        <Card ref={ratingCardRef} id="catalog-rating">
+          <CardHeader className="pb-2">
+            <h2 className="text-base font-semibold leading-none tracking-tight">{t('detail.yourRating')}</h2>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-2">
+            {user && myRatingLoading ? (
+              <Spinner className="size-5" />
+            ) : (
+              <>
+                <div className="flex gap-1" role="group" aria-label={t('detail.ratingGroupAria')}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`rounded p-1 transition-colors ${
+                        myRating != null && n <= myRating
+                          ? 'text-amber-500'
+                          : 'text-muted-foreground hover:text-amber-400'
+                      }`}
+                      onClick={() => {
+                        if (!user) {
+                          navigate(goAuth('rate'));
+                          return;
+                        }
+                        submitRating(n);
+                      }}
+                      aria-label={t('detail.starsAria', { count: n })}
+                    >
+                      <Star
+                        className={`size-8 ${myRating != null && n <= myRating ? 'fill-current' : ''}`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {user && myRating != null && (
+                  <Button type="button" variant="ghost" size="sm" onClick={clearRating}>
+                    {t('detail.clearRating')}
+                  </Button>
+                )}
+                {!user && (
+                  <p className="text-sm text-muted-foreground w-full">{t('guest.rateRedirectHint')}</p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {!user ? (
+          <Card
+            ref={garageCtaRef}
+            id="catalog-add-to-garage"
+            className={`border-primary/40 bg-primary/5 shadow-sm${garageHighlight}`}
+          >
             <CardHeader className="pb-2">
-              <h2 className="text-base font-semibold leading-none tracking-tight">Tu valoración</h2>
+              <h2 className="text-xl font-semibold leading-none tracking-tight">{t('guest.addTitle')}</h2>
             </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-2">
-              {myRatingLoading ? (
-                <Spinner className="size-5" />
-              ) : (
-                <>
-                  <div className="flex gap-1" role="group" aria-label="Valoración de 1 a 5">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        className={`rounded p-1 transition-colors ${
-                          myRating != null && n <= myRating
-                            ? 'text-amber-500'
-                            : 'text-muted-foreground hover:text-amber-400'
-                        }`}
-                        onClick={() => submitRating(n)}
-                        aria-label={`${n} estrellas`}
-                      >
-                        <Star
-                          className={`size-8 ${myRating != null && n <= myRating ? 'fill-current' : ''}`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                  {myRating != null && (
-                    <Button type="button" variant="ghost" size="sm" onClick={clearRating}>
-                      Quitar mi nota
-                    </Button>
-                  )}
-                </>
-              )}
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground leading-relaxed">{t('guest.addBody')}</p>
+              <Button asChild>
+                <Link to={goAuth('addToGarage')}>{t('guest.addCta')}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card
+            ref={garageCtaRef}
+            id="catalog-add-to-garage"
+            className={`border-primary/30 shadow-sm${garageHighlight}`}
+          >
+            <CardHeader className="pb-2">
+              <h2 className="text-xl font-semibold leading-none tracking-tight">{t('detail.addToGarage')}</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground leading-relaxed">{t('detail.addToGarageHint')}</p>
+              <Button asChild>
+                <Link to={`/vehicles/new?catalogItemId=${encodeURIComponent(item.id)}`}>
+                  {t('detail.addToGarage')}
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         )}
-<Card className="border shadow-sm">
+
+        <Card className="border shadow-sm">
           <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
-            <h2 className="text-base font-semibold leading-none tracking-tight">Colecciones</h2>
+            <h2 className="text-base font-semibold leading-none tracking-tight">{t('detail.collections')}</h2>
           </CardHeader>
           <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6 pt-0">
             <p className="text-sm text-muted-foreground leading-relaxed">{collectionBlurb}</p>
@@ -581,11 +649,11 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Sugerir corrección</DialogTitle>
+            <DialogTitle>{t('detail.suggestTitle')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submitSuggest} className="space-y-3 py-2">
             <CatalogBrandSelect
-              label="Marca"
+              label={t('detail.fieldBrand')}
               required
               value={suggestForm.manufacturer_id ?? ''}
               onChange={(manufacturer_id) =>
@@ -593,14 +661,14 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               }
             />
             <div className="space-y-2">
-              <Label>Nombre / modelo</Label>
+              <Label>{t('detail.fieldName')}</Label>
               <Input
                 value={suggestForm.model_name ?? ''}
                 onChange={(e) => setSuggestForm((f) => ({ ...f, model_name: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
-              <Label>Tipo</Label>
+              <Label>{t('detail.fieldType')}</Label>
               <Select
                 value={suggestForm.vehicle_type || '__none__'}
                 onValueChange={(v) =>
@@ -608,13 +676,13 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Opcional" />
+                  <SelectValue placeholder={t('detail.optional')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">— Sin tipo —</SelectItem>
-                  {VEHICLE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
+                  <SelectItem value="__none__">{t('detail.noType')}</SelectItem>
+                  {VEHICLE_TYPES.map((typeName) => (
+                    <SelectItem key={typeName} value={typeName}>
+                      {typeName}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -626,7 +694,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               id="suggest-catalog-traction"
             />
             <div className="space-y-2">
-              <Label>Posición del motor</Label>
+              <Label>{t('detail.fieldMotor')}</Label>
               <Select
                 value={suggestForm.motor_position || '__none__'}
                 onValueChange={(v) =>
@@ -637,7 +705,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                   <SelectValue placeholder="Opcional" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                  <SelectItem value="__none__">{t('detail.unspecified')}</SelectItem>
                   {MOTOR_POSITION_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
                       {o.label}
@@ -647,7 +715,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Año de comercialización</Label>
+              <Label>{t('detail.fieldYear')}</Label>
               <Input
                 type="number"
                 min={1900}
@@ -659,7 +727,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               />
             </div>
             <div className="space-y-2">
-              <Label>Dorsal</Label>
+              <Label>{t('detail.fieldDorsal')}</Label>
               <Input
                 value={suggestForm.dorsal ?? ''}
                 onChange={(e) => setSuggestForm((f) => ({ ...f, dorsal: e.target.value }))}
@@ -667,7 +735,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             </div>
             <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
               <Label htmlFor="suggest-limited" className="cursor-pointer">
-                Edición limitada
+                {t('detail.fieldLimited')}
               </Label>
               <Switch
                 id="suggest-limited"
@@ -683,7 +751,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             </div>
             {suggestForm.limited_edition && (
               <div className="space-y-2">
-                <Label>Tirada total (unidades)</Label>
+                <Label>{t('detail.limitedTotalUnits')}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -695,7 +763,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               </div>
             )}
             <div className="space-y-2">
-              <Label>Enlace a resultados (competición real)</Label>
+              <Label>{t('detail.raceResultsUrl')}</Label>
               <Input
                 type="url"
                 inputMode="url"
@@ -707,7 +775,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               />
             </div>
             <div className="space-y-2">
-              <Label>Enlace a fotos del vehículo real</Label>
+              <Label>{t('detail.racePhotosUrl')}</Label>
               <Input
                 type="url"
                 inputMode="url"
@@ -721,7 +789,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             <div className="flex flex-col gap-3 rounded-lg border p-3">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="suggest-discontinued" className="cursor-pointer">
-                  Descatalogado
+                  {t('detail.fieldDiscontinued')}
                 </Label>
                 <Switch
                   id="suggest-discontinued"
@@ -731,7 +799,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               </div>
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="suggest-upcoming" className="cursor-pointer">
-                  Próximo lanzamiento
+                  {t('detail.fieldUpcoming')}
                 </Label>
                 <Switch
                   id="suggest-upcoming"
@@ -741,7 +809,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Imagen (opcional)</Label>
+              <Label>{t('detail.optionalImage')}</Label>
               <Input
                 type="file"
                 accept="image/*"
@@ -750,10 +818,10 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setSuggestOpen(false)}>
-                Cancelar
+                {t('detail.cancel')}
               </Button>
               <Button type="submit" disabled={suggestSaving}>
-                {suggestSaving ? 'Enviando…' : 'Enviar'}
+                {suggestSaving ? t('detail.sending') : t('detail.send')}
               </Button>
             </DialogFooter>
           </form>

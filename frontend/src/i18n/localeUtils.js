@@ -49,8 +49,15 @@ export function pathImpliesLocale(pathname) {
 /** @param {string} pathname */
 export function stripLocalePrefix(pathname) {
   const p = pathname.split('?')[0];
-  const stripped = p.replace(/^\/(en|de)(?=\/|$)/, '') || '/';
-  return stripped.endsWith('/') && stripped.length > 1 ? stripped.slice(0, -1) : stripped;
+  let stripped = p.replace(/^\/(en|de)(?=\/|$)/, '') || '/';
+  if (stripped.endsWith('/') && stripped.length > 1) stripped = stripped.slice(0, -1);
+  // Bases localizadas del catálogo público → canónico /catalogo (cambio de idioma y títulos).
+  if (stripped === '/catalog' || stripped.startsWith('/catalog/')) {
+    stripped = `/catalogo${stripped.slice('/catalog'.length)}`;
+  } else if (stripped === '/katalog' || stripped.startsWith('/katalog/')) {
+    stripped = `/catalogo${stripped.slice('/katalog'.length)}`;
+  }
+  return stripped;
 }
 
 /**
