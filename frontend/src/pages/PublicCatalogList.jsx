@@ -39,17 +39,10 @@ import { labelMotorPosition } from '../data/motorPosition';
 import { Package, Search, Star, X } from 'lucide-react';
 import { localizePath } from '../i18n/localeUtils';
 import { useLocale } from '../hooks/useLocale';
+import { useTranslation } from 'react-i18next';
 
 const EMPTY   = '__all__';
 const PAGE_SIZE = 24;
-
-// Opciones fijas de ordenación
-const SORT_OPTIONS = [
-  { value: 'manufacturer', label: 'Marca / Referencia' },
-  { value: 'year_desc',    label: 'Año (más reciente)' },
-  { value: 'rating_desc',  label: 'Mejor valorado' },
-  { value: 'newest',       label: 'Añadido recientemente' },
-];
 
 function useDebounce(value, delay = 300) {
   const [debounced, setDebounced] = useState(value);
@@ -65,6 +58,16 @@ function PublicCatalogList() {
   const navigate       = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { locale }     = useLocale();
+  const { t }          = useTranslation('catalog');
+  const sortOptions = useMemo(
+    () => [
+      { value: 'manufacturer', label: t('list.sortManufacturer') },
+      { value: 'year_desc',    label: t('list.sortYearDesc') },
+      { value: 'rating_desc',  label: t('list.sortRatingDesc') },
+      { value: 'newest',       label: t('list.sortNewest') },
+    ],
+    [t],
+  );
 
   // --- Parseo del path SEO ---
   const pathSegments = useMemo(() => {
@@ -167,7 +170,7 @@ function PublicCatalogList() {
       setTotalPages(data.totalPages ?? 1);
       setTotal(data.total ?? 0);
     } catch (e) {
-      setError(e.response?.data?.error || e.message || 'Error al cargar');
+      setError(e.response?.data?.error || e.message || t('list.loadError'));
       setItems([]);
     } finally {
       setLoading(false);
@@ -189,10 +192,11 @@ function PublicCatalogList() {
       tractionLabel:    trLabel,
       year:             pathFilters.year,
       total,
-      canonicalPath:    buildCatalogPath(pathFilters),
+      locale,
+      canonicalPath:    localizePath(locale, buildCatalogPath(pathFilters)),
     });
     return clearCatalogItemPageSeo;
-  }, [pathFilters, brands, total]);
+  }, [pathFilters, brands, total, locale]);
 
   // ---- Helpers para cambiar filtros del PATH ----
   const setPathFilter = useCallback((key, value) => {
@@ -301,10 +305,10 @@ function PublicCatalogList() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Package className="size-8 shrink-0" />
-            Catálogo de referencias
+            {t('list.heading')}
           </h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">
-            Modelos de slot catalogados: referencia, marca, tipo y año de comercialización.
+            {t('list.lead')}
           </p>
         </div>
 
@@ -316,7 +320,7 @@ function PublicCatalogList() {
             <Input
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
-              placeholder="Buscar por referencia, modelo o marca…"
+              placeholder={t('list.searchPlaceholder')}
               className="pl-9"
             />
             {qInput && (
@@ -324,7 +328,7 @@ function PublicCatalogList() {
                 type="button"
                 onClick={() => setQInput('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                aria-label="Limpiar búsqueda"
+                aria-label={t('list.clearSearch')}
               >
                 <X className="size-4" />
               </button>
@@ -335,16 +339,16 @@ function PublicCatalogList() {
           <div className="flex flex-wrap gap-3 items-end">
             {/* Marca */}
             <div className="space-y-1.5 min-w-[160px]">
-              <Label>Marca</Label>
+              <Label>{t('list.brand')}</Label>
               <Select
                 value={pathFilters.manufacturerSlug || EMPTY}
                 onValueChange={(v) => setPathFilter('manufacturerSlug', v === EMPTY ? null : v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Todas las marcas" />
+                  <SelectValue placeholder={t('list.allBrands')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={EMPTY}>Todas las marcas</SelectItem>
+                  <SelectItem value={EMPTY}>{t('list.allBrands')}</SelectItem>
                   {manufacturerOptions.map((b) => (
                     <SelectItem key={b.slug || b.name} value={b.slug || b.name.toLowerCase()}>
                       <span className="flex items-center gap-2">
@@ -361,16 +365,16 @@ function PublicCatalogList() {
 
             {/* Tipo */}
             <div className="space-y-1.5 min-w-[140px]">
-              <Label>Tipo</Label>
+              <Label>{t('list.type')}</Label>
               <Select
                 value={pathFilters.vehicleTypeSlug || EMPTY}
                 onValueChange={(v) => setPathFilter('vehicleTypeSlug', v === EMPTY ? null : v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Todos los tipos" />
+                  <SelectValue placeholder={t('list.allTypes')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={EMPTY}>Todos los tipos</SelectItem>
+                  <SelectItem value={EMPTY}>{t('list.allTypes')}</SelectItem>
                   {vehicleTypeOptions.map((o) => (
                     <SelectItem key={o.slug} value={o.slug}>{o.label}</SelectItem>
                   ))}
@@ -380,16 +384,16 @@ function PublicCatalogList() {
 
             {/* Tracción */}
             <div className="space-y-1.5 min-w-[130px]">
-              <Label>Tracción</Label>
+              <Label>{t('list.traction')}</Label>
               <Select
                 value={pathFilters.tractionSlug || EMPTY}
                 onValueChange={(v) => setPathFilter('tractionSlug', v === EMPTY ? null : v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
+                  <SelectValue placeholder={t('list.allTractions')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={EMPTY}>Todas</SelectItem>
+                  <SelectItem value={EMPTY}>{t('list.allTractions')}</SelectItem>
                   {tractionOptions.map((o) => (
                     <SelectItem key={o.slug} value={o.slug}>{o.label}</SelectItem>
                   ))}
@@ -399,7 +403,7 @@ function PublicCatalogList() {
 
             {/* Año (path): se aplica al salir del campo o Enter; mientras tanto se edita libremente */}
             <div className="space-y-1.5 w-[110px]">
-              <Label htmlFor="catalog-filter-year">Año</Label>
+              <Label htmlFor="catalog-filter-year">{t('list.year')}</Label>
               <Input
                 id="catalog-filter-year"
                 type="text"
@@ -425,21 +429,21 @@ function PublicCatalogList() {
             <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground select-none flex items-center gap-1.5">
               <span className="text-[10px] border rounded px-1 py-0.5 group-open:hidden">+</span>
               <span className="text-[10px] border rounded px-1 py-0.5 hidden group-open:inline">−</span>
-              Filtros avanzados
+              {t('list.advancedFilters')}
             </summary>
             <div className="mt-3 flex flex-wrap gap-3 items-end">
               {/* Motor */}
               <div className="space-y-1.5 min-w-[150px]">
-                <Label>Posición motor</Label>
+                <Label>{t('list.motorPosition')}</Label>
                 <Select
                   value={motorParam || EMPTY}
                   onValueChange={(v) => setQsFilter('motor_position', v === EMPTY ? '' : v)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
+                    <SelectValue placeholder={t('list.allOption')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={EMPTY}>Todas</SelectItem>
+                    <SelectItem value={EMPTY}>{t('list.allOption')}</SelectItem>
                     {motorPositionOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
@@ -451,7 +455,7 @@ function PublicCatalogList() {
 
               {/* Descatalogado */}
               <div className="space-y-1.5 min-w-[150px]">
-                <Label>Estado</Label>
+                <Label>{t('list.status')}</Label>
                 <Select
                   value={discontinuedParam || upcomingParam ? (discontinuedParam === 'true' ? 'discontinued' : upcomingParam === 'true' ? 'upcoming' : EMPTY) : EMPTY}
                   onValueChange={(v) => {
@@ -466,25 +470,25 @@ function PublicCatalogList() {
                     }, { replace: true });
                   }}
                 >
-                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('list.allStatuses')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={EMPTY}>Todos</SelectItem>
-                    <SelectItem value="discontinued">Descatalogados</SelectItem>
-                    <SelectItem value="upcoming">Próximos lanzamientos</SelectItem>
+                    <SelectItem value={EMPTY}>{t('list.allStatuses')}</SelectItem>
+                    <SelectItem value="discontinued">{t('list.discontinued')}</SelectItem>
+                    <SelectItem value="upcoming">{t('list.upcoming')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Rango de años */}
               <div className="space-y-1.5">
-                <Label>Rango de años</Label>
+                <Label>{t('list.yearRange')}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     type="text"
                     inputMode="numeric"
                     autoComplete="off"
                     maxLength={4}
-                    placeholder="Desde"
+                    placeholder={t('list.yearFrom')}
                     className="w-24"
                     value={yearFromParam}
                     onChange={(e) => setQsFilter('year_from', e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -495,7 +499,7 @@ function PublicCatalogList() {
                     inputMode="numeric"
                     autoComplete="off"
                     maxLength={4}
-                    placeholder="Hasta"
+                    placeholder={t('list.yearTo')}
                     className="w-24"
                     value={yearToParam}
                     onChange={(e) => setQsFilter('year_to', e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -508,7 +512,7 @@ function PublicCatalogList() {
           {/* Fila inferior: ordenación + limpiar */}
           <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border">
             <div className="flex items-center gap-2">
-              <Label className="text-xs shrink-0">Ordenar por</Label>
+              <Label className="text-xs shrink-0">{t('list.sortBy')}</Label>
               <Select
                 value={sortParam}
                 onValueChange={(v) => setQsFilter('sort', v === 'manufacturer' ? '' : v)}
@@ -517,7 +521,7 @@ function PublicCatalogList() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SORT_OPTIONS.map((o) => (
+                  {sortOptions.map((o) => (
                     <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -533,7 +537,7 @@ function PublicCatalogList() {
                 onClick={clearAllFilters}
               >
                 <X className="size-3 mr-1" />
-                Limpiar filtros
+                {t('list.clearFilters')}
               </Button>
             )}
           </div>
@@ -551,7 +555,7 @@ function PublicCatalogList() {
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              {total === 0 ? 'Sin resultados' : `${total} resultado${total === 1 ? '' : 's'}`}
+              {total === 0 ? t('list.noResults') : t('list.results', { count: total })}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -571,7 +575,7 @@ function PublicCatalogList() {
                           />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                            Sin imagen
+                            {t('list.noImage')}
                           </div>
                         )}
                       </div>
@@ -600,11 +604,11 @@ function PublicCatalogList() {
                         )}
                         <div className="flex flex-wrap gap-2 pt-1 text-xs">
                           {row.discontinued && (
-                            <span className="rounded-md bg-muted px-2 py-0.5">Descatalogado</span>
+                            <span className="rounded-md bg-muted px-2 py-0.5">{t('list.badgeDiscontinued')}</span>
                           )}
                           {row.upcoming_release && (
                             <span className="rounded-md bg-primary/15 text-primary px-2 py-0.5">
-                              Próximo lanzamiento
+                              {t('list.badgeUpcoming')}
                             </span>
                           )}
                           {row.vehicle_type && (

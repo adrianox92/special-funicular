@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { invalidateApiAccessTokenCache } from '../lib/axios';
+import { isSafeReturnUrl } from '../utils/authReturnUrl';
 
 const AuthContext = createContext(null);
 
@@ -38,11 +39,12 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (returnPath) => {
+    const safePath = isSafeReturnUrl(returnPath) ? returnPath.trim() : '/dashboard';
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${window.location.origin}${safePath}`,
       },
     });
     if (error) throw error;

@@ -59,13 +59,38 @@ describe('catalogSeoHtml', () => {
   };
 
   test('título y description únicos por ítem', () => {
-    const title = buildCatalogItemPageTitle(item);
-    const desc = buildCatalogItemMetaDescription(item);
+    const title = buildCatalogItemPageTitle(item, 'es');
+    const desc = buildCatalogItemMetaDescription(item, 'es');
     expect(title).toContain('Scalextric');
     expect(title).toContain('C1234');
     expect(title).toContain('Slot Database');
     expect(desc).toContain('C1234');
     expect(desc).toContain('GT');
+  });
+
+  test('EN y DE no reutilizan la meta description en español', () => {
+    const en = buildCatalogItemMetaDescription(item, 'en');
+    const de = buildCatalogItemMetaDescription(item, 'de');
+    expect(en).not.toMatch(/coche slot/i);
+    expect(en).not.toMatch(/tracci[oó]n/i);
+    expect(de).not.toMatch(/coche slot/i);
+    expect(de).not.toMatch(/tracci[oó]n/i);
+    expect(en.toLowerCase()).toContain('slot car');
+    expect(de).toContain('Slotcar');
+  });
+
+  test('cuerpo EN usa chrome localizado y no “Anterior”', () => {
+    const html = renderItemBody({
+      item,
+      locale: 'en',
+      origin: 'https://www.slotdatabase.es',
+      slug: catalogSlugify(item.model_name),
+      neighbors: item.neighbors,
+    });
+    expect(html).toContain('Previous');
+    expect(html).toContain('Next');
+    expect(html).not.toContain('Anterior');
+    expect(html).toContain('href="/en/catalog/');
   });
 
   test('cuerpo crawlable con img, datos y prev/next <a href>', () => {
@@ -93,8 +118,8 @@ describe('catalogSeoHtml', () => {
       '<!DOCTYPE html><html lang="es"><head><title>Slot Database | genérico</title>' +
       '<meta name="description" content="genérico" />' +
       '</head><body><div id="root"></div></body></html>';
-    const title = buildCatalogItemPageTitle(item);
-    const description = buildCatalogItemMetaDescription(item);
+    const title = buildCatalogItemPageTitle(item, 'es');
+    const description = buildCatalogItemMetaDescription(item, 'es');
     const canonical = `https://www.slotdatabase.es${catalogItemPath('es', item.id, 'porsche-911-gt3')}`;
     const headTags = buildHeadTags({
       locale: 'es',

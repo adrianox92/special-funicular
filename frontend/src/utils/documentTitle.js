@@ -14,9 +14,7 @@ export function isPublicCatalogDetailPath(pathname) {
   const p = stripLocalePrefix(pathname);
   const PUBLIC_CATALOG_ITEM_PATH =
     /^\/catalogo\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(\/[^/]*)?$/i;
-  const EN_DE_CATALOG =
-    /^\/(en\/catalog|de\/katalog)\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(\/[^/]*)?$/i;
-  return PUBLIC_CATALOG_ITEM_PATH.test(p) || EN_DE_CATALOG.test(p);
+  return PUBLIC_CATALOG_ITEM_PATH.test(p);
 }
 
 export const BRAND = 'Slot Database';
@@ -71,10 +69,10 @@ export function getDocumentTitle(pathname) {
   if (normalized === '/contacto') return withBrand(i18n.t('contact', { ns: 'meta' }));
   if (normalized === '/slot-race-manager') return withBrand(i18n.t('slotRaceManager', { ns: 'meta' }));
   if (normalized.startsWith('/piloto/')) return withBrand(i18n.t('pilot', { ns: 'meta' }));
-  if (normalized === '/catalogo' || normalized === '/en/catalog' || normalized === '/de/katalog') {
+  if (normalized === '/catalogo') {
     return withBrand(i18n.t('catalog', { ns: 'meta' }));
   }
-  if (normalized.startsWith('/catalogo/') || normalized.startsWith('/en/catalog/') || normalized.startsWith('/de/katalog/')) {
+  if (normalized.startsWith('/catalogo/')) {
     return withBrand(i18n.t('catalogItem', { ns: 'meta' }));
   }
   if (normalized === '/mis-sugerencias-catalogo') return withBrand(i18n.t('mySuggestions', { ns: 'meta' }));

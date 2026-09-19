@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -10,6 +10,11 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
 import LanguageSelector from './LanguageSelector';
+import {
+  clearStoredReturnUrl,
+  persistReturnUrl,
+  resolveReturnUrl,
+} from '../utils/authReturnUrl';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -32,7 +37,11 @@ const Login = () => {
     if (searchParams.get('register') === 'true') {
       setActiveTab('register');
     }
+    const next = resolveReturnUrl(searchParams);
+    persistReturnUrl(next);
   }, [searchParams]);
+
+  const afterAuthPath = () => resolveReturnUrl(searchParams) || '/dashboard';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -63,7 +72,9 @@ const Login = () => {
     try {
       if (activeTab === 'login') {
         await login(formData.email, formData.password);
-        navigate('/dashboard');
+        const dest = afterAuthPath();
+        clearStoredReturnUrl();
+        navigate(dest);
       } else {
         if (formData.password !== formData.confirmPassword) {
           throw new Error(t('passwordMismatch'));
@@ -88,7 +99,8 @@ const Login = () => {
     setError(null);
     setGoogleLoading(true);
     try {
-      await loginWithGoogle();
+      const dest = afterAuthPath();
+      await loginWithGoogle(`/login?returnUrl=${encodeURIComponent(dest)}`);
     } catch (err) {
       setError(err.message ?? t('googleError'));
       setGoogleLoading(false);
@@ -313,5 +325,16 @@ const Login = () => {
     </div>
   );
 };
+
+export function LoginOrRedirect() {
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  if (user) {
+    const dest = resolveReturnUrl(searchParams) || '/dashboard';
+    clearStoredReturnUrl();
+    return <Navigate to={dest} replace />;
+  }
+  return <Login />;
+}
 
 export default Login;
