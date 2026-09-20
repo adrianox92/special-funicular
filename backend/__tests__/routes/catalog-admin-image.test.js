@@ -131,6 +131,54 @@ describe('admin catalog item image', () => {
     expect(response.body.image_url).toBeNull();
   });
 
+  test('PUT /items/:id con año vacío lo deja a null', async () => {
+    ratingsBuilder = createRatingsBuilder({ ...EXISTING, commercial_release_year: null });
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemsBuilder;
+      if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      return createItemsBuilder(null);
+    });
+
+    const response = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name)
+      .field('commercial_release_year', '');
+
+    expect(response.status).toBe(200);
+    expect(itemsBuilder.updatePayload).toEqual(
+      expect.objectContaining({
+        commercial_release_year: null,
+      }),
+    );
+    expect(response.body.commercial_release_year).toBeNull();
+  });
+
+  test('PUT /items/:id sin campo de año conserva el existente', async () => {
+    ratingsBuilder = createRatingsBuilder(EXISTING);
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemsBuilder;
+      if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      return createItemsBuilder(null);
+    });
+
+    const response = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name);
+
+    expect(response.status).toBe(200);
+    expect(itemsBuilder.updatePayload).toEqual(
+      expect.objectContaining({
+        commercial_release_year: EXISTING.commercial_release_year,
+      }),
+    );
+  });
+
   test('PUT /items/:id sin clear_image conserva la foto', async () => {
     ratingsBuilder = createRatingsBuilder(EXISTING);
     mockSupabase.from.mockImplementation((table) => {
