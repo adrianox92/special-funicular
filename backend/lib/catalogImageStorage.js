@@ -65,5 +65,6 @@ module.exports = {
   CATALOG_IMAGES_BUCKET,
   uploadCatalogImageBuffer,
   uploadBrandLogoBuffer,
+  catalogStoragePathFromPublicUrl,
   removeCatalogObjectByPublicUrl,
 };
