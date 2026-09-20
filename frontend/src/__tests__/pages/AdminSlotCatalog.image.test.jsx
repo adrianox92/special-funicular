@@ -197,4 +197,19 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
     });
     expect(screen.queryByLabelText('Quitar imagen actual')).not.toBeInTheDocument();
   });
+
+  it('al borrar el año de comercialización lo envía vacío para poder dejarlo sin valor', async () => {
+    await openItemsAndEdit();
+
+    const yearInput = screen.getByPlaceholderText('ej. 2020');
+    expect(yearInput).toHaveValue(2020);
+    await userEvent.clear(yearInput);
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalled();
+    });
+    const [, fd] = api.put.mock.calls[0];
+    expect(fd.get('commercial_release_year')).toBe('');
+  });
 });

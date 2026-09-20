@@ -733,7 +733,7 @@ function AdminSlotCatalog() {
       if (form.vehicle_type) fd.append('vehicle_type', form.vehicle_type);
       fd.append('traction', form.traction ?? '');
       fd.append('motor_position', form.motor_position ?? '');
-      if (form.commercial_release_year) fd.append('commercial_release_year', form.commercial_release_year);
+      fd.append('commercial_release_year', form.commercial_release_year ?? '');
       fd.append('dorsal', form.dorsal ?? '');
       fd.append('limited_edition', form.limited_edition ? 'true' : 'false');
       fd.append(
