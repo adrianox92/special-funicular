@@ -232,9 +232,12 @@ function AdminSlotCatalog() {
   const [imageFile, setImageFile] = useState(null);
   /** URL guardada en servidor al editar (solo lectura en el formulario). */
   const [existingImageUrl, setExistingImageUrl] = useState(null);
+  /** Si true, al guardar se elimina la imagen actual (salvo que se suba otra). */
+  const [clearImage, setClearImage] = useState(false);
   /** Vista previa de archivo nuevo elegido (object URL). */
   const [newImageObjectUrl, setNewImageObjectUrl] = useState(null);
   const [formSaving, setFormSaving] = useState(false);
+  const [imageDeleting, setImageDeleting] = useState(false);
 
   useEffect(() => {
     if (!imageFile) {
@@ -646,6 +649,7 @@ function AdminSlotCatalog() {
     setForm(emptyItem);
     setImageFile(null);
     setExistingImageUrl(null);
+    setClearImage(false);
     setNewImageObjectUrl(null);
     setEditOpen(true);
   };
@@ -678,6 +682,7 @@ function AdminSlotCatalog() {
     setImageFile(null);
     const url = row.image_url != null && String(row.image_url).trim() ? String(row.image_url) : null;
     setExistingImageUrl(url);
+    setClearImage(false);
     setNewImageObjectUrl(null);
     setEditOpen(true);
   };
@@ -709,6 +714,7 @@ function AdminSlotCatalog() {
     });
     setImageFile(null);
     setExistingImageUrl(null);
+    setClearImage(false);
     setNewImageObjectUrl(null);
     setEditOpen(true);
   };
@@ -741,6 +747,7 @@ function AdminSlotCatalog() {
       fd.append('real_race_results_url', form.real_race_results_url?.trim() ?? '');
       fd.append('real_race_photos_url', form.real_race_photos_url?.trim() ?? '');
       if (imageFile) fd.append('image', imageFile);
+      if (editMode === 'edit' && clearImage && !imageFile) fd.append('clear_image', 'true');
 
       if (editMode === 'create' || editMode === 'duplicate') {
         await api.post('/catalog/items', fd);
@@ -753,6 +760,24 @@ function AdminSlotCatalog() {
       alert(e.response?.data?.error || e.message || 'Error al guardar');
     } finally {
       setFormSaving(false);
+    }
+  };
+
+  const removeExistingImageNow = async () => {
+    if (editMode !== 'edit' || !editingId || !existingImageUrl || imageFile) return;
+    setImageDeleting(true);
+    try {
+      await api.delete(`/catalog/items/${editingId}/image`);
+      setExistingImageUrl(null);
+      setClearImage(false);
+      setItems((prev) =>
+        prev.map((row) => (row.id === editingId ? { ...row, image_url: null } : row)),
+      );
+      toast.success('Imagen eliminada');
+    } catch (e) {
+      alert(e.response?.data?.error || e.message || 'Error al eliminar la imagen');
+    } finally {
+      setImageDeleting(false);
     }
   };
 
@@ -1085,6 +1110,7 @@ function AdminSlotCatalog() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Imagen</TableHead>
                       <TableHead>Referencia</TableHead>
                       <TableHead>Marca</TableHead>
                       <TableHead>Nombre</TableHead>
@@ -1100,6 +1126,17 @@ function AdminSlotCatalog() {
                   <TableBody>
                     {items.map(row => (
                       <TableRow key={row.id}>
+                        <TableCell>
+                          {row.image_url ? (
+                            <img
+                              src={row.image_url}
+                              alt=""
+                              className="h-12 w-auto max-w-[5rem] rounded border object-contain bg-muted/30"
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-sm">{row.reference}</TableCell>
                         <TableCell>{row.manufacturer}</TableCell>
                         <TableCell>{row.model_name}</TableCell>
@@ -2080,7 +2117,7 @@ function AdminSlotCatalog() {
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>Imagen (opcional)</Label>
-              {(newImageObjectUrl || existingImageUrl) && (
+              {(newImageObjectUrl || (existingImageUrl && !clearImage)) && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">
                     {newImageObjectUrl ? 'Vista previa (sustituirá la actual al guardar)' : 'Imagen actual'}
@@ -2092,11 +2129,43 @@ function AdminSlotCatalog() {
                   />
                 </div>
               )}
+              {clearImage && !newImageObjectUrl && (
+                <p className="text-xs text-muted-foreground">
+                  La imagen actual se eliminará al guardar. Puedes cancelar o elegir otra foto.
+                </p>
+              )}
               <Input
                 type="file"
                 accept="image/*"
-                onChange={e => setImageFile(e.target.files?.[0] || null)}
+                onChange={e => {
+                  setImageFile(e.target.files?.[0] || null);
+                  setClearImage(false);
+                }}
               />
+              {editMode === 'edit' && existingImageUrl && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={clearImage}
+                      onChange={(e) => {
+                        setClearImage(e.target.checked);
+                        if (e.target.checked) setImageFile(null);
+                      }}
+                    />
+                    Quitar imagen actual
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={imageDeleting || !!imageFile}
+                    onClick={removeExistingImageNow}
+                  >
+                    {imageDeleting ? 'Eliminando…' : 'Eliminar ahora'}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
