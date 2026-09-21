@@ -235,9 +235,9 @@ describe('Dashboard Component', () => {
       expect(screen.getByTestId('kpi-stat-investment')).toBeInTheDocument();
       expect(screen.getByTestId('kpi-extra-avg-increment')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('kpi-stat-purchases')).toHaveTextContent('4.000,00');
-    expect(screen.getByTestId('kpi-stat-modifications')).toHaveTextContent('1.000,00');
-    expect(screen.getByTestId('kpi-stat-investment')).toHaveTextContent('5.000,00');
+    expect(screen.getByTestId('kpi-stat-purchases')).toHaveTextContent('4000,00');
+    expect(screen.getByTestId('kpi-stat-modifications')).toHaveTextContent('1000,00');
+    expect(screen.getByTestId('kpi-stat-investment')).toHaveTextContent('5000,00');
   });
 
   test('actualiza los datos cuando cambian las respuestas de la API', async () => {
