@@ -93,6 +93,7 @@ const CATALOG_ITEMS_MISSING = {
 
 const CATALOG_MISSING_FILTER_LABELS = {
   '': 'Sin filtrar por huecos',
+  weighted: 'Falta algún dato ponderado',
   image: 'Solo sin imagen',
   vehicle_type: 'Solo sin tipo',
   traction: 'Solo sin tracción',
@@ -100,6 +101,35 @@ const CATALOG_MISSING_FILTER_LABELS = {
   year: 'Solo sin año de comercialización',
   dorsal: 'Solo sin dorsal',
 };
+
+function BrandWeightedCompletenessCell({ brand, onOpenIncomplete }) {
+  const items = Number.isFinite(brand.catalog_items_count) ? brand.catalog_items_count : 0;
+  const pct = Number.isFinite(brand.weighted_completeness_percent)
+    ? brand.weighted_completeness_percent
+    : 0;
+  const incomplete = Number.isFinite(brand.incomplete_count) ? brand.incomplete_count : 0;
+  if (items === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const label = `${pct}%`;
+  return (
+    <Button
+      type="button"
+      variant="link"
+      size="sm"
+      className="h-auto px-0 py-0 tabular-nums"
+      title={
+        incomplete > 0
+          ? `${incomplete} ítem${incomplete === 1 ? '' : 's'} con algún dato ponderado pendiente`
+          : 'Todos los ítems tienen los 6 campos ponderados'
+      }
+      aria-label={`Ver ítems incompletos de ${brand.name}: ${label}`}
+      onClick={() => onOpenIncomplete(brand)}
+    >
+      {label}
+    </Button>
+  );
+}
 
 const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
@@ -562,6 +592,14 @@ function AdminSlotCatalog() {
     } finally {
       setCreateSellerSaving(false);
     }
+  };
+
+  const openBrandIncompleteItems = (brand) => {
+    setRefFilter('');
+    setMfgBrandId(brand.id);
+    setItemsMissingFilter('weighted');
+    setPage(1);
+    setTab('items');
   };
 
   const fetchBrandsAdmin = useCallback(async () => {
@@ -1062,6 +1100,7 @@ function AdminSlotCatalog() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">{CATALOG_MISSING_FILTER_LABELS['']}</SelectItem>
+                      <SelectItem value="weighted">{CATALOG_MISSING_FILTER_LABELS.weighted}</SelectItem>
                       <SelectItem value="image">{CATALOG_MISSING_FILTER_LABELS.image}</SelectItem>
                       <SelectItem value="vehicle_type">{CATALOG_MISSING_FILTER_LABELS.vehicle_type}</SelectItem>
                       <SelectItem value="traction">{CATALOG_MISSING_FILTER_LABELS.traction}</SelectItem>
@@ -1161,6 +1200,7 @@ function AdminSlotCatalog() {
                 <CardTitle>Marcas del catálogo</CardTitle>
                 <CardDescription>
                   Nombre canónico único (comparación sin distinguir mayúsculas). Logo opcional. Los ítems e importaciones deben usar estas marcas.
+                  La completitud ponderada (imagen 30%; nombre, tipo, tracción, motor y año 14% cada uno) es un enlace a los ítems de esa marca a los que les falta alguno de esos datos.
                 </CardDescription>
               </div>
               <Button type="button" onClick={openCreateBrand}>
@@ -1179,6 +1219,7 @@ function AdminSlotCatalog() {
                       <TableHead>Nombre</TableHead>
                       <TableHead className="hidden md:table-cell w-[100px]">Prefijo ref.</TableHead>
                       <TableHead className="text-right whitespace-nowrap">Ítems</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Completitud</TableHead>
                       <TableHead className="hidden sm:table-cell">Creada</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -1205,6 +1246,12 @@ function AdminSlotCatalog() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {Number.isFinite(b.catalog_items_count) ? b.catalog_items_count : 0}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          <BrandWeightedCompletenessCell
+                            brand={b}
+                            onOpenIncomplete={openBrandIncompleteItems}
+                          />
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
                           {b.created_at
