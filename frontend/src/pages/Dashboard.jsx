@@ -5,6 +5,7 @@ import {
   Truck,
   Wrench,
   Euro,
+  ShoppingCart,
   Trophy,
   Clock,
   Car,
@@ -167,6 +168,9 @@ const KpiChip = ({ to, icon: Icon, label, value }) => {
   return <div className={className}>{inner}</div>;
 };
 
+const kpiCellClassName =
+  'min-w-0 flex-1 border-b border-border/60 last:border-b-0 sm:max-lg:[&:nth-child(odd)]:border-r sm:max-lg:[&:nth-last-child(-n+2)]:border-b-0 lg:border-r lg:[&:nth-child(3n)]:border-r-0 lg:[&:nth-last-child(-n+3)]:border-b-0';
+
 const KpiStat = ({ to, icon: Icon, label, value, subtitle, testId }) => {
   const inner = (
     <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-3 sm:px-4" data-testid={testId}>
@@ -182,13 +186,16 @@ const KpiStat = ({ to, icon: Icon, label, value, subtitle, testId }) => {
     return (
       <Link
         to={to}
-        className="min-w-0 flex-1 rounded-lg transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(
+          kpiCellClassName,
+          'rounded-none transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
       >
         {inner}
       </Link>
     );
   }
-  return inner;
+  return <div className={kpiCellClassName}>{inner}</div>;
 };
 
 const ExtraMetricRow = ({ label, value, hint, to, testId }) => {
@@ -678,7 +685,7 @@ const Dashboard = () => {
           <p className="text-sm text-muted-foreground">{t('kpiDescCompact')}</p>
         </div>
         <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
-          <div className="grid grid-cols-1 divide-y divide-border/60 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <KpiStat
               to="/vehicles"
               icon={Truck}
@@ -687,10 +694,23 @@ const Dashboard = () => {
               testId="kpi-stat-vehicles"
             />
             <KpiStat
+              icon={ShoppingCart}
+              label={t('metrics.purchaseInvestment')}
+              value={formatCurrencyEur(metrics.purchaseInvestment)}
+              testId="kpi-stat-purchases"
+            />
+            <KpiStat
+              icon={Wrench}
+              label={t('metrics.modificationInvestment')}
+              value={formatCurrencyEur(metrics.modificationInvestment)}
+              subtitle={t('metrics.averageLabel', { value: formatCurrencyEur(metrics.averageInvestmentPerVehicle) })}
+              testId="kpi-stat-modifications"
+            />
+            <KpiStat
               icon={Euro}
               label={t('metrics.totalInvestment')}
               value={formatCurrencyEur(metrics.totalInvestment)}
-              subtitle={t('metrics.averageLabel', { value: formatCurrencyEur(metrics.averageInvestmentPerVehicle) })}
+              subtitle={t('metrics.investmentSumHint')}
               testId="kpi-stat-investment"
             />
             <KpiStat
