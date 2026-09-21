@@ -18,6 +18,11 @@ const { catalogContributionsLimiter } = require('../middleware/rateLimits');
 const { isExcelImportFile, normalizeBlankColumnHeaders } = require('../lib/vehicleImport');
 const { parseImportCommercialReleaseYear } = require('../lib/importDateParse');
 const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
+const {
+  computeCatalogDashboardStats,
+  aggregateCompletenessByManufacturerId,
+  applyCatalogItemsMissingFilter,
+} = require('../lib/catalogCompleteness');
 
 const router = express.Router();
 
@@ -182,103 +187,6 @@ function adminCatalogServiceDb(req, res, next) {
   const svc = getServiceClient();
   if (svc) req.supabase = svc;
   next();
-}
-
-/**
- * Completitud ponderada del catálogo (dashboard admin). Marca excluida: `manufacturer_id` es NOT NULL
- * y no discrimina. Pesos sobre 6 campos, suma 1 — imagen 30%; nombre, tipo, tracción, motor y año 14% cada uno.
- */
-const CATALOG_COMPLETENESS_WEIGHTS = {
-  image_url: 0.3,
-  model_name: 0.14,
-  vehicle_type: 0.14,
-  traction: 0.14,
-  motor_position: 0.14,
-  commercial_release_year: 0.14,
-};
-
-/** Año de comercialización válido para métricas “sin año” y ponderación. */
-function catalogYearPresent(y) {
-  if (y == null || y === '') return false;
-  const n = Number(y);
-  return Number.isFinite(n) && n >= 1900 && n <= 2100;
-}
-
-function catalogDorsalPresent(d) {
-  if (d == null || d === '') return false;
-  return String(d).trim() !== '';
-}
-
-function catalogCompletenessFilled(row) {
-  return {
-    model_name: row.model_name != null && String(row.model_name).trim() !== '',
-    vehicle_type: row.vehicle_type != null && String(row.vehicle_type).trim() !== '',
-    traction: row.traction != null && String(row.traction).trim() !== '',
-    motor_position: row.motor_position != null && String(row.motor_position).trim() !== '',
-    image_url: row.image_url != null && String(row.image_url).trim() !== '',
-    commercial_release_year: catalogYearPresent(row.commercial_release_year),
-  };
-}
-
-function computeCatalogDashboardStats(rows) {
-  const w = CATALOG_COMPLETENESS_WEIGHTS;
-  const total = rows.length;
-  let sumScores = 0;
-  let fullyComplete = 0;
-  let withoutImage = 0;
-  let withoutVehicleType = 0;
-  let withoutTraction = 0;
-  let withoutMotor = 0;
-  let withoutYear = 0;
-  let withoutDorsal = 0;
-
-  for (const row of rows) {
-    const f = catalogCompletenessFilled(row);
-    sumScores +=
-      w.image_url * (f.image_url ? 1 : 0) +
-      w.model_name * (f.model_name ? 1 : 0) +
-      w.vehicle_type * (f.vehicle_type ? 1 : 0) +
-      w.traction * (f.traction ? 1 : 0) +
-      w.motor_position * (f.motor_position ? 1 : 0) +
-      w.commercial_release_year * (f.commercial_release_year ? 1 : 0);
-    if (
-      f.model_name &&
-      f.vehicle_type &&
-      f.traction &&
-      f.motor_position &&
-      f.image_url &&
-      f.commercial_release_year
-    ) {
-      fullyComplete += 1;
-    }
-    if (!f.image_url) withoutImage += 1;
-    if (!f.vehicle_type) withoutVehicleType += 1;
-    if (!f.traction) withoutTraction += 1;
-    if (!f.motor_position) withoutMotor += 1;
-    if (!catalogYearPresent(row.commercial_release_year)) withoutYear += 1;
-    if (!catalogDorsalPresent(row.dorsal)) withoutDorsal += 1;
-  }
-
-  const pctRatio = (num, den) => (den > 0 ? Math.round((num / den) * 10000) / 100 : 0);
-
-  return {
-    totalItems: total,
-    weightedCompletenessPercent: total > 0 ? pctRatio(sumScores, total) : 0,
-    fullyCompleteCount: fullyComplete,
-    fullyCompletePercent: pctRatio(fullyComplete, total),
-    missing: {
-      withoutImage,
-      withoutVehicleType,
-      withoutTraction,
-      withoutMotor,
-      withoutYear,
-      withoutDorsal,
-    },
-    weights: {
-      ...CATALOG_COMPLETENESS_WEIGHTS,
-      note: 'Marca (manufacturer_id) no entra en la ponderación.',
-    },
-  };
 }
 
 async function fetchAllSlotCatalogRowsForStats(sb) {
@@ -948,7 +856,7 @@ router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
     const refFilter = String(req.query.reference ?? '').trim();
     const manufacturerId = String(req.query.manufacturer_id ?? '').trim();
     const mfgFilter = String(req.query.manufacturer ?? '').trim();
-    /** Hueco de datos: solo ítems que carecen de ese campo (alineado con métricas del dashboard). */
+    /** Hueco de datos: campo concreto o `weighted` (falta algún campo ponderado). */
     const missing = String(req.query.missing ?? '').trim().toLowerCase();
 
     const buildCatalogItemsQuery = (opts = {}) => {
@@ -965,21 +873,7 @@ router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
         const p = `%${escapeIlikePattern(mfgFilter)}%`;
         q = q.ilike('manufacturer', p);
       }
-      if (missing === 'image') {
-        q = q.or('image_url.is.null,image_url.eq.');
-      } else if (missing === 'vehicle_type') {
-        q = q.or('vehicle_type.is.null,vehicle_type.eq.');
-      } else if (missing === 'traction') {
-        q = q.or('traction.is.null,traction.eq.');
-      } else if (missing === 'motor' || missing === 'motor_position') {
-        q = q.or('motor_position.is.null,motor_position.eq.');
-      } else if (missing === 'year') {
-        q = q.or(
-          'commercial_release_year.is.null,commercial_release_year.lt.1900,commercial_release_year.gt.2100',
-        );
-      } else if (missing === 'dorsal') {
-        q = q.or('dorsal.is.null,dorsal.eq.');
-      }
+      q = applyCatalogItemsMissingFilter(q, missing);
       if (opts.head !== true) {
         q = q.order('reference', { ascending: true });
       }
@@ -2007,7 +1901,7 @@ router.post('/import', adminGuard, adminCatalogServiceDb, upload.single('file'),
 const brandUpload = upload.fields([{ name: 'logo', maxCount: 1 }]);
 
 /**
- * GET /brands — admin: listado completo con timestamps + nº de ítems por marca
+ * GET /brands — admin: listado completo con timestamps, nº de ítems y completitud ponderada
  */
 router.get('/brands', adminGuard, adminCatalogServiceDb, async (req, res) => {
   try {
@@ -2017,32 +1911,38 @@ router.get('/brands', adminGuard, adminCatalogServiceDb, async (req, res) => {
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
 
-    const countByManufacturer = new Map();
+    const allItems = [];
     const pageSize = 1000;
     let from = 0;
     while (true) {
       const to = from + pageSize - 1;
       const { data: itemRows, error: itemsError } = await req.supabase
         .from('slot_catalog_items')
-        .select('manufacturer_id')
+        .select(
+          'manufacturer_id, model_name, vehicle_type, traction, motor_position, image_url, commercial_release_year',
+        )
         .not('manufacturer_id', 'is', null)
         .range(from, to);
       if (itemsError) return res.status(500).json({ error: itemsError.message });
 
-      for (const row of itemRows ?? []) {
-        const manufacturerId = row?.manufacturer_id != null ? String(row.manufacturer_id) : '';
-        if (!manufacturerId) continue;
-        countByManufacturer.set(manufacturerId, (countByManufacturer.get(manufacturerId) ?? 0) + 1);
-      }
+      allItems.push(...(itemRows ?? []));
 
       if (!itemRows || itemRows.length < pageSize) break;
       from += pageSize;
     }
 
-    const brandsWithCounts = (brands ?? []).map((brand) => ({
-      ...brand,
-      catalog_items_count: countByManufacturer.get(String(brand.id)) ?? 0,
-    }));
+    const completenessByBrand = aggregateCompletenessByManufacturerId(allItems);
+
+    const brandsWithCounts = (brands ?? []).map((brand) => {
+      const metrics = completenessByBrand.get(String(brand.id));
+      return {
+        ...brand,
+        catalog_items_count: metrics?.catalog_items_count ?? 0,
+        weighted_completeness_percent: metrics?.weighted_completeness_percent ?? 0,
+        fully_complete_count: metrics?.fully_complete_count ?? 0,
+        incomplete_count: metrics?.incomplete_count ?? 0,
+      };
+    });
 
     res.json({ brands: brandsWithCounts });
   } catch (e) {
