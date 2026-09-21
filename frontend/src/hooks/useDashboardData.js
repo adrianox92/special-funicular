@@ -9,6 +9,8 @@ const defaultMetrics = {
   museoVehicles: 0,
   tallerVehicles: 0,
   totalInvestment: 0,
+  purchaseInvestment: 0,
+  modificationInvestment: 0,
   averageInvestmentPerVehicle: 0,
   averagePriceIncrement: 0,
   lastUpdate: null,

@@ -141,6 +141,8 @@ describe('Dashboard Routes', () => {
       expect(response.body).toHaveProperty('totalVehicles', 3);
       expect(response.body).toHaveProperty('modifiedVehicles', 2);
       expect(response.body).toHaveProperty('stockVehicles', 1);
+      expect(response.body).toHaveProperty('purchaseInvestment');
+      expect(response.body).toHaveProperty('modificationInvestment');
       expect(response.body).toHaveProperty('totalInvestment');
       expect(response.body).toHaveProperty('averageInvestmentPerVehicle');
       expect(response.body).toHaveProperty('averagePriceIncrement');
@@ -163,6 +165,62 @@ describe('Dashboard Routes', () => {
         daysSinceLastSession: null,
         consecutiveWeeksWithSession: 0,
       });
+    });
+
+    test('separa compras, modificaciones y el total invertido', async () => {
+      const mockVehicles = [
+        {
+          id: 1,
+          type: 'F1',
+          modified: true,
+          price: 100,
+          total_price: 150,
+          digital: false,
+          museo: false,
+          taller: false,
+          technical_specs: [
+            { is_modification: false, components: [{ price: 40, mounted_qty: 1 }] },
+            { is_modification: true, components: [{ price: 20, mounted_qty: 2 }] },
+          ],
+        },
+        {
+          id: 2,
+          type: 'GT',
+          modified: false,
+          price: 80,
+          total_price: 80,
+          digital: false,
+          museo: false,
+          taller: false,
+          technical_specs: [],
+        },
+      ];
+
+      mockSupabase.from.mockImplementation((table) => {
+        if (table === 'vehicles') {
+          const b = createQueryBuilder();
+          b.eq.mockReturnThis();
+          b.limit.mockImplementation(() => Promise.resolve({ data: mockVehicles, error: null }));
+          return b;
+        }
+        if (table === 'vehicle_timings') {
+          const b = createQueryBuilder();
+          b.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+          b.gte.mockImplementation(() => Promise.resolve({ data: [], error: null }));
+          return b;
+        }
+        return createQueryBuilder();
+      });
+
+      const response = await request(app)
+        .get('/api/dashboard/metrics')
+        .set('Authorization', 'Bearer test-token');
+
+      expect(response.status).toBe(200);
+      expect(response.body.purchaseInvestment).toBe(180);
+      expect(response.body.modificationInvestment).toBe(40);
+      expect(response.body.totalInvestment).toBe(220);
+      expect(response.body.averageInvestmentPerVehicle).toBe(40);
     });
 
     test('cuenta tiempos embebidos y las ventanas de 30 y 14 días', async () => {

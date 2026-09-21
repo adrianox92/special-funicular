@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
-const { modificationLineTotal } = require('../lib/componentPricing');
+const { modificationLineTotal, vehicleModificationCost, vehiclePurchaseCost } = require('../lib/componentPricing');
 const { resolveStaleDaysThreshold } = require('../lib/userPreferences');
 const { evaluateGoalProgress } = require('../lib/trainingGoals');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
@@ -273,14 +273,15 @@ const calculateTrends = async (userId, options = {}) => {
       return v.modified && createdDate >= oneMonthAgo;
     });
 
-    // Calcular tendencia de inversión
-    const currentInvestment = vehicles
-      .filter(v => v.modified && v.total_price > v.price)
-      .reduce((sum, v) => sum + (v.total_price - v.price), 0);
-
-    const lastMonthInvestment = lastMonthVehicles
-      .filter(v => v.modified && v.total_price > v.price)
-      .reduce((sum, v) => sum + (v.total_price - v.price), 0);
+    // Tendencia de inversión: compras + modificaciones de vehículos añadidos este mes
+    const lastMonthInvestment = lastMonthVehicles.reduce((sum, v) => {
+      const purchase = vehiclePurchaseCost(v);
+      const mods =
+        v.modified && Number(v.total_price) > Number(v.price)
+          ? Number(v.total_price) - Number(v.price)
+          : 0;
+      return sum + purchase + mods;
+    }, 0);
 
     // Calcular incremento promedio anual
     const vehiclesWithIncrement = vehicles
@@ -477,24 +478,18 @@ router.get('/metrics', async (req, res) => {
     const museoVehicles = vehicles.filter((v) => v.museo).length;
     const tallerVehicles = vehicles.filter((v) => v.taller).length;
     
-    // Calcular inversión total solo en modificaciones
-    const totalInvestment = Number(vehicles
-      .filter(v => v.modified && v.technical_specs?.length > 0)
-      .reduce((sum, vehicle) => {
-        // Sumar solo los componentes que son modificaciones
-        const modificationCost = vehicle.technical_specs
-          .filter(spec => spec.is_modification)
-          .reduce((specSum, spec) => {
-            const componentsCost = spec.components
-              .reduce((compSum, comp) => compSum + modificationLineTotal(comp.price, comp.mounted_qty), 0);
-            return specSum + componentsCost;
-          }, 0);
-        return sum + modificationCost;
-      }, 0)
-      .toFixed(2));
-    
-    const averageInvestmentPerVehicle = modifiedVehicles > 0 
-      ? Number((totalInvestment / modifiedVehicles).toFixed(2))
+    const roundMoney = (n) => Number(Number(n || 0).toFixed(2));
+
+    const purchaseInvestment = roundMoney(
+      vehicles.reduce((sum, vehicle) => sum + vehiclePurchaseCost(vehicle), 0),
+    );
+    const modificationInvestment = roundMoney(
+      vehicles.reduce((sum, vehicle) => sum + vehicleModificationCost(vehicle), 0),
+    );
+    const totalInvestment = roundMoney(purchaseInvestment + modificationInvestment);
+
+    const averageInvestmentPerVehicle = modifiedVehicles > 0
+      ? roundMoney(modificationInvestment / modifiedVehicles)
       : 0;
 
     // Calcular incremento promedio y mayor incremento
@@ -675,6 +670,8 @@ router.get('/metrics', async (req, res) => {
       digitalVehicles,
       museoVehicles,
       tallerVehicles,
+      purchaseInvestment,
+      modificationInvestment,
       totalInvestment,
       averageInvestmentPerVehicle,
       averagePriceIncrement,

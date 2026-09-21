@@ -11,4 +11,34 @@ function modificationLineTotal(price, mountedQty) {
   return unit * q;
 }
 
-module.exports = { modificationLineTotal };
+/**
+ * Suma el coste de componentes marcados como modificación en las specs del vehículo.
+ * @param {{ technical_specs?: Array<{ is_modification?: boolean, components?: Array<{ price?: unknown, mounted_qty?: unknown }> }> } | null | undefined} vehicle
+ * @returns {number}
+ */
+function vehicleModificationCost(vehicle) {
+  const specs = vehicle?.technical_specs;
+  if (!Array.isArray(specs) || specs.length === 0) return 0;
+  return specs
+    .filter((spec) => spec && spec.is_modification)
+    .reduce((specSum, spec) => {
+      const components = Array.isArray(spec.components) ? spec.components : [];
+      const componentsCost = components.reduce(
+        (compSum, comp) => compSum + modificationLineTotal(comp?.price, comp?.mounted_qty),
+        0,
+      );
+      return specSum + componentsCost;
+    }, 0);
+}
+
+/**
+ * Precio de compra del vehículo (sin modificaciones).
+ * @param {{ price?: unknown } | null | undefined} vehicle
+ * @returns {number}
+ */
+function vehiclePurchaseCost(vehicle) {
+  const n = Number(vehicle?.price);
+  return Number.isFinite(n) ? n : 0;
+}
+
+module.exports = { modificationLineTotal, vehicleModificationCost, vehiclePurchaseCost };
