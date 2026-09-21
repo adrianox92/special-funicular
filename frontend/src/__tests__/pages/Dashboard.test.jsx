@@ -99,6 +99,8 @@ const mockMetricsData = {
   museoVehicles: 0,
   tallerVehicles: 0,
   totalInvestment: 5000,
+  purchaseInvestment: 4000,
+  modificationInvestment: 1000,
   averageInvestmentPerVehicle: 1000,
   averagePriceIncrement: 25,
   lastUpdate: '2024-03-07',
@@ -214,18 +216,28 @@ describe('Dashboard Component', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('kpi-stat-vehicles')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-stat-purchases')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-stat-modifications')).toBeInTheDocument();
       expect(screen.getByTestId('kpi-stat-investment')).toBeInTheDocument();
       expect(screen.getByTestId('kpi-extra-avg-increment')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('kpi-stat-purchases')).toHaveTextContent(/compras de coches/i);
+    expect(screen.getByTestId('kpi-stat-modifications')).toHaveTextContent(/modificaciones/i);
+    expect(screen.getByTestId('kpi-stat-investment')).toHaveTextContent(/compras \+ modificaciones/i);
   });
 
   test('formatea correctamente los valores monetarios y porcentajes', async () => {
     renderDashboard();
 
     await waitFor(() => {
+      expect(screen.getByTestId('kpi-stat-purchases')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-stat-modifications')).toBeInTheDocument();
       expect(screen.getByTestId('kpi-stat-investment')).toBeInTheDocument();
       expect(screen.getByTestId('kpi-extra-avg-increment')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('kpi-stat-purchases')).toHaveTextContent('4.000,00');
+    expect(screen.getByTestId('kpi-stat-modifications')).toHaveTextContent('1.000,00');
+    expect(screen.getByTestId('kpi-stat-investment')).toHaveTextContent('5.000,00');
   });
 
   test('actualiza los datos cuando cambian las respuestas de la API', async () => {
@@ -382,6 +394,8 @@ describe('Dashboard Component', () => {
       museoVehicles: 0,
       tallerVehicles: 0,
       totalInvestment: 0,
+      purchaseInvestment: 0,
+      modificationInvestment: 0,
       averageInvestmentPerVehicle: 0,
       totalTimings: 0,
       timingsLast30Days: 0,
