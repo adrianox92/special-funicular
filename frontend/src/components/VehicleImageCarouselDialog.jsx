@@ -12,6 +12,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from './ui/carousel';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 export default function VehicleImageCarouselDialog({
   open,
@@ -78,7 +79,7 @@ export default function VehicleImageCarouselDialog({
                 <CarouselItem key={slide.name} className="min-w-0 shrink-0 grow-0 basis-full pl-0">
                   <div className="flex w-full flex-col items-center justify-center gap-3 px-1">
                     <img
-                      src={slide.url}
+                      src={cachedStorageImageUrl(slide.url)}
                       alt={slide.label}
                       className="mx-auto block max-h-[75dvh] max-w-full object-contain"
                     />

@@ -40,6 +40,7 @@ import { Package, Search, Star, X } from 'lucide-react';
 import { localizePath } from '../i18n/localeUtils';
 import { useLocale } from '../hooks/useLocale';
 import { useTranslation } from 'react-i18next';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const EMPTY   = '__all__';
 const PAGE_SIZE = 24;
@@ -353,7 +354,7 @@ function PublicCatalogList() {
                     <SelectItem key={b.slug || b.name} value={b.slug || b.name.toLowerCase()}>
                       <span className="flex items-center gap-2">
                         {b.logo_url && (
-                          <img src={b.logo_url} alt="" className="h-4 w-6 object-contain" />
+                          <img src={cachedStorageImageUrl(b.logo_url)} alt="" className="h-4 w-6 object-contain" />
                         )}
                         {b.name}
                       </span>
@@ -568,7 +569,7 @@ function PublicCatalogList() {
                       <div className="aspect-[4/3] bg-muted relative overflow-hidden">
                         {row.image_url ? (
                           <img
-                            src={row.image_url}
+                            src={cachedStorageImageUrl(row.image_url)}
                             alt=""
                             className="absolute inset-0 size-full object-cover"
                             loading="lazy"
@@ -587,7 +588,7 @@ function PublicCatalogList() {
                         <div className="flex items-center gap-1.5">
                           {row.manufacturer_logo_url && (
                             <img
-                              src={row.manufacturer_logo_url}
+                              src={cachedStorageImageUrl(row.manufacturer_logo_url)}
                               alt=""
                               className="h-4 w-6 object-contain"
                             />

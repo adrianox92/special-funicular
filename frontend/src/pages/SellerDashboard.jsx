@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -164,7 +165,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
           <div className="shrink-0">
             {profile?.logo_url ? (
               <img
-                src={profile.logo_url}
+                src={cachedStorageImageUrl(profile.logo_url)}
                 alt="Logo de la tienda"
                 className="h-16 w-28 rounded-md object-contain bg-muted border border-border"
               />

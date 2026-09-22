@@ -13,6 +13,7 @@ const {
   buildItemJsonLd: buildItemJsonLdShared,
   homePathForLocale,
 } = require('../../src/utils/catalogSeoCopy');
+const { cachedStorageImageUrl } = require('../../src/utils/cachedStorageImageUrl');
 
 function copyFor(locale) {
   return copyChrome(locale);
@@ -64,7 +65,7 @@ function shellStyles() {
 function renderItemBody({ item, locale, origin, slug, neighbors }) {
   const t = copyFor(locale);
   const { catalogItemPath, localizeCatalogPath } = require('./parseCatalogPath');
-  const imageUrl = item.image_url && String(item.image_url).trim() ? String(item.image_url) : '';
+  const imageUrl = cachedStorageImageUrl(item.image_url, { origin });
   const alt = buildCatalogItemImageAlt(item, locale);
   const catalogHref = localizeCatalogPath(locale, '/catalogo');
   const homeHref = homePathForLocale(locale);

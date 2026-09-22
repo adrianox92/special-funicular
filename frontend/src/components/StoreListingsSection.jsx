@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ArrowUpDown, ExternalLink, ShoppingCart } from 'lucide-react';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
@@ -166,7 +167,7 @@ export default function StoreListingsSection({ catalogItemId }) {
                       <div className="flex items-center gap-2.5 min-w-0">
                         {listing.store_logo_url ? (
                           <img
-                            src={listing.store_logo_url}
+                            src={cachedStorageImageUrl(listing.store_logo_url)}
                             alt=""
                             className="h-8 w-12 shrink-0 rounded-md object-contain bg-muted border border-border"
                           />
