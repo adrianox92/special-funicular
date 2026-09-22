@@ -107,6 +107,22 @@ describe('catalogSeoHtml', () => {
     expect(html).toContain('C1234');
     expect(html).toContain('GT');
     expect(html).toContain('<img src="https://cdn.example/p911.jpg"');
+    const supabaseItem = {
+      ...item,
+      image_url:
+        'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/catalog/1710000000-ab12cd.webp',
+    };
+    const cachedHtml = renderItemBody({
+      item: supabaseItem,
+      locale: 'es',
+      origin: 'https://www.slotdatabase.es',
+      slug,
+      neighbors: item.neighbors,
+    });
+    expect(cachedHtml).toContain(
+      'src="https://www.slotdatabase.es/api/img/catalog-images/catalog/1710000000-ab12cd.webp"',
+    );
+    expect(cachedHtml).not.toContain('abcdxyz.supabase.co');
     expect(html).toContain(`href="/catalogo/${item.neighbors.prev.id}/ferrari-488"`);
     expect(html).toContain(`href="/catalogo/${item.neighbors.next.id}/audi-r8"`);
     expect(html).toContain('Anterior');

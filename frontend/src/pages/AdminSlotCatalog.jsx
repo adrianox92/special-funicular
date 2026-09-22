@@ -63,6 +63,7 @@ import CatalogTractionSelect from '../components/CatalogTractionSelect';
 import { Switch } from '../components/ui/switch';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const emptyItem = {
   reference: '',
@@ -1230,7 +1231,7 @@ function AdminSlotCatalog() {
                         <TableCell>
                           {b.logo_url ? (
                             <img
-                              src={b.logo_url}
+                              src={cachedStorageImageUrl(b.logo_url)}
                               alt=""
                               className="h-10 w-10 rounded object-contain border bg-muted/30"
                             />
@@ -1398,13 +1399,13 @@ function AdminSlotCatalog() {
                                           <span className="font-medium">{d.label}</span>
                                           <div className="flex flex-wrap items-center gap-2">
                                             {d.before ? (
-                                              <img src={d.before} alt="" className="h-14 w-auto max-w-[120px] rounded border object-contain bg-muted/30" />
+                                              <img src={cachedStorageImageUrl(d.before)} alt="" className="h-14 w-auto max-w-[120px] rounded border object-contain bg-muted/30" />
                                             ) : (
                                               <span className="text-xs text-muted-foreground">Sin imagen</span>
                                             )}
                                             <span className="text-muted-foreground">→</span>
                                             {d.after ? (
-                                              <img src={d.after} alt="" className="h-14 w-auto max-w-[120px] rounded border object-contain bg-muted/30" />
+                                              <img src={cachedStorageImageUrl(d.after)} alt="" className="h-14 w-auto max-w-[120px] rounded border object-contain bg-muted/30" />
                                             ) : (
                                               <span className="text-xs text-muted-foreground">Quitar imagen</span>
                                             )}
@@ -1494,7 +1495,7 @@ function AdminSlotCatalog() {
                             <TableCell>
                               {r.proposed_image_url ? (
                                 <img
-                                  src={r.proposed_image_url}
+                                  src={cachedStorageImageUrl(r.proposed_image_url)}
                                   alt=""
                                   className="h-11 w-11 rounded border object-contain bg-muted/30"
                                 />
@@ -1587,7 +1588,7 @@ function AdminSlotCatalog() {
                             <div className="flex items-center gap-2">
                               {s.logo_url ? (
                                 <img
-                                  src={s.logo_url}
+                                  src={cachedStorageImageUrl(s.logo_url)}
                                   alt=""
                                   className="h-8 w-12 shrink-0 rounded-md object-contain bg-muted border border-border"
                                 />
@@ -2133,7 +2134,7 @@ function AdminSlotCatalog() {
                     {newImageObjectUrl ? 'Vista previa (sustituirá la actual al guardar)' : 'Imagen actual'}
                   </p>
                   <img
-                    src={newImageObjectUrl || existingImageUrl}
+                    src={newImageObjectUrl || cachedStorageImageUrl(existingImageUrl)}
                     alt=""
                     className="max-h-36 w-auto max-w-full rounded-md border object-contain bg-muted/30"
                   />
@@ -2199,7 +2200,7 @@ function AdminSlotCatalog() {
               <Label>Logo (opcional)</Label>
               {(brandLogoPreviewUrl || (brandExistingLogo && !brandClearLogo)) && (
                 <img
-                  src={brandLogoPreviewUrl || brandExistingLogo}
+                  src={brandLogoPreviewUrl || cachedStorageImageUrl(brandExistingLogo)}
                   alt=""
                   className="max-h-24 w-auto rounded border object-contain bg-muted/30"
                 />

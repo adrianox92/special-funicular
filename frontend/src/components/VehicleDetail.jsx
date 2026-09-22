@@ -25,6 +25,7 @@ import {
 } from './ui/dialog';
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -141,7 +142,7 @@ const VehicleDetail = () => {
         <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-2 overflow-auto">
           {lightboxImage && (
             <img
-              src={lightboxImage.url}
+              src={cachedStorageImageUrl(lightboxImage.url)}
               alt={lightboxImage.label}
               className="max-w-full max-h-[90vh] w-auto h-auto object-contain"
             />
@@ -274,7 +275,7 @@ const VehicleDetail = () => {
                       {images[name] ? (
                         <>
                           <img
-                            src={images[name]}
+                            src={cachedStorageImageUrl(images[name])}
                             alt={label}
                             className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={(e) => {

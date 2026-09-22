@@ -19,6 +19,7 @@ import {
   interpolate,
   toIsoDateModified,
 } from './catalogSeoCopy';
+import { cachedStorageImageUrl } from './cachedStorageImageUrl';
 
 function currentLocale() {
   return i18n.language?.split('-')[0] || 'es';
@@ -208,7 +209,7 @@ export function applyCatalogItemPageSeo(item) {
   if (canonicalUrl) setMeta('og:url', canonicalUrl, true);
   if (modifiedIso) setMeta('article:modified_time', modifiedIso, true);
 
-  const imageUrl = item.image_url && String(item.image_url).trim() ? String(item.image_url) : '';
+  const imageUrl = cachedStorageImageUrl(item.image_url, { origin });
   if (imageUrl) {
     setMeta('og:image', imageUrl, true);
     setMeta('og:image:alt', imageAlt, true);

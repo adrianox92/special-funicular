@@ -33,6 +33,7 @@ import {
 } from './ui/tooltip';
 import placeholderImage from '../assets/images/placeholder.png';
 import DuplicateVehicleDialog from './DuplicateVehicleDialog';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
   const { t } = useTranslation('vehicles');
@@ -125,7 +126,7 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
               <TooltipTrigger asChild>
                 <span className="inline-block cursor-pointer rounded overflow-hidden">
                   <img
-                    src={vehicle.image || placeholderImage}
+                    src={cachedStorageImageUrl(vehicle.image) || placeholderImage}
                     alt={vehicle.model}
                     className="w-10 h-[30px] object-cover rounded"
                     loading="lazy"
@@ -134,7 +135,7 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
               </TooltipTrigger>
               <TooltipContent side="right" className="p-1 bg-background border shadow-lg">
                 <img
-                  src={vehicle.image || placeholderImage}
+                  src={cachedStorageImageUrl(vehicle.image) || placeholderImage}
                   alt={vehicle.model}
                   className="w-48 h-32 object-contain rounded-md"
                 />

@@ -43,6 +43,7 @@ import CatalogPrevNext from '../components/CatalogPrevNext';
 import { useLocale } from '../hooks/useLocale';
 import { localizePath } from '../i18n/localeUtils';
 import { buildLoginPath, withIntent } from '../utils/authReturnUrl';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 function readItemBootstrap(expectedId) {
   if (typeof window === 'undefined' || !expectedId) return null;
@@ -426,7 +427,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
               >
                 <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8 rounded-xl overflow-hidden">
                   <img
-                    src={item.image_url}
+                    src={cachedStorageImageUrl(item.image_url)}
                     alt={imageAlt}
                     className="max-w-full max-h-[min(420px,50vh)] w-auto h-auto object-contain cursor-zoom-in"
                   />
@@ -456,7 +457,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                         <X className="size-5" aria-hidden />
                       </Button>
                       <img
-                        src={item.image_url}
+                        src={cachedStorageImageUrl(item.image_url)}
                         alt=""
                         className="max-h-[min(90vh,900px)] max-w-[min(96vw,56rem)] w-auto object-contain rounded-lg border-2 border-border shadow-2xl bg-card"
                         onClick={(e) => e.stopPropagation()}

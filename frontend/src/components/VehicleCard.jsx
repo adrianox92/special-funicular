@@ -20,6 +20,7 @@ import {
 } from './ui/alert-dialog';
 import placeholderImage from '../assets/images/placeholder.png';
 import DuplicateVehicleDialog from './DuplicateVehicleDialog';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
   const { t } = useTranslation('vehicles');
@@ -116,7 +117,7 @@ const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
         </Button>
       </div>
       <div className="relative aspect-[4/3] bg-muted">
-        <img ref={imgRef} src={vehicle.image || placeholderImage} alt={vehicle.model} className="w-full h-full object-cover" loading="lazy" />
+        <img ref={imgRef} src={cachedStorageImageUrl(vehicle.image) || placeholderImage} alt={vehicle.model} className="w-full h-full object-cover" loading="lazy" />
       </div>
       <CardContent className="p-4">
         <h3 className="font-semibold text-lg">{vehicle.model}</h3>

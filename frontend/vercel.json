@@ -34,6 +34,10 @@
     {
       "source": "/de/katalog/:path*",
       "destination": "/api/catalog-ssr?ssrPath=/de/katalog/:path*"
+    },
+    {
+      "source": "/api/img/:path*",
+      "destination": "/api/img?p=:path*"
     }
   ]
 }
