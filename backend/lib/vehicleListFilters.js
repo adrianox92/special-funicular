@@ -13,31 +13,56 @@
  */
 
 /**
- * Patrón ilike de "contiene" seguro para PostgREST + PostgreSQL.
+ * Escapa literales para SQL LIKE / PostgREST ilike.
  *
- * - Escapa `\`, `%` y `_` (comodines SQL LIKE), como el filtro cliente `includes()`.
- * - Envuelve en comillas dobles para que `.` `,` `:` `()` (p. ej. "Slot.it") no
- *   se parseen como gramática de filtros PostgREST (`ilike.%Slot.it%` → 400).
+ * @param {unknown} raw
+ * @returns {string|null}
+ */
+function escapeIlikeLiteral(raw) {
+  if (raw == null) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  return trimmed
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/"/g, '\\"');
+}
+
+/**
+ * Patrón SQL LIKE de "contiene" (sin comillas PostgREST).
+ *
+ * No se pasa a `.ilike()` envuelto en `"`: supabase-js concatena `ilike.${pattern}`
+ * y las comillas quedan en el patrón SQL (`ILIKE '"%Ninco%"'`), que no coincide
+ * con ninguna marca.
  *
  * @param {unknown} raw
  * @returns {string|null}
  */
 function buildIlikeContainsPattern(raw) {
-  if (raw == null) return null;
-  const trimmed = String(raw).trim();
-  if (!trimmed) return null;
-  const escaped = trimmed
-    .replace(/\\/g, '\\\\')
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_')
-    .replace(/"/g, '\\"');
-  return `"%${escaped}%"`;
+  const escaped = escapeIlikeLiteral(raw);
+  if (!escaped) return null;
+  return `%${escaped}%`;
+}
+
+/**
+ * Predicado PostgREST para `.or()`, con el valor citado.
+ * Así `.` `,` `:` `()` (p. ej. Slot.it) no se parsean como gramática del filtro.
+ *
+ * @param {string} column
+ * @param {unknown} raw
+ * @returns {string|null}
+ */
+function buildPostgrestIlikeContainsFilter(column, raw) {
+  const escaped = escapeIlikeLiteral(raw);
+  if (!escaped) return null;
+  return `${column}.ilike."%${escaped}%"`;
 }
 
 function applyIlikeContains(query, column, raw) {
-  const pattern = buildIlikeContainsPattern(raw);
-  if (!pattern) return query;
-  return query.ilike(column, pattern);
+  const filter = buildPostgrestIlikeContainsFilter(column, raw);
+  if (!filter) return query;
+  return query.or(filter);
 }
 
 function applyVehicleListFilters(query, params = {}) {
@@ -94,4 +119,5 @@ module.exports = {
   applyVehicleListFilters,
   applyVehicleExportFilters,
   buildIlikeContainsPattern,
+  buildPostgrestIlikeContainsFilter,
 };

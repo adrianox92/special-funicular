@@ -20,6 +20,7 @@ import { cn } from '../ui/utils';
 import { VEHICLE_TYPES as vehicleTypes } from '../../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS } from '../../data/motorPosition';
 import { useEditVehicle } from './EditVehicleContext';
+import { cachedStorageImageUrl } from '../../utils/cachedStorageImageUrl';
 
 export default function VehicleGeneralTab() {
   const { t } = useTranslation('vehicles');
@@ -344,7 +345,7 @@ export default function VehicleGeneralTab() {
                             ref={(el) => {
                               imageRefs.current[name] = el;
                             }}
-                            src={previews[name] || URL.createObjectURL(images[name])}
+                            src={previews[name] ? cachedStorageImageUrl(previews[name]) : URL.createObjectURL(images[name])}
                             alt={label}
                             className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
                             loading="lazy"

@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const IMAGE_FIELD_NAMES = ['front', 'left', 'right', 'rear', 'top', 'chassis', 'three_quarters'];
 
@@ -432,7 +433,7 @@ const AddVehicle = () => {
             {catalogThumb && (
               <div className="mb-4 rounded-md border p-2 bg-muted/30">
                 <p className="text-xs text-muted-foreground mb-1">{t('addPage.catalogImageHint')}</p>
-                <img src={catalogThumb} alt="" className="max-h-24 object-contain" />
+                <img src={cachedStorageImageUrl(catalogThumb)} alt="" className="max-h-24 object-contain" />
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">

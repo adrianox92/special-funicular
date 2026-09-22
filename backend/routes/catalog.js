@@ -998,7 +998,7 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
 });
 
 /**
- * PUT /items/:id
+ * PUT /items/:id — actualizar ficha; clear_image=true quita la foto y borra el objeto
  */
 router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (req, res) => {
   try {
@@ -1058,10 +1058,18 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
     }
 
     let image_url = existing.image_url;
+    const clearImage = parseBodyBool(req.body.clear_image);
+    if (clearImage) {
+      if (existing.image_url) {
+        const { error: rmErr } = await removeCatalogObjectByPublicUrl(req.supabase, existing.image_url);
+        if (rmErr) console.warn('[catalog] clear image', rmErr.message);
+      }
+      image_url = null;
+    }
     const img = req.files?.image?.[0];
     if (img) {
       try {
-        if (existing.image_url) {
+        if (existing.image_url && !clearImage) {
           await removeCatalogObjectByPublicUrl(req.supabase, existing.image_url);
         }
         image_url = await uploadCatalogImageBuffer(req.supabase, img.buffer, img.mimetype);
@@ -1104,6 +1112,43 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
     }
     const { data: full } = await req.supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
     res.json(full);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * DELETE /items/:id/image — quita la foto del ítem y borra el objeto en storage
+ */
+router.delete('/items/:id/image', adminGuard, adminCatalogServiceDb, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: existing, error: exErr } = await req.supabase
+      .from('slot_catalog_items')
+      .select('id, image_url')
+      .eq('id', id)
+      .maybeSingle();
+    if (exErr) return res.status(500).json({ error: exErr.message });
+    if (!existing) return res.status(404).json({ error: 'Ítem no encontrado' });
+    if (!existing.image_url || String(existing.image_url).trim() === '') {
+      return res.status(404).json({ error: 'Este ítem no tiene imagen' });
+    }
+
+    const { error: rmErr } = await removeCatalogObjectByPublicUrl(req.supabase, existing.image_url);
+    if (rmErr) console.warn('[catalog] delete image', rmErr.message);
+
+    const { error } = await req.supabase
+      .from('slot_catalog_items')
+      .update({ image_url: null, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+
+    const { data: full } = await req.supabase
+      .from('slot_catalog_items_with_ratings')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    res.json(full || { ok: true, image_url: null });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

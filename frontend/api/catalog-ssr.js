@@ -26,6 +26,7 @@ const {
   injectIntoSpaHtml,
   fallbackDocument,
 } = require('./_lib/catalogSeoHtml');
+const { cachedStorageImageUrl } = require('../src/utils/cachedStorageImageUrl');
 
 const LIST_PAGE_SIZE = 24;
 const FETCH_MS = 8000;
@@ -212,7 +213,7 @@ async function renderItem(req, res, parsed, spaHtml) {
   const title = buildCatalogItemPageTitle(item, locale);
   const description = buildCatalogItemMetaDescription(item, locale);
   const canonicalUrl = `${origin}${catalogItemPath(locale, item.id, slug)}`;
-  const imageUrl = item.image_url && String(item.image_url).trim() ? String(item.image_url) : '';
+  const imageUrl = cachedStorageImageUrl(item.image_url, { origin });
   const imageAlt = buildCatalogItemImageAlt(item, locale);
   const jsonLd = buildItemJsonLd({ item, origin, canonicalUrl, description, imageUrl, locale });
   const neighbors = item.neighbors || { prev: null, next: null };

@@ -1,4 +1,8 @@
-const { applyVehicleListFilters, buildIlikeContainsPattern } = require('../../lib/vehicleListFilters');
+const {
+  applyVehicleListFilters,
+  buildIlikeContainsPattern,
+  buildPostgrestIlikeContainsFilter,
+} = require('../../lib/vehicleListFilters');
 
 function createQuery() {
   const query = {
@@ -25,26 +29,30 @@ describe('applyVehicleListFilters', () => {
     expect(query.or).not.toHaveBeenCalled();
   });
 
-  test('un solo filtro (fabricante) usa ilike citado (PostgREST)', () => {
+  test('un solo filtro (fabricante) usa or con ilike citado (PostgREST)', () => {
     const query = createQuery();
     applyVehicleListFilters(query, { manufacturer: 'Ninco' });
-    expect(query.ilike).toHaveBeenCalledWith('manufacturer', '"%Ninco%"');
+    expect(query.or).toHaveBeenCalledWith('manufacturer.ilike."%Ninco%"');
+    expect(query.ilike).not.toHaveBeenCalled();
     expect(query.eq).not.toHaveBeenCalled();
-    expect(query.or).not.toHaveBeenCalled();
   });
 
-  test('marcas con punto (Slot.it) van entre comillas para no romper el parseo PostgREST', () => {
+  test('marcas con punto (Slot.it) van citadas en or para no romper el parseo PostgREST', () => {
     const query = createQuery();
     applyVehicleListFilters(query, { manufacturer: 'Slot.it' });
-    expect(query.ilike).toHaveBeenCalledWith('manufacturer', '"%Slot.it%"');
+    expect(query.or).toHaveBeenCalledWith('manufacturer.ilike."%Slot.it%"');
+    expect(query.ilike).not.toHaveBeenCalled();
   });
 
-  test('buildIlikeContainsPattern escapa comodines SQL y recorta', () => {
-    expect(buildIlikeContainsPattern('  Ninco  ')).toBe('"%Ninco%"');
-    expect(buildIlikeContainsPattern('N_R')).toBe('"%N\\_R%"');
-    expect(buildIlikeContainsPattern('100%')).toBe('"%100\\%%"');
+  test('buildIlikeContainsPattern escapa comodines SQL y recorta (sin comillas SQL)', () => {
+    expect(buildIlikeContainsPattern('  Ninco  ')).toBe('%Ninco%');
+    expect(buildIlikeContainsPattern('N_R')).toBe('%N\\_R%');
+    expect(buildIlikeContainsPattern('100%')).toBe('%100\\%%');
     expect(buildIlikeContainsPattern('   ')).toBeNull();
     expect(buildIlikeContainsPattern('')).toBeNull();
+    expect(buildPostgrestIlikeContainsFilter('manufacturer', 'Slot.it')).toBe(
+      'manufacturer.ilike."%Slot.it%"',
+    );
   });
 
   test('museo y taller juntos usan OR', () => {
@@ -63,7 +71,8 @@ describe('applyVehicleListFilters', () => {
       digital: 'Digital',
       scale_factor: '32',
     });
-    expect(query.ilike).toHaveBeenCalledWith('model', '"%Ferrari%"');
+    expect(query.or).toHaveBeenCalledWith('model.ilike."%Ferrari%"');
+    expect(query.ilike).not.toHaveBeenCalled();
     expect(query.eq).toHaveBeenCalledWith('type', 'GT');
     expect(query.eq).toHaveBeenCalledWith('modified', true);
     expect(query.eq).toHaveBeenCalledWith('digital', true);

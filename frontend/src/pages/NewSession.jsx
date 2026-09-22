@@ -35,6 +35,7 @@ import {
   getSessionCaptureIssue,
   isBlockingCaptureIssue,
 } from '../utils/sessionCaptureValidation';
+import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 
 const VEHICLES_PAGE_LIMIT = 10000;
 const STEPS = ['circuit', 'vehicle', 'capture', 'summary'];
@@ -777,7 +778,7 @@ const NewSession = () => {
                         >
                           {vehicle.image ? (
                             <img
-                              src={vehicle.image}
+                              src={cachedStorageImageUrl(vehicle.image)}
                               alt=""
                               className="size-10 rounded object-cover bg-muted"
                             />
