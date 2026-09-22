@@ -1,7 +1,8 @@
 /**
  * Imágenes de vehículo (Supabase Storage): ver ../lib/processVehicleImageBuffer.js,
  * ../lib/vehicleImageStorage.js — VEHICLE_IMAGE_MAX_UPLOAD_BYTES (default 12MB),
- * VEHICLE_IMAGE_MAX_EDGE_PX, VEHICLE_IMAGE_OUTPUT_FORMAT (webp|jpeg), etc.
+ * VEHICLE_IMAGE_MAX_EDGE_PX (default 1400), VEHICLE_IMAGE_WEBP_QUALITY (default 70),
+ * VEHICLE_IMAGE_OUTPUT_FORMAT (webp|jpeg), etc.
  */
 const express = require('express');
 const router = express.Router();
