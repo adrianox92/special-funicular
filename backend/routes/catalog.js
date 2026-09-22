@@ -712,6 +712,7 @@ router.get('/search', async (req, res) => {
 router.get('/my-requests', async (req, res) => {
   try {
     const uid = req.user.id;
+    const insertReadDb = getServiceClient() || req.supabase;
     const [chg, ins] = await Promise.all([
       req.supabase
         .from('slot_catalog_change_requests')
@@ -719,7 +720,7 @@ router.get('/my-requests', async (req, res) => {
         .eq('submitted_by', uid)
         .order('created_at', { ascending: false })
         .limit(50),
-      req.supabase
+      insertReadDb
         .from('slot_catalog_insert_requests')
         .select(
           'id, proposed_reference, proposed_manufacturer_id, proposed_model_name, proposed_vehicle_type, proposed_traction, proposed_motor_position, proposed_commercial_release_year, proposed_discontinued, proposed_upcoming_release, proposed_dorsal, proposed_limited_edition, proposed_limited_edition_total, status, created_at, reviewed_at, rejection_reason, created_catalog_item_id',
@@ -731,7 +732,7 @@ router.get('/my-requests', async (req, res) => {
     if (chg.error) return res.status(500).json({ error: chg.error.message });
     if (ins.error) return res.status(500).json({ error: ins.error.message });
     const changeRows = await attachCatalogItemSummariesToChangeRequests(req.supabase, chg.data ?? []);
-    const insertRows = await enrichInsertRequestsWithBrandNames(req.supabase, ins.data ?? []);
+    const insertRows = await enrichInsertRequestsWithBrandNames(insertReadDb, ins.data ?? []);
     res.json({
       change_requests: changeRows,
       insert_requests: insertRows,
@@ -1482,7 +1483,12 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
       });
     }
 
-    const { data: existingItem } = await req.supabase
+    // service_role: el alta no depende de que el JWT supere RLS en
+    // slot_catalog_insert_requests (si no hay policy de INSERT, PostgREST
+    // responde "new row violates row-level security policy").
+    const writeDb = getServiceClient() || req.supabase;
+
+    const { data: existingItem } = await writeDb
       .from('slot_catalog_items')
       .select('id')
       .eq('reference', proposed_reference)
@@ -1498,13 +1504,13 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
     const img = req.files?.image?.[0];
     if (img) {
       try {
-        proposed_image_url = await uploadCatalogImageBuffer(req.supabase, img.buffer, img.mimetype);
+        proposed_image_url = await uploadCatalogImageBuffer(writeDb, img.buffer, img.mimetype);
       } catch (e) {
         return res.status(400).json({ error: e.message || 'No se pudo procesar la imagen' });
       }
     }
 
-    const { data: insRow, error } = await req.supabase
+    const { data: insRow, error } = await writeDb
       .from('slot_catalog_insert_requests')
       .insert([
         {
@@ -1537,7 +1543,7 @@ router.post('/insert-requests', catalogContributionsLimiter, insertUpload, async
       }
       return res.status(500).json({ error: error.message });
     }
-    const enriched = await enrichInsertRequestsWithBrandNames(req.supabase, [insRow]);
+    const enriched = await enrichInsertRequestsWithBrandNames(writeDb, [insRow]);
     res.status(201).json(enriched[0] || insRow);
   } catch (e) {
     res.status(500).json({ error: e.message });
