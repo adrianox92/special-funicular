@@ -1,16 +1,19 @@
 /**
- * Redimensiona y comprime imágenes de vehículo antes de subirlas a Storage.
+ * Redimensiona y comprime imágenes de vehículo/catálogo antes de subirlas a Storage.
+ * Preset alineado con el lote ya recomprimido en producción (free-tier 1GB).
  *
- * Variables de entorno opcionales:
- * - VEHICLE_IMAGE_MAX_EDGE_PX: lado largo máximo (default 2048)
+ * Variables de entorno opcionales (overrides; si no existen, valen estos defaults):
+ * - VEHICLE_IMAGE_MAX_EDGE_PX: lado largo máximo (default 1400)
  * - VEHICLE_IMAGE_OUTPUT_FORMAT: "webp" (default) o "jpeg"
- * - VEHICLE_IMAGE_WEBP_QUALITY: 1-100 (default 80)
+ * - VEHICLE_IMAGE_WEBP_QUALITY: 1-100 (default 70)
  * - VEHICLE_IMAGE_JPEG_QUALITY: 1-100 (default 85)
  */
 
 const sharp = require('sharp');
 
-const DEFAULT_MAX_EDGE = 2048;
+const DEFAULT_MAX_EDGE = 1400;
+const DEFAULT_WEBP_QUALITY = 70;
+const DEFAULT_JPEG_QUALITY = 85;
 
 function getMaxEdgePx() {
   const raw = process.env.VEHICLE_IMAGE_MAX_EDGE_PX;
@@ -26,16 +29,16 @@ function getOutputFormat() {
 
 function getWebpQuality() {
   const raw = process.env.VEHICLE_IMAGE_WEBP_QUALITY;
-  if (raw == null || raw === '') return 80;
+  if (raw == null || raw === '') return DEFAULT_WEBP_QUALITY;
   const n = parseInt(String(raw), 10);
-  return Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : 80;
+  return Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : DEFAULT_WEBP_QUALITY;
 }
 
 function getJpegQuality() {
   const raw = process.env.VEHICLE_IMAGE_JPEG_QUALITY;
-  if (raw == null || raw === '') return 85;
+  if (raw == null || raw === '') return DEFAULT_JPEG_QUALITY;
   const n = parseInt(String(raw), 10);
-  return Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : 85;
+  return Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : DEFAULT_JPEG_QUALITY;
 }
 
 /**
@@ -86,4 +89,7 @@ module.exports = {
   processVehicleImageBuffer,
   getMaxEdgePx,
   getOutputFormat,
+  getWebpQuality,
+  DEFAULT_MAX_EDGE,
+  DEFAULT_WEBP_QUALITY,
 };

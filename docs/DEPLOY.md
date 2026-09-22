@@ -44,6 +44,7 @@ Antes de fusionar el PR de promoción:
 - [ ] **Smoke en la URL de staging** (Preview de Vercel del branch `staging`): login, listado de vehículos, un flujo de tiempos, dashboard. Si hay API de staging, úsala; si no, recuerda que el preview habla con la API de prod (modelo barato).
 - [ ] **Migraciones / SQL**: si el lote incluye scripts en `backend/scripts/`, ejecútalos en Supabase **antes** (o en el orden que indique el PR) para que prod no arranque contra un esquema viejo.
 - [ ] **Variables de entorno**: ¿hace falta alguna nueva en Vercel (frontend) o Render (API)? Añádela en **prod** (y en el servicio de staging si existe) **antes** del merge. No copies secretos a este doc ni a PRs públicos.
+  - Imágenes de catálogo/garaje: el código usa **WebP, lado largo 1400px, calidad 70** si no hay override. `VEHICLE_IMAGE_MAX_EDGE_PX` / `VEHICLE_IMAGE_WEBP_QUALITY` / `VEHICLE_IMAGE_OUTPUT_FORMAT` son opcionales; si en Render siguen fijadas a 2048/80, el env gana sobre el default.
 - [ ] **CORS / URL del frontend**: si el preview o un dominio nuevo debe llamar a la API, confirma que el origen está permitido en el backend (lista `allowedOrigins` / `FRONTEND_URL`). El Preview de Vercel genera hosts `*.vercel.app` distintos del dominio canónico `slotdatabase.es`.
 - [ ] **Cron / jobs**: el Cron de Render del digest semanal apunta a la API de **prod**. No lo cambies al promover salvo que el lote toque esa ruta.
 - [ ] Abre o actualiza el PR **`staging` → `master`**, revisa el diff agregado del lote, merge.
