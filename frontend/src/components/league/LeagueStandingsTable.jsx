@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import LeagueMySeason from './LeagueMySeason';
 import LeagueAdjustedBadge from './LeagueAdjustedBadge';
 import LeaguePointsOverrideDialog from './LeaguePointsOverrideDialog';
+import LeagueRulesHelp from './LeagueRulesHelp';
 import {
   buildParticipantSeason,
   findMyStandingRow,
@@ -62,25 +63,13 @@ const RESULT_STATUS_LABEL = {
   dsq: 'DSQ',
 };
 
-const LeagueStandingsHelp = ({ countingRaces, t }) => (
-  <Alert>
-    <Info className="size-4" />
-    <AlertTitle>{t('standings.helpTitle')}</AlertTitle>
-    <AlertDescription>
-      <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
-        <li>{t('standings.helpDns')}</li>
-        <li>{t('standings.helpDsq')}</li>
-        <li>{t('standings.helpAbsent')}</li>
-        <li>
-          {countingRaces
-            ? t('standings.helpCounting', { count: countingRaces })
-            : t('standings.helpCountingUnset')}
-        </li>
-        <li>{t('standings.helpOverride')}</li>
-      </ul>
-    </AlertDescription>
-  </Alert>
-);
+const standingsEmptyKind = (competitions, standings) => {
+  const list = competitions || [];
+  if (!list.length) return 'noEvents';
+  if (!list.some(isLeagueCompetitionVisible)) return 'noResults';
+  if (!(standings || []).length) return 'noParticipants';
+  return null;
+};
 
 const StandingCellContent = ({ entry, includeAuthor = false }) => {
   if (!entry) {
@@ -134,6 +123,7 @@ const LeagueStandingsTable = ({
   standings = [],
   competitions = [],
   countingRaces = null,
+  tiebreakMode = null,
   exportBasePath = null,
   leagueName = '',
   leagueSlug = null,
@@ -169,6 +159,7 @@ const LeagueStandingsTable = ({
           name: leagueName,
           slug: leagueSlug,
           counting_races: countingRaces,
+          tiebreak_mode: tiebreakMode,
         },
         competitions,
         standings,
@@ -180,7 +171,7 @@ const LeagueStandingsTable = ({
       },
       { isSelf, includeEmail: Boolean(canManage || isSelf), viewer },
     );
-  }, [selectedRow, viewer, leagueId, leagueName, leagueSlug, countingRaces, competitions, standings, canManage]);
+  }, [selectedRow, viewer, leagueId, leagueName, leagueSlug, countingRaces, tiebreakMode, competitions, standings, canManage]);
 
   const openRow = (row) => {
     const key = participantKeyFromRow(row);
@@ -279,18 +270,59 @@ const LeagueStandingsTable = ({
     }
   };
 
+  const emptyKind = standingsEmptyKind(competitions, standings);
+  const emptyTitleKey = {
+    noEvents: 'standings.emptyNoEvents',
+    noResults: 'standings.emptyNoResults',
+    noParticipants: 'standings.emptyNoParticipants',
+  }[emptyKind] || 'standings.empty';
+  const emptyHintKey = {
+    noEvents: 'standings.emptyNoEventsHint',
+    noResults: 'standings.emptyNoResultsHint',
+    noParticipants: 'standings.emptyNoParticipantsHint',
+  }[emptyKind];
+
   return (
     <div className="space-y-4">
-      <LeagueStandingsHelp countingRaces={countingRaces} t={t} />
+      <Alert data-testid="league-rules-help-banner">
+        <Info className="size-4" />
+        <AlertTitle>{t('standings.helpTitle')}</AlertTitle>
+        <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            {countingRaces
+              ? t('standings.countingSummary', { count: countingRaces })
+              : t('standings.emptyCountingUnset')}
+          </p>
+          <LeagueRulesHelp
+            countingRaces={countingRaces}
+            tiebreakMode={tiebreakMode}
+            context="standings"
+          />
+        </AlertDescription>
+      </Alert>
 
-      {!standings.length ? (
+      {emptyKind ? (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Trophy className="size-8 mx-auto mb-3 opacity-50" />
-            <p>{t('standings.empty')}</p>
-            {canManage ? (
-              <p className="text-xs mt-2">{t('standings.emptyOrganizerHint')}</p>
+          <CardContent className="py-12 text-center text-muted-foreground space-y-3">
+            <Trophy className="size-8 mx-auto opacity-50" />
+            <p data-testid="league-standings-empty">{t(emptyTitleKey)}</p>
+            {emptyHintKey ? (
+              <p className="text-xs max-w-md mx-auto">{t(emptyHintKey)}</p>
             ) : null}
+            {!countingRaces && canManage ? (
+              <p className="text-xs">{t('standings.emptyCountingUnsetOrganizer')}</p>
+            ) : null}
+            {canManage && emptyKind !== 'noEvents' ? (
+              <p className="text-xs">{t('standings.emptyOrganizerHint')}</p>
+            ) : null}
+            <div className="flex justify-center pt-1">
+              <LeagueRulesHelp
+                countingRaces={countingRaces}
+                tiebreakMode={tiebreakMode}
+                variant="link"
+                context="standings"
+              />
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -305,7 +337,11 @@ const LeagueStandingsTable = ({
                 <p className="text-xs text-muted-foreground mt-1">
                   {t('standings.countingSummary', { count: countingRaces })}
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('standings.emptyCountingUnset')}
+                </p>
+              )}
               {canManage ? (
                 <p className="text-xs text-muted-foreground mt-1">{t('standings.organizerHint')}</p>
               ) : null}

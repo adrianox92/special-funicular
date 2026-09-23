@@ -16,6 +16,48 @@ jest.mock('react-i18next', () => ({
         'standings.helpOverride': 'Override',
         'standings.countingSummary': `Cuentan ${opts?.count ?? ''}`,
         'standings.empty': 'Aún no hay clasificación.',
+        'standings.emptyNoEvents': 'Esta liga aún no tiene pruebas enlazadas.',
+        'standings.emptyNoEventsHint': 'Sin pruebas no hay columnas.',
+        'standings.emptyNoResults': 'Hay pruebas, pero todavía no alimentan la clasificación.',
+        'standings.emptyNoResultsHint': 'Cerrada siempre cuenta.',
+        'standings.emptyNoParticipants': 'No hay pilotos con fila.',
+        'standings.emptyNoParticipantsHint': 'Inscribe participantes.',
+        'standings.emptyCountingUnset': 'No hay descartes configurados.',
+        'standings.emptyCountingUnsetOrganizer': 'Configura pruebas que cuentan.',
+        'standings.countingUnsetBadge': 'Sin descartes',
+        'rules.open': 'Cómo se calcula',
+        'rules.openSettings': 'Reglas de clasificación',
+        'rules.title': 'Reglas de la liga',
+        'rules.subtitle.standings': 'Descartes y DNS',
+        'rules.drops.title': 'Descartes',
+        'rules.drops.counting': `Cuentan ${opts?.count ?? ''}`,
+        'rules.drops.unset': 'Sin descartes',
+        'rules.drops.meaning': 'Descartada no suma',
+        'rules.dns.title': 'DNS',
+        'rules.dns.body': '0 pts y ocupa descarte',
+        'rules.absent.title': 'No figura',
+        'rules.absent.body': 'Celda — no consume descarte',
+        'rules.dnf.title': 'DNF',
+        'rules.dnf.body': 'Puntos del resultado',
+        'rules.dsq.title': 'DSQ',
+        'rules.dsq.body': 'Igual que DNS',
+        'rules.tiebreak.title': 'Empates',
+        'rules.tiebreak.intro': 'Puntos primero',
+        'rules.tiebreak.current': `Modo ${opts?.mode ?? ''}`,
+        'rules.tiebreak.labels.competitions_completed': 'Más pruebas',
+        'rules.tiebreak.labels.most_wins': 'Más victorias',
+        'rules.tiebreak.labels.last_race_position': 'Última prueba',
+        'rules.tiebreak.modes.competitions_completed': 'más filas con puntos',
+        'rules.tiebreak.modes.most_wins': 'más primeros',
+        'rules.tiebreak.modes.last_race_position': 'mejor puesto última',
+        'rules.tiebreak.fallback': 'Por nombre',
+        'rules.override.title': 'Ajustado',
+        'rules.override.body': 'Override manual',
+        'rules.override.priority': 'override > DNS/DSQ > calculated',
+        'rules.scoringEvents.title': 'Qué pruebas alimentan',
+        'rules.scoringEvents.closed': 'Cerrada siempre',
+        'rules.scoringEvents.runningPublished': 'En curso o publicada con tiempos',
+        'rules.scoringEvents.other': 'Borrador no entra',
         'standings.pos': 'Pos',
         'standings.driver': 'Piloto',
         'standings.total': 'Total',
@@ -146,13 +188,46 @@ describe('LeagueStandingsTable — Mi temporada', () => {
     expect(screen.getAllByTestId('league-adjusted-badge')[0]).toHaveAttribute('title', expect.stringContaining('Acta'));
   });
 
-  test('empty state de clasificación', () => {
+  test('empty state sin pruebas', () => {
     render(
       <MemoryRouter>
         <LeagueStandingsTable standings={[]} competitions={[]} />
       </MemoryRouter>,
     );
-    expect(screen.getByText('Aún no hay clasificación.')).toBeInTheDocument();
+    expect(screen.getByTestId('league-standings-empty')).toHaveTextContent(
+      'Esta liga aún no tiene pruebas enlazadas.',
+    );
     expect(screen.queryByTestId('league-my-season-cta')).not.toBeInTheDocument();
+  });
+
+  test('empty state sin resultados publicados', () => {
+    render(
+      <MemoryRouter>
+        <LeagueStandingsTable
+          standings={[]}
+          competitions={[
+            {
+              competition_id: 'c-draft',
+              competition_name: 'Borrador',
+              competition_status: 'published',
+              has_results: false,
+            },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('league-standings-empty')).toHaveTextContent(
+      'Hay pruebas, pero todavía no alimentan la clasificación.',
+    );
+  });
+
+  test('abre el panel de reglas con DNS y Ajustado', () => {
+    renderTable({ tiebreakMode: 'most_wins' });
+    fireEvent.click(screen.getAllByTestId('league-rules-help-trigger')[0]);
+    const panel = screen.getByTestId('league-rules-help');
+    expect(panel).toHaveTextContent('0 pts y ocupa descarte');
+    expect(panel).toHaveTextContent('Celda — no consume descarte');
+    expect(panel).toHaveTextContent('override > DNS/DSQ > calculated');
+    expect(panel).toHaveTextContent('Cerrada siempre');
   });
 });

@@ -115,6 +115,7 @@ const LeagueStandings = () => {
           standings={data.standings || []}
           competitions={data.competitions || []}
           countingRaces={data.league?.counting_races}
+          tiebreakMode={data.league?.tiebreak_mode}
           exportBasePath={`/public-leagues/${slug}`}
           leagueName={data.league?.name}
           leagueSlug={slug}

@@ -10,6 +10,15 @@
     "helpOverride": "Un ajuste de puntos (badge “ajustado”) sustituye el resultado o la marca DNS/DSQ de esa prueba al sumar la general.",
     "countingSummary": "Se descartan las peores pruebas; cuentan las {{count}} mejores puntuaciones.",
     "empty": "Aún no hay clasificación. Se calculará cuando las pruebas tengan resultados o estén cerradas.",
+    "emptyNoEvents": "Esta liga aún no tiene pruebas enlazadas.",
+    "emptyNoEventsHint": "Sin pruebas no hay columnas ni puntos. Enlaza competiciones para que alimenten la general.",
+    "emptyNoResults": "Hay pruebas, pero todavía no alimentan la clasificación.",
+    "emptyNoResultsHint": "Una prueba cerrada siempre cuenta. En curso o publicada solo entra si ya hay tiempos.",
+    "emptyNoParticipants": "No hay pilotos con fila en la clasificación.",
+    "emptyNoParticipantsHint": "Inscribe participantes o cierra una prueba con resultados. Un no-show de un inscrito se marca como DNS.",
+    "countingUnsetBadge": "Sin descartes",
+    "emptyCountingUnset": "No hay descartes configurados: todas las filas con resultado (incl. DNS/DSQ) suman.",
+    "emptyCountingUnsetOrganizer": "En Editar liga, “pruebas que cuentan” deja solo las N mejores y descarta las peores.",
     "emptyOrganizerHint": "Para un no-show de un inscrito de la liga, márcalo DNS en la celda de esa prueba cuando haya columnas de clasificación.",
     "organizerHint": "Pulsa una celda para marcar DNS/DSQ o ajustar puntos de un piloto inscrito.",
     "markDns": "Marcar DNS",
@@ -116,5 +125,76 @@
     "clubSectionTitle": "Ligas del club",
     "clubSectionEmpty": "Este club aún no tiene ligas publicadas.",
     "openLeague": "Ver liga"
+  },
+  "rules": {
+    "title": "Reglas de la liga",
+    "open": "Cómo se calcula",
+    "openSettings": "Reglas de clasificación",
+    "subtitle": {
+      "standings": "Descartes, DNS, DSQ, empates y ajustes que ves en la tabla.",
+      "mySeason": "Cómo se leen puntos, descartes y el badge Ajustado en tu temporada.",
+      "settings": "Estas opciones cambian la general al instante (se recalcula al leer)."
+    },
+    "drops": {
+      "title": "Descartes",
+      "counting": "Cuentan las {{count}} mejores puntuaciones. El resto se tacha (“descartada”) y no suma al total.",
+      "unset": "No hay un número de “pruebas que cuentan”: todas las filas con resultado (incl. DNS/DSQ) suman. Vacío o 0 = sin descartes.",
+      "meaning": "“Descartada” es visible en la tabla, pero no entra en el total. Solo ocupan plaza las filas que existen: un DNS sí, un “no figura” no."
+    },
+    "dns": {
+      "title": "DNS (no disputa)",
+      "body": "0 puntos y sí ocupa plaza de descarte. Se marca a mano o se infiere si el piloto tiene NP en todas las rondas de esa prueba."
+    },
+    "absent": {
+      "title": "No figura / no inscrito",
+      "body": "Celda “—”: no hay fila en esa prueba. No recibe puntos y no consume descarte. Distinto de DNS."
+    },
+    "dnf": {
+      "title": "DNF",
+      "body": "No se infiere un estado DNF. Puntos y puesto son los del resultado registrado en la prueba."
+    },
+    "dsq": {
+      "title": "DSQ (descalificado)",
+      "body": "0 puntos y el mismo tratamiento que DNS respecto a descartes: la fila existe y ocupa plaza."
+    },
+    "tiebreak": {
+      "title": "Empates",
+      "intro": "Primero mandan los puntos (tras descartes). Si empatan, se aplica el criterio de la liga.",
+      "current": "En esta liga: {{mode}}",
+      "labels": {
+        "competitions_completed": "Más pruebas disputadas",
+        "most_wins": "Más victorias",
+        "last_race_position": "Última prueba"
+      },
+      "modes": {
+        "competitions_completed": "más filas con puntos > 0 que no estén descartadas.",
+        "most_wins": "más primeros puestos (posición 1) que no estén descartados.",
+        "last_race_position": "mejor puesto en la última prueba puntuable que no esté descartada y tenga posición."
+      },
+      "fallback": "Si sigue el empate, se ordena por nombre."
+    },
+    "override": {
+      "title": "Ajustado",
+      "body": "El badge “Ajustado” es un override manual de puntos (piloto × prueba). Ese valor es el que suma y el que entra en el descarte.",
+      "priority": "Prioridad: ajuste manual > DNS/DSQ > puntos calculados. Quitar el ajuste restaura DNS/DSQ o el cálculo (o “—” si no hay fila)."
+    },
+    "scoringEvents": {
+      "title": "Qué pruebas alimentan la general",
+      "closed": "Cerrada: siempre entra, aunque no haya tiempos (puede haber DNS/DSQ o un ajuste).",
+      "runningPublished": "En curso o publicada: solo si ya hay tiempos registrados.",
+      "other": "Borrador u otros estados: no aparecen como columna ni suman."
+    }
+  },
+  "scoring": {
+    "perCompetition": "Esta liga usa reglas de puntuación por competición. Configura las reglas en cada prueba individual."
+  },
+  "competitions": {
+    "empty": "No hay pruebas enlazadas en esta liga todavía.",
+    "emptyHint": "Sin pruebas no hay calendario ni clasificación. Añade competiciones existentes; cerradas o con tiempos alimentan la general."
+  },
+  "participants": {
+    "empty": "No hay participantes inscritos en la liga.",
+    "emptyHint": "La general también puede salir de resultados de las pruebas. Un inscrito de liga se puede marcar DNS, DSQ o Ajustado.",
+    "emptyImportHint": "Si tus pruebas ya tienen pilotos, usa «Importar desde competiciones»."
   }
 }

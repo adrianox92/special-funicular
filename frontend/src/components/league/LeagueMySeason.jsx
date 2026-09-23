@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Trophy, ExternalLink, Info } from 'lucide-react';
+import { Trophy, ExternalLink } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import LeagueAdjustedBadge from './LeagueAdjustedBadge';
+import LeagueRulesHelp from './LeagueRulesHelp';
 
 const APPEARANCE_VARIANT = {
   result: 'secondary',
@@ -29,6 +29,12 @@ const LeagueMySeason = ({ season, showEmail = false, showOverrideAuthor = false 
             ? t('mySeason.emptyNoCompetitions')
             : t('mySeason.emptyNotFound')}
         </p>
+        <LeagueRulesHelp
+          countingRaces={season.counting_races}
+          tiebreakMode={season.league?.tiebreak_mode}
+          variant="link"
+          context="mySeason"
+        />
       </div>
     );
   }
@@ -65,19 +71,18 @@ const LeagueMySeason = ({ season, showEmail = false, showOverrideAuthor = false 
         </div>
       </div>
 
-      <Alert>
-        <Info className="size-4" />
-        <AlertTitle>{t('mySeason.helpTitle')}</AlertTitle>
-        <AlertDescription className="space-y-1">
-          <p>
-            {season.counting_races
-              ? t('mySeason.helpCounting', { count: season.counting_races })
-              : t('mySeason.helpCountingUnset')}
-          </p>
-          <p>{t('mySeason.helpDnsVsAbsent')}</p>
-          <p>{t('mySeason.helpOverride')}</p>
-        </AlertDescription>
-      </Alert>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          {season.counting_races
+            ? t('mySeason.helpCounting', { count: season.counting_races })
+            : t('mySeason.helpCountingUnset')}
+        </p>
+        <LeagueRulesHelp
+          countingRaces={season.counting_races}
+          tiebreakMode={season.league?.tiebreak_mode}
+          context="mySeason"
+        />
+      </div>
 
       {season.empty_reason === 'no_competitions' ? (
         <p className="text-sm text-muted-foreground" data-testid="league-my-season-no-races">
