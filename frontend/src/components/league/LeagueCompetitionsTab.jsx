@@ -28,7 +28,6 @@ import {
 import CompetitionStatusBadge from '../CompetitionStatusBadge';
 import { toast } from 'sonner';
 import { Spinner } from '../ui/spinner';
-import { useTranslation } from 'react-i18next';
 import LeagueRulesHelp from './LeagueRulesHelp';
 
 const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
