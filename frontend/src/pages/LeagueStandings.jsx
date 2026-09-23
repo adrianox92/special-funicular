@@ -92,7 +92,18 @@ const LeagueStandings = () => {
         </div>
 
         <LeagueSeasonCalendar
-          competitions={leagueMeta?.competitions || []}
+          competitions={
+            leagueMeta?.competitions?.length
+              ? leagueMeta.competitions
+              : (data.competitions || []).map((c) => ({
+                  id: c.competition_id || c.id,
+                  name: c.competition_name || c.name,
+                  status: c.competition_status || c.status,
+                  public_slug: c.public_slug,
+                  order_index: c.order_index,
+                  event_date: c.event_date || null,
+                }))
+          }
           variant="public"
         />
 
