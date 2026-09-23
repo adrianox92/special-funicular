@@ -9,8 +9,14 @@ const { isLeagueCompetitionVisibleInStandings } = require('./leagueStandings');
  */
 function formatStandingCellCsv(entry) {
   if (!entry) return '—';
-  const status = entry.result_status ? String(entry.result_status).toUpperCase() : null;
-  const inner = status || String(entry.points ?? 0);
+  let inner;
+  if (entry.overridden) {
+    inner = `${entry.points ?? 0}*`;
+  } else if (entry.result_status) {
+    inner = String(entry.result_status).toUpperCase();
+  } else {
+    inner = String(entry.points ?? 0);
+  }
   return entry.dropped ? `(${inner})` : inner;
 }
 

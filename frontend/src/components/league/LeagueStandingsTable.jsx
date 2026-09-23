@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trophy, Download, Share2, Info, ChevronDown } from 'lucide-react';
+import { Trophy, Download, Share2, Info, ChevronDown, UserRound } from 'lucide-react';
 import axios from '../../lib/axios';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
@@ -20,7 +20,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '../ui/sheet';
 import { toast } from 'sonner';
+import LeagueMySeason from './LeagueMySeason';
+import LeagueAdjustedBadge from './LeagueAdjustedBadge';
+import LeaguePointsOverrideDialog from './LeaguePointsOverrideDialog';
+import LeagueRulesHelp from './LeagueRulesHelp';
+import {
+  buildParticipantSeason,
+  findMyStandingRow,
+  findStandingRow,
+  isSelfStanding,
+  matcherFromParticipantKey,
+  participantKeyFromRow,
+} from '../../utils/leagueParticipantSeason';
 
 const isLeagueCompetitionVisible = (comp) =>
   comp.competition_status === 'closed' ||
@@ -44,33 +63,21 @@ const RESULT_STATUS_LABEL = {
   dsq: 'DSQ',
 };
 
-const LeagueStandingsHelp = ({ countingRaces, t }) => (
-  <Alert>
-    <Info className="size-4" />
-    <AlertTitle>{t('standings.helpTitle')}</AlertTitle>
-    <AlertDescription>
-      <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
-        <li>{t('standings.helpDns')}</li>
-        <li>{t('standings.helpDsq')}</li>
-        <li>{t('standings.helpAbsent')}</li>
-        <li>
-          {countingRaces
-            ? t('standings.helpCounting', { count: countingRaces })
-            : t('standings.helpCountingUnset')}
-        </li>
-        <li>{t('standings.helpTimingSync')}</li>
-      </ul>
-    </AlertDescription>
-  </Alert>
-);
+const standingsEmptyKind = (competitions, standings) => {
+  const list = competitions || [];
+  if (!list.length) return 'noEvents';
+  if (!list.some(isLeagueCompetitionVisible)) return 'noResults';
+  if (!(standings || []).length) return 'noParticipants';
+  return null;
+};
 
-const StandingCellContent = ({ entry }) => {
+const StandingCellContent = ({ entry, includeAuthor = false }) => {
   if (!entry) {
     return <span className="text-muted-foreground">—</span>;
   }
 
   const dropped = Boolean(entry.dropped);
-  const statusLabel = RESULT_STATUS_LABEL[entry.result_status];
+  const statusLabel = !entry.overridden ? RESULT_STATUS_LABEL[entry.result_status] : null;
   const pts = entry.points;
   const vehicle = entry.vehicle;
 
@@ -79,6 +86,16 @@ const StandingCellContent = ({ entry }) => {
       <div className={dropped ? 'line-through text-muted-foreground' : 'font-medium'}>
         {statusLabel || pts}
       </div>
+      {entry.overridden ? (
+        <div className="flex justify-center">
+          <LeagueAdjustedBadge override={entry.override} includeAuthor={includeAuthor} />
+        </div>
+      ) : null}
+      {entry.overridden && RESULT_STATUS_LABEL[entry.result_status] ? (
+        <div className="text-[10px] leading-tight text-muted-foreground">
+          {RESULT_STATUS_LABEL[entry.result_status]}
+        </div>
+      ) : null}
       {(entry.power_stage_points || 0) > 0 && (
         <div
           className={`text-[10px] leading-tight ${
@@ -106,15 +123,66 @@ const LeagueStandingsTable = ({
   standings = [],
   competitions = [],
   countingRaces = null,
+  tiebreakMode = null,
   exportBasePath = null,
   leagueName = '',
+  leagueSlug = null,
   canManage = false,
   leagueId = null,
   onResultUpdated,
+  viewer = null,
+  selectedParticipantKey = null,
+  onSelectParticipant,
 }) => {
   const { t } = useTranslation('leagues');
   const closedCompetitions = (competitions || []).filter(isLeagueCompetitionVisible);
   const [markingKey, setMarkingKey] = useState(null);
+  const [internalSelectedKey, setInternalSelectedKey] = useState(null);
+  const [overrideTarget, setOverrideTarget] = useState(null);
+  const [overrideBusy, setOverrideBusy] = useState(false);
+
+  const selectedKey = onSelectParticipant ? selectedParticipantKey : internalSelectedKey;
+  const myRow = useMemo(() => findMyStandingRow(standings, viewer), [standings, viewer]);
+
+  const selectedRow = useMemo(() => {
+    if (!selectedKey) return null;
+    return findStandingRow(standings, matcherFromParticipantKey(selectedKey));
+  }, [selectedKey, standings]);
+
+  const season = useMemo(() => {
+    if (!selectedRow) return null;
+    const isSelf = isSelfStanding(selectedRow, viewer);
+    return buildParticipantSeason(
+      {
+        league: {
+          id: leagueId,
+          name: leagueName,
+          slug: leagueSlug,
+          counting_races: countingRaces,
+          tiebreak_mode: tiebreakMode,
+        },
+        competitions,
+        standings,
+      },
+      {
+        leagueParticipantId: selectedRow.league_participant_id,
+        name: selectedRow.name,
+        email: selectedRow.email,
+      },
+      { isSelf, includeEmail: Boolean(canManage || isSelf), viewer },
+    );
+  }, [selectedRow, viewer, leagueId, leagueName, leagueSlug, countingRaces, tiebreakMode, competitions, standings, canManage]);
+
+  const openRow = (row) => {
+    const key = participantKeyFromRow(row);
+    if (onSelectParticipant) onSelectParticipant(key);
+    else setInternalSelectedKey(key);
+  };
+
+  const closeSeason = () => {
+    if (onSelectParticipant) onSelectParticipant(null);
+    else setInternalSelectedKey(null);
+  };
 
   const handleExport = async (type) => {
     if (!exportBasePath) return;
@@ -154,18 +222,107 @@ const LeagueStandingsTable = ({
     }
   };
 
+  const openOverride = (row, competition) => {
+    setOverrideTarget({
+      row,
+      competitionId: competition.competition_id,
+      competitionName: competition.competition_name,
+      entry: row.by_competition?.[competition.competition_id] || null,
+    });
+  };
+
+  const handleSaveOverride = async ({ points, reason }) => {
+    if (!leagueId || !overrideTarget?.row?.league_participant_id) return;
+    try {
+      setOverrideBusy(true);
+      await axios.put(
+        `/leagues/${leagueId}/competitions/${overrideTarget.competitionId}/overrides`,
+        {
+          league_participant_id: overrideTarget.row.league_participant_id,
+          points,
+          reason,
+        },
+      );
+      toast.success(t('standings.adjustSaved'));
+      setOverrideTarget(null);
+      onResultUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || t('standings.saveError'));
+    } finally {
+      setOverrideBusy(false);
+    }
+  };
+
+  const handleClearOverride = async () => {
+    if (!leagueId || !overrideTarget?.row?.league_participant_id) return;
+    try {
+      setOverrideBusy(true);
+      await axios.delete(
+        `/leagues/${leagueId}/competitions/${overrideTarget.competitionId}/overrides/${overrideTarget.row.league_participant_id}`,
+      );
+      toast.success(t('standings.adjustCleared'));
+      setOverrideTarget(null);
+      onResultUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || t('standings.saveError'));
+    } finally {
+      setOverrideBusy(false);
+    }
+  };
+
+  const emptyKind = standingsEmptyKind(competitions, standings);
+  const emptyTitleKey = {
+    noEvents: 'standings.emptyNoEvents',
+    noResults: 'standings.emptyNoResults',
+    noParticipants: 'standings.emptyNoParticipants',
+  }[emptyKind] || 'standings.empty';
+  const emptyHintKey = {
+    noEvents: 'standings.emptyNoEventsHint',
+    noResults: 'standings.emptyNoResultsHint',
+    noParticipants: 'standings.emptyNoParticipantsHint',
+  }[emptyKind];
+
   return (
     <div className="space-y-4">
-      <LeagueStandingsHelp countingRaces={countingRaces} t={t} />
+      <Alert data-testid="league-rules-help-banner">
+        <Info className="size-4" />
+        <AlertTitle>{t('standings.helpTitle')}</AlertTitle>
+        <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            {countingRaces
+              ? t('standings.countingSummary', { count: countingRaces })
+              : t('standings.emptyCountingUnset')}
+          </p>
+          <LeagueRulesHelp
+            countingRaces={countingRaces}
+            tiebreakMode={tiebreakMode}
+            context="standings"
+          />
+        </AlertDescription>
+      </Alert>
 
-      {!standings.length ? (
+      {emptyKind ? (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Trophy className="size-8 mx-auto mb-3 opacity-50" />
-            <p>{t('standings.empty')}</p>
-            {canManage ? (
-              <p className="text-xs mt-2">{t('standings.emptyOrganizerHint')}</p>
+          <CardContent className="py-12 text-center text-muted-foreground space-y-3">
+            <Trophy className="size-8 mx-auto opacity-50" />
+            <p data-testid="league-standings-empty">{t(emptyTitleKey)}</p>
+            {emptyHintKey ? (
+              <p className="text-xs max-w-md mx-auto">{t(emptyHintKey)}</p>
             ) : null}
+            {!countingRaces && canManage ? (
+              <p className="text-xs">{t('standings.emptyCountingUnsetOrganizer')}</p>
+            ) : null}
+            {canManage && emptyKind !== 'noEvents' ? (
+              <p className="text-xs">{t('standings.emptyOrganizerHint')}</p>
+            ) : null}
+            <div className="flex justify-center pt-1">
+              <LeagueRulesHelp
+                countingRaces={countingRaces}
+                tiebreakMode={tiebreakMode}
+                variant="link"
+                context="standings"
+              />
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -180,23 +337,40 @@ const LeagueStandingsTable = ({
                 <p className="text-xs text-muted-foreground mt-1">
                   {t('standings.countingSummary', { count: countingRaces })}
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('standings.emptyCountingUnset')}
+                </p>
+              )}
               {canManage ? (
                 <p className="text-xs text-muted-foreground mt-1">{t('standings.organizerHint')}</p>
               ) : null}
             </div>
-            {exportBasePath ? (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
-                  <Download className="size-4 mr-2" />
-                  {t('standings.csv')}
+            <div className="flex flex-wrap gap-2">
+              {myRow ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => openRow(myRow)}
+                  data-testid="league-my-season-cta"
+                >
+                  <UserRound className="size-4 mr-2" />
+                  {t('mySeason.cta')}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExport('social')}>
-                  <Share2 className="size-4 mr-2" />
-                  {t('standings.socialImage')}
-                </Button>
-              </div>
-            ) : null}
+              ) : null}
+              {exportBasePath ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
+                    <Download className="size-4 mr-2" />
+                    {t('standings.csv')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleExport('social')}>
+                    <Share2 className="size-4 mr-2" />
+                    {t('standings.socialImage')}
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -219,7 +393,15 @@ const LeagueStandingsTable = ({
                       <Badge variant={row.position === 1 ? 'default' : 'outline'}>{row.position}</Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{row.name}</div>
+                      <button
+                        type="button"
+                        className="text-left rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => openRow(row)}
+                        title={t('standings.openSeasonHint')}
+                        data-testid="league-standings-driver"
+                      >
+                        <div className="font-medium">{row.name}</div>
+                      </button>
                       {row.email ? (
                         <div className="text-xs text-muted-foreground">{row.email}</div>
                       ) : null}
@@ -247,7 +429,7 @@ const LeagueStandingsTable = ({
                                   className="w-full rounded-md px-1 py-0.5 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                   title={t('standings.markTitle')}
                                 >
-                                  <StandingCellContent entry={entry} />
+                                  <StandingCellContent entry={entry} includeAuthor={canManage} />
                                   <ChevronDown className="size-3 mx-auto mt-0.5 opacity-50" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -262,6 +444,12 @@ const LeagueStandingsTable = ({
                                 >
                                   {t('standings.markDsq')}
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => openOverride(row, comp)}
+                                  data-testid="league-adjust-points"
+                                >
+                                  {t('standings.adjustPoints')}
+                                </DropdownMenuItem>
                                 {entry?.result_status_source === 'explicit' ? (
                                   <DropdownMenuItem
                                     onClick={() => handleSetResult(row, comp.competition_id, null)}
@@ -272,7 +460,7 @@ const LeagueStandingsTable = ({
                               </DropdownMenuContent>
                             </DropdownMenu>
                           ) : (
-                            <StandingCellContent entry={entry} />
+                            <StandingCellContent entry={entry} includeAuthor={canManage} />
                           )}
                         </TableCell>
                       );
@@ -285,6 +473,29 @@ const LeagueStandingsTable = ({
           </CardContent>
         </Card>
       )}
+
+      <Sheet open={Boolean(season)} onOpenChange={(open) => { if (!open) closeSeason(); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="sr-only">
+            <SheetTitle>{season?.is_self ? t('mySeason.titleSelf') : t('mySeason.titleFallback')}</SheetTitle>
+            <SheetDescription>{t('standings.openSeasonHint')}</SheetDescription>
+          </SheetHeader>
+          <LeagueMySeason
+            season={season}
+            showEmail={Boolean(canManage || season?.is_self)}
+            showOverrideAuthor={canManage}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <LeaguePointsOverrideDialog
+        open={Boolean(overrideTarget)}
+        onOpenChange={(next) => { if (!next) setOverrideTarget(null); }}
+        target={overrideTarget}
+        busy={overrideBusy}
+        onSave={handleSaveOverride}
+        onClear={handleClearOverride}
+      />
     </div>
   );
 };

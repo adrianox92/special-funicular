@@ -41,7 +41,9 @@ import LeagueParticipantsTab from '../components/league/LeagueParticipantsTab';
 import LeagueRulesTab from '../components/league/LeagueRulesTab';
 import LeagueStandingsTable from '../components/league/LeagueStandingsTable';
 import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
+import LeagueRulesHelp from '../components/league/LeagueRulesHelp';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 const LEAGUE_TABS = new Set(['competitions', 'calendar', 'participants', 'rules', 'standings']);
 
@@ -61,6 +63,7 @@ const LeagueDetail = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation('leagues');
+  const { user } = useAuth();
   const [league, setLeague] = useState(null);
   const [standings, setStandings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -235,7 +238,9 @@ const LeagueDetail = () => {
               <Badge variant="outline">{SCORING_LABEL[league.scoring_mode]}</Badge>
               {league.counting_races ? (
                 <Badge variant="secondary">Cuentan {league.counting_races} pruebas</Badge>
-              ) : null}
+              ) : (
+                <Badge variant="outline">{t('standings.countingUnsetBadge')}</Badge>
+              )}
             </div>
             {league.club?.name && (
               <p className="text-sm text-muted-foreground mt-1">Club: {league.club.name}</p>
@@ -332,7 +337,12 @@ const LeagueDetail = () => {
 
         {league.scoring_mode === 'league_rules' && (
           <TabsContent value="rules" className="mt-4">
-            <LeagueRulesTab leagueId={league.id} scoringMode={league.scoring_mode} />
+            <LeagueRulesTab
+              leagueId={league.id}
+              scoringMode={league.scoring_mode}
+              countingRaces={league.counting_races}
+              tiebreakMode={league.tiebreak_mode}
+            />
           </TabsContent>
         )}
 
@@ -346,11 +356,21 @@ const LeagueDetail = () => {
               standings={standings?.standings || []}
               competitions={standings?.competitions || []}
               countingRaces={league.counting_races}
+              tiebreakMode={league.tiebreak_mode}
               exportBasePath={`/leagues/${id}`}
               leagueName={league.name}
+              leagueSlug={league.slug}
               canManage={canManage}
               leagueId={league.id}
               onResultUpdated={loadStandings}
+              viewer={user}
+              selectedParticipantKey={searchParams.get('pilot')}
+              onSelectParticipant={(key) => {
+                const next = new URLSearchParams(searchParams);
+                if (key) next.set('pilot', key);
+                else next.delete('pilot');
+                setSearchParams(next, { replace: true });
+              }}
             />
           )}
         </TabsContent>
@@ -382,7 +402,7 @@ const LeagueDetail = () => {
                 placeholder="Todas"
               />
               <p className="text-xs text-muted-foreground">
-                DNS y DSQ (0 pts) entran en el descarte; no inscrito en esa prueba no.
+                {t('standings.helpDns')} {t('standings.helpAbsent')}
               </p>
             </div>
             <div className="space-y-2">
@@ -411,6 +431,12 @@ const LeagueDetail = () => {
                   <SelectItem value="last_race_position">Última prueba</SelectItem>
                 </SelectContent>
               </Select>
+              <LeagueRulesHelp
+                countingRaces={editForm.counting_races ? parseInt(editForm.counting_races, 10) : null}
+                tiebreakMode={editForm.tiebreak_mode}
+                variant="inline"
+                context="settings"
+              />
             </div>
             {hasCompetitionsOrRules && (
               <p className="text-xs text-muted-foreground">

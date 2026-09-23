@@ -11,6 +11,10 @@ const {
 } = require('../lib/leaguePermissions');
 const { computeLeagueStandings } = require('../lib/leagueStandings');
 const {
+  buildParticipantSeason,
+  resolveMyMatcher,
+} = require('../lib/leagueParticipantSeason');
+const {
   syncLeagueParticipantsToCompetition,
   importCompetitionParticipantsToLeague,
 } = require('../lib/leagueSync');
@@ -556,6 +560,12 @@ router.delete(
         .eq('league_id', req.params.id)
         .eq('competition_id', req.params.compId);
 
+      await supabase
+        .from('league_point_overrides')
+        .delete()
+        .eq('league_id', req.params.id)
+        .eq('competition_id', req.params.compId);
+
       res.json({ ok: true });
     } catch (error) {
       console.error('DELETE /leagues/:id/competitions/:compId:', error);
@@ -654,6 +664,144 @@ router.put(
       res.json(data);
     } catch (error) {
       console.error('PUT /leagues/:id/competitions/:compId/results:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+function overrideAuthorLabel(user) {
+  const meta = user?.user_metadata || {};
+  const name = String(meta.full_name || meta.name || '').trim();
+  if (name) return name.slice(0, 80);
+  return 'Organizador';
+}
+
+async function assertLinkedParticipant(supabase, leagueId, competitionId, participantId) {
+  const { data: link, error: linkErr } = await supabase
+    .from('league_competitions')
+    .select('id')
+    .eq('league_id', leagueId)
+    .eq('competition_id', competitionId)
+    .maybeSingle();
+
+  if (linkErr) return { error: { status: 500, message: linkErr.message } };
+  if (!link) return { error: { status: 404, message: 'La prueba no está enlazada a esta liga' } };
+
+  const { data: participant, error: partErr } = await supabase
+    .from('league_participants')
+    .select('id, name, email, status')
+    .eq('id', participantId)
+    .eq('league_id', leagueId)
+    .maybeSingle();
+
+  if (partErr) return { error: { status: 500, message: partErr.message } };
+  if (!participant) {
+    return { error: { status: 404, message: 'Participante no encontrado en esta liga' } };
+  }
+
+  return { participant };
+}
+
+router.put(
+  '/:id/competitions/:compId/overrides',
+  param('id').isUUID(),
+  param('compId').isUUID(),
+  body('league_participant_id').isUUID(),
+  body('points').isFloat({ min: 0, max: 9999 }),
+  body('reason').optional({ values: 'falsy' }).isString().trim().isLength({ max: 140 }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const competitionId = req.params.compId;
+      const participantId = req.body.league_participant_id;
+      const points = Number(req.body.points);
+      const reason = req.body.reason ? String(req.body.reason).trim().slice(0, 140) : null;
+
+      const linked = await assertLinkedParticipant(
+        supabase,
+        req.params.id,
+        competitionId,
+        participantId,
+      );
+      if (linked.error) {
+        return res.status(linked.error.status).json({ error: linked.error.message });
+      }
+
+      const { data: existing, error: existingErr } = await supabase
+        .from('league_point_overrides')
+        .select('id, created_by')
+        .eq('league_id', req.params.id)
+        .eq('competition_id', competitionId)
+        .eq('league_participant_id', participantId)
+        .maybeSingle();
+
+      if (existingErr) {
+        return res.status(500).json({ error: existingErr.message });
+      }
+
+      const { data, error } = await supabase
+        .from('league_point_overrides')
+        .upsert(
+          {
+            league_id: req.params.id,
+            competition_id: competitionId,
+            league_participant_id: participantId,
+            points,
+            reason,
+            created_by: existing?.created_by || req.user.id,
+            updated_by: req.user.id,
+            updated_by_label: overrideAuthorLabel(req.user),
+          },
+          { onConflict: 'league_id,competition_id,league_participant_id' },
+        )
+        .select('*')
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json(data);
+    } catch (error) {
+      console.error('PUT /leagues/:id/competitions/:compId/overrides:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.delete(
+  '/:id/competitions/:compId/overrides/:participantId',
+  param('id').isUUID(),
+  param('compId').isUUID(),
+  param('participantId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const { error } = await supabase
+        .from('league_point_overrides')
+        .delete()
+        .eq('league_id', req.params.id)
+        .eq('competition_id', req.params.compId)
+        .eq('league_participant_id', req.params.participantId);
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json({
+        ok: true,
+        league_participant_id: req.params.participantId,
+        competition_id: req.params.compId,
+        override: null,
+      });
+    } catch (error) {
+      console.error('DELETE /leagues/:id/competitions/:compId/overrides/:participantId:', error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -965,6 +1113,68 @@ router.post(
       res.json({ total_created: totalCreated, competitions: results });
     } catch (error) {
       console.error('POST sync-all-competitions:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/my-season',
+  param('id').isUUID(),
+  query('category_id').optional().isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireViewLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const matcher = await resolveMyMatcher(supabase, req.params.id, req.user);
+      const payload = await computeLeagueStandings(supabase, req.params.id, {
+        categoryId: req.query.category_id || undefined,
+      });
+      const season = buildParticipantSeason(payload, matcher, {
+        viewer: req.user,
+        includeEmail: true,
+        isSelf: true,
+      });
+      res.json(season);
+    } catch (error) {
+      console.error('GET /leagues/:id/my-season:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/season',
+  param('id').isUUID(),
+  query('participant_id').optional().isUUID(),
+  query('category_id').optional().isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireViewLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const matcher = {
+        leagueParticipantId: req.query.participant_id || null,
+        name: req.query.name || null,
+        email: req.query.email || null,
+      };
+      if (!matcher.leagueParticipantId && !matcher.name && !matcher.email) {
+        return res.status(400).json({ error: 'Indica participant_id o name' });
+      }
+
+      const payload = await computeLeagueStandings(supabase, req.params.id, {
+        categoryId: req.query.category_id || undefined,
+      });
+      const season = buildParticipantSeason(payload, matcher, {
+        viewer: req.user,
+        includeEmail: access.league.organizer === req.user.id,
+      });
+      res.json(season);
+    } catch (error) {
+      console.error('GET /leagues/:id/season:', error);
       res.status(500).json({ error: error.message });
     }
   },

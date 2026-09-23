@@ -40,10 +40,13 @@ import {
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { Spinner } from '../ui/spinner';
+import { useTranslation } from 'react-i18next';
+import LeagueRulesHelp from './LeagueRulesHelp';
 
 const emptyForm = { name: '', email: '', vehicle_model: '', status: 'confirmed' };
 
 const LeagueParticipantsTab = ({ league, canManage, onRefresh }) => {
+  const { t } = useTranslation('leagues');
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [adding, setAdding] = useState(false);
@@ -165,14 +168,21 @@ const LeagueParticipantsTab = ({ league, canManage, onRefresh }) => {
 
       {participants.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Users className="size-8 mx-auto mb-3 opacity-50" />
-            <p>No hay participantes inscritos en la liga.</p>
-            {canManage && hasCompetitions && (
-              <p className="text-sm mt-2">
-                Si tus pruebas ya tienen pilotos, usa «Importar desde competiciones».
-              </p>
-            )}
+          <CardContent className="py-12 text-center text-muted-foreground space-y-3">
+            <Users className="size-8 mx-auto opacity-50" />
+            <p>{t('participants.empty')}</p>
+            <p className="text-xs max-w-md mx-auto">{t('participants.emptyHint')}</p>
+            {canManage && hasCompetitions ? (
+              <p className="text-sm">{t('participants.emptyImportHint')}</p>
+            ) : null}
+            <div className="flex justify-center">
+              <LeagueRulesHelp
+                countingRaces={league?.counting_races}
+                tiebreakMode={league?.tiebreak_mode}
+                variant="link"
+                context="settings"
+              />
+            </div>
           </CardContent>
         </Card>
       ) : (
