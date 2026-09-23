@@ -13,12 +13,24 @@ jest.mock('react-i18next', () => ({
         'standings.helpAbsent': 'Ausente',
         'standings.helpCounting': `Cuentan ${opts?.count ?? ''}`,
         'standings.helpCountingUnset': 'Todas',
+        'standings.helpOverride': 'Override',
         'standings.countingSummary': `Cuentan ${opts?.count ?? ''}`,
         'standings.empty': 'Aún no hay clasificación.',
         'standings.pos': 'Pos',
         'standings.driver': 'Piloto',
         'standings.total': 'Total',
         'standings.openSeasonHint': 'Abre la ficha',
+        'standings.adjustPoints': 'Ajustar puntos',
+        'standings.adjustPointsTitle': 'Ajustar puntos de la prueba',
+        'standings.adjustPointsHelp': 'Ayuda ajuste',
+        'standings.adjustPointsField': 'Puntos',
+        'standings.adjustReason': 'Motivo',
+        'standings.adjustReasonHint': 'Ej.',
+        'standings.adjustSave': 'Guardar ajuste',
+        'standings.adjustClear': 'Quitar ajuste',
+        'standings.adjustedBadge': 'Ajustado',
+        'standings.adjustedBy': `por ${opts?.name ?? ''}`,
+        'standings.adjustedAuthorFallback': 'organizador',
         'mySeason.cta': 'Mi temporada',
         'mySeason.titleSelf': 'Mi temporada',
         'mySeason.titleOther': `Temporada de ${opts?.name ?? ''}`,
@@ -34,6 +46,7 @@ jest.mock('react-i18next', () => ({
         'mySeason.helpCounting': `Cuentan ${opts?.count ?? ''}`,
         'mySeason.helpCountingUnset': 'Todas',
         'mySeason.helpDnsVsAbsent': 'DNS vs no figura',
+        'mySeason.helpOverride': 'Ajustado sustituye',
         'mySeason.racesTitle': 'Desglose',
         'mySeason.droppedTitle': 'Descartadas',
         'mySeason.countingTitle': 'Cuentan',
@@ -57,7 +70,7 @@ jest.mock('react-i18next', () => ({
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
-  default: { get: jest.fn(), put: jest.fn() },
+  default: { get: jest.fn(), put: jest.fn(), delete: jest.fn() },
 }));
 
 import LeagueStandingsTable from '../../components/league/LeagueStandingsTable';
@@ -87,7 +100,13 @@ const standings = [
     position: 1,
     total_points: 25,
     by_competition: {
-      c1: { points: 25, position: 1, dropped: false },
+      c1: {
+        points: 22,
+        position: 1,
+        dropped: false,
+        overridden: true,
+        override: { points: 22, reason: 'Acta' },
+      },
       c2: { points: 0, position: null, dropped: true, result_status: 'dns' },
     },
   },
@@ -119,6 +138,12 @@ describe('LeagueStandingsTable — Mi temporada', () => {
   test('CTA Mi temporada si el visitante coincide por email', () => {
     renderTable({ viewer: { email: 'ana@test.com' } });
     expect(screen.getByTestId('league-my-season-cta')).toBeInTheDocument();
+  });
+
+  test('muestra badge de puntos ajustados en la celda', () => {
+    renderTable();
+    expect(screen.getAllByTestId('league-adjusted-badge')[0]).toHaveTextContent('Ajustado');
+    expect(screen.getAllByTestId('league-adjusted-badge')[0]).toHaveAttribute('title', expect.stringContaining('Acta'));
   });
 
   test('empty state de clasificación', () => {

@@ -106,6 +106,9 @@ function buildRaceRow(comp, entry) {
     power_stage_points: hasEntry ? Number(entry.power_stage_points) || 0 : 0,
     result_status: entry?.result_status || null,
     result_status_source: entry?.result_status_source || null,
+    overridden: Boolean(entry?.overridden),
+    override: entry?.override || null,
+    points_source: entry?.points_source || null,
     public_path: competitionPublicPath(comp),
   };
 }
@@ -203,6 +206,19 @@ export function participantKeyFromRow(row) {
   if (row.league_participant_id) return row.league_participant_id;
   if (row.name) return `name:${row.name}`;
   return null;
+}
+
+export function formatOverrideTooltip(override, t, { includeAuthor = false } = {}) {
+  const parts = [t('standings.adjustedBadge')];
+  if (override?.reason) parts.push(override.reason);
+  if (includeAuthor && override?.updated_by_label) {
+    parts.push(t('standings.adjustedBy', { name: override.updated_by_label }));
+  }
+  if (includeAuthor && override?.updated_at) {
+    const when = Date.parse(override.updated_at);
+    parts.push(Number.isNaN(when) ? String(override.updated_at) : new Date(when).toLocaleString());
+  }
+  return parts.join(' · ');
 }
 
 export function matcherFromParticipantKey(key) {

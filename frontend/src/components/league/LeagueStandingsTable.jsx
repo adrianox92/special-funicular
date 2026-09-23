@@ -29,6 +29,8 @@ import {
 } from '../ui/sheet';
 import { toast } from 'sonner';
 import LeagueMySeason from './LeagueMySeason';
+import LeagueAdjustedBadge from './LeagueAdjustedBadge';
+import LeaguePointsOverrideDialog from './LeaguePointsOverrideDialog';
 import {
   buildParticipantSeason,
   findMyStandingRow,
@@ -74,18 +76,19 @@ const LeagueStandingsHelp = ({ countingRaces, t }) => (
             ? t('standings.helpCounting', { count: countingRaces })
             : t('standings.helpCountingUnset')}
         </li>
+        <li>{t('standings.helpOverride')}</li>
       </ul>
     </AlertDescription>
   </Alert>
 );
 
-const StandingCellContent = ({ entry }) => {
+const StandingCellContent = ({ entry, includeAuthor = false }) => {
   if (!entry) {
     return <span className="text-muted-foreground">—</span>;
   }
 
   const dropped = Boolean(entry.dropped);
-  const statusLabel = RESULT_STATUS_LABEL[entry.result_status];
+  const statusLabel = !entry.overridden ? RESULT_STATUS_LABEL[entry.result_status] : null;
   const pts = entry.points;
   const vehicle = entry.vehicle;
 
@@ -94,6 +97,16 @@ const StandingCellContent = ({ entry }) => {
       <div className={dropped ? 'line-through text-muted-foreground' : 'font-medium'}>
         {statusLabel || pts}
       </div>
+      {entry.overridden ? (
+        <div className="flex justify-center">
+          <LeagueAdjustedBadge override={entry.override} includeAuthor={includeAuthor} />
+        </div>
+      ) : null}
+      {entry.overridden && RESULT_STATUS_LABEL[entry.result_status] ? (
+        <div className="text-[10px] leading-tight text-muted-foreground">
+          {RESULT_STATUS_LABEL[entry.result_status]}
+        </div>
+      ) : null}
       {(entry.power_stage_points || 0) > 0 && (
         <div
           className={`text-[10px] leading-tight ${
@@ -135,6 +148,8 @@ const LeagueStandingsTable = ({
   const closedCompetitions = (competitions || []).filter(isLeagueCompetitionVisible);
   const [markingKey, setMarkingKey] = useState(null);
   const [internalSelectedKey, setInternalSelectedKey] = useState(null);
+  const [overrideTarget, setOverrideTarget] = useState(null);
+  const [overrideBusy, setOverrideBusy] = useState(false);
 
   const selectedKey = onSelectParticipant ? selectedParticipantKey : internalSelectedKey;
   const myRow = useMemo(() => findMyStandingRow(standings, viewer), [standings, viewer]);
@@ -213,6 +228,54 @@ const LeagueStandingsTable = ({
       toast.error(err.response?.data?.error || t('standings.saveError'));
     } finally {
       setMarkingKey(null);
+    }
+  };
+
+  const openOverride = (row, competition) => {
+    setOverrideTarget({
+      row,
+      competitionId: competition.competition_id,
+      competitionName: competition.competition_name,
+      entry: row.by_competition?.[competition.competition_id] || null,
+    });
+  };
+
+  const handleSaveOverride = async ({ points, reason }) => {
+    if (!leagueId || !overrideTarget?.row?.league_participant_id) return;
+    try {
+      setOverrideBusy(true);
+      await axios.put(
+        `/leagues/${leagueId}/competitions/${overrideTarget.competitionId}/overrides`,
+        {
+          league_participant_id: overrideTarget.row.league_participant_id,
+          points,
+          reason,
+        },
+      );
+      toast.success(t('standings.adjustSaved'));
+      setOverrideTarget(null);
+      onResultUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || t('standings.saveError'));
+    } finally {
+      setOverrideBusy(false);
+    }
+  };
+
+  const handleClearOverride = async () => {
+    if (!leagueId || !overrideTarget?.row?.league_participant_id) return;
+    try {
+      setOverrideBusy(true);
+      await axios.delete(
+        `/leagues/${leagueId}/competitions/${overrideTarget.competitionId}/overrides/${overrideTarget.row.league_participant_id}`,
+      );
+      toast.success(t('standings.adjustCleared'));
+      setOverrideTarget(null);
+      onResultUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || t('standings.saveError'));
+    } finally {
+      setOverrideBusy(false);
     }
   };
 
@@ -330,7 +393,7 @@ const LeagueStandingsTable = ({
                                   className="w-full rounded-md px-1 py-0.5 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                   title={t('standings.markTitle')}
                                 >
-                                  <StandingCellContent entry={entry} />
+                                  <StandingCellContent entry={entry} includeAuthor={canManage} />
                                   <ChevronDown className="size-3 mx-auto mt-0.5 opacity-50" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -345,6 +408,12 @@ const LeagueStandingsTable = ({
                                 >
                                   {t('standings.markDsq')}
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => openOverride(row, comp)}
+                                  data-testid="league-adjust-points"
+                                >
+                                  {t('standings.adjustPoints')}
+                                </DropdownMenuItem>
                                 {entry?.result_status_source === 'explicit' ? (
                                   <DropdownMenuItem
                                     onClick={() => handleSetResult(row, comp.competition_id, null)}
@@ -355,7 +424,7 @@ const LeagueStandingsTable = ({
                               </DropdownMenuContent>
                             </DropdownMenu>
                           ) : (
-                            <StandingCellContent entry={entry} />
+                            <StandingCellContent entry={entry} includeAuthor={canManage} />
                           )}
                         </TableCell>
                       );
@@ -375,9 +444,22 @@ const LeagueStandingsTable = ({
             <SheetTitle>{season?.is_self ? t('mySeason.titleSelf') : t('mySeason.titleFallback')}</SheetTitle>
             <SheetDescription>{t('standings.openSeasonHint')}</SheetDescription>
           </SheetHeader>
-          <LeagueMySeason season={season} showEmail={Boolean(canManage || season?.is_self)} />
+          <LeagueMySeason
+            season={season}
+            showEmail={Boolean(canManage || season?.is_self)}
+            showOverrideAuthor={canManage}
+          />
         </SheetContent>
       </Sheet>
+
+      <LeaguePointsOverrideDialog
+        open={Boolean(overrideTarget)}
+        onOpenChange={(next) => { if (!next) setOverrideTarget(null); }}
+        target={overrideTarget}
+        busy={overrideBusy}
+        onSave={handleSaveOverride}
+        onClear={handleClearOverride}
+      />
     </div>
   );
 };

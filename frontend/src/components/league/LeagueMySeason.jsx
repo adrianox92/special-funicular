@@ -5,6 +5,7 @@ import { Trophy, ExternalLink, Info } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import LeagueAdjustedBadge from './LeagueAdjustedBadge';
 
 const APPEARANCE_VARIANT = {
   result: 'secondary',
@@ -14,7 +15,7 @@ const APPEARANCE_VARIANT = {
   pending: 'outline',
 };
 
-const LeagueMySeason = ({ season, showEmail = false }) => {
+const LeagueMySeason = ({ season, showEmail = false, showOverrideAuthor = false }) => {
   const { t } = useTranslation('leagues');
 
   if (!season) return null;
@@ -74,6 +75,7 @@ const LeagueMySeason = ({ season, showEmail = false }) => {
               : t('mySeason.helpCountingUnset')}
           </p>
           <p>{t('mySeason.helpDnsVsAbsent')}</p>
+          <p>{t('mySeason.helpOverride')}</p>
         </AlertDescription>
       </Alert>
 
@@ -105,6 +107,14 @@ const LeagueMySeason = ({ season, showEmail = false }) => {
                     {race.points != null ? ` · ${t('mySeason.pointsValue', { points: race.points })}` : ''}
                     {race.position != null ? ` · ${t('mySeason.place', { n: race.position })}` : ''}
                   </p>
+                  {race.overridden ? (
+                    <div className="mt-1">
+                      <LeagueAdjustedBadge
+                        override={race.override}
+                        includeAuthor={showOverrideAuthor}
+                      />
+                    </div>
+                  ) : null}
                 </div>
                 <Badge variant="outline">{t('mySeason.droppedBadge')}</Badge>
               </li>
@@ -152,6 +162,12 @@ const LeagueMySeason = ({ season, showEmail = false }) => {
                     </Badge>
                     {race.dropped ? <Badge variant="outline">{t('mySeason.droppedBadge')}</Badge> : null}
                     {race.counts ? <Badge>{t('mySeason.countsBadge')}</Badge> : null}
+                    {race.overridden ? (
+                      <LeagueAdjustedBadge
+                        override={race.override}
+                        includeAuthor={showOverrideAuthor}
+                      />
+                    ) : null}
                   </div>
                 </div>
                 {race.public_path ? (

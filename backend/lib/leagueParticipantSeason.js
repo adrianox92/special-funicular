@@ -135,6 +135,9 @@ function buildRaceRow(comp, entry) {
     power_stage_points: hasEntry ? Number(entry.power_stage_points) || 0 : 0,
     result_status: entry?.result_status || null,
     result_status_source: entry?.result_status_source || null,
+    overridden: Boolean(entry?.overridden),
+    override: entry?.override || null,
+    points_source: entry?.points_source || null,
     public_path: competitionPublicPath(comp),
   };
 }

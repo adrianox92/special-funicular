@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const { optionalAuthMiddleware } = require('../middleware/auth');
-const { computeLeagueStandings } = require('../lib/leagueStandings');
+const { computeLeagueStandings, sanitizeStandingsForPublic } = require('../lib/leagueStandings');
 const {
   buildParticipantSeason,
   resolveMyMatcher,
@@ -194,9 +194,11 @@ router.get('/:slug/season', optionalAuthMiddleware, async (req, res) => {
       }
     }
 
-    const payload = await computeLeagueStandings(supabase, league.id, {
-      categoryId: req.query.category_id || undefined,
-    });
+    const payload = sanitizeStandingsForPublic(
+      await computeLeagueStandings(supabase, league.id, {
+        categoryId: req.query.category_id || undefined,
+      }),
+    );
     const season = buildParticipantSeason(payload, matcher, {
       viewer: req.user || null,
       includeEmail: Boolean(req.user && wantMe),
@@ -216,9 +218,11 @@ router.get('/:slug/standings', async (req, res) => {
       return res.status(404).json({ error: 'Liga no encontrada' });
     }
 
-    const result = await computeLeagueStandings(supabase, league.id, {
-      categoryId: req.query.category_id || undefined,
-    });
+    const result = sanitizeStandingsForPublic(
+      await computeLeagueStandings(supabase, league.id, {
+        categoryId: req.query.category_id || undefined,
+      }),
+    );
     res.json(result);
   } catch (error) {
     console.error('GET /public-leagues/:slug/standings:', error);
