@@ -1,23 +1,38 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '../ui/alert';
 import CompetitionRulesPanel from '../CompetitionRulesPanel';
+import LeagueRulesHelp from './LeagueRulesHelp';
 
-const LeagueRulesTab = ({ leagueId, scoringMode }) => {
-  if (scoringMode !== 'league_rules') {
-    return (
-      <Alert>
-        <AlertDescription>
-          Esta liga usa reglas de puntuación por competición. Configura las reglas en cada prueba individual.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+const LeagueRulesTab = ({
+  leagueId,
+  scoringMode,
+  countingRaces = null,
+  tiebreakMode = null,
+}) => {
+  const { t } = useTranslation('leagues');
 
   return (
-    <CompetitionRulesPanel
-      leagueId={leagueId}
-      onRuleChange={() => {}}
-    />
+    <div className="space-y-4">
+      <LeagueRulesHelp
+        countingRaces={countingRaces}
+        tiebreakMode={tiebreakMode}
+        variant="inline"
+        context="settings"
+      />
+      {scoringMode !== 'league_rules' ? (
+        <Alert>
+          <AlertDescription>
+            {t('scoring.perCompetition')}
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <CompetitionRulesPanel
+          leagueId={leagueId}
+          onRuleChange={() => {}}
+        />
+      )}
+    </div>
   );
 };
 

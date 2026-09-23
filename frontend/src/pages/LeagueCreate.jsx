@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -16,8 +17,10 @@ import {
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import { toast } from 'sonner';
+import LeagueRulesHelp from '../components/league/LeagueRulesHelp';
 
 const LeagueCreate = () => {
+  const { t } = useTranslation('leagues');
   const navigate = useNavigate();
   const [clubs, setClubs] = useState([]);
   const [form, setForm] = useState({
@@ -126,9 +129,7 @@ const LeagueCreate = () => {
                 placeholder="Ej: 5 (descarta las peores)"
               />
               <p className="text-xs text-muted-foreground">
-                Si hay más pruebas que este número, se descartan las de menor puntuación.
-                Un DNS (no disputa) vale 0 puntos y sí ocupa plaza de descarte; quien no figure
-                en una prueba no consume descarte.
+                {t('standings.helpCountingUnset')} {t('standings.helpDns')} {t('standings.helpAbsent')}
               </p>
             </div>
 
@@ -159,6 +160,12 @@ const LeagueCreate = () => {
                   <SelectItem value="last_race_position">Mejor posición en última prueba</SelectItem>
                 </SelectContent>
               </Select>
+              <LeagueRulesHelp
+                countingRaces={form.counting_races ? parseInt(form.counting_races, 10) : null}
+                tiebreakMode={form.tiebreak_mode}
+                variant="inline"
+                context="settings"
+              />
             </div>
 
             <div className="space-y-2">

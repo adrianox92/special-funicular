@@ -10,6 +10,15 @@
     "helpOverride": "Eine Punkteanpassung (Badge „angepasst“) ersetzt das berechnete Ergebnis oder DNS/DSQ dieses Laufs in der Gesamtwertung.",
     "countingSummary": "Die schlechtesten Läufe entfallen; es zählen die {{count}} besten Wertungen.",
     "empty": "Noch keine Wertung. Sie wird berechnet, sobald Läufe Ergebnisse haben oder geschlossen sind.",
+    "emptyNoEvents": "Dieser Liga sind noch keine Läufe zugeordnet.",
+    "emptyNoEventsHint": "Ohne Läufe gibt es keine Spalten und keine Punkte. Verknüpfe Wettbewerbe, damit sie in die Wertung einfließen.",
+    "emptyNoResults": "Es gibt Läufe, aber noch keinen Beitrag zur Wertung.",
+    "emptyNoResultsHint": "Ein geschlossener Lauf zählt immer. Laufend oder veröffentlicht nur, wenn Zeiten vorliegen.",
+    "emptyNoParticipants": "Es gibt noch keine Fahrer in der Wertung.",
+    "emptyNoParticipantsHint": "Teilnehmer eintragen oder einen Lauf mit Ergebnissen schließen. Ein Fernbleiben eines Gemeldeten als DNS markieren.",
+    "countingUnsetBadge": "Keine Streicher",
+    "emptyCountingUnset": "Kein Streichlimit: jede Ergebniszeile (inkl. DNS/DSQ) zählt.",
+    "emptyCountingUnsetOrganizer": "Unter Liga bearbeiten behält „zählende Läufe“ die N besten und streicht die schlechtesten.",
     "emptyOrganizerHint": "Für ein Fernbleiben eines Liga-Teilnehmers DNS in der Zelle des Laufs markieren, sobald Spalten erscheinen.",
     "organizerHint": "Zelle antippen, um DNS/DSQ zu setzen oder Punkte eines Liga-Teilnehmers anzupassen.",
     "markDns": "DNS markieren",
@@ -116,5 +125,76 @@
     "clubSectionTitle": "Club-Ligen",
     "clubSectionEmpty": "Dieser Club hat noch keine veröffentlichten Ligen.",
     "openLeague": "Liga ansehen"
+  },
+  "rules": {
+    "title": "Liga-Regeln",
+    "open": "So wird gerechnet",
+    "openSettings": "Wertungsregeln",
+    "subtitle": {
+      "standings": "Streichresultate, DNS, DSQ, Gleichstand und Anpassungen in der Tabelle.",
+      "mySeason": "So liest du Punkte, Streichresultate und das Badge Angepasst in deiner Saison.",
+      "settings": "Diese Optionen ändern die Wertung sofort (Neuberechnung beim Lesen)."
+    },
+    "drops": {
+      "title": "Streichresultate",
+      "counting": "Die {{count}} besten Wertungen zählen. Der Rest wird durchgestrichen („gestrichen“) und zählt nicht zur Summe.",
+      "unset": "Kein Limit „zählende Läufe“: jede Ergebniszeile (inkl. DNS/DSQ) zählt. Leer oder 0 = keine Streichresultate.",
+      "meaning": "„Gestrichen“ bleibt sichtbar, zählt aber nicht. Nur vorhandene Zeilen belegen einen Streichplatz: DNS ja, „nicht gelistet“ nein."
+    },
+    "dns": {
+      "title": "DNS (nicht gestartet)",
+      "body": "0 Punkte und belegt einen Streichplatz. Manuell gesetzt oder abgeleitet, wenn der Fahrer in allen Runden dieses Laufs NP hat."
+    },
+    "absent": {
+      "title": "Nicht gelistet / nicht gemeldet",
+      "body": "Zelle „—“: keine Zeile für diesen Lauf. Keine Punkte und kein Streichplatz. Anders als DNS."
+    },
+    "dnf": {
+      "title": "DNF",
+      "body": "Es wird kein DNF-Status abgeleitet. Punkte und Platz kommen vom im Lauf erfassten Ergebnis."
+    },
+    "dsq": {
+      "title": "DSQ (disqualifiziert)",
+      "body": "0 Punkte und dieselbe Streichregel wie DNS: die Zeile existiert und belegt einen Platz."
+    },
+    "tiebreak": {
+      "title": "Gleichstand",
+      "intro": "Zuerst zählen die Punkte (nach Streichresultaten). Bei Gleichstand gilt das Liga-Kriterium.",
+      "current": "In dieser Liga: {{mode}}",
+      "labels": {
+        "competitions_completed": "Die meisten bestrittenen Läufe",
+        "most_wins": "Die meisten Siege",
+        "last_race_position": "Letzter Lauf"
+      },
+      "modes": {
+        "competitions_completed": "mehr Zeilen mit Punkten > 0, die nicht gestrichen sind.",
+        "most_wins": "mehr erste Plätze (Position 1), die nicht gestrichen sind.",
+        "last_race_position": "besserer Platz im letzten wertbaren Lauf, der nicht gestrichen ist und eine Position hat."
+      },
+      "fallback": "Bei weiterem Gleichstand entscheidet der Name."
+    },
+    "override": {
+      "title": "Angepasst",
+      "body": "Das Badge „Angepasst“ ist eine manuelle Punkteüberschreibung (Fahrer × Lauf). Dieser Wert zählt in Summe und Streichpool.",
+      "priority": "Priorität: manuelle Anpassung > DNS/DSQ > berechnete Punkte. Entfernen stellt DNS/DSQ oder die Berechnung wieder her (oder „—“, wenn keine Zeile da ist)."
+    },
+    "scoringEvents": {
+      "title": "Welche Läufe in die Wertung einfließen",
+      "closed": "Geschlossen: zählt immer, auch ohne Zeiten (DNS/DSQ oder eine Anpassung sind möglich).",
+      "runningPublished": "Laufend oder veröffentlicht: nur wenn bereits Zeiten erfasst sind.",
+      "other": "Entwurf oder andere Status: keine Spalte und keine Punkte."
+    }
+  },
+  "scoring": {
+    "perCompetition": "Diese Liga verwendet Wertungsregeln pro Lauf. Die Regeln werden in jedem Wettbewerb konfiguriert."
+  },
+  "competitions": {
+    "empty": "Dieser Liga sind noch keine Läufe zugeordnet.",
+    "emptyHint": "Ohne Läufe gibt es keinen Kalender und keine Wertung. Bestehende Wettbewerbe hinzufügen; geschlossene oder mit Zeiten fließen ein."
+  },
+  "participants": {
+    "empty": "In dieser Liga sind keine Teilnehmer eingetragen.",
+    "emptyHint": "Die Wertung kann auch aus Lauf-Ergebnissen kommen. Ein Liga-Teilnehmer kann DNS, DSQ oder Angepasst erhalten.",
+    "emptyImportHint": "Wenn deine Läufe schon Fahrer haben, nutze „Aus Wettbewerben importieren“."
   }
 }

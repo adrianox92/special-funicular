@@ -26,8 +26,11 @@ import {
 import CompetitionStatusBadge from '../CompetitionStatusBadge';
 import { toast } from 'sonner';
 import { Spinner } from '../ui/spinner';
+import { useTranslation } from 'react-i18next';
+import LeagueRulesHelp from './LeagueRulesHelp';
 
 const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
+  const { t } = useTranslation('leagues');
   const [available, setAvailable] = useState([]);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState('');
   const [loadingAvailable, setLoadingAvailable] = useState(false);
@@ -260,8 +263,17 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
 
       {competitions.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No hay competiciones en esta liga todavía.
+          <CardContent className="py-12 text-center text-muted-foreground space-y-3">
+            <p>{t('competitions.empty')}</p>
+            <p className="text-xs max-w-md mx-auto">{t('competitions.emptyHint')}</p>
+            <div className="flex justify-center">
+              <LeagueRulesHelp
+                countingRaces={league?.counting_races}
+                tiebreakMode={league?.tiebreak_mode}
+                variant="link"
+                context="settings"
+              />
+            </div>
           </CardContent>
         </Card>
       ) : (
