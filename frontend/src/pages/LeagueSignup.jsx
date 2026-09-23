@@ -66,6 +66,7 @@ const LeagueSignup = () => {
       setSignupResult({
         waitlisted: Boolean(res.data?.waitlisted),
         position: res.data?.waitlist_position ?? null,
+        participantId: res.data?.participant?.id || null,
       });
       setShowSuccessModal(true);
       setForm({ name: '', email: '', vehicle: '' });
@@ -224,6 +225,13 @@ const LeagueSignup = () => {
             )}
           </p>
           <div className="flex flex-col gap-2 pt-2">
+            {signupResult?.participantId ? (
+              <Button asChild>
+                <Link to={`/leagues/standings/${slug}?pilot=${signupResult.participantId}`}>
+                  Ver mi temporada
+                </Link>
+              </Button>
+            ) : null}
             <Button asChild variant="outline">
               <Link to={`/leagues/standings/${slug}`}>Ver clasificación</Link>
             </Button>

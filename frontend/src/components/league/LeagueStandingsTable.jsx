@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trophy, Download, Share2, Info, ChevronDown } from 'lucide-react';
+import { Trophy, Download, Share2, Info, ChevronDown, UserRound } from 'lucide-react';
 import axios from '../../lib/axios';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
@@ -20,7 +20,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '../ui/sheet';
 import { toast } from 'sonner';
+import LeagueMySeason from './LeagueMySeason';
+import {
+  buildParticipantSeason,
+  findMyStandingRow,
+  findStandingRow,
+  isSelfStanding,
+  matcherFromParticipantKey,
+  participantKeyFromRow,
+} from '../../utils/leagueParticipantSeason';
 
 const isLeagueCompetitionVisible = (comp) =>
   comp.competition_status === 'closed' ||
@@ -107,13 +123,60 @@ const LeagueStandingsTable = ({
   countingRaces = null,
   exportBasePath = null,
   leagueName = '',
+  leagueSlug = null,
   canManage = false,
   leagueId = null,
   onResultUpdated,
+  viewer = null,
+  selectedParticipantKey = null,
+  onSelectParticipant,
 }) => {
   const { t } = useTranslation('leagues');
   const closedCompetitions = (competitions || []).filter(isLeagueCompetitionVisible);
   const [markingKey, setMarkingKey] = useState(null);
+  const [internalSelectedKey, setInternalSelectedKey] = useState(null);
+
+  const selectedKey = onSelectParticipant ? selectedParticipantKey : internalSelectedKey;
+  const myRow = useMemo(() => findMyStandingRow(standings, viewer), [standings, viewer]);
+
+  const selectedRow = useMemo(() => {
+    if (!selectedKey) return null;
+    return findStandingRow(standings, matcherFromParticipantKey(selectedKey));
+  }, [selectedKey, standings]);
+
+  const season = useMemo(() => {
+    if (!selectedRow) return null;
+    const isSelf = isSelfStanding(selectedRow, viewer);
+    return buildParticipantSeason(
+      {
+        league: {
+          id: leagueId,
+          name: leagueName,
+          slug: leagueSlug,
+          counting_races: countingRaces,
+        },
+        competitions,
+        standings,
+      },
+      {
+        leagueParticipantId: selectedRow.league_participant_id,
+        name: selectedRow.name,
+        email: selectedRow.email,
+      },
+      { isSelf, includeEmail: Boolean(canManage || isSelf), viewer },
+    );
+  }, [selectedRow, viewer, leagueId, leagueName, leagueSlug, countingRaces, competitions, standings, canManage]);
+
+  const openRow = (row) => {
+    const key = participantKeyFromRow(row);
+    if (onSelectParticipant) onSelectParticipant(key);
+    else setInternalSelectedKey(key);
+  };
+
+  const closeSeason = () => {
+    if (onSelectParticipant) onSelectParticipant(null);
+    else setInternalSelectedKey(null);
+  };
 
   const handleExport = async (type) => {
     if (!exportBasePath) return;
@@ -184,18 +247,31 @@ const LeagueStandingsTable = ({
                 <p className="text-xs text-muted-foreground mt-1">{t('standings.organizerHint')}</p>
               ) : null}
             </div>
-            {exportBasePath ? (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
-                  <Download className="size-4 mr-2" />
-                  {t('standings.csv')}
+            <div className="flex flex-wrap gap-2">
+              {myRow ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => openRow(myRow)}
+                  data-testid="league-my-season-cta"
+                >
+                  <UserRound className="size-4 mr-2" />
+                  {t('mySeason.cta')}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExport('social')}>
-                  <Share2 className="size-4 mr-2" />
-                  {t('standings.socialImage')}
-                </Button>
-              </div>
-            ) : null}
+              ) : null}
+              {exportBasePath ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
+                    <Download className="size-4 mr-2" />
+                    {t('standings.csv')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleExport('social')}>
+                    <Share2 className="size-4 mr-2" />
+                    {t('standings.socialImage')}
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -218,7 +294,15 @@ const LeagueStandingsTable = ({
                       <Badge variant={row.position === 1 ? 'default' : 'outline'}>{row.position}</Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{row.name}</div>
+                      <button
+                        type="button"
+                        className="text-left rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => openRow(row)}
+                        title={t('standings.openSeasonHint')}
+                        data-testid="league-standings-driver"
+                      >
+                        <div className="font-medium">{row.name}</div>
+                      </button>
                       {row.email ? (
                         <div className="text-xs text-muted-foreground">{row.email}</div>
                       ) : null}
@@ -284,6 +368,16 @@ const LeagueStandingsTable = ({
           </CardContent>
         </Card>
       )}
+
+      <Sheet open={Boolean(season)} onOpenChange={(open) => { if (!open) closeSeason(); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="sr-only">
+            <SheetTitle>{season?.is_self ? t('mySeason.titleSelf') : t('mySeason.titleFallback')}</SheetTitle>
+            <SheetDescription>{t('standings.openSeasonHint')}</SheetDescription>
+          </SheetHeader>
+          <LeagueMySeason season={season} showEmail={Boolean(canManage || season?.is_self)} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
