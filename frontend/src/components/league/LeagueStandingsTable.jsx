@@ -1,5 +1,6 @@
-import React from 'react';
-import { Trophy, Download, Share2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Trophy, Download, Share2, Info, ChevronDown } from 'lucide-react';
 import axios from '../../lib/axios';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
@@ -12,6 +13,13 @@ import {
   TableRow,
 } from '../ui/table';
 import { Badge } from '../ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 
 const isLeagueCompetitionVisible = (comp) =>
@@ -31,14 +39,81 @@ const triggerBlobDownload = (data, filename) => {
   window.URL.revokeObjectURL(url);
 };
 
+const RESULT_STATUS_LABEL = {
+  dns: 'DNS',
+  dsq: 'DSQ',
+};
+
+const LeagueStandingsHelp = ({ countingRaces, t }) => (
+  <Alert>
+    <Info className="size-4" />
+    <AlertTitle>{t('standings.helpTitle')}</AlertTitle>
+    <AlertDescription>
+      <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+        <li>{t('standings.helpDns')}</li>
+        <li>{t('standings.helpDsq')}</li>
+        <li>{t('standings.helpAbsent')}</li>
+        <li>
+          {countingRaces
+            ? t('standings.helpCounting', { count: countingRaces })
+            : t('standings.helpCountingUnset')}
+        </li>
+      </ul>
+    </AlertDescription>
+  </Alert>
+);
+
+const StandingCellContent = ({ entry }) => {
+  if (!entry) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  const dropped = Boolean(entry.dropped);
+  const statusLabel = RESULT_STATUS_LABEL[entry.result_status];
+  const pts = entry.points;
+  const vehicle = entry.vehicle;
+
+  return (
+    <div className="space-y-0.5">
+      <div className={dropped ? 'line-through text-muted-foreground' : 'font-medium'}>
+        {statusLabel || pts}
+      </div>
+      {(entry.power_stage_points || 0) > 0 && (
+        <div
+          className={`text-[10px] leading-tight ${
+            dropped ? 'line-through opacity-70' : 'text-muted-foreground'
+          }`}
+        >
+          ⚡ +{entry.power_stage_points} PS
+        </div>
+      )}
+      {vehicle ? (
+        <div
+          className={`text-[10px] leading-tight truncate max-w-[7rem] mx-auto ${
+            dropped ? 'line-through opacity-70' : 'text-muted-foreground'
+          }`}
+          title={vehicle}
+        >
+          {vehicle}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const LeagueStandingsTable = ({
   standings = [],
   competitions = [],
   countingRaces = null,
   exportBasePath = null,
   leagueName = '',
+  canManage = false,
+  leagueId = null,
+  onResultUpdated,
 }) => {
+  const { t } = useTranslation('leagues');
   const closedCompetitions = (competitions || []).filter(isLeagueCompetitionVisible);
+  const [markingKey, setMarkingKey] = useState(null);
 
   const handleExport = async (type) => {
     if (!exportBasePath) return;
@@ -48,122 +123,168 @@ const LeagueStandingsTable = ({
       const day = new Date().toISOString().split('T')[0];
       const ext = type === 'csv' ? 'csv' : 'pdf';
       triggerBlobDownload(response.data, `liga_${base}_${type === 'social' ? 'social_' : ''}${day}.${ext}`);
-      toast.success('Descarga iniciada');
+      toast.success(t('standings.exportStarted'));
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al exportar');
+      toast.error(err.response?.data?.error || t('standings.exportError'));
     }
   };
 
-  if (!standings.length) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          <Trophy className="size-8 mx-auto mb-3 opacity-50" />
-          <p>Aún no hay clasificación. Se calculará cuando las pruebas tengan resultados o estén cerradas.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleSetResult = async (row, competitionId, resultStatus) => {
+    if (!leagueId || !row.league_participant_id) return;
+    const key = `${row.league_participant_id}:${competitionId}`;
+    try {
+      setMarkingKey(key);
+      await axios.put(`/leagues/${leagueId}/competitions/${competitionId}/results`, {
+        league_participant_id: row.league_participant_id,
+        result_status: resultStatus,
+      });
+      const okMsg =
+        resultStatus === 'dns'
+          ? t('standings.markedDns')
+          : resultStatus === 'dsq'
+            ? t('standings.markedDsq')
+            : t('standings.clearedMark');
+      toast.success(okMsg);
+      onResultUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || t('standings.saveError'));
+    } finally {
+      setMarkingKey(null);
+    }
+  };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h3 className="font-semibold flex items-center gap-2">
-            <Trophy className="size-4" />
-            Clasificación general
-          </h3>
-          {countingRaces ? (
-            <p className="text-xs text-muted-foreground mt-1">
-              Se descartan las peores pruebas; cuentan las {countingRaces} mejores puntuaciones.
-            </p>
-          ) : null}
-        </div>
-        {exportBasePath ? (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
-              <Download className="size-4 mr-2" />
-              CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport('social')}>
-              <Share2 className="size-4 mr-2" />
-              Imagen social
-            </Button>
-          </div>
-        ) : null}
-      </CardHeader>
-      <CardContent className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">Pos</TableHead>
-              <TableHead>Piloto</TableHead>
-              {closedCompetitions.map((comp) => (
-                <TableHead key={comp.competition_id} className="text-center min-w-[80px]">
-                  <span className="text-xs">{comp.competition_name}</span>
-                </TableHead>
-              ))}
-              <TableHead className="text-right font-bold">Total</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {standings.map((row) => (
-              <TableRow key={`${row.name}-${row.email || ''}`}>
-                <TableCell>
-                  <Badge variant={row.position === 1 ? 'default' : 'outline'}>{row.position}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="font-medium">{row.name}</div>
-                  {row.email ? (
-                    <div className="text-xs text-muted-foreground">{row.email}</div>
-                  ) : null}
-                </TableCell>
-                {closedCompetitions.map((comp) => {
-                  const entry = row.by_competition?.[comp.competition_id];
-                  const pts = entry?.points;
-                  const dropped = entry?.dropped;
-                  const vehicle = entry?.vehicle;
-                  return (
-                    <TableCell
-                      key={comp.competition_id}
-                      className={`text-center align-top ${dropped ? 'text-muted-foreground' : ''}`}
-                    >
-                      {pts != null ? (
-                        <div className="space-y-0.5">
-                          <div className={dropped ? 'line-through' : 'font-medium'}>{pts}</div>
-                          {(entry?.power_stage_points || 0) > 0 && (
-                            <div
-                              className={`text-[10px] leading-tight ${
-                                dropped ? 'line-through opacity-70' : 'text-muted-foreground'
-                              }`}
-                            >
-                              ⚡ +{entry.power_stage_points} PS
-                            </div>
-                          )}
-                          {vehicle ? (
-                            <div
-                              className={`text-[10px] leading-tight truncate max-w-[7rem] mx-auto ${
-                                dropped ? 'line-through opacity-70' : 'text-muted-foreground'
-                              }`}
-                              title={vehicle}
-                            >
-                              {vehicle}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        '—'
-                      )}
+    <div className="space-y-4">
+      <LeagueStandingsHelp countingRaces={countingRaces} t={t} />
+
+      {!standings.length ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Trophy className="size-8 mx-auto mb-3 opacity-50" />
+            <p>{t('standings.empty')}</p>
+            {canManage ? (
+              <p className="text-xs mt-2">{t('standings.emptyOrganizerHint')}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2">
+                <Trophy className="size-4" />
+                {t('standings.title')}
+              </h3>
+              {countingRaces ? (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('standings.countingSummary', { count: countingRaces })}
+                </p>
+              ) : null}
+              {canManage ? (
+                <p className="text-xs text-muted-foreground mt-1">{t('standings.organizerHint')}</p>
+              ) : null}
+            </div>
+            {exportBasePath ? (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
+                  <Download className="size-4 mr-2" />
+                  {t('standings.csv')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleExport('social')}>
+                  <Share2 className="size-4 mr-2" />
+                  {t('standings.socialImage')}
+                </Button>
+              </div>
+            ) : null}
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">{t('standings.pos')}</TableHead>
+                  <TableHead>{t('standings.driver')}</TableHead>
+                  {closedCompetitions.map((comp) => (
+                    <TableHead key={comp.competition_id} className="text-center min-w-[80px]">
+                      <span className="text-xs">{comp.competition_name}</span>
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-right font-bold">{t('standings.total')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {standings.map((row) => (
+                  <TableRow key={`${row.name}-${row.email || ''}-${row.league_participant_id || ''}`}>
+                    <TableCell>
+                      <Badge variant={row.position === 1 ? 'default' : 'outline'}>{row.position}</Badge>
                     </TableCell>
-                  );
-                })}
-                <TableCell className="text-right font-bold">{row.total_points}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                    <TableCell>
+                      <div className="font-medium">{row.name}</div>
+                      {row.email ? (
+                        <div className="text-xs text-muted-foreground">{row.email}</div>
+                      ) : null}
+                    </TableCell>
+                    {closedCompetitions.map((comp) => {
+                      const entry = row.by_competition?.[comp.competition_id];
+                      const dropped = entry?.dropped;
+                      const canMark = Boolean(
+                        canManage && leagueId && row.league_participant_id,
+                      );
+                      const cellKey = `${row.league_participant_id}:${comp.competition_id}`;
+                      const busy = markingKey === cellKey;
+
+                      return (
+                        <TableCell
+                          key={comp.competition_id}
+                          className={`text-center align-top ${dropped ? 'text-muted-foreground' : ''}`}
+                        >
+                          {canMark ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  className="w-full rounded-md px-1 py-0.5 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  title={t('standings.markTitle')}
+                                >
+                                  <StandingCellContent entry={entry} />
+                                  <ChevronDown className="size-3 mx-auto mt-0.5 opacity-50" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="center">
+                                <DropdownMenuItem
+                                  onClick={() => handleSetResult(row, comp.competition_id, 'dns')}
+                                >
+                                  {t('standings.markDns')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleSetResult(row, comp.competition_id, 'dsq')}
+                                >
+                                  {t('standings.markDsq')}
+                                </DropdownMenuItem>
+                                {entry?.result_status_source === 'explicit' ? (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSetResult(row, comp.competition_id, null)}
+                                  >
+                                    {t('standings.clearMark')}
+                                  </DropdownMenuItem>
+                                ) : null}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (
+                            <StandingCellContent entry={entry} />
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-right font-bold">{row.total_points}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 };
 

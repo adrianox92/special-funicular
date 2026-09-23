@@ -30,19 +30,63 @@ function formatParticipantVehicle(participant) {
   return model || null;
 }
 
+/** DNS y DSQ: 0 pts y ocupan plaza de descarte (`counting_races`). */
+const COUNTABLE_ZERO_RESULT_STATUSES = ['dns', 'dsq'];
+
+function isCountableZeroResultStatus(status) {
+  return COUNTABLE_ZERO_RESULT_STATUSES.includes(String(status || '').toLowerCase());
+}
+
+/**
+ * NP en todas las rondas de la prueba se muestra como DNS (0 pts, consume descarte).
+ * DNF no se infiere: puntos/posición salen del resultado registrado en la competición.
+ * @param {{ rounds_completed?: number, rounds_dnp?: number }} stat
+ * @returns {'dns'|null}
+ */
+function inferResultStatusFromPointsStat(stat) {
+  const completed = Number(stat?.rounds_completed) || 0;
+  const dnp = Number(stat?.rounds_dnp) || 0;
+  if (completed > 0 && dnp === completed) return 'dns';
+  return null;
+}
+
 /**
  * @param {number} points
  * @param {number} position
  * @param {string|null} vehicle
  * @param {number} [powerStagePoints]
+ * @param {{ result_status?: string|null, result_status_source?: string|null }} [extra]
  */
-function buildCompetitionStandingEntry(points, position, vehicle, powerStagePoints = 0) {
+function buildCompetitionStandingEntry(points, position, vehicle, powerStagePoints = 0, extra = {}) {
+  const resultStatus = extra.result_status || null;
   return {
     points: Number(points) || 0,
     position,
     dropped: false,
     vehicle: vehicle || null,
     power_stage_points: Number(powerStagePoints) || 0,
+    result_status: resultStatus,
+    result_status_source: extra.result_status_source || null,
+  };
+}
+
+/**
+ * Sobrescribe (o crea) una fila 0 pts contable: DNS o DSQ.
+ * DSQ se trata igual que DNS respecto a descartes (0 pts, ocupa plaza).
+ * @param {object} row
+ * @param {string} competitionId
+ * @param {{ resultStatus: 'dns'|'dsq', competitionName?: string|null, source?: string }} opts
+ */
+function applyExplicitZeroPointResult(row, competitionId, opts) {
+  const existing = row.by_competition?.[competitionId];
+  const resultStatus = opts.resultStatus;
+  if (!row.by_competition) row.by_competition = {};
+  row.by_competition[competitionId] = {
+    ...buildCompetitionStandingEntry(0, null, existing?.vehicle || null, 0, {
+      result_status: resultStatus,
+      result_status_source: opts.source || 'explicit',
+    }),
+    competition_name: opts.competitionName || existing?.competition_name || null,
   };
 }
 
@@ -117,6 +161,8 @@ function resolveParticipantKey(keyAliases, standingsMap, name, email) {
 
 /**
  * Aplica descarte de peores resultados y recalcula total_points.
+ * Toda entrada en `by_competition` (incl. DNS/DSQ a 0 pts) entra en el pool;
+ * la ausencia de clave no consume descarte.
  * @param {object} row
  * @param {number|null|undefined} countingRaces
  */
@@ -400,8 +446,12 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
       const pts = Number(stat.points) || 0;
       const powerStagePts = Number(stat.power_stage_points) || 0;
       const vehicle = formatParticipantVehicle(participant);
+      const inferredStatus = inferResultStatusFromPointsStat(stat);
       const compEntry = {
-        ...buildCompetitionStandingEntry(pts, stat.position, vehicle, powerStagePts),
+        ...buildCompetitionStandingEntry(pts, stat.position, vehicle, powerStagePts, {
+          result_status: inferredStatus,
+          result_status_source: inferredStatus ? 'inferred' : null,
+        }),
         competition_name: comp.name,
       };
 
@@ -411,6 +461,7 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
         position: stat.position,
         driver_name: participant.driver_name,
         vehicle,
+        result_status: inferredStatus,
       };
 
       if (standingsMap.has(key)) {
@@ -441,6 +492,51 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
     competitionResults.push(compResult);
   }
 
+  const scoredCompetitionIds = new Set(closedCompetitionIds);
+  const { data: explicitResults, error: explicitErr } = await supabase
+    .from('league_competition_results')
+    .select('competition_id, league_participant_id, result_status')
+    .eq('league_id', leagueId);
+
+  if (explicitErr) {
+    throw new Error(explicitErr.message);
+  }
+
+  const rowByParticipantId = new Map();
+  for (const row of standingsMap.values()) {
+    if (row.league_participant_id) {
+      rowByParticipantId.set(row.league_participant_id, row);
+    }
+  }
+
+  const competitionsById = new Map(competitions.map((c) => [c.id, c]));
+
+  for (const rec of explicitResults || []) {
+    if (!scoredCompetitionIds.has(rec.competition_id)) continue;
+    if (!isCountableZeroResultStatus(rec.result_status)) continue;
+    const row = rowByParticipantId.get(rec.league_participant_id);
+    if (!row) continue;
+    const competition = competitionsById.get(rec.competition_id);
+    applyExplicitZeroPointResult(row, rec.competition_id, {
+      resultStatus: rec.result_status,
+      competitionName: competition?.name || null,
+      source: 'explicit',
+    });
+
+    const matchKey = resolveParticipantKey(keyAliases, standingsMap, row.name, row.email);
+    const scoredComp = competitionResults.find((c) => c.competition_id === rec.competition_id);
+    if (scoredComp) {
+      scoredComp.points_by_participant_key[matchKey] = {
+        points: 0,
+        power_stage_points: 0,
+        position: null,
+        driver_name: row.name,
+        vehicle: row.by_competition[rec.competition_id]?.vehicle || null,
+        result_status: rec.result_status,
+      };
+    }
+  }
+
   const rawStandings = Array.from(standingsMap.values());
   for (const row of rawStandings) {
     applyCountingRaces(row, league.counting_races);
@@ -460,9 +556,13 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
 }
 
 module.exports = {
+  COUNTABLE_ZERO_RESULT_STATUSES,
   normalizeParticipantName,
   formatParticipantVehicle,
+  isCountableZeroResultStatus,
+  inferResultStatusFromPointsStat,
   buildCompetitionStandingEntry,
+  applyExplicitZeroPointResult,
   participantMatchKey,
   registerStandingsEntry,
   resolveParticipantKey,

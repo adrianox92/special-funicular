@@ -1,0 +1,30 @@
+{
+  "standings": {
+    "title": "Clasificación general",
+    "helpTitle": "Cómo se calcula la clasificación",
+    "helpDns": "DNS (no disputa): 0 puntos y sí cuenta para el descarte.",
+    "helpDsq": "DSQ (descalificado): mismo tratamiento que DNS (0 pts, ocupa descarte).",
+    "helpAbsent": "No inscrito en esa prueba (celda —): no recibe fila y no consume descarte.",
+    "helpCounting": "Cuentan las {{count}} mejores puntuaciones; el resto se tacha, incluido un DNS si es de los peores.",
+    "helpCountingUnset": "Si configuras “pruebas que cuentan”, se quedan las N mejores y se descartan las peores (incluido DNS).",
+    "countingSummary": "Se descartan las peores pruebas; cuentan las {{count}} mejores puntuaciones.",
+    "empty": "Aún no hay clasificación. Se calculará cuando las pruebas tengan resultados o estén cerradas.",
+    "emptyOrganizerHint": "Para un no-show de un inscrito de la liga, márcalo DNS en la celda de esa prueba cuando haya columnas de clasificación.",
+    "organizerHint": "Pulsa una celda para marcar DNS o DSQ de un piloto inscrito en la liga.",
+    "markDns": "Marcar DNS",
+    "markDsq": "Marcar DSQ",
+    "clearMark": "Quitar marca",
+    "markTitle": "Marcar DNS o DSQ",
+    "markedDns": "Marcado DNS (0 pts, cuenta para descarte)",
+    "markedDsq": "Marcado DSQ (0 pts, cuenta para descarte)",
+    "clearedMark": "Marca de resultado eliminada",
+    "saveError": "Error al guardar el resultado",
+    "pos": "Pos",
+    "driver": "Piloto",
+    "total": "Total",
+    "csv": "CSV",
+    "socialImage": "Imagen social",
+    "exportStarted": "Descarga iniciada",
+    "exportError": "Error al exportar"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "standings": {
+    "title": "Overall standings",
+    "helpTitle": "How standings are calculated",
+    "helpDns": "DNS (did not start): 0 points and it does count toward dropped rounds.",
+    "helpDsq": "DSQ (disqualified): same as DNS for dropped rounds (0 pts, uses a drop slot).",
+    "helpAbsent": "Not entered in that event (— cell): no row is created and it does not use a drop slot.",
+    "helpCounting": "The best {{count}} scores count; the rest are struck through, including a DNS if it is among the worst.",
+    "helpCountingUnset": "If you set “counting races”, the best N scores are kept and the worst are dropped (including DNS).",
+    "countingSummary": "Worst events are dropped; the best {{count}} scores count.",
+    "empty": "No standings yet. They are calculated when events have results or are closed.",
+    "emptyOrganizerHint": "For a league driver no-show, mark DNS on that event cell once standings columns appear.",
+    "organizerHint": "Tap a cell to mark DNS or DSQ for a league-registered driver.",
+    "markDns": "Mark DNS",
+    "markDsq": "Mark DSQ",
+    "clearMark": "Clear mark",
+    "markTitle": "Mark DNS or DSQ",
+    "markedDns": "Marked DNS (0 pts, counts toward drops)",
+    "markedDsq": "Marked DSQ (0 pts, counts toward drops)",
+    "clearedMark": "Result mark removed",
+    "saveError": "Could not save the result",
+    "pos": "Pos",
+    "driver": "Driver",
+    "total": "Total",
+    "csv": "CSV",
+    "socialImage": "Social image",
+    "exportStarted": "Download started",
+    "exportError": "Could not export"
+  }
+}

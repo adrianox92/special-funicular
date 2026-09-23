@@ -127,6 +127,8 @@ const LeagueCreate = () => {
               />
               <p className="text-xs text-muted-foreground">
                 Si hay más pruebas que este número, se descartan las de menor puntuación.
+                Un DNS (no disputa) vale 0 puntos y sí ocupa plaza de descarte; quien no figure
+                en una prueba no consume descarte.
               </p>
             </div>
 
