@@ -77,6 +77,7 @@
     "openSignup": "Öffentliche Anmeldung",
     "signupLinkCopied": "Anmeldelink kopiert",
     "signupLinkCopyError": "Link konnte nicht kopiert werden",
-    "leagueBadge": "Liga: {{name}}"
+    "leagueBadge": "Liga: {{name}}",
+    "timingSyncCta": "Aus Timing aktualisieren"
   }
 }
