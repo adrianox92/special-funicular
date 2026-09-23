@@ -9,6 +9,13 @@ describe('leagueCsvGenerator — DNS / DSQ', () => {
     expect(formatStandingCellCsv({ points: 0, result_status: 'dns' })).toBe('DNS');
     expect(formatStandingCellCsv({ points: 0, result_status: 'dsq', dropped: true })).toBe('(DSQ)');
     expect(formatStandingCellCsv({ points: 4, dropped: true })).toBe('(4)');
+    expect(formatStandingCellCsv({ points: 15, overridden: true })).toBe('15*');
+    expect(formatStandingCellCsv({
+      points: 12,
+      overridden: true,
+      result_status: 'dns',
+      dropped: true,
+    })).toBe('(12*)');
   });
 
   it('exporta DNS en la columna de la prueba', () => {

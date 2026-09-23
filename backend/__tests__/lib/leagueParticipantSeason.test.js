@@ -226,6 +226,41 @@ describe('leagueParticipantSeason — shape / descartes', () => {
 describe('leagueParticipantSeason — appearance', () => {
   const closed = { competition_status: 'closed', has_results: true };
 
+  it('proyecta override en la ficha sin recalcular', () => {
+    const row = {
+      league_participant_id: 'lp-1',
+      name: 'Ana',
+      email: 'ana@test.com',
+      position: 1,
+      total_points: 40,
+      dropped_competitions: 0,
+      by_competition: {
+        c1: {
+          points: 25,
+          position: 1,
+          dropped: false,
+          overridden: true,
+          override: { points: 25, reason: 'Acta', updated_by_label: 'María' },
+        },
+      },
+    };
+
+    const season = buildParticipantSeason(
+      {
+        league: { counting_races: 3, name: 'Liga' },
+        competitions: [scoredComp('c1', 'Prueba 1', 0)],
+        standings: [row],
+      },
+      { leagueParticipantId: 'lp-1' },
+    );
+
+    expect(season.total_points).toBe(40);
+    expect(season.races[0].points).toBe(25);
+    expect(season.races[0].overridden).toBe(true);
+    expect(season.races[0].override.reason).toBe('Acta');
+    expect(season.counting[0].overridden).toBe(true);
+  });
+
   it('distingue resultado, DNS, DSQ, ausente y pendiente', () => {
     expect(raceAppearance(closed, { points: 10, position: 2 })).toBe('result');
     expect(raceAppearance(closed, { points: 0, result_status: 'dns' })).toBe('dns');

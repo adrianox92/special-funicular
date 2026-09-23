@@ -20,6 +20,9 @@ jest.mock('react-i18next', () => ({
         'mySeason.helpCounting': `Cuentan las ${opts?.count ?? ''} mejores`,
         'mySeason.helpCountingUnset': 'Todas cuentan',
         'mySeason.helpDnsVsAbsent': 'DNS vs no figura',
+        'mySeason.helpOverride': 'Ajustado sustituye',
+        'standings.adjustedBadge': 'Ajustado',
+        'standings.adjustedBy': `por ${opts?.name ?? ''}`,
         'mySeason.racesTitle': 'Desglose por prueba',
         'mySeason.droppedTitle': 'Pruebas descartadas',
         'mySeason.countingTitle': 'Pruebas que cuentan',
@@ -110,6 +113,8 @@ describe('LeagueMySeason', () => {
           counts: true,
           dropped: false,
           public_path: '/competitions/signup/p1',
+          overridden: true,
+          override: { points: 25, reason: 'Acta' },
         },
         {
           competition_id: 'c3',
@@ -136,6 +141,7 @@ describe('LeagueMySeason', () => {
     expect(screen.getByTestId('league-my-season-dropped')).toHaveTextContent('Prueba 3');
     expect(screen.getByTestId('league-my-season-dropped')).toHaveTextContent('DNS');
     expect(screen.getByTestId('league-my-season-races')).toHaveTextContent('No figura');
+    expect(screen.getAllByTestId('league-adjusted-badge')[0]).toHaveTextContent('Ajustado');
     expect(screen.getByRole('link', { name: /Ver inscripción/i })).toHaveAttribute(
       'href',
       '/competitions/signup/p1',

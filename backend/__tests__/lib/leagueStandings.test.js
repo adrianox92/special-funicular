@@ -7,6 +7,9 @@ const {
   resolveParticipantKey,
   applyCountingRaces,
   applyExplicitZeroPointResult,
+  applyPointOverride,
+  publicOverrideView,
+  sanitizeStandingsForPublic,
   inferResultStatusFromPointsStat,
   isCountableZeroResultStatus,
   sortStandings,
@@ -298,6 +301,160 @@ describe('leagueStandings — DNS / DSQ y descartes', () => {
       inferResultStatusFromPointsStat({ rounds_completed: 3, rounds_dnp: 1, points: 8 }),
     ).toBeNull();
     expect(inferResultStatusFromPointsStat({ rounds_completed: 0, rounds_dnp: 0 })).toBeNull();
+  });
+});
+
+describe('leagueStandings — overrides de puntos', () => {
+  it('el override gana a los puntos calculados', () => {
+    const row = {
+      name: 'Ana',
+      by_competition: {
+        c1: { points: 10, position: 3, vehicle: 'Porsche', competition_name: 'Ronda 1' },
+        c2: { points: 18, position: 2, competition_name: 'Ronda 2' },
+      },
+    };
+
+    applyPointOverride(row, 'c1', {
+      points: 25,
+      reason: 'Corrección acta',
+      updated_by: 'user-1',
+      updated_by_label: 'Organizador',
+    }, { competitionName: 'Ronda 1' });
+    applyCountingRaces(row, null);
+
+    expect(row.by_competition.c1.points).toBe(25);
+    expect(row.by_competition.c1.overridden).toBe(true);
+    expect(row.by_competition.c1.position).toBe(3);
+    expect(row.by_competition.c1.vehicle).toBe('Porsche');
+    expect(row.by_competition.c1.override.reason).toBe('Corrección acta');
+    expect(row.total_points).toBe(43);
+  });
+
+  it('el override gana a una marca DNS (0 pts)', () => {
+    const row = {
+      name: 'Luis',
+      by_competition: {
+        c1: { points: 25, position: 1 },
+        c2: { points: 18, position: 2 },
+      },
+    };
+
+    applyExplicitZeroPointResult(row, 'c3', { resultStatus: 'dns', competitionName: 'Ronda 3' });
+    applyPointOverride(row, 'c3', { points: 12, reason: 'Llegó tarde pero corrió' });
+    applyCountingRaces(row, null);
+
+    expect(row.by_competition.c3.result_status).toBe('dns');
+    expect(row.by_competition.c3.points).toBe(12);
+    expect(row.by_competition.c3.overridden).toBe(true);
+    expect(row.total_points).toBe(55);
+  });
+
+  it('quitar el override restaura DNS / calculado', () => {
+    const withOverride = {
+      name: 'Ana',
+      by_competition: {
+        c1: { points: 25, position: 1, competition_name: 'R1' },
+      },
+    };
+    applyExplicitZeroPointResult(withOverride, 'c1', { resultStatus: 'dsq', competitionName: 'R1' });
+    applyPointOverride(withOverride, 'c1', { points: 8, reason: 'Acta' });
+    expect(withOverride.by_competition.c1.points).toBe(8);
+
+    const restored = {
+      name: 'Ana',
+      by_competition: {
+        c1: { points: 25, position: 1, competition_name: 'R1' },
+      },
+    };
+    applyExplicitZeroPointResult(restored, 'c1', { resultStatus: 'dsq', competitionName: 'R1' });
+
+    expect(restored.by_competition.c1.points).toBe(0);
+    expect(restored.by_competition.c1.result_status).toBe('dsq');
+    expect(restored.by_competition.c1.overridden).toBeUndefined();
+  });
+
+  it('counting_races usa el valor efectivo post-override', () => {
+    const row = {
+      name: 'Mixto',
+      by_competition: {
+        c1: { points: 25, position: 1 },
+        c2: { points: 18, position: 2 },
+        c3: { points: 6, position: 5 },
+      },
+    };
+
+    applyExplicitZeroPointResult(row, 'c3', { resultStatus: 'dns', competitionName: 'R3' });
+    applyPointOverride(row, 'c3', { points: 30 });
+    applyCountingRaces(row, 2);
+
+    expect(row.by_competition.c3.points).toBe(30);
+    expect(row.by_competition.c2.dropped).toBe(true);
+    expect(row.by_competition.c3.dropped).toBe(false);
+    expect(row.total_points).toBe(55);
+  });
+
+  it('override sobre celda vacía crea fila que sí consume descarte', () => {
+    const row = {
+      name: 'Ausente',
+      by_competition: {
+        c1: { points: 10, position: 2 },
+        c2: { points: 8, position: 3 },
+      },
+    };
+
+    applyPointOverride(row, 'c3', { points: 0, reason: 'No-show ajustado' });
+    applyCountingRaces(row, 2);
+
+    expect(row.by_competition.c3.points).toBe(0);
+    expect(row.dropped_competitions).toBe(1);
+    expect(row.by_competition.c3.dropped).toBe(true);
+    expect(row.total_points).toBe(18);
+  });
+
+  it('la vista pública oculta ids de autor y conserva motivo', () => {
+    const view = publicOverrideView({
+      points: 15,
+      reason: 'Acta',
+      created_by: 'user-1',
+      updated_by: 'user-1',
+      updated_by_label: 'María',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-02T00:00:00Z',
+    });
+
+    expect(view).toEqual({
+      points: 15,
+      reason: 'Acta',
+      updated_at: '2026-01-02T00:00:00Z',
+      updated_by_label: 'María',
+    });
+    expect(view.created_by).toBeUndefined();
+    expect(view.updated_by).toBeUndefined();
+
+    const sanitized = sanitizeStandingsForPublic({
+      standings: [
+        {
+          name: 'Ana',
+          by_competition: {
+            c1: {
+              points: 15,
+              overridden: true,
+              override: {
+                points: 15,
+                reason: 'Acta',
+                created_by: 'user-1',
+                updated_by: 'user-2',
+                updated_by_label: 'María',
+                updated_at: '2026-01-02T00:00:00Z',
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(sanitized.standings[0].by_competition.c1.override.created_by).toBeUndefined();
+    expect(sanitized.standings[0].by_competition.c1.override.reason).toBe('Acta');
   });
 });
 
