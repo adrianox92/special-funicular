@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import LeagueStandingsTable from '../components/league/LeagueStandingsTable';
 import LeagueStatusBadge from '../components/league/LeagueStatusBadge';
+import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
 
 const headerImgClass =
   'h-9 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:max-w-[16rem]';
@@ -20,6 +21,7 @@ const LeagueStandings = () => {
   }`;
 
   const [data, setData] = useState(null);
+  const [leagueMeta, setLeagueMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -27,8 +29,12 @@ const LeagueStandings = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`/public-leagues/${slug}/standings`);
-        setData(res.data);
+        const [standingsRes, leagueRes] = await Promise.all([
+          axios.get(`/public-leagues/${slug}/standings`),
+          axios.get(`/public-leagues/${slug}`).catch(() => null),
+        ]);
+        setData(standingsRes.data);
+        setLeagueMeta(leagueRes?.data || null);
         setError(null);
       } catch (err) {
         setError(err.response?.data?.error || 'Liga no encontrada');
@@ -84,6 +90,22 @@ const LeagueStandings = () => {
             </Button>
           )}
         </div>
+
+        <LeagueSeasonCalendar
+          competitions={
+            leagueMeta?.competitions?.length
+              ? leagueMeta.competitions
+              : (data.competitions || []).map((c) => ({
+                  id: c.competition_id || c.id,
+                  name: c.competition_name || c.name,
+                  status: c.competition_status || c.status,
+                  public_slug: c.public_slug,
+                  order_index: c.order_index,
+                  event_date: c.event_date || null,
+                }))
+          }
+          variant="public"
+        />
 
         <LeagueStandingsTable
           standings={data.standings || []}

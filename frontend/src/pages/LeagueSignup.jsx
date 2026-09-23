@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Trophy, Users, CheckCircle, AlertTriangle, ArrowLeft, Calendar } from 'lucide-react';
+import { Trophy, Users, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import axios from '../lib/axios';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/ui/button';
@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import LeagueStatusBadge from '../components/league/LeagueStatusBadge';
-import CompetitionStatusBadge from '../components/CompetitionStatusBadge';
+import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
 
 const headerImgClass =
   'h-9 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:max-w-[16rem]';
@@ -114,7 +114,7 @@ const LeagueSignup = () => {
         </Link>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-lg px-4 py-8 space-y-6">
+      <main className="flex-1 mx-auto w-full max-w-2xl px-4 py-8 space-y-6">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2 mb-2">
@@ -197,29 +197,10 @@ const LeagueSignup = () => {
           </CardContent>
         </Card>
 
-        {(league.competitions || []).length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <h3 className="font-medium flex items-center gap-2">
-                <Calendar className="size-4" />
-                Calendario de pruebas
-              </h3>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {league.competitions.map((c, i) => (
-                  <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span>
-                      #{i + 1} {c.name}
-                      {c.circuit_name ? ` · ${c.circuit_name}` : ''}
-                    </span>
-                    <CompetitionStatusBadge status={c.status} />
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
+        <LeagueSeasonCalendar
+          competitions={league.competitions || []}
+          variant="public"
+        />
       </main>
 
       <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>

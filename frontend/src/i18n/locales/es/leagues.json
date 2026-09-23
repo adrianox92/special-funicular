@@ -26,5 +26,42 @@
     "socialImage": "Imagen social",
     "exportStarted": "Descarga iniciada",
     "exportError": "Error al exportar"
+  },
+  "calendar": {
+    "title": "Calendario de temporada",
+    "subtitle": "Próximas, en curso y disputadas. Si no hay fecha, se usa el orden de la liga.",
+    "tab": "Calendario",
+    "filterLabel": "Filtrar pruebas",
+    "filter": {
+      "all": "Todas",
+      "upcoming": "Próximas",
+      "running": "En curso",
+      "completed": "Disputadas"
+    },
+    "section": {
+      "upcoming": "Próximas",
+      "running": "En curso",
+      "completed": "Disputadas"
+    },
+    "phase": {
+      "upcoming": "Próxima",
+      "running": "En curso",
+      "completed": "Disputada"
+    },
+    "empty": "No hay pruebas enlazadas en esta liga.",
+    "emptyPublic": "No hay pruebas públicas en el calendario.",
+    "emptySection": "No hay pruebas en esta sección.",
+    "noDate": "Sin fecha",
+    "noDatesHint": "Ninguna prueba tiene fecha; se muestra el orden de la liga y el estado.",
+    "orderIndex": "Prueba {{n}}",
+    "dateFromClubEvent": "Fecha del evento del club",
+    "signupUntil": "Inscripción hasta {{date}}",
+    "manage": "Gestionar",
+    "signup": "Inscribirse",
+    "publicStatus": "Estado público",
+    "viewPublic": "Ver calendario público",
+    "clubSectionTitle": "Ligas del club",
+    "clubSectionEmpty": "Este club aún no tiene ligas publicadas.",
+    "openLeague": "Ver liga"
   }
 }

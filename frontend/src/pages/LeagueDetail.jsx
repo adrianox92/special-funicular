@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Link2, BarChart3, Settings, Trash2 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -39,7 +40,10 @@ import LeagueCompetitionsTab from '../components/league/LeagueCompetitionsTab';
 import LeagueParticipantsTab from '../components/league/LeagueParticipantsTab';
 import LeagueRulesTab from '../components/league/LeagueRulesTab';
 import LeagueStandingsTable from '../components/league/LeagueStandingsTable';
+import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
 import { toast } from 'sonner';
+
+const LEAGUE_TABS = new Set(['competitions', 'calendar', 'participants', 'rules', 'standings']);
 
 const SCORING_LABEL = {
   league_rules: 'Reglas de liga',
@@ -55,12 +59,17 @@ const TIEBREAK_LABEL = {
 const LeagueDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation('leagues');
   const [league, setLeague] = useState(null);
   const [standings, setStandings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [standingsLoading, setStandingsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('competitions');
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(
+    LEAGUE_TABS.has(tabFromUrl) ? tabFromUrl : 'competitions',
+  );
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -106,6 +115,17 @@ const LeagueDetail = () => {
       loadStandings();
     }
   }, [activeTab, loadStandings]);
+
+  const handleTabChange = (next) => {
+    setActiveTab(next);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'competitions') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', next);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const handleStatusChange = async (newStatus) => {
     try {
@@ -190,12 +210,14 @@ const LeagueDetail = () => {
 
   const leagueTabOptions = [
     { value: 'competitions', label: 'Pruebas' },
+    { value: 'calendar', label: t('calendar.tab') },
     { value: 'participants', label: 'Participantes' },
     ...(league.scoring_mode === 'league_rules'
       ? [{ value: 'rules', label: 'Reglas' }]
       : []),
     { value: 'standings', label: 'Clasificación' },
   ];
+  const tabCols = league.scoring_mode === 'league_rules' ? 5 : 4;
 
   return (
     <div className="space-y-6">
@@ -282,17 +304,26 @@ const LeagueDetail = () => {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <ResponsiveTabsNav
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={handleTabChange}
           options={leagueTabOptions}
-          listClassName="sm:grid-cols-2 md:grid-cols-4"
+          listClassName={
+            tabCols === 5 ? 'sm:grid-cols-2 md:grid-cols-5' : 'sm:grid-cols-2 md:grid-cols-4'
+          }
           mobileLabel="Sección de la liga"
         />
 
         <TabsContent value="competitions" className="mt-4">
           <LeagueCompetitionsTab league={league} canManage={canManage} onRefresh={loadLeague} />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-4">
+          <LeagueSeasonCalendar
+            competitions={league.competitions || []}
+            variant="organizer"
+          />
         </TabsContent>
 
         <TabsContent value="participants" className="mt-4">

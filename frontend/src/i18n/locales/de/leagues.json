@@ -26,5 +26,42 @@
     "socialImage": "Social-Bild",
     "exportStarted": "Download gestartet",
     "exportError": "Export fehlgeschlagen"
+  },
+  "calendar": {
+    "title": "Saisonkalender",
+    "subtitle": "Bevorstehend, laufend und ausgetragen. Ohne Datum gilt die Liga-Reihenfolge.",
+    "tab": "Kalender",
+    "filterLabel": "Läufe filtern",
+    "filter": {
+      "all": "Alle",
+      "upcoming": "Bevorstehend",
+      "running": "Laufend",
+      "completed": "Ausgetragen"
+    },
+    "section": {
+      "upcoming": "Bevorstehend",
+      "running": "Laufend",
+      "completed": "Ausgetragen"
+    },
+    "phase": {
+      "upcoming": "Bevorstehend",
+      "running": "Laufend",
+      "completed": "Ausgetragen"
+    },
+    "empty": "Dieser Liga sind noch keine Läufe zugeordnet.",
+    "emptyPublic": "Im Kalender gibt es keine öffentlichen Läufe.",
+    "emptySection": "In diesem Abschnitt gibt es keine Läufe.",
+    "noDate": "Kein Datum",
+    "noDatesHint": "Kein Lauf hat ein Datum; angezeigt werden Liga-Reihenfolge und Status.",
+    "orderIndex": "Lauf {{n}}",
+    "dateFromClubEvent": "Datum aus dem Club-Termin",
+    "signupUntil": "Anmeldung bis {{date}}",
+    "manage": "Verwalten",
+    "signup": "Anmelden",
+    "publicStatus": "Öffentlicher Status",
+    "viewPublic": "Öffentlichen Kalender ansehen",
+    "clubSectionTitle": "Club-Ligen",
+    "clubSectionEmpty": "Dieser Club hat noch keine veröffentlichten Ligen.",
+    "openLeague": "Liga ansehen"
   }
 }

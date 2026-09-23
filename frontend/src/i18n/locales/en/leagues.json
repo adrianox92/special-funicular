@@ -26,5 +26,42 @@
     "socialImage": "Social image",
     "exportStarted": "Download started",
     "exportError": "Could not export"
+  },
+  "calendar": {
+    "title": "Season calendar",
+    "subtitle": "Upcoming, running and completed. If a date is missing, league order is used.",
+    "tab": "Calendar",
+    "filterLabel": "Filter events",
+    "filter": {
+      "all": "All",
+      "upcoming": "Upcoming",
+      "running": "Running",
+      "completed": "Completed"
+    },
+    "section": {
+      "upcoming": "Upcoming",
+      "running": "Running",
+      "completed": "Completed"
+    },
+    "phase": {
+      "upcoming": "Upcoming",
+      "running": "Running",
+      "completed": "Completed"
+    },
+    "empty": "No events are linked to this league yet.",
+    "emptyPublic": "There are no public events on the calendar.",
+    "emptySection": "No events in this section.",
+    "noDate": "No date",
+    "noDatesHint": "None of the events have a date; league order and status are shown instead.",
+    "orderIndex": "Event {{n}}",
+    "dateFromClubEvent": "Date from the club event",
+    "signupUntil": "Entries close {{date}}",
+    "manage": "Manage",
+    "signup": "Sign up",
+    "publicStatus": "Public status",
+    "viewPublic": "View public calendar",
+    "clubSectionTitle": "Club leagues",
+    "clubSectionEmpty": "This club has no published leagues yet.",
+    "openLeague": "View league"
   }
 }

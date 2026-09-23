@@ -4,6 +4,7 @@ const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const { computeLeagueStandings } = require('../lib/leagueStandings');
 const { generateLeagueCSV, safeFilenamePart } = require('../lib/leagueCsvGenerator');
 const { generateLeagueSocialPDF } = require('../src/utils/leagueSocialPdfGenerator');
+const { attachCompetitionEventDates } = require('../lib/leagueSeasonCalendar');
 
 const supabase = getServiceOrAnonClient();
 
@@ -35,7 +36,7 @@ router.get('/:slug', async (req, res) => {
       .from('league_competitions')
       .select(`
         order_index,
-        competitions ( id, name, status, public_slug, circuit_name )
+        competitions ( id, name, status, public_slug, circuit_name, registration_deadline )
       `)
       .eq('league_id', league.id)
       .order('order_index', { ascending: true });
@@ -52,13 +53,18 @@ router.get('/:slug', async (req, res) => {
       .eq('league_id', league.id)
       .eq('status', 'waitlist');
 
-    res.json({
-      ...league,
-      club: league.clubs || null,
-      competitions: (leagueCompetitions || []).map((row) => ({
+    const competitions = await attachCompetitionEventDates(
+      supabase,
+      (leagueCompetitions || []).map((row) => ({
         order_index: row.order_index,
         ...row.competitions,
       })),
+    );
+
+    res.json({
+      ...league,
+      club: league.clubs || null,
+      competitions,
       participants_count: participantsCount || 0,
       waitlist_count: waitlistCount || 0,
     });

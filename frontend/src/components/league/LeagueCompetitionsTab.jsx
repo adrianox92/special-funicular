@@ -278,6 +278,7 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
                   <p className="text-sm text-muted-foreground">
                     {comp.rounds} ronda{comp.rounds !== 1 ? 's' : ''}
                     {comp.circuit_name ? ` · ${comp.circuit_name}` : ''}
+                    {comp.event_date ? ` · ${comp.event_date}` : ''}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

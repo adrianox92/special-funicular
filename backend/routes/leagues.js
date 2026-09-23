@@ -16,6 +16,7 @@ const {
 } = require('../lib/leagueSync');
 const { generateLeagueCSV, safeFilenamePart } = require('../lib/leagueCsvGenerator');
 const { generateLeagueSocialPDF } = require('../src/utils/leagueSocialPdfGenerator');
+const { attachCompetitionEventDates } = require('../lib/leagueSeasonCalendar');
 
 const router = express.Router();
 const supabase = getServiceOrAnonClient();
@@ -254,7 +255,8 @@ router.get('/:id', param('id').isUUID(), handleValidationErrors, async (req, res
           num_slots,
           public_slug,
           circuit_name,
-          created_at
+          created_at,
+          registration_deadline
         )
       `)
       .eq('league_id', req.params.id)
@@ -288,14 +290,19 @@ router.get('/:id', param('id').isUUID(), handleValidationErrors, async (req, res
           .maybeSingle()
       : { data: null };
 
-    res.json({
-      ...access.league,
-      club: club || null,
-      competitions: (leagueCompetitions || []).map((row) => ({
+    const competitions = await attachCompetitionEventDates(
+      supabase,
+      (leagueCompetitions || []).map((row) => ({
         link_id: row.id,
         order_index: row.order_index,
         ...row.competitions,
       })),
+    );
+
+    res.json({
+      ...access.league,
+      club: club || null,
+      competitions,
       participants: participants || [],
       rules_count: rulesCount || 0,
       can_manage: access.league.organizer === req.user.id,
