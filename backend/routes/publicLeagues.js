@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { getServiceOrAnonClient } = require('../lib/supabaseClients');
+const { optionalAuthMiddleware } = require('../middleware/auth');
 const { computeLeagueStandings } = require('../lib/leagueStandings');
+const {
+  buildParticipantSeason,
+  resolveMyMatcher,
+} = require('../lib/leagueParticipantSeason');
 const { generateLeagueCSV, safeFilenamePart } = require('../lib/leagueCsvGenerator');
 const { generateLeagueSocialPDF } = require('../src/utils/leagueSocialPdfGenerator');
 const { attachCompetitionEventDates } = require('../lib/leagueSeasonCalendar');
@@ -159,6 +164,47 @@ router.post('/:slug/signup', async (req, res) => {
     });
   } catch (error) {
     console.error('POST /public-leagues/:slug/signup:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/:slug/season', optionalAuthMiddleware, async (req, res) => {
+  try {
+    const league = await getPublicLeagueBySlug(req.params.slug);
+    if (!league) {
+      return res.status(404).json({ error: 'Liga no encontrada' });
+    }
+
+    const wantMe = String(req.query.me || '') === '1' || String(req.query.me || '').toLowerCase() === 'true';
+    if (wantMe && !req.user) {
+      return res.status(401).json({ error: 'Debes iniciar sesión para ver tu temporada' });
+    }
+
+    let matcher;
+    if (wantMe) {
+      matcher = await resolveMyMatcher(supabase, league.id, req.user);
+    } else {
+      matcher = {
+        leagueParticipantId: req.query.participant_id || null,
+        name: req.query.name || null,
+        email: req.query.email || null,
+      };
+      if (!matcher.leagueParticipantId && !matcher.name && !matcher.email) {
+        return res.status(400).json({ error: 'Indica participant_id, name o me=1' });
+      }
+    }
+
+    const payload = await computeLeagueStandings(supabase, league.id, {
+      categoryId: req.query.category_id || undefined,
+    });
+    const season = buildParticipantSeason(payload, matcher, {
+      viewer: req.user || null,
+      includeEmail: Boolean(req.user && wantMe),
+    });
+
+    res.json(season);
+  } catch (error) {
+    console.error('GET /public-leagues/:slug/season:', error);
     res.status(500).json({ error: error.message });
   }
 });

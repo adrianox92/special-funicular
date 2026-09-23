@@ -11,6 +11,10 @@ const {
 } = require('../lib/leaguePermissions');
 const { computeLeagueStandings } = require('../lib/leagueStandings');
 const {
+  buildParticipantSeason,
+  resolveMyMatcher,
+} = require('../lib/leagueParticipantSeason');
+const {
   syncLeagueParticipantsToCompetition,
   importCompetitionParticipantsToLeague,
 } = require('../lib/leagueSync');
@@ -914,6 +918,68 @@ router.post(
       res.json({ total_created: totalCreated, competitions: results });
     } catch (error) {
       console.error('POST sync-all-competitions:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/my-season',
+  param('id').isUUID(),
+  query('category_id').optional().isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireViewLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const matcher = await resolveMyMatcher(supabase, req.params.id, req.user);
+      const payload = await computeLeagueStandings(supabase, req.params.id, {
+        categoryId: req.query.category_id || undefined,
+      });
+      const season = buildParticipantSeason(payload, matcher, {
+        viewer: req.user,
+        includeEmail: true,
+        isSelf: true,
+      });
+      res.json(season);
+    } catch (error) {
+      console.error('GET /leagues/:id/my-season:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  '/:id/season',
+  param('id').isUUID(),
+  query('participant_id').optional().isUUID(),
+  query('category_id').optional().isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireViewLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const matcher = {
+        leagueParticipantId: req.query.participant_id || null,
+        name: req.query.name || null,
+        email: req.query.email || null,
+      };
+      if (!matcher.leagueParticipantId && !matcher.name && !matcher.email) {
+        return res.status(400).json({ error: 'Indica participant_id o name' });
+      }
+
+      const payload = await computeLeagueStandings(supabase, req.params.id, {
+        categoryId: req.query.category_id || undefined,
+      });
+      const season = buildParticipantSeason(payload, matcher, {
+        viewer: req.user,
+        includeEmail: access.league.organizer === req.user.id,
+      });
+      res.json(season);
+    } catch (error) {
+      console.error('GET /leagues/:id/season:', error);
       res.status(500).json({ error: error.message });
     }
   },

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Trophy, ArrowLeft } from 'lucide-react';
 import axios from '../lib/axios';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
@@ -16,6 +17,9 @@ const headerImgClass =
 const LeagueStandings = () => {
   const { slug } = useParams();
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedParticipantKey = searchParams.get('pilot');
   const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
     theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
   }`;
@@ -113,6 +117,15 @@ const LeagueStandings = () => {
           countingRaces={data.league?.counting_races}
           exportBasePath={`/public-leagues/${slug}`}
           leagueName={data.league?.name}
+          leagueSlug={slug}
+          viewer={user}
+          selectedParticipantKey={selectedParticipantKey}
+          onSelectParticipant={(key) => {
+            const next = new URLSearchParams(searchParams);
+            if (key) next.set('pilot', key);
+            else next.delete('pilot');
+            setSearchParams(next, { replace: true });
+          }}
         />
       </main>
     </div>

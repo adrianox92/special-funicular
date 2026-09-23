@@ -42,6 +42,7 @@ import LeagueRulesTab from '../components/league/LeagueRulesTab';
 import LeagueStandingsTable from '../components/league/LeagueStandingsTable';
 import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 const LEAGUE_TABS = new Set(['competitions', 'calendar', 'participants', 'rules', 'standings']);
 
@@ -61,6 +62,7 @@ const LeagueDetail = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation('leagues');
+  const { user } = useAuth();
   const [league, setLeague] = useState(null);
   const [standings, setStandings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -348,9 +350,18 @@ const LeagueDetail = () => {
               countingRaces={league.counting_races}
               exportBasePath={`/leagues/${id}`}
               leagueName={league.name}
+              leagueSlug={league.slug}
               canManage={canManage}
               leagueId={league.id}
               onResultUpdated={loadStandings}
+              viewer={user}
+              selectedParticipantKey={searchParams.get('pilot')}
+              onSelectParticipant={(key) => {
+                const next = new URLSearchParams(searchParams);
+                if (key) next.set('pilot', key);
+                else next.delete('pilot');
+                setSearchParams(next, { replace: true });
+              }}
             />
           )}
         </TabsContent>
