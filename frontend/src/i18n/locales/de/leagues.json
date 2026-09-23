@@ -1,0 +1,30 @@
+{
+  "standings": {
+    "title": "Gesamtwertung",
+    "helpTitle": "So wird die Wertung berechnet",
+    "helpDns": "DNS (nicht gestartet): 0 Punkte und zählt für Streichresultate.",
+    "helpDsq": "DSQ (disqualifiziert): wie DNS bei Streichresultaten (0 Pkt., belegt einen Streichplatz).",
+    "helpAbsent": "Nicht gemeldet für diesen Lauf (Zelle —): keine Zeile, kein Streichresultat.",
+    "helpCounting": "Die {{count}} besten Wertungen zählen; der Rest wird durchgestrichen, auch ein DNS wenn es zu den schlechtesten gehört.",
+    "helpCountingUnset": "Mit „zählenden Läufen“ bleiben die N besten Ergebnisse, die schlechtesten (inkl. DNS) werden gestrichen.",
+    "countingSummary": "Die schlechtesten Läufe entfallen; es zählen die {{count}} besten Wertungen.",
+    "empty": "Noch keine Wertung. Sie wird berechnet, sobald Läufe Ergebnisse haben oder geschlossen sind.",
+    "emptyOrganizerHint": "Für ein Fernbleiben eines Liga-Teilnehmers DNS in der Zelle des Laufs markieren, sobald Spalten erscheinen.",
+    "organizerHint": "Zelle antippen, um DNS oder DSQ für einen Liga-Teilnehmer zu setzen.",
+    "markDns": "DNS markieren",
+    "markDsq": "DSQ markieren",
+    "clearMark": "Markierung entfernen",
+    "markTitle": "DNS oder DSQ markieren",
+    "markedDns": "DNS gesetzt (0 Pkt., zählt für Streichresultate)",
+    "markedDsq": "DSQ gesetzt (0 Pkt., zählt für Streichresultate)",
+    "clearedMark": "Ergebnis-Markierung entfernt",
+    "saveError": "Ergebnis konnte nicht gespeichert werden",
+    "pos": "Pos",
+    "driver": "Fahrer",
+    "total": "Gesamt",
+    "csv": "CSV",
+    "socialImage": "Social-Bild",
+    "exportStarted": "Download gestartet",
+    "exportError": "Export fehlgeschlagen"
+  }
+}

@@ -317,6 +317,9 @@ const LeagueDetail = () => {
               countingRaces={league.counting_races}
               exportBasePath={`/leagues/${id}`}
               leagueName={league.name}
+              canManage={canManage}
+              leagueId={league.id}
+              onResultUpdated={loadStandings}
             />
           )}
         </TabsContent>
@@ -347,6 +350,9 @@ const LeagueDetail = () => {
                 onChange={(e) => setEditForm({ ...editForm, counting_races: e.target.value })}
                 placeholder="Todas"
               />
+              <p className="text-xs text-muted-foreground">
+                DNS y DSQ (0 pts) entran en el descarte; no inscrito en esa prueba no.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-max">Cupo máximo</Label>

@@ -539,9 +539,110 @@ router.delete(
         return res.status(500).json({ error: error.message });
       }
 
+      await supabase
+        .from('league_competition_results')
+        .delete()
+        .eq('league_id', req.params.id)
+        .eq('competition_id', req.params.compId);
+
       res.json({ ok: true });
     } catch (error) {
       console.error('DELETE /leagues/:id/competitions/:compId:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.put(
+  '/:id/competitions/:compId/results',
+  param('id').isUUID(),
+  param('compId').isUUID(),
+  body('league_participant_id').isUUID(),
+  body('result_status').custom((value) => {
+    if (value === null || value === undefined || value === '') return true;
+    if (['dns', 'dsq'].includes(value)) return true;
+    throw new Error('result_status debe ser dns, dsq o null');
+  }),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const competitionId = req.params.compId;
+      const { league_participant_id: participantId } = req.body;
+      const resultStatus = req.body.result_status || null;
+
+      const { data: link, error: linkErr } = await supabase
+        .from('league_competitions')
+        .select('id')
+        .eq('league_id', req.params.id)
+        .eq('competition_id', competitionId)
+        .maybeSingle();
+
+      if (linkErr) {
+        return res.status(500).json({ error: linkErr.message });
+      }
+      if (!link) {
+        return res.status(404).json({ error: 'La prueba no está enlazada a esta liga' });
+      }
+
+      const { data: participant, error: partErr } = await supabase
+        .from('league_participants')
+        .select('id, name, email, status')
+        .eq('id', participantId)
+        .eq('league_id', req.params.id)
+        .maybeSingle();
+
+      if (partErr) {
+        return res.status(500).json({ error: partErr.message });
+      }
+      if (!participant) {
+        return res.status(404).json({ error: 'Participante no encontrado en esta liga' });
+      }
+
+      if (!resultStatus) {
+        const { error: delErr } = await supabase
+          .from('league_competition_results')
+          .delete()
+          .eq('league_id', req.params.id)
+          .eq('competition_id', competitionId)
+          .eq('league_participant_id', participantId);
+
+        if (delErr) {
+          return res.status(500).json({ error: delErr.message });
+        }
+
+        return res.json({
+          ok: true,
+          league_participant_id: participantId,
+          competition_id: competitionId,
+          result_status: null,
+        });
+      }
+
+      const { data, error } = await supabase
+        .from('league_competition_results')
+        .upsert(
+          {
+            league_id: req.params.id,
+            competition_id: competitionId,
+            league_participant_id: participantId,
+            result_status: resultStatus,
+            created_by: req.user.id,
+          },
+          { onConflict: 'league_id,competition_id,league_participant_id' },
+        )
+        .select('*')
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      res.json(data);
+    } catch (error) {
+      console.error('PUT /leagues/:id/competitions/:compId/results:', error);
       res.status(500).json({ error: error.message });
     }
   },
