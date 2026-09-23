@@ -58,6 +58,7 @@ const LeagueStandingsHelp = ({ countingRaces, t }) => (
             ? t('standings.helpCounting', { count: countingRaces })
             : t('standings.helpCountingUnset')}
         </li>
+        <li>{t('standings.helpTimingSync')}</li>
       </ul>
     </AlertDescription>
   </Alert>

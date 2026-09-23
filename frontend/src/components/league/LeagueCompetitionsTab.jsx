@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, RefreshCw, ExternalLink, ChevronUp, ChevronDown, Import } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Plus, Trash2, RefreshCw, ExternalLink, ChevronUp, ChevronDown, Import, Timer } from 'lucide-react';
 import axios from '../../lib/axios';
 import { competitionDetailPath } from '../../utils/competitionRoutes';
+import LeagueTimingSyncDialog from './LeagueTimingSyncDialog';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -28,6 +30,7 @@ import { toast } from 'sonner';
 import { Spinner } from '../ui/spinner';
 
 const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
+  const { t } = useTranslation('leagues');
   const [available, setAvailable] = useState([]);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState('');
   const [loadingAvailable, setLoadingAvailable] = useState(false);
@@ -38,6 +41,7 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
   const [importingAll, setImportingAll] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState({ open: false, competitionId: null });
+  const [timingSync, setTimingSync] = useState({ open: false, competition: null });
 
   const loadAvailable = useCallback(async () => {
     if (!canManage) return;
@@ -313,6 +317,15 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => setTimingSync({ open: true, competition: comp })}
+                        data-testid="league-timing-sync-cta"
+                      >
+                        <Timer className="size-4 mr-2" />
+                        {t('timingSync.cta')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleImport(comp.id)}
                         disabled={importingId === comp.id}
                       >
@@ -344,6 +357,22 @@ const LeagueCompetitionsTab = ({ league, canManage, onRefresh }) => {
           ))}
         </div>
       )}
+
+      <LeagueTimingSyncDialog
+        open={timingSync.open}
+        onOpenChange={(open) => setTimingSync((cur) => ({ open, competition: open ? cur.competition : null }))}
+        leagueId={league?.id}
+        competitionId={timingSync.competition?.id}
+        competitionName={timingSync.competition?.name}
+        onApplied={(result) => {
+          const matched = result.matched_count || 0;
+          toast.success(t('timingSync.applied', { matched }));
+          if (result.skipped_override_count) {
+            toast.info(t('timingSync.appliedOverrides', { count: result.skipped_override_count }));
+          }
+          onRefresh?.();
+        }}
+      />
 
       <AlertDialog open={removeConfirm.open} onOpenChange={(open) => !open && setRemoveConfirm({ open: false, competitionId: null })}>
         <AlertDialogContent>

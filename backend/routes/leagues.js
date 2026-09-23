@@ -17,6 +17,10 @@ const {
 const { generateLeagueCSV, safeFilenamePart } = require('../lib/leagueCsvGenerator');
 const { generateLeagueSocialPDF } = require('../src/utils/leagueSocialPdfGenerator');
 const { attachCompetitionEventDates } = require('../lib/leagueSeasonCalendar');
+const {
+  previewLeagueTimingSync,
+  applyLeagueTimingSync,
+} = require('../lib/leagueTimingSync');
 
 const router = express.Router();
 const supabase = getServiceOrAnonClient();
@@ -774,6 +778,53 @@ router.delete(
     } catch (error) {
       console.error('DELETE /leagues/:id/participants/:participantId:', error);
       res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+function timingSyncError(res, error) {
+  const status = error.status || 500;
+  return res.status(status).json({ error: error.message });
+}
+
+router.get(
+  '/:id/competitions/:compId/timing-sync',
+  param('id').isUUID(),
+  param('compId').isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const result = await previewLeagueTimingSync(supabase, req.params.id, req.params.compId);
+      res.json(result);
+    } catch (error) {
+      console.error('GET timing-sync:', error);
+      return timingSyncError(res, error);
+    }
+  },
+);
+
+router.post(
+  '/:id/competitions/:compId/timing-sync',
+  param('id').isUUID(),
+  param('compId').isUUID(),
+  body('session_ids').optional().isArray(),
+  body('session_ids.*').optional().isUUID(),
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const access = await requireManageLeague(supabase, req.user, req.params.id);
+      if (!access.ok) return access.respond(res);
+
+      const result = await applyLeagueTimingSync(supabase, req.params.id, req.params.compId, {
+        sessionIds: req.body.session_ids,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('POST timing-sync:', error);
+      return timingSyncError(res, error);
     }
   },
 );
