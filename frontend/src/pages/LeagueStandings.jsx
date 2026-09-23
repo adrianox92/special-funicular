@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Trophy, ArrowLeft } from 'lucide-react';
 import axios from '../lib/axios';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Spinner } from '../components/ui/spinner';
 import LeagueStandingsTable from '../components/league/LeagueStandingsTable';
 import LeagueStatusBadge from '../components/league/LeagueStatusBadge';
+import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
 
 const headerImgClass =
   'h-9 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:max-w-[16rem]';
@@ -15,11 +17,15 @@ const headerImgClass =
 const LeagueStandings = () => {
   const { slug } = useParams();
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedParticipantKey = searchParams.get('pilot');
   const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
     theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
   }`;
 
   const [data, setData] = useState(null);
+  const [leagueMeta, setLeagueMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -27,8 +33,12 @@ const LeagueStandings = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`/public-leagues/${slug}/standings`);
-        setData(res.data);
+        const [standingsRes, leagueRes] = await Promise.all([
+          axios.get(`/public-leagues/${slug}/standings`),
+          axios.get(`/public-leagues/${slug}`).catch(() => null),
+        ]);
+        setData(standingsRes.data);
+        setLeagueMeta(leagueRes?.data || null);
         setError(null);
       } catch (err) {
         setError(err.response?.data?.error || 'Liga no encontrada');
@@ -85,12 +95,38 @@ const LeagueStandings = () => {
           )}
         </div>
 
+        <LeagueSeasonCalendar
+          competitions={
+            leagueMeta?.competitions?.length
+              ? leagueMeta.competitions
+              : (data.competitions || []).map((c) => ({
+                  id: c.competition_id || c.id,
+                  name: c.competition_name || c.name,
+                  status: c.competition_status || c.status,
+                  public_slug: c.public_slug,
+                  order_index: c.order_index,
+                  event_date: c.event_date || null,
+                }))
+          }
+          variant="public"
+        />
+
         <LeagueStandingsTable
           standings={data.standings || []}
           competitions={data.competitions || []}
           countingRaces={data.league?.counting_races}
+          tiebreakMode={data.league?.tiebreak_mode}
           exportBasePath={`/public-leagues/${slug}`}
           leagueName={data.league?.name}
+          leagueSlug={slug}
+          viewer={user}
+          selectedParticipantKey={selectedParticipantKey}
+          onSelectParticipant={(key) => {
+            const next = new URLSearchParams(searchParams);
+            if (key) next.set('pilot', key);
+            else next.delete('pilot');
+            setSearchParams(next, { replace: true });
+          }}
         />
       </main>
     </div>

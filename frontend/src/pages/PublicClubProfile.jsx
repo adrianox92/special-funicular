@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Building2, CalendarDays, FileText, Link as LinkIcon, MapPin, Globe, Megaphone, Users, Flag } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Building2, CalendarDays, FileText, Link as LinkIcon, MapPin, Globe, Megaphone, Users, Flag, Trophy } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -18,6 +19,8 @@ import Footer from '../components/Footer';
 import { cn } from '../lib/utils';
 import { clubEventCategoryMeta } from '../constants/clubEventCategories';
 import ClubCircuitLeaderboard from '../components/ClubCircuitLeaderboard';
+import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
+import LeagueStatusBadge from '../components/league/LeagueStatusBadge';
 
 function formatClubDate(iso) {
   if (!iso) return null;
@@ -44,6 +47,7 @@ const pageShellClass = 'w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8';
 
 export default function PublicClubProfile() {
   const { slug } = useParams();
+  const { t } = useTranslation('leagues');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
@@ -104,7 +108,13 @@ export default function PublicClubProfile() {
     );
   }
 
-  const { club, upcoming_events: upcomingEvents, board_items: boardItems = [], circuits = [] } = data;
+  const {
+    club,
+    upcoming_events: upcomingEvents,
+    board_items: boardItems = [],
+    circuits = [],
+    leagues = [],
+  } = data;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -227,6 +237,47 @@ export default function PublicClubProfile() {
                   );
                 })}
               </ul>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {leagues.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Trophy className="size-5" />
+                {t('calendar.clubSectionTitle')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {leagues.map((lg) => (
+                <div key={lg.id || lg.slug} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-medium">{lg.name}</h3>
+                      <LeagueStatusBadge status={lg.status} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/leagues/signup/${encodeURIComponent(lg.slug)}`}>
+                          {t('calendar.openLeague')}
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/leagues/standings/${encodeURIComponent(lg.slug)}`}>
+                          {t('standings.title')}
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                  <LeagueSeasonCalendar
+                    competitions={lg.competitions || []}
+                    variant="public"
+                    compact
+                    showTitle={false}
+                  />
+                </div>
+              ))}
             </CardContent>
           </Card>
         ) : null}

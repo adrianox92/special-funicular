@@ -7,6 +7,7 @@ const { getServiceClient } = require('../lib/supabaseClients');
 const { buildClubEventsIcs } = require('../lib/clubIcs');
 const { buildClubCircuitLeaderboard } = require('../lib/clubCircuitLeaderboard');
 const { handleValidationErrors } = require('../middleware/validateRequest');
+const { loadPublicClubLeagues } = require('../lib/leagueSeasonCalendar');
 
 const router = express.Router();
 const supabaseAdmin = getServiceClient();
@@ -79,6 +80,8 @@ router.get(
         publicCircuits = circuits || [];
       }
 
+      const leagues = await loadPublicClubLeagues(supabaseAdmin, club.id);
+
       res.json({
         club: {
           name: club.name,
@@ -91,6 +94,7 @@ router.get(
         upcoming_events: events || [],
         board_items: boardItems || [],
         circuits: publicCircuits,
+        leagues,
       });
     } catch (e) {
       console.error('GET by-slug profile', e);

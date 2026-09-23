@@ -72,6 +72,7 @@
     "leaguesTitle": "Club-Ligen",
     "leaguesEmpty": "In diesem Club sind keine Ligen veröffentlicht.",
     "leaguesMeta": "{{competitions}} Wettkämpfe · {{participants}} Teilnehmer",
+    "leaguesCalendar": "Kalender",
     "tabs": {
       "members": "Mitglieder",
       "board": "Pinnwand",

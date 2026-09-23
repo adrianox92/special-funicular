@@ -1,0 +1,222 @@
+{
+  "standings": {
+    "title": "Overall standings",
+    "helpTitle": "How standings are calculated",
+    "helpDns": "DNS (did not start): 0 points and it does count toward dropped rounds.",
+    "helpDsq": "DSQ (disqualified): same as DNS for dropped rounds (0 pts, uses a drop slot).",
+    "helpAbsent": "Not entered in that event (— cell): no row is created and it does not use a drop slot.",
+    "helpCounting": "The best {{count}} scores count; the rest are struck through, including a DNS if it is among the worst.",
+    "helpCountingUnset": "If you set “counting races”, the best N scores are kept and the worst are dropped (including DNS).",
+    "helpTimingSync": "“Update from timing” writes the event result from garage sessions. It does not create DNS for drivers who did not race and it does not overwrite point overrides.",
+    "helpOverride": "A points adjustment (“adjusted” badge) replaces that event’s calculated result or DNS/DSQ when totaling the standings.",
+    "countingSummary": "Worst events are dropped; the best {{count}} scores count.",
+    "empty": "No standings yet. They are calculated when events have results or are closed.",
+    "emptyNoEvents": "This league has no linked events yet.",
+    "emptyNoEventsHint": "Without events there are no columns or points. Link competitions so they can feed the standings.",
+    "emptyNoResults": "Events are linked, but none feed the standings yet.",
+    "emptyNoResultsHint": "A closed event always counts. Running or published events only count once they have timings.",
+    "emptyNoParticipants": "There are no drivers in the standings yet.",
+    "emptyNoParticipantsHint": "Add league entries or close an event with results. Mark a registered no-show as DNS.",
+    "countingUnsetBadge": "No drops",
+    "emptyCountingUnset": "No dropped-round limit is set: every result row (including DNS/DSQ) counts.",
+    "emptyCountingUnsetOrganizer": "In Edit league, “counting races” keeps the best N scores and drops the worst.",
+    "emptyOrganizerHint": "For a league driver no-show, mark DNS on that event cell once standings columns appear.",
+    "organizerHint": "Tap a cell to mark DNS/DSQ or adjust points for a league-registered driver.",
+    "markDns": "Mark DNS",
+    "markDsq": "Mark DSQ",
+    "clearMark": "Clear mark",
+    "markTitle": "Mark DNS or DSQ",
+    "markedDns": "Marked DNS (0 pts, counts toward drops)",
+    "markedDsq": "Marked DSQ (0 pts, counts toward drops)",
+    "clearedMark": "Result mark removed",
+    "saveError": "Could not save the result",
+    "pos": "Pos",
+    "driver": "Driver",
+    "total": "Total",
+    "csv": "CSV",
+    "socialImage": "Social image",
+    "exportStarted": "Download started",
+    "exportError": "Could not export",
+    "openSeason": "View season",
+    "openSeasonHint": "Open this driver’s season card",
+    "adjustPoints": "Adjust points",
+    "adjustPointsTitle": "Adjust event points",
+    "adjustPointsHelp": "If the club sheet does not match the automatic score, enter the official points for this driver in this event. The adjustment replaces the result, DNS or DSQ. Removing it restores the automatic value.",
+    "adjustPointsField": "Points",
+    "adjustReason": "Reason (optional)",
+    "adjustReasonHint": "E.g. corrected results sheet, lap recount…",
+    "adjustSave": "Save adjustment",
+    "adjustClear": "Remove adjustment",
+    "adjustSaved": "Points adjusted",
+    "adjustCleared": "Adjustment removed; automatic value is used",
+    "adjustedBadge": "Adjusted",
+    "adjustedBy": "by {{name}}",
+    "adjustedAuthorFallback": "organizer"
+  },
+  "mySeason": {
+    "kicker": "League",
+    "titleSelf": "My season",
+    "titleOther": "{{name}}’s season",
+    "titleFallback": "Driver season",
+    "driverFallback": "driver",
+    "cta": "My season",
+    "viewCta": "View my season",
+    "position": "Current position",
+    "points": "Points",
+    "pointsHint": "After dropped rounds",
+    "pointsValue": "{{points}} pts",
+    "place": "{{n}}th",
+    "noPoints": "No points",
+    "helpTitle": "How to read this card",
+    "helpCounting": "The best {{count}} events count. Dropped rounds are listed explicitly, not only in a tooltip.",
+    "helpCountingUnset": "Every event with a result counts; no dropped-round limit is set.",
+    "helpDnsVsAbsent": "DNS (0 pts) does appear and can be dropped. “Not listed” is different: no row and it does not use a drop slot.",
+    "helpOverride": "If an event is “adjusted”, those official points replace the calculated score or DNS/DSQ.",
+    "racesTitle": "Breakdown by event",
+    "droppedTitle": "Dropped events",
+    "countingTitle": "Events that count",
+    "droppedEmpty": "No events have been dropped yet.",
+    "droppedBadge": "Dropped",
+    "countsBadge": "Counts",
+    "appearance": {
+      "result": "Result",
+      "dns": "DNS",
+      "dsq": "DSQ",
+      "absent": "Not listed",
+      "pending": "Upcoming"
+    },
+    "emptyNoCompetitions": "This league has no linked events yet.",
+    "emptyNoResults": "This driver has no league results yet.",
+    "emptyNotFound": "This participant was not found in the league.",
+    "openRace": "View event entry"
+  },
+  "calendar": {
+    "title": "Season calendar",
+    "subtitle": "Upcoming, running and completed. If a date is missing, league order is used.",
+    "tab": "Calendar",
+    "filterLabel": "Filter events",
+    "filter": {
+      "all": "All",
+      "upcoming": "Upcoming",
+      "running": "Running",
+      "completed": "Completed"
+    },
+    "section": {
+      "upcoming": "Upcoming",
+      "running": "Running",
+      "completed": "Completed"
+    },
+    "phase": {
+      "upcoming": "Upcoming",
+      "running": "Running",
+      "completed": "Completed"
+    },
+    "empty": "No events are linked to this league yet.",
+    "emptyPublic": "There are no public events on the calendar.",
+    "emptySection": "No events in this section.",
+    "noDate": "No date",
+    "noDatesHint": "None of the events have a date; league order and status are shown instead.",
+    "orderIndex": "Event {{n}}",
+    "dateFromClubEvent": "Date from the club event",
+    "signupUntil": "Entries close {{date}}",
+    "manage": "Manage",
+    "signup": "Sign up",
+    "publicStatus": "Public status",
+    "viewPublic": "View public calendar",
+    "clubSectionTitle": "Club leagues",
+    "clubSectionEmpty": "This club has no published leagues yet.",
+    "openLeague": "View league"
+  },
+  "timingSync": {
+    "cta": "Update from timing",
+    "title": "Create result from timing session",
+    "subtitle": "Copy timing sessions from vehicles linked to this event. Standings refresh on read.",
+    "subtitleNamed": "Copy timing sessions from vehicles linked to {{name}}. Standings refresh on read.",
+    "summary": "{{matched}} drivers matched · {{unmatched}} unmatched sessions · {{skipped}} overrides kept",
+    "roundsCount": "{{count}} round(s)",
+    "overrideKept": "override kept",
+    "unmatchedPilots": "No session (not listed, no DNS created): {{names}}",
+    "dnsRule": "Sync does not invent DNS rows or league entries for unmatched sessions. A registered driver with no session stays “not listed” and does not use a drop slot. Mark DNS/DSQ by hand in the standings.",
+    "emptyVehicles": "No vehicles are linked to the drivers in this event. Link a vehicle or send league entries to the event, then try again.",
+    "emptySessions": "There are no timing sessions on the vehicles for this event.",
+    "emptyMatches": "Sessions exist, but none match a league or event driver (email or name).",
+    "errorTitle": "Could not prepare the sync",
+    "loadError": "Could not load timing sessions",
+    "applyError": "Could not apply the timing result",
+    "applied": "Result updated from timing: {{matched}} driver(s)",
+    "appliedOverrides": "{{count}} override(s) were left intact",
+    "cancel": "Cancel",
+    "apply": "Apply to event"
+  },
+  "rules": {
+    "title": "League rules",
+    "open": "How it’s calculated",
+    "openSettings": "Standings rules",
+    "subtitle": {
+      "standings": "Dropped rounds, DNS, DSQ, tie-breaks and adjustments you see in the table.",
+      "mySeason": "How to read points, dropped rounds and the Adjusted badge on your season card.",
+      "settings": "These options change the standings immediately (recalculated on read)."
+    },
+    "drops": {
+      "title": "Dropped rounds",
+      "counting": "The best {{count}} scores count. The rest are struck through (“dropped”) and do not add to the total.",
+      "unset": "No “counting races” limit: every result row (including DNS/DSQ) counts. Empty or 0 means no drops.",
+      "meaning": "A “dropped” cell stays visible but does not add to the total. Only existing rows use a drop slot: DNS does, “not listed” does not."
+    },
+    "dns": {
+      "title": "DNS (did not start)",
+      "body": "0 points and it does use a drop slot. Set manually, or inferred if the driver is NP in every round of that event."
+    },
+    "absent": {
+      "title": "Not listed / not entered",
+      "body": "A “—” cell: no row for that event. No points and it does not use a drop slot. Different from DNS."
+    },
+    "dnf": {
+      "title": "DNF",
+      "body": "No DNF status is inferred. Points and place come from the result recorded in the event."
+    },
+    "dsq": {
+      "title": "DSQ (disqualified)",
+      "body": "0 points and the same drop-slot treatment as DNS: the row exists and occupies a slot."
+    },
+    "tiebreak": {
+      "title": "Tie-breaks",
+      "intro": "Points after drops come first. If still tied, the league’s tie-break applies.",
+      "current": "In this league: {{mode}}",
+      "labels": {
+        "competitions_completed": "Most events completed",
+        "most_wins": "Most wins",
+        "last_race_position": "Last event"
+      },
+      "modes": {
+        "competitions_completed": "more rows with points > 0 that are not dropped.",
+        "most_wins": "more first places (position 1) that are not dropped.",
+        "last_race_position": "better place in the last scoring event that is not dropped and has a position."
+      },
+      "fallback": "If still tied, drivers are ordered by name."
+    },
+    "override": {
+      "title": "Adjusted",
+      "body": "The “Adjusted” badge is a manual points override (driver × event). That value is what totals and what enters the drop pool.",
+      "priority": "Priority: manual override > DNS/DSQ > calculated points. Removing the override restores DNS/DSQ or the calculation (or “—” if there is no row)."
+    },
+    "scoringEvents": {
+      "title": "Which events feed the standings",
+      "closed": "Closed: always included, even with no timings (DNS/DSQ or an override can still apply).",
+      "runningPublished": "Running or published: only if timings are already recorded.",
+      "other": "Draft or other statuses: no standings column and no points."
+    }
+  },
+  "scoring": {
+    "perCompetition": "This league uses per-event scoring rules. Configure the rules on each competition."
+  },
+  "competitions": {
+    "empty": "No events are linked to this league yet.",
+    "emptyHint": "Without events there is no calendar or standings. Add existing competitions; closed ones or those with timings feed the table."
+  },
+  "participants": {
+    "empty": "No participants are entered in the league.",
+    "emptyHint": "Standings can also come from event results. A league entry can be marked DNS, DSQ or Adjusted.",
+    "emptyImportHint": "If your events already have drivers, use “Import from competitions”."
+  }
+}

@@ -188,6 +188,8 @@ Montado bajo **`/api/sync`** junto al resto de sync; el middleware resuelve `req
 | `POST` | `/api/sync/competitions/:id/participants` | `{ "participants": [{ "id"?, "driver_name", "vehicle_id"?, "vehicle_model"? }] }` |
 | `POST` | `/api/sync/competitions/:id/timings` | `{ "timings": [{ "participant_id", "round_number", "best_lap_time", "total_time", "laps", … }] }` formato `mm:ss.mmm`; *media* derivada de `total_time` y `laps` |
 
+**Liga ← sesión de timing (organizador, JWT):** `GET`/`POST /api/leagues/:id/competitions/:compId/timing-sync`. Copia `vehicle_timings` de vehículos enlazados a `competition_timings` (lo que lee la general). Matching: vehículo → email → nombre normalizado. No crea DNS para no emparejados (“no figura”) ni escribe `league_point_overrides`.
+
 **Mapeo rondas (web) ↔ mangas (Slot Race Manager)** — ver también comentario en el cliente `ds200-manager` `src/core/syncService.js`:
 
 - **Simultáneo:** suele usarse **1 manga = 1 ronda** (`heat_number` → `round_number`).

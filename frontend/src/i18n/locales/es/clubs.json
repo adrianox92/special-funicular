@@ -72,6 +72,7 @@
     "leaguesTitle": "Ligas del club",
     "leaguesEmpty": "No hay ligas publicadas en este club.",
     "leaguesMeta": "{{competitions}} pruebas · {{participants}} participantes",
+    "leaguesCalendar": "Calendario",
     "tabs": {
       "members": "Miembros",
       "board": "Tablón",

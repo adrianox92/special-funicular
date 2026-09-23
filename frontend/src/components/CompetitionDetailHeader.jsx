@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Link2 } from 'lucide-react';
+import { ArrowLeft, Link2, Timer } from 'lucide-react';
 import axios from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
@@ -12,11 +12,14 @@ import { ResponsiveTabsNav } from './ui/responsive-tabs-nav';
 import CompetitionStatusBadge from './CompetitionStatusBadge';
 import { toast } from 'sonner';
 import { buildCompetitionSectionOptions } from '../constants/competitionSections';
+import LeagueTimingSyncDialog from './league/LeagueTimingSyncDialog';
 
 const CompetitionDetailHeader = ({ competition, competitionId, section, onSectionChange, onRefresh }) => {
   const { t } = useTranslation('competitions');
+  const { t: tLeagues } = useTranslation('leagues');
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [timingSyncOpen, setTimingSyncOpen] = useState(false);
 
   const canUseOrganizerTools = Boolean(
     (user?.id && competition?.organizer === user.id) || isLicenseAdminUser(user),
@@ -100,6 +103,19 @@ const CompetitionDetailHeader = ({ competition, competitionId, section, onSectio
           </div>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
+          {canUseOrganizerTools && competition.league?.id ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setTimingSyncOpen(true)}
+              data-testid="competition-timing-sync-cta"
+            >
+              <Timer className="size-4" />
+              {t('detail.timingSyncCta')}
+            </Button>
+          ) : null}
           {competition.public_slug && (
             <Button type="button" variant="outline" size="sm" className="gap-2" onClick={handlePublicLink}>
               <Link2 className="size-4" />
@@ -119,6 +135,24 @@ const CompetitionDetailHeader = ({ competition, competitionId, section, onSectio
           mobileLabel={t('detail.sectionLabel')}
         />
       </Tabs>
+
+      {competition.league?.id ? (
+        <LeagueTimingSyncDialog
+          open={timingSyncOpen}
+          onOpenChange={setTimingSyncOpen}
+          leagueId={competition.league.id}
+          competitionId={competitionId}
+          competitionName={competition.name}
+          onApplied={(result) => {
+            const matched = result.matched_count || 0;
+            toast.success(tLeagues('timingSync.applied', { matched }));
+            if (result.skipped_override_count) {
+              toast.info(tLeagues('timingSync.appliedOverrides', { count: result.skipped_override_count }));
+            }
+            onRefresh?.();
+          }}
+        />
+      ) : null}
     </div>
   );
 };

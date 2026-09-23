@@ -30,20 +30,157 @@ function formatParticipantVehicle(participant) {
   return model || null;
 }
 
+/** DNS y DSQ: 0 pts y ocupan plaza de descarte (`counting_races`). */
+const COUNTABLE_ZERO_RESULT_STATUSES = ['dns', 'dsq'];
+
+/**
+ * Prioridad de puntos efectivos por celda (piloto × prueba):
+ * 1. Override auditado (`league_point_overrides`) — gana siempre
+ * 2. Marca explícita DNS/DSQ (`league_competition_results`) — 0 pts
+ * 3. Puntos calculados de la competición
+ * Quitar el override restaura 2 o 3 (o “no figura” si no hay fila).
+ */
+const POINTS_PRIORITY = Object.freeze({
+  OVERRIDE: 'override',
+  EXPLICIT_STATUS: 'explicit_status',
+  CALCULATED: 'calculated',
+});
+
+function isCountableZeroResultStatus(status) {
+  return COUNTABLE_ZERO_RESULT_STATUSES.includes(String(status || '').toLowerCase());
+}
+
+/**
+ * NP en todas las rondas de la prueba se muestra como DNS (0 pts, consume descarte).
+ * DNF no se infiere: puntos/posición salen del resultado registrado en la competición.
+ * @param {{ rounds_completed?: number, rounds_dnp?: number }} stat
+ * @returns {'dns'|null}
+ */
+function inferResultStatusFromPointsStat(stat) {
+  const completed = Number(stat?.rounds_completed) || 0;
+  const dnp = Number(stat?.rounds_dnp) || 0;
+  if (completed > 0 && dnp === completed) return 'dns';
+  return null;
+}
+
 /**
  * @param {number} points
  * @param {number} position
  * @param {string|null} vehicle
  * @param {number} [powerStagePoints]
+ * @param {{ result_status?: string|null, result_status_source?: string|null }} [extra]
  */
-function buildCompetitionStandingEntry(points, position, vehicle, powerStagePoints = 0) {
+function buildCompetitionStandingEntry(points, position, vehicle, powerStagePoints = 0, extra = {}) {
+  const resultStatus = extra.result_status || null;
   return {
     points: Number(points) || 0,
     position,
     dropped: false,
     vehicle: vehicle || null,
     power_stage_points: Number(powerStagePoints) || 0,
+    result_status: resultStatus,
+    result_status_source: extra.result_status_source || null,
   };
+}
+
+/**
+ * Sobrescribe (o crea) una fila 0 pts contable: DNS o DSQ.
+ * DSQ se trata igual que DNS respecto a descartes (0 pts, ocupa plaza).
+ * @param {object} row
+ * @param {string} competitionId
+ * @param {{ resultStatus: 'dns'|'dsq', competitionName?: string|null, source?: string }} opts
+ */
+function applyExplicitZeroPointResult(row, competitionId, opts) {
+  const existing = row.by_competition?.[competitionId];
+  const resultStatus = opts.resultStatus;
+  if (!row.by_competition) row.by_competition = {};
+  row.by_competition[competitionId] = {
+    ...buildCompetitionStandingEntry(0, null, existing?.vehicle || null, 0, {
+      result_status: resultStatus,
+      result_status_source: opts.source || 'explicit',
+    }),
+    competition_name: opts.competitionName || existing?.competition_name || null,
+    points_source: POINTS_PRIORITY.EXPLICIT_STATUS,
+  };
+}
+
+function parseOverridePoints(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildOverrideMeta(rec) {
+  if (!rec) return null;
+  const points = parseOverridePoints(rec.points);
+  return {
+    points: points == null ? 0 : points,
+    reason: rec.reason || null,
+    created_by: rec.created_by || null,
+    updated_by: rec.updated_by || null,
+    created_at: rec.created_at || null,
+    updated_at: rec.updated_at || null,
+    updated_by_label: rec.updated_by_label || null,
+  };
+}
+
+/** Vista pública: badge + motivo; sin ids de autor. */
+function publicOverrideView(override) {
+  if (!override) return null;
+  return {
+    points: parseOverridePoints(override.points) ?? 0,
+    reason: override.reason || null,
+    updated_at: override.updated_at || null,
+    updated_by_label: override.updated_by_label || null,
+  };
+}
+
+/**
+ * Aplica un override de puntos encima del valor automático (cálculo o DNS/DSQ).
+ * Conserva marca DNS/DSQ y vehículo si existían; solo sustituye los puntos.
+ */
+function applyPointOverride(row, competitionId, override, opts = {}) {
+  const existing = row.by_competition?.[competitionId];
+  const parsed = parseOverridePoints(override?.points);
+  const points = parsed == null ? 0 : parsed;
+  if (!row.by_competition) row.by_competition = {};
+  row.by_competition[competitionId] = {
+    ...buildCompetitionStandingEntry(
+      points,
+      existing?.position ?? null,
+      existing?.vehicle || null,
+      existing?.power_stage_points || 0,
+      {
+        result_status: existing?.result_status || null,
+        result_status_source: existing?.result_status_source || null,
+      },
+    ),
+    competition_name: opts.competitionName || existing?.competition_name || null,
+    overridden: true,
+    points_source: POINTS_PRIORITY.OVERRIDE,
+    override: buildOverrideMeta({ ...override, points }),
+  };
+}
+
+function sanitizeEntryOverrideForPublic(entry) {
+  if (!entry?.overridden) return entry;
+  return {
+    ...entry,
+    override: publicOverrideView(entry.override),
+  };
+}
+
+function sanitizeStandingsForPublic(payload) {
+  if (!payload) return payload;
+  const standings = (payload.standings || []).map((row) => ({
+    ...row,
+    by_competition: Object.fromEntries(
+      Object.entries(row.by_competition || {}).map(([id, entry]) => [
+        id,
+        sanitizeEntryOverrideForPublic(entry),
+      ]),
+    ),
+  }));
+  return { ...payload, standings };
 }
 
 /**
@@ -117,6 +254,8 @@ function resolveParticipantKey(keyAliases, standingsMap, name, email) {
 
 /**
  * Aplica descarte de peores resultados y recalcula total_points.
+ * Toda entrada en `by_competition` (incl. DNS/DSQ a 0 pts) entra en el pool;
+ * la ausencia de clave no consume descarte.
  * @param {object} row
  * @param {number|null|undefined} countingRaces
  */
@@ -400,8 +539,12 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
       const pts = Number(stat.points) || 0;
       const powerStagePts = Number(stat.power_stage_points) || 0;
       const vehicle = formatParticipantVehicle(participant);
+      const inferredStatus = inferResultStatusFromPointsStat(stat);
       const compEntry = {
-        ...buildCompetitionStandingEntry(pts, stat.position, vehicle, powerStagePts),
+        ...buildCompetitionStandingEntry(pts, stat.position, vehicle, powerStagePts, {
+          result_status: inferredStatus,
+          result_status_source: inferredStatus ? 'inferred' : null,
+        }),
         competition_name: comp.name,
       };
 
@@ -411,6 +554,7 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
         position: stat.position,
         driver_name: participant.driver_name,
         vehicle,
+        result_status: inferredStatus,
       };
 
       if (standingsMap.has(key)) {
@@ -441,6 +585,88 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
     competitionResults.push(compResult);
   }
 
+  const scoredCompetitionIds = new Set(closedCompetitionIds);
+  const { data: explicitResults, error: explicitErr } = await supabase
+    .from('league_competition_results')
+    .select('competition_id, league_participant_id, result_status')
+    .eq('league_id', leagueId);
+
+  if (explicitErr) {
+    throw new Error(explicitErr.message);
+  }
+
+  const rowByParticipantId = new Map();
+  for (const row of standingsMap.values()) {
+    if (row.league_participant_id) {
+      rowByParticipantId.set(row.league_participant_id, row);
+    }
+  }
+
+  const competitionsById = new Map(competitions.map((c) => [c.id, c]));
+
+  for (const rec of explicitResults || []) {
+    if (!scoredCompetitionIds.has(rec.competition_id)) continue;
+    if (!isCountableZeroResultStatus(rec.result_status)) continue;
+    const row = rowByParticipantId.get(rec.league_participant_id);
+    if (!row) continue;
+    const competition = competitionsById.get(rec.competition_id);
+    applyExplicitZeroPointResult(row, rec.competition_id, {
+      resultStatus: rec.result_status,
+      competitionName: competition?.name || null,
+      source: 'explicit',
+    });
+
+    const matchKey = resolveParticipantKey(keyAliases, standingsMap, row.name, row.email);
+    const scoredComp = competitionResults.find((c) => c.competition_id === rec.competition_id);
+    if (scoredComp) {
+      scoredComp.points_by_participant_key[matchKey] = {
+        points: 0,
+        power_stage_points: 0,
+        position: null,
+        driver_name: row.name,
+        vehicle: row.by_competition[rec.competition_id]?.vehicle || null,
+        result_status: rec.result_status,
+      };
+    }
+  }
+
+  // 1 override > 2 DNS/DSQ > 3 calculado. On-read: sin job batch.
+  const { data: pointOverrides, error: overrideErr } = await supabase
+    .from('league_point_overrides')
+    .select(
+      'competition_id, league_participant_id, points, reason, created_by, updated_by, created_at, updated_at, updated_by_label',
+    )
+    .eq('league_id', leagueId);
+
+  if (overrideErr) {
+    throw new Error(overrideErr.message);
+  }
+
+  for (const rec of pointOverrides || []) {
+    if (!scoredCompetitionIds.has(rec.competition_id)) continue;
+    const row = rowByParticipantId.get(rec.league_participant_id);
+    if (!row) continue;
+    const competition = competitionsById.get(rec.competition_id);
+    applyPointOverride(row, rec.competition_id, rec, {
+      competitionName: competition?.name || null,
+    });
+
+    const matchKey = resolveParticipantKey(keyAliases, standingsMap, row.name, row.email);
+    const scoredComp = competitionResults.find((c) => c.competition_id === rec.competition_id);
+    if (scoredComp) {
+      const entry = row.by_competition[rec.competition_id];
+      scoredComp.points_by_participant_key[matchKey] = {
+        points: Number(entry?.points) || 0,
+        power_stage_points: Number(entry?.power_stage_points) || 0,
+        position: entry?.position ?? null,
+        driver_name: row.name,
+        vehicle: entry?.vehicle || null,
+        result_status: entry?.result_status || null,
+        overridden: true,
+      };
+    }
+  }
+
   const rawStandings = Array.from(standingsMap.values());
   for (const row of rawStandings) {
     applyCountingRaces(row, league.counting_races);
@@ -460,9 +686,19 @@ async function computeLeagueStandings(supabase, leagueId, opts = {}) {
 }
 
 module.exports = {
+  COUNTABLE_ZERO_RESULT_STATUSES,
+  POINTS_PRIORITY,
   normalizeParticipantName,
   formatParticipantVehicle,
+  isCountableZeroResultStatus,
+  inferResultStatusFromPointsStat,
   buildCompetitionStandingEntry,
+  applyExplicitZeroPointResult,
+  parseOverridePoints,
+  buildOverrideMeta,
+  publicOverrideView,
+  applyPointOverride,
+  sanitizeStandingsForPublic,
   participantMatchKey,
   registerStandingsEntry,
   resolveParticipantKey,

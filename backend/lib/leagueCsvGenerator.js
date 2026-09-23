@@ -4,6 +4,23 @@ const { safeFilenamePart } = require('./competitionCsvGenerator');
 const { isLeagueCompetitionVisibleInStandings } = require('./leagueStandings');
 
 /**
+ * Celda de clasificación: puntos, DNS/DSQ; paréntesis si está descartada.
+ * @param {{ points?: number, dropped?: boolean, result_status?: string|null }|null|undefined} entry
+ */
+function formatStandingCellCsv(entry) {
+  if (!entry) return '—';
+  let inner;
+  if (entry.overridden) {
+    inner = `${entry.points ?? 0}*`;
+  } else if (entry.result_status) {
+    inner = String(entry.result_status).toUpperCase();
+  } else {
+    inner = String(entry.points ?? 0);
+  }
+  return entry.dropped ? `(${inner})` : inner;
+}
+
+/**
  * @param {object} payload — resultado de computeLeagueStandings
  */
 function generateLeagueCSV(payload) {
@@ -29,14 +46,7 @@ function generateLeagueCSV(payload) {
       `"${String(row.email || '').replace(/"/g, '""')}"`,
     ];
     for (const comp of closedCompetitions) {
-      const entry = row.by_competition?.[comp.competition_id];
-      if (!entry) {
-        cols.push('—');
-      } else if (entry.dropped) {
-        cols.push(`(${entry.points ?? 0})`);
-      } else {
-        cols.push(entry.points ?? 0);
-      }
+      cols.push(formatStandingCellCsv(row.by_competition?.[comp.competition_id]));
     }
     cols.push(row.total_points);
     csv += `${cols.join(',')}\n`;
@@ -45,4 +55,4 @@ function generateLeagueCSV(payload) {
   return csv;
 }
 
-module.exports = { generateLeagueCSV, safeFilenamePart };
+module.exports = { generateLeagueCSV, formatStandingCellCsv, safeFilenamePart };

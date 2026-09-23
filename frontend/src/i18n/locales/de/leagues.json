@@ -1,0 +1,222 @@
+{
+  "standings": {
+    "title": "Gesamtwertung",
+    "helpTitle": "So wird die Wertung berechnet",
+    "helpDns": "DNS (nicht gestartet): 0 Punkte und zählt für Streichresultate.",
+    "helpDsq": "DSQ (disqualifiziert): wie DNS bei Streichresultaten (0 Pkt., belegt einen Streichplatz).",
+    "helpAbsent": "Nicht gemeldet für diesen Lauf (Zelle —): keine Zeile, kein Streichresultat.",
+    "helpCounting": "Die {{count}} besten Wertungen zählen; der Rest wird durchgestrichen, auch ein DNS wenn es zu den schlechtesten gehört.",
+    "helpCountingUnset": "Mit „zählenden Läufen“ bleiben die N besten Ergebnisse, die schlechtesten (inkl. DNS) werden gestrichen.",
+    "helpTimingSync": "„Aus Timing aktualisieren“ schreibt das Lauf-Ergebnis aus Garage-Sitzungen. Es erzeugt kein DNS für Fahrer ohne Rennen und überschreibt keine Punkte-Overrides.",
+    "helpOverride": "Eine Punkteanpassung (Badge „angepasst“) ersetzt das berechnete Ergebnis oder DNS/DSQ dieses Laufs in der Gesamtwertung.",
+    "countingSummary": "Die schlechtesten Läufe entfallen; es zählen die {{count}} besten Wertungen.",
+    "empty": "Noch keine Wertung. Sie wird berechnet, sobald Läufe Ergebnisse haben oder geschlossen sind.",
+    "emptyNoEvents": "Dieser Liga sind noch keine Läufe zugeordnet.",
+    "emptyNoEventsHint": "Ohne Läufe gibt es keine Spalten und keine Punkte. Verknüpfe Wettbewerbe, damit sie in die Wertung einfließen.",
+    "emptyNoResults": "Es gibt Läufe, aber noch keinen Beitrag zur Wertung.",
+    "emptyNoResultsHint": "Ein geschlossener Lauf zählt immer. Laufend oder veröffentlicht nur, wenn Zeiten vorliegen.",
+    "emptyNoParticipants": "Es gibt noch keine Fahrer in der Wertung.",
+    "emptyNoParticipantsHint": "Teilnehmer eintragen oder einen Lauf mit Ergebnissen schließen. Ein Fernbleiben eines Gemeldeten als DNS markieren.",
+    "countingUnsetBadge": "Keine Streicher",
+    "emptyCountingUnset": "Kein Streichlimit: jede Ergebniszeile (inkl. DNS/DSQ) zählt.",
+    "emptyCountingUnsetOrganizer": "Unter Liga bearbeiten behält „zählende Läufe“ die N besten und streicht die schlechtesten.",
+    "emptyOrganizerHint": "Für ein Fernbleiben eines Liga-Teilnehmers DNS in der Zelle des Laufs markieren, sobald Spalten erscheinen.",
+    "organizerHint": "Zelle antippen, um DNS/DSQ zu setzen oder Punkte eines Liga-Teilnehmers anzupassen.",
+    "markDns": "DNS markieren",
+    "markDsq": "DSQ markieren",
+    "clearMark": "Markierung entfernen",
+    "markTitle": "DNS oder DSQ markieren",
+    "markedDns": "DNS gesetzt (0 Pkt., zählt für Streichresultate)",
+    "markedDsq": "DSQ gesetzt (0 Pkt., zählt für Streichresultate)",
+    "clearedMark": "Ergebnis-Markierung entfernt",
+    "saveError": "Ergebnis konnte nicht gespeichert werden",
+    "pos": "Pos",
+    "driver": "Fahrer",
+    "total": "Gesamt",
+    "csv": "CSV",
+    "socialImage": "Social-Bild",
+    "exportStarted": "Download gestartet",
+    "exportError": "Export fehlgeschlagen",
+    "openSeason": "Saison ansehen",
+    "openSeasonHint": "Saisonkarte dieses Fahrers öffnen",
+    "adjustPoints": "Punkte anpassen",
+    "adjustPointsTitle": "Punkte des Laufs anpassen",
+    "adjustPointsHelp": "Wenn das Vereinsprotokoll nicht zur automatischen Berechnung passt, trage die offiziellen Punkte für diesen Fahrer in diesem Lauf ein. Die Anpassung ersetzt Ergebnis, DNS oder DSQ. Entfernen stellt den automatischen Wert wieder her.",
+    "adjustPointsField": "Punkte",
+    "adjustReason": "Grund (optional)",
+    "adjustReasonHint": "z. B. korrigiertes Protokoll, neu gezählte Runden…",
+    "adjustSave": "Anpassung speichern",
+    "adjustClear": "Anpassung entfernen",
+    "adjustSaved": "Punkte angepasst",
+    "adjustCleared": "Anpassung entfernt; es gilt der automatische Wert",
+    "adjustedBadge": "Angepasst",
+    "adjustedBy": "von {{name}}",
+    "adjustedAuthorFallback": "Organisator"
+  },
+  "mySeason": {
+    "kicker": "Liga",
+    "titleSelf": "Meine Saison",
+    "titleOther": "Saison von {{name}}",
+    "titleFallback": "Fahrer-Saison",
+    "driverFallback": "Fahrer",
+    "cta": "Meine Saison",
+    "viewCta": "Meine Saison ansehen",
+    "position": "Aktuelle Position",
+    "points": "Punkte",
+    "pointsHint": "Nach Streichresultaten",
+    "pointsValue": "{{points}} Pkt.",
+    "place": "{{n}}.",
+    "noPoints": "Keine Punkte",
+    "helpTitle": "So liest du diese Karte",
+    "helpCounting": "Die {{count}} besten Läufe zählen. Streichresultate stehen ausdrücklich, nicht nur im Tooltip.",
+    "helpCountingUnset": "Jeder Lauf mit Ergebnis zählt; es gibt kein Streichlimit.",
+    "helpDnsVsAbsent": "DNS (0 Pkt.) erscheint und kann gestrichen werden. „Nicht gelistet“ ist anders: keine Zeile, kein Streichplatz.",
+    "helpOverride": "Ist ein Lauf „angepasst“, ersetzen diese offiziellen Punkte das berechnete Ergebnis oder DNS/DSQ.",
+    "racesTitle": "Aufschlüsselung nach Lauf",
+    "droppedTitle": "Gestrichene Läufe",
+    "countingTitle": "Zählende Läufe",
+    "droppedEmpty": "Noch keine Läufe gestrichen.",
+    "droppedBadge": "Streichresultat",
+    "countsBadge": "Zählt",
+    "appearance": {
+      "result": "Ergebnis",
+      "dns": "DNS",
+      "dsq": "DSQ",
+      "absent": "Nicht gelistet",
+      "pending": "Ausstehend"
+    },
+    "emptyNoCompetitions": "Dieser Liga sind noch keine Läufe zugeordnet.",
+    "emptyNoResults": "Dieser Fahrer hat noch keine Liga-Ergebnisse.",
+    "emptyNotFound": "Dieser Teilnehmer wurde in der Liga nicht gefunden.",
+    "openRace": "Lauf-Anmeldung ansehen"
+  },
+  "calendar": {
+    "title": "Saisonkalender",
+    "subtitle": "Bevorstehend, laufend und ausgetragen. Ohne Datum gilt die Liga-Reihenfolge.",
+    "tab": "Kalender",
+    "filterLabel": "Läufe filtern",
+    "filter": {
+      "all": "Alle",
+      "upcoming": "Bevorstehend",
+      "running": "Laufend",
+      "completed": "Ausgetragen"
+    },
+    "section": {
+      "upcoming": "Bevorstehend",
+      "running": "Laufend",
+      "completed": "Ausgetragen"
+    },
+    "phase": {
+      "upcoming": "Bevorstehend",
+      "running": "Laufend",
+      "completed": "Ausgetragen"
+    },
+    "empty": "Dieser Liga sind noch keine Läufe zugeordnet.",
+    "emptyPublic": "Im Kalender gibt es keine öffentlichen Läufe.",
+    "emptySection": "In diesem Abschnitt gibt es keine Läufe.",
+    "noDate": "Kein Datum",
+    "noDatesHint": "Kein Lauf hat ein Datum; angezeigt werden Liga-Reihenfolge und Status.",
+    "orderIndex": "Lauf {{n}}",
+    "dateFromClubEvent": "Datum aus dem Club-Termin",
+    "signupUntil": "Anmeldung bis {{date}}",
+    "manage": "Verwalten",
+    "signup": "Anmelden",
+    "publicStatus": "Öffentlicher Status",
+    "viewPublic": "Öffentlichen Kalender ansehen",
+    "clubSectionTitle": "Club-Ligen",
+    "clubSectionEmpty": "Dieser Club hat noch keine veröffentlichten Ligen.",
+    "openLeague": "Liga ansehen"
+  },
+  "timingSync": {
+    "cta": "Aus Timing aktualisieren",
+    "title": "Ergebnis aus Timing-Sitzung erstellen",
+    "subtitle": "Kopiert Timing-Sitzungen der verknüpften Fahrzeuge in diesen Lauf. Die Wertung wird beim Lesen neu berechnet.",
+    "subtitleNamed": "Kopiert Timing-Sitzungen der verknüpften Fahrzeuge nach {{name}}. Die Wertung wird beim Lesen neu berechnet.",
+    "summary": "{{matched}} Fahrer zugeordnet · {{unmatched}} Sitzungen ohne Treffer · {{skipped}} Overrides unverändert",
+    "roundsCount": "{{count}} Runde(n)",
+    "overrideKept": "Override unverändert",
+    "unmatchedPilots": "Keine Sitzung (nicht gelistet, kein DNS): {{names}}",
+    "dnsRule": "Der Sync erzeugt kein DNS und keine Liga-Starter für Sitzungen ohne Treffer. Ein gemeldeter Fahrer ohne Sitzung bleibt „nicht gelistet“ und verbraucht kein Streichresultat. DNS/DSQ setzt du manuell in der Wertung.",
+    "emptyVehicles": "Für die Starter dieses Laufs sind keine Fahrzeuge verknüpft. Verknüpfe ein Fahrzeug oder sende Liga-Starter in den Lauf und versuche es erneut.",
+    "emptySessions": "Für die Fahrzeuge dieses Laufs gibt es keine Timing-Sitzungen.",
+    "emptyMatches": "Es gibt Sitzungen, aber keine passt zu einem Liga- oder Lauf-Fahrer (E-Mail oder Name).",
+    "errorTitle": "Sync konnte nicht vorbereitet werden",
+    "loadError": "Timing-Sitzungen konnten nicht geladen werden",
+    "applyError": "Timing-Ergebnis konnte nicht übernommen werden",
+    "applied": "Ergebnis aus Timing aktualisiert: {{matched}} Fahrer",
+    "appliedOverrides": "{{count}} Override(s) wurden beibehalten",
+    "cancel": "Abbrechen",
+    "apply": "Auf den Lauf anwenden"
+  },
+  "rules": {
+    "title": "Liga-Regeln",
+    "open": "So wird gerechnet",
+    "openSettings": "Wertungsregeln",
+    "subtitle": {
+      "standings": "Streichresultate, DNS, DSQ, Gleichstand und Anpassungen in der Tabelle.",
+      "mySeason": "So liest du Punkte, Streichresultate und das Badge Angepasst in deiner Saison.",
+      "settings": "Diese Optionen ändern die Wertung sofort (Neuberechnung beim Lesen)."
+    },
+    "drops": {
+      "title": "Streichresultate",
+      "counting": "Die {{count}} besten Wertungen zählen. Der Rest wird durchgestrichen („gestrichen“) und zählt nicht zur Summe.",
+      "unset": "Kein Limit „zählende Läufe“: jede Ergebniszeile (inkl. DNS/DSQ) zählt. Leer oder 0 = keine Streichresultate.",
+      "meaning": "„Gestrichen“ bleibt sichtbar, zählt aber nicht. Nur vorhandene Zeilen belegen einen Streichplatz: DNS ja, „nicht gelistet“ nein."
+    },
+    "dns": {
+      "title": "DNS (nicht gestartet)",
+      "body": "0 Punkte und belegt einen Streichplatz. Manuell gesetzt oder abgeleitet, wenn der Fahrer in allen Runden dieses Laufs NP hat."
+    },
+    "absent": {
+      "title": "Nicht gelistet / nicht gemeldet",
+      "body": "Zelle „—“: keine Zeile für diesen Lauf. Keine Punkte und kein Streichplatz. Anders als DNS."
+    },
+    "dnf": {
+      "title": "DNF",
+      "body": "Es wird kein DNF-Status abgeleitet. Punkte und Platz kommen vom im Lauf erfassten Ergebnis."
+    },
+    "dsq": {
+      "title": "DSQ (disqualifiziert)",
+      "body": "0 Punkte und dieselbe Streichregel wie DNS: die Zeile existiert und belegt einen Platz."
+    },
+    "tiebreak": {
+      "title": "Gleichstand",
+      "intro": "Zuerst zählen die Punkte (nach Streichresultaten). Bei Gleichstand gilt das Liga-Kriterium.",
+      "current": "In dieser Liga: {{mode}}",
+      "labels": {
+        "competitions_completed": "Die meisten bestrittenen Läufe",
+        "most_wins": "Die meisten Siege",
+        "last_race_position": "Letzter Lauf"
+      },
+      "modes": {
+        "competitions_completed": "mehr Zeilen mit Punkten > 0, die nicht gestrichen sind.",
+        "most_wins": "mehr erste Plätze (Position 1), die nicht gestrichen sind.",
+        "last_race_position": "besserer Platz im letzten wertbaren Lauf, der nicht gestrichen ist und eine Position hat."
+      },
+      "fallback": "Bei weiterem Gleichstand entscheidet der Name."
+    },
+    "override": {
+      "title": "Angepasst",
+      "body": "Das Badge „Angepasst“ ist eine manuelle Punkteüberschreibung (Fahrer × Lauf). Dieser Wert zählt in Summe und Streichpool.",
+      "priority": "Priorität: manuelle Anpassung > DNS/DSQ > berechnete Punkte. Entfernen stellt DNS/DSQ oder die Berechnung wieder her (oder „—“, wenn keine Zeile da ist)."
+    },
+    "scoringEvents": {
+      "title": "Welche Läufe in die Wertung einfließen",
+      "closed": "Geschlossen: zählt immer, auch ohne Zeiten (DNS/DSQ oder eine Anpassung sind möglich).",
+      "runningPublished": "Laufend oder veröffentlicht: nur wenn bereits Zeiten erfasst sind.",
+      "other": "Entwurf oder andere Status: keine Spalte und keine Punkte."
+    }
+  },
+  "scoring": {
+    "perCompetition": "Diese Liga verwendet Wertungsregeln pro Lauf. Die Regeln werden in jedem Wettbewerb konfiguriert."
+  },
+  "competitions": {
+    "empty": "Dieser Liga sind noch keine Läufe zugeordnet.",
+    "emptyHint": "Ohne Läufe gibt es keinen Kalender und keine Wertung. Bestehende Wettbewerbe hinzufügen; geschlossene oder mit Zeiten fließen ein."
+  },
+  "participants": {
+    "empty": "In dieser Liga sind keine Teilnehmer eingetragen.",
+    "emptyHint": "Die Wertung kann auch aus Lauf-Ergebnissen kommen. Ein Liga-Teilnehmer kann DNS, DSQ oder Angepasst erhalten.",
+    "emptyImportHint": "Wenn deine Läufe schon Fahrer haben, nutze „Aus Wettbewerben importieren“."
+  }
+}

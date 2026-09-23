@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Link2, BarChart3, Settings, Trash2 } from 'lucide-react';
 import axios from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -39,7 +40,12 @@ import LeagueCompetitionsTab from '../components/league/LeagueCompetitionsTab';
 import LeagueParticipantsTab from '../components/league/LeagueParticipantsTab';
 import LeagueRulesTab from '../components/league/LeagueRulesTab';
 import LeagueStandingsTable from '../components/league/LeagueStandingsTable';
+import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
+import LeagueRulesHelp from '../components/league/LeagueRulesHelp';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
+
+const LEAGUE_TABS = new Set(['competitions', 'calendar', 'participants', 'rules', 'standings']);
 
 const SCORING_LABEL = {
   league_rules: 'Reglas de liga',
@@ -55,12 +61,18 @@ const TIEBREAK_LABEL = {
 const LeagueDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation('leagues');
+  const { user } = useAuth();
   const [league, setLeague] = useState(null);
   const [standings, setStandings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [standingsLoading, setStandingsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('competitions');
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(
+    LEAGUE_TABS.has(tabFromUrl) ? tabFromUrl : 'competitions',
+  );
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -106,6 +118,17 @@ const LeagueDetail = () => {
       loadStandings();
     }
   }, [activeTab, loadStandings]);
+
+  const handleTabChange = (next) => {
+    setActiveTab(next);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'competitions') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', next);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const handleStatusChange = async (newStatus) => {
     try {
@@ -190,12 +213,14 @@ const LeagueDetail = () => {
 
   const leagueTabOptions = [
     { value: 'competitions', label: 'Pruebas' },
+    { value: 'calendar', label: t('calendar.tab') },
     { value: 'participants', label: 'Participantes' },
     ...(league.scoring_mode === 'league_rules'
       ? [{ value: 'rules', label: 'Reglas' }]
       : []),
     { value: 'standings', label: 'Clasificación' },
   ];
+  const tabCols = league.scoring_mode === 'league_rules' ? 5 : 4;
 
   return (
     <div className="space-y-6">
@@ -213,7 +238,9 @@ const LeagueDetail = () => {
               <Badge variant="outline">{SCORING_LABEL[league.scoring_mode]}</Badge>
               {league.counting_races ? (
                 <Badge variant="secondary">Cuentan {league.counting_races} pruebas</Badge>
-              ) : null}
+              ) : (
+                <Badge variant="outline">{t('standings.countingUnsetBadge')}</Badge>
+              )}
             </div>
             {league.club?.name && (
               <p className="text-sm text-muted-foreground mt-1">Club: {league.club.name}</p>
@@ -282,17 +309,26 @@ const LeagueDetail = () => {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <ResponsiveTabsNav
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={handleTabChange}
           options={leagueTabOptions}
-          listClassName="sm:grid-cols-2 md:grid-cols-4"
+          listClassName={
+            tabCols === 5 ? 'sm:grid-cols-2 md:grid-cols-5' : 'sm:grid-cols-2 md:grid-cols-4'
+          }
           mobileLabel="Sección de la liga"
         />
 
         <TabsContent value="competitions" className="mt-4">
           <LeagueCompetitionsTab league={league} canManage={canManage} onRefresh={loadLeague} />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-4">
+          <LeagueSeasonCalendar
+            competitions={league.competitions || []}
+            variant="organizer"
+          />
         </TabsContent>
 
         <TabsContent value="participants" className="mt-4">
@@ -301,7 +337,12 @@ const LeagueDetail = () => {
 
         {league.scoring_mode === 'league_rules' && (
           <TabsContent value="rules" className="mt-4">
-            <LeagueRulesTab leagueId={league.id} scoringMode={league.scoring_mode} />
+            <LeagueRulesTab
+              leagueId={league.id}
+              scoringMode={league.scoring_mode}
+              countingRaces={league.counting_races}
+              tiebreakMode={league.tiebreak_mode}
+            />
           </TabsContent>
         )}
 
@@ -315,8 +356,21 @@ const LeagueDetail = () => {
               standings={standings?.standings || []}
               competitions={standings?.competitions || []}
               countingRaces={league.counting_races}
+              tiebreakMode={league.tiebreak_mode}
               exportBasePath={`/leagues/${id}`}
               leagueName={league.name}
+              leagueSlug={league.slug}
+              canManage={canManage}
+              leagueId={league.id}
+              onResultUpdated={loadStandings}
+              viewer={user}
+              selectedParticipantKey={searchParams.get('pilot')}
+              onSelectParticipant={(key) => {
+                const next = new URLSearchParams(searchParams);
+                if (key) next.set('pilot', key);
+                else next.delete('pilot');
+                setSearchParams(next, { replace: true });
+              }}
             />
           )}
         </TabsContent>
@@ -347,6 +401,9 @@ const LeagueDetail = () => {
                 onChange={(e) => setEditForm({ ...editForm, counting_races: e.target.value })}
                 placeholder="Todas"
               />
+              <p className="text-xs text-muted-foreground">
+                {t('standings.helpDns')} {t('standings.helpAbsent')}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-max">Cupo máximo</Label>
@@ -374,6 +431,12 @@ const LeagueDetail = () => {
                   <SelectItem value="last_race_position">Última prueba</SelectItem>
                 </SelectContent>
               </Select>
+              <LeagueRulesHelp
+                countingRaces={editForm.counting_races ? parseInt(editForm.counting_races, 10) : null}
+                tiebreakMode={editForm.tiebreak_mode}
+                variant="inline"
+                context="settings"
+              />
             </div>
             {hasCompetitionsOrRules && (
               <p className="text-xs text-muted-foreground">

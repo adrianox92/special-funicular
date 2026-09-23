@@ -32,6 +32,12 @@ const ClubLeaguesPanel = ({ leagues = [] }) => {
                       participants: lg.participants_count ?? 0,
                     })}
                   </p>
+                  <Link
+                    to={`/leagues/${lg.id}?tab=calendar`}
+                    className="text-xs text-primary hover:underline mt-1 inline-block"
+                  >
+                    {t('detail.leaguesCalendar')}
+                  </Link>
                 </div>
                 <Badge variant="outline">{lg.status}</Badge>
               </li>
