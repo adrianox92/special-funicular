@@ -37,6 +37,7 @@ if (isTelegramBotConfigured()) {
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
+const { isPartnerDocsPath } = require('./lib/partnerOpenApi');
 const {
   publicSignupLimiter,
   publicCatalogReadLimiter,
@@ -52,7 +53,16 @@ const app = express();
 // lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR y req.ip no refleja al cliente real.
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
-  app.use(helmet());
+  // Swagger UI needs inline init + same-origin assets; keep default Helmet elsewhere.
+  app.use((req, res, next) => {
+    if (isPartnerDocsPath(req.path)) {
+      return helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+      })(req, res, next);
+    }
+    return helmet()(req, res, next);
+  });
 } else {
   app.use(helmet({ contentSecurityPolicy: false }));
 }
@@ -104,6 +114,7 @@ function pickCorsOptions(path) {
   if (path.startsWith('/api/lap-timer/license')) return corsSyncOptions;
   if (path.startsWith('/api/lap-timer/promo')) return corsSyncOptions;
   if (
+    path.startsWith('/api/docs') ||
     path.startsWith('/api/sync') ||
     path === '/api/auth/api-key' ||
     path.startsWith('/api/license')
@@ -205,6 +216,8 @@ const publicRefereeRoute = require('./routes/publicReferee');
 app.use('/api/referee', publicRefereeLimiter, publicRefereeRoute);
 const publicLeaguesRoute = require('./routes/publicLeagues');
 app.use('/api/public-leagues', publicSignupLimiter, publicLeaguesRoute);
+const partnerDocsRoute = require('./routes/partnerDocs');
+app.use('/api/docs', partnerDocsRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');
