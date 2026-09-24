@@ -53,19 +53,23 @@ const app = express();
 // lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR y req.ip no refleja al cliente real.
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
-  // Swagger UI needs inline init + same-origin assets; keep default Helmet elsewhere.
-  app.use((req, res, next) => {
-    if (isPartnerDocsPath(req.path)) {
-      return helmet({
-        contentSecurityPolicy: false,
-        crossOriginEmbedderPolicy: false,
-      })(req, res, next);
-    }
-    return helmet()(req, res, next);
-  });
-} else {
-  app.use(helmet({ contentSecurityPolicy: false }));
 }
+
+// Swagger UI: inline init + allow slotdatabase.es (P3) to fetch the YAML.
+// Default Helmet stays on every other route.
+app.use((req, res, next) => {
+  if (isPartnerDocsPath(req.path)) {
+    return helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })(req, res, next);
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return helmet()(req, res, next);
+  }
+  return helmet({ contentSecurityPolicy: false })(req, res, next);
+});
 
 // Configuración de CORS
 const allowedOrigins = [

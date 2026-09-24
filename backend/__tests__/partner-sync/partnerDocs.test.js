@@ -85,5 +85,6 @@ describe('Slot Database API docs (P2 Swagger UI)', () => {
       .set('Origin', 'https://slotdatabase.es');
     expect(res.status).toBe(200);
     expect(res.headers['access-control-allow-origin']).toBe('https://slotdatabase.es');
+    expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
   });
 });
