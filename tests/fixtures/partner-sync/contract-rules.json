@@ -63,6 +63,19 @@
     "GET /api/sync/clubs/:id/circuits": {
       "response_required_keys": ["circuits"]
     },
+    "GET /api/sync/clubs/:id/members": {
+      "response_required_keys": ["members", "owner_user_id"],
+      "member_keys": [
+        "id",
+        "user_id",
+        "display_name",
+        "email",
+        "role",
+        "joined_at",
+        "is_owner"
+      ],
+      "notes": "P1 D10. Admin/owner only. Complements guest-members. Not used by current client fixtures."
+    },
     "GET /api/sync/clubs/:id/guest-members": {
       "response_required_keys": ["guest_members"],
       "guest_keys": [

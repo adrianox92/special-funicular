@@ -1,0 +1,1620 @@
+openapi: 3.0.3
+info:
+  title: Slot Database API
+  version: 1.0.0
+  termsOfService: https://slotdatabase.es/developers
+  contact:
+    name: Slot Database
+    url: https://slotdatabase.es/developers
+  description: |
+    **ES — Slot Database API (Partner Sync v1)**
+
+    Contrato **as-built** de `/api/sync/*` para integradores de cronometraje y
+    gestores de pista. Autenticación con API key de usuario (`X-API-Key`).
+
+    - **Modo personal:** la key actúa sobre el garaje del titular (`/vehicles`,
+      `/circuits`, `/timings`).
+    - **Modo club:** con key de un admin/owner se listan clubes, circuitos del
+      club, **socios** (`/members`) e invitados (`/guest-members`), y se
+      sincronizan competiciones.
+    - Copia a historial / garaje personal: hace falta **`vehicle_id` asignado**.
+      Un `user_id` solo no basta. Pilotos externos sin cuenta son válidos en
+      la prueba; no reciben perfil personal.
+
+    Compatibilidad: cambios **aditivos**. No se eliminan ni renombran paths ni
+    campos estables sin una versión nueva.
+
+    **EN — Slot Database API (Partner Sync v1)**
+
+    As-built contract for `/api/sync/*`. Authenticate with a user API key
+    (`X-API-Key`). Personal mode writes to the key owner's garage. Club mode
+    (admin/owner key) lists club roster (`members` + `guest-members`) and
+    syncs competitions. Personal-history copy requires an assigned
+    `vehicle_id`. External pilots without an account are allowed online.
+
+    Field names and required/optional rules below are taken from the live
+    validators and handlers. Extra columns from `SELECT *` may appear on some
+    competition payloads; do not rely on undocumented keys.
+
+    Unknown / server quirks are called out in operation descriptions
+    (`UNKNOWN` / `NOTE`).
+servers:
+  - url: https://api.slotdatabase.es
+    description: Production
+  - url: http://localhost:5001
+    description: Local development
+tags:
+  - name: Vehicles
+    description: Garage vehicles of the API-key owner
+  - name: Circuits
+    description: Personal circuits (find-or-create)
+  - name: Timings
+    description: Garage timing sessions
+  - name: Clubs
+    description: Club admin roster, circuits, and guest timings
+  - name: Competitions
+    description: Competition CRUD-ish sync, participants, timings, progress
+security:
+  - ApiKeyAuth: []
+paths:
+  /api/sync/vehicles:
+    get:
+      tags: [Vehicles]
+      operationId: listSyncVehicles
+      summary: List garage vehicles
+      description: |
+        Paginated list of vehicles owned by the API-key user.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Vehicle page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleListResponse'
+              example:
+                vehicles:
+                  - id: 11111111-1111-4111-8111-111111111111
+                    model: Ferrari 488
+                    manufacturer: Scalextric
+                    type: GT
+                    traction: RWD
+                    image: https://example.test/image.jpg
+                pagination:
+                  total: 1
+                  page: 1
+                  limit: 25
+                  totalPages: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/circuits:
+    get:
+      tags: [Circuits]
+      operationId: listSyncCircuits
+      summary: List personal circuits
+      parameters:
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Circuits of the API-key user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircuitListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [Circuits]
+      operationId: findOrCreateSyncCircuit
+      summary: Find or create a personal circuit
+      description: |
+        Looks up a circuit by name for the API-key user, or creates it.
+        Returns the **flat circuit object** (not `{ circuit, created }`).
+        `200` if found, `201` if created.
+      parameters:
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CircuitWrite'
+            example:
+              name: Pista casa
+      responses:
+        '200':
+          description: Existing circuit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+        '201':
+          description: Created circuit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Circuit'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/timings:
+    get:
+      tags: [Timings]
+      operationId: listSyncTimings
+      summary: List garage timings for a vehicle
+      description: |
+        `vehicle_id` is required. Optional `circuit_id` / `lane` filter the
+        baseline set used by guided training.
+
+        **NOTE:** some clients send `session_type` as a query param; the
+        current handler **does not read it**.
+      parameters:
+        - name: vehicle_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: circuit_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: lane
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Lane number as string (e.g. `"1"`)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: session_type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            UNKNOWN at server — accepted by some clients, ignored by the handler.
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Filtered timings plus meta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimingListResponse'
+        '400':
+          description: Missing vehicle_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: vehicle_id es requerido
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [Timings]
+      operationId: createSyncTiming
+      summary: Create a garage timing session
+      description: |
+        Required: `vehicle_id`, `best_lap_time`, `total_time`, `laps`,
+        `average_time`. Times are typically `mm:ss.mmm` (garage is truthy,
+        not a strict regex).
+
+        `lap_times` items use `{ lap_number, time_seconds, time_text }`
+        (aliases `lap_time_seconds` / `lapNumber` are also accepted).
+
+        Response is the inserted `vehicle_timings` row plus `sync_meta`.
+        Extra DB columns may be present.
+      parameters:
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GarageTimingWrite'
+            examples:
+              minimal:
+                summary: Required fields only
+                value:
+                  vehicle_id: 11111111-1111-4111-8111-111111111111
+                  best_lap_time: '00:12.345'
+                  total_time: '02:03.210'
+                  laps: 10
+                  average_time: '00:12.321'
+              withLaps:
+                summary: With per-lap times
+                value:
+                  vehicle_id: 11111111-1111-4111-8111-111111111111
+                  best_lap_time: '00:08.210'
+                  total_time: '01:22.100'
+                  laps: 10
+                  average_time: '00:08.210'
+                  lane: '1'
+                  circuit_id: 22222222-2222-4222-8222-222222222222
+                  timing_date: '2026-09-24'
+                  session_type: TRAINING
+                  best_lap_timestamp: 8.21
+                  total_time_timestamp: 82.1
+                  average_time_timestamp: 8.21
+                  supply_voltage_volts: 12.5
+                  reaction_time_ms: 180
+                  lap_times:
+                    - lap_number: 1
+                      time_seconds: 8.3
+                      time_text: '00:08.300'
+                    - lap_number: 2
+                      time_seconds: 8.21
+                      time_text: '00:08.210'
+      responses:
+        '201':
+          description: Created timing + sync_meta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GarageTimingCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/clubs/admin:
+    get:
+      tags: [Clubs]
+      operationId: listAdminClubs
+      summary: Clubs where the user is admin or owner
+      parameters:
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Admin/owner clubs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminClubListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/clubs/{id}/circuits:
+    get:
+      tags: [Clubs]
+      operationId: listClubCircuits
+      summary: Club circuits (admin/owner)
+      parameters:
+        - $ref: '#/components/parameters/ClubId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Club circuits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircuitListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/clubs/{id}/members:
+    get:
+      tags: [Clubs]
+      operationId: listClubMembers
+      summary: Club account members (admin/owner)
+      description: |
+        **D10.** Roster of socios with a Slot Database account. Admin/owner
+        API key required (`403` otherwise). Complements
+        `GET /api/sync/clubs/{id}/guest-members` (invitados); this path does
+        **not** replace guests.
+
+        Shape mirrors JWT `GET /api/clubs/:id/members` and adds
+        `display_name` (public pilot profile, else auth metadata).
+      parameters:
+        - $ref: '#/components/parameters/ClubId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Account members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMembersResponse'
+              example:
+                owner_user_id: 88888888-8888-4888-8888-888888888888
+                members:
+                  - id: 12121212-1212-4121-8121-121212121212
+                    user_id: 88888888-8888-4888-8888-888888888888
+                    display_name: Ada Lovelace
+                    email: ada@example.test
+                    role: admin
+                    joined_at: '2026-01-15T10:00:00.000Z'
+                    is_owner: true
+                  - id: 13131313-1313-4131-8131-131313131313
+                    user_id: 99999999-9999-4999-8999-999999999999
+                    display_name: Bob
+                    email: bob@example.test
+                    role: member
+                    joined_at: '2026-02-01T10:00:00.000Z'
+                    is_owner: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/clubs/{id}/guest-members:
+    get:
+      tags: [Clubs]
+      operationId: listClubGuestMembers
+      summary: Club guest members (admin/owner)
+      parameters:
+        - $ref: '#/components/parameters/ClubId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Guest members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestMemberListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/clubs/{id}/guest-members/{guestId}/timings:
+    post:
+      tags: [Clubs]
+      operationId: createGuestMemberTiming
+      summary: Record a guest training session
+      description: |
+        Server requires `circuit_id` + `best_lap_time`. `laps` is optional
+        on the server (some clients always send it). Optional vehicle fields
+        (`vehicle_id` / `vehicle_model` / `vehicle_type`). Does not require
+        `total_time` / `average_time`.
+      parameters:
+        - $ref: '#/components/parameters/ClubId'
+        - name: guestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestTimingWrite'
+            example:
+              circuit_id: 22222222-2222-4222-8222-222222222222
+              best_lap_time: '00:11.987'
+              laps: 12
+              best_lap_timestamp: 11.987
+              lane: '2'
+              timing_date: '2026-09-24'
+              vehicle_id: 11111111-1111-4111-8111-111111111111
+      responses:
+        '201':
+          description: Inserted `club_guest_timings` row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestTiming'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/competitions:
+    get:
+      tags: [Competitions]
+      operationId: listSyncCompetitions
+      summary: List competitions the user can access
+      description: |
+        Owned competitions plus those of clubs the user belongs to.
+        Each item is a competition row (`SELECT *`) plus
+        `participants_count`. Nested `circuits` may be present.
+        Extra table columns are **UNKNOWN / additive**.
+      parameters:
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Competition list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [Competitions]
+      operationId: createSyncCompetition
+      summary: Create a competition
+      description: |
+        Required: `name`, `num_slots`, `rounds`. Optional client-generated
+        `id` (UUID). Duplicate id → `409`. If `club_id` is set, the user
+        must belong to that club.
+      parameters:
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompetitionCreate'
+            example:
+              name: Copa club
+              num_slots: 8
+              rounds: 4
+              club_id: 33333333-3333-4333-8333-333333333333
+              circuit_id: 22222222-2222-4222-8222-222222222222
+              circuit_name: Pista club
+              laps_per_round: 20
+      responses:
+        '201':
+          description: Created competition row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Competition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/competitions/{id}:
+    get:
+      tags: [Competitions]
+      operationId: getSyncCompetition
+      summary: Competition detail
+      description: |
+        Stable nested keys: `laps_per_round`, `rounds`, `circuit_*`,
+        `participants`, `round_stages`, `timings`, plus `categories` and
+        `rules`. Top-level fields include the full competition row.
+      parameters:
+        - $ref: '#/components/parameters/CompetitionId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Competition with nested collections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags: [Competitions]
+      operationId: updateSyncCompetition
+      summary: Patch competition fields
+      description: |
+        Partial update. Known writable fields: `name`, `num_slots`,
+        `rounds`, `circuit_id`, `circuit_name`, `external_status`
+        (`DRAFT`|`RUNNING`|`FINISHED`), `status` (`closed` only),
+        `laps_per_round`, `updated_at` (optimistic concurrency; stale → `409`).
+      parameters:
+        - $ref: '#/components/parameters/CompetitionId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompetitionUpdate'
+            examples:
+              status:
+                value:
+                  external_status: FINISHED
+                  status: closed
+      responses:
+        '200':
+          description: Updated competition row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Competition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/competitions/{id}/progress:
+    get:
+      tags: [Competitions]
+      operationId: getSyncCompetitionProgress
+      summary: Competition progress
+      parameters:
+        - $ref: '#/components/parameters/CompetitionId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Progress payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionProgress'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/competitions/{id}/participants:
+    post:
+      tags: [Competitions]
+      operationId: upsertSyncParticipants
+      summary: Add or upsert participants
+      description: |
+        Body `{ participants: [...] }`. Each item requires `driver_name`.
+        Send **either** `vehicle_id` **or** `vehicle_model` (both → `400`).
+        Neither → `vehicle_model` becomes `"Externo"`.
+        `vehicle_id` must belong to the API-key user.
+        Optional `id` (UUID) and `start_order`.
+        Participants without a Slot Database `user_id` are allowed.
+      parameters:
+        - $ref: '#/components/parameters/CompetitionId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantsWrite'
+            example:
+              participants:
+                - id: 66666666-6666-4666-8666-666666666666
+                  driver_name: Ada
+                  vehicle_id: 11111111-1111-4111-8111-111111111111
+                  start_order: 1
+                - driver_name: Bob
+                  vehicle_model: Externo
+                  start_order: 2
+      responses:
+        '201':
+          description: Upserted participants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantsWriteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/sync/competitions/{id}/timings:
+    post:
+      tags: [Competitions]
+      operationId: upsertSyncCompetitionTimings
+      summary: Push heat / round timings
+      description: |
+        Body `{ timings: [...] }`. Each row requires `participant_id`,
+        **`round_number`** (not `heat_number`), `best_lap_time`,
+        `total_time`, `laps`. Server **derives** `average_time` from
+        `total_time` + `laps` using strict `mm:ss.mmm`.
+
+        Optional: `average_time` (ignored as source), `lane`, `driver`,
+        timestamps, `timing_date`, `penalty_seconds`, `lap_times`
+        (`{ lap_number, time_seconds, time_text }`), `circuit` / `circuit_id`,
+        `setup_snapshot`.
+
+        Personal-garage copy runs only when the participant has `vehicle_id`.
+        Returns `{ created, updated }`.
+      parameters:
+        - $ref: '#/components/parameters/CompetitionId'
+        - $ref: '#/components/parameters/XClientApp'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompetitionTimingsWrite'
+            example:
+              timings:
+                - participant_id: 66666666-6666-4666-8666-666666666666
+                  round_number: 1
+                  best_lap_time: '00:08.210'
+                  total_time: '01:22.100'
+                  laps: 10
+                  lane: '1'
+                  timing_date: '2026-09-24'
+                  best_lap_timestamp: 8.21
+                  total_time_timestamp: 82.1
+                  penalty_seconds: 0
+      responses:
+        '201':
+          description: Created and/or updated rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionTimingsWriteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        User API key from Profile (or `POST /api/auth/api-key`).
+        Case-insensitive header name. Missing/invalid → `401`.
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 25
+    ClubId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CompetitionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    XClientApp:
+      name: X-Client-App
+      in: header
+      required: false
+      schema:
+        type: string
+      description: |
+        Optional client label. When present, may map to `recorded_from`
+        on garage inserts. Omitted is valid.
+    XClientVersion:
+      name: X-Client-Version
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Optional client version. Not validated by the server.
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing:
+              value:
+                error: No se proporcionó API key. Usa el header X-API-Key.
+            invalid:
+              value:
+                error: API key inválida o expirada
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Authenticated but not allowed (e.g. not club admin/owner)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Sin permiso
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Duplicate id or stale `updated_at`
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: Internal error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+          description: Present on some 409 conflict responses
+    Uuid:
+      type: string
+      format: uuid
+    LapTime:
+      type: object
+      required: [lap_number, time_seconds]
+      properties:
+        lap_number:
+          type: integer
+          minimum: 1
+        time_seconds:
+          type: number
+        time_text:
+          type: string
+          example: '00:08.210'
+          description: Display form, typically `mm:ss.mmm`
+      additionalProperties: true
+    Pagination:
+      type: object
+      required: [total, page, limit, totalPages]
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+    Vehicle:
+      type: object
+      required: [id, model, manufacturer, type, traction, image]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        model:
+          type: string
+        manufacturer:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        traction:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+          description: First vehicle image URL, or null
+    VehicleListResponse:
+      type: object
+      required: [vehicles, pagination]
+      properties:
+        vehicles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vehicle'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    Circuit:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        num_lanes:
+          type: integer
+          nullable: true
+        lane_lengths:
+          type: array
+          items:
+            type: number
+          nullable: true
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        club_id:
+          type: string
+          format: uuid
+          nullable: true
+      additionalProperties: true
+    CircuitWrite:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        num_lanes:
+          type: integer
+        lane_lengths:
+          type: array
+          items:
+            type: number
+    CircuitListResponse:
+      type: object
+      required: [circuits]
+      properties:
+        circuits:
+          type: array
+          items:
+            $ref: '#/components/schemas/Circuit'
+    GuidedSession:
+      type: object
+      required: [baseline_lap_seconds, target_improvement_ms, laps_on_target]
+      properties:
+        baseline_lap_seconds:
+          type: number
+        target_improvement_ms:
+          type: integer
+        laps_on_target:
+          type: integer
+        total_laps:
+          type: integer
+        best_improvement_ms:
+          type: number
+    SyncMeta:
+      type: object
+      required: [previous_best_lap_seconds, delta_vs_pb_seconds, is_personal_best]
+      properties:
+        previous_best_lap_seconds:
+          type: number
+          nullable: true
+        delta_vs_pb_seconds:
+          type: number
+          nullable: true
+        is_personal_best:
+          type: boolean
+    GarageTimingWrite:
+      type: object
+      required: [vehicle_id, best_lap_time, total_time, laps, average_time]
+      properties:
+        vehicle_id:
+          $ref: '#/components/schemas/Uuid'
+        best_lap_time:
+          type: string
+          example: '00:12.345'
+        total_time:
+          type: string
+        laps:
+          type: integer
+        average_time:
+          type: string
+        lane:
+          description: Lane number (string or number)
+          oneOf:
+            - type: string
+            - type: integer
+        circuit:
+          type: string
+        circuit_id:
+          $ref: '#/components/schemas/Uuid'
+        timing_date:
+          type: string
+          format: date
+        session_type:
+          type: string
+          enum: [HEAT, TRAINING]
+        best_lap_timestamp:
+          type: number
+        total_time_timestamp:
+          type: number
+        average_time_timestamp:
+          type: number
+        supply_voltage_volts:
+          type: number
+          description: 0–30 volts
+        voltage:
+          type: number
+          description: Alias of supply_voltage_volts
+        reaction_time_ms:
+          type: integer
+          minimum: 0
+          maximum: 600000
+        reactionTime:
+          type: integer
+          description: Alias of reaction_time_ms
+        reactionTimeMs:
+          type: integer
+          description: Alias of reaction_time_ms
+        recorded_from:
+          type: string
+          description: Optional override; usually derived from X-Client-App
+        guided_session:
+          $ref: '#/components/schemas/GuidedSession'
+        lap_times:
+          type: array
+          items:
+            $ref: '#/components/schemas/LapTime'
+      additionalProperties: true
+    GarageTimingCreated:
+      type: object
+      required: [id, vehicle_id, best_lap_time, total_time, laps, average_time, sync_meta]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        vehicle_id:
+          $ref: '#/components/schemas/Uuid'
+        best_lap_time:
+          type: string
+        total_time:
+          type: string
+        laps:
+          type: integer
+        average_time:
+          type: string
+        lane:
+          nullable: true
+        circuit:
+          type: string
+          nullable: true
+        circuit_id:
+          type: string
+          format: uuid
+          nullable: true
+        timing_date:
+          type: string
+        session_type:
+          type: string
+          nullable: true
+        recorded_from:
+          type: string
+        sync_meta:
+          $ref: '#/components/schemas/SyncMeta'
+      additionalProperties: true
+    TimingListItem:
+      type: object
+      required:
+        - id
+        - vehicle_id
+        - best_lap_time
+        - best_lap_timestamp
+        - lane
+        - circuit_id
+        - circuit
+        - timing_date
+        - laps
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        vehicle_id:
+          $ref: '#/components/schemas/Uuid'
+        best_lap_time:
+          type: string
+          nullable: true
+        best_lap_timestamp:
+          type: number
+          nullable: true
+        lane:
+          nullable: true
+        circuit_id:
+          type: string
+          format: uuid
+          nullable: true
+        circuit:
+          type: string
+          nullable: true
+        timing_date:
+          type: string
+          nullable: true
+        laps:
+          type: integer
+          nullable: true
+      additionalProperties: true
+    TimingListMeta:
+      type: object
+      required: [rawCount, filteredCount, laneFallback]
+      properties:
+        rawCount:
+          type: integer
+        filteredCount:
+          type: integer
+        laneFallback:
+          description: Present on filtered lists; may be boolean
+        invalidLane:
+          type: boolean
+        circuitNumLanes:
+          type: integer
+      additionalProperties: true
+    TimingListResponse:
+      type: object
+      required: [timings, meta]
+      properties:
+        timings:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimingListItem'
+        meta:
+          $ref: '#/components/schemas/TimingListMeta'
+    AdminClub:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+        slug:
+          type: string
+          nullable: true
+    AdminClubListResponse:
+      type: object
+      required: [clubs]
+      properties:
+        clubs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminClub'
+    ClubMember:
+      type: object
+      required: [id, user_id, display_name, email, role, is_owner]
+      properties:
+        id:
+          type: string
+          description: Membership row id
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        display_name:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, member]
+        joined_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_owner:
+          type: boolean
+    ClubMembersResponse:
+      type: object
+      required: [members, owner_user_id]
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClubMember'
+        owner_user_id:
+          $ref: '#/components/schemas/Uuid'
+    GuestMember:
+      type: object
+      required: [id, club_id, name]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        club_id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+        linked_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        linked_user_email:
+          type: string
+          nullable: true
+          description: Email of linked_user_id when present
+    GuestMemberListResponse:
+      type: object
+      required: [guest_members]
+      properties:
+        guest_members:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuestMember'
+    GuestTimingWrite:
+      type: object
+      required: [circuit_id, best_lap_time]
+      properties:
+        circuit_id:
+          $ref: '#/components/schemas/Uuid'
+        best_lap_time:
+          type: string
+        laps:
+          type: integer
+        best_lap_timestamp:
+          type: number
+        lane:
+          type: string
+        timing_date:
+          type: string
+          format: date
+        vehicle_id:
+          $ref: '#/components/schemas/Uuid'
+        vehicle_model:
+          type: string
+        vehicle_type:
+          type: string
+        consistency_score:
+          type: number
+        notes:
+          type: string
+    GuestTiming:
+      type: object
+      required: [id, club_id, guest_member_id, circuit_id, best_lap_time]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        club_id:
+          $ref: '#/components/schemas/Uuid'
+        guest_member_id:
+          $ref: '#/components/schemas/Uuid'
+        circuit_id:
+          $ref: '#/components/schemas/Uuid'
+        best_lap_time:
+          type: string
+        best_lap_timestamp:
+          type: number
+          nullable: true
+        laps:
+          type: integer
+          nullable: true
+        lane:
+          type: string
+          nullable: true
+        timing_date:
+          type: string
+        vehicle_model:
+          type: string
+          nullable: true
+        vehicle_type:
+          type: string
+          nullable: true
+        source:
+          type: string
+      additionalProperties: true
+    Competition:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+        public_slug:
+          type: string
+        organizer:
+          $ref: '#/components/schemas/Uuid'
+        num_slots:
+          type: integer
+        rounds:
+          type: integer
+        club_id:
+          type: string
+          format: uuid
+          nullable: true
+        circuit_id:
+          type: string
+          format: uuid
+          nullable: true
+        circuit_name:
+          type: string
+          nullable: true
+        laps_per_round:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        external_status:
+          type: string
+          nullable: true
+        participants_count:
+          type: integer
+      additionalProperties: true
+    CompetitionListResponse:
+      type: object
+      required: [competitions]
+      properties:
+        competitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Competition'
+    CompetitionCreate:
+      type: object
+      required: [name, num_slots, rounds]
+      properties:
+        name:
+          type: string
+        num_slots:
+          type: integer
+          minimum: 1
+        rounds:
+          type: integer
+          minimum: 1
+        id:
+          $ref: '#/components/schemas/Uuid'
+        club_id:
+          type: string
+          format: uuid
+          nullable: true
+        circuit_id:
+          type: string
+          format: uuid
+          nullable: true
+        circuit_name:
+          type: string
+          nullable: true
+        laps_per_round:
+          type: integer
+          nullable: true
+    CompetitionUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        num_slots:
+          type: integer
+          minimum: 1
+        rounds:
+          type: integer
+          minimum: 1
+        circuit_id:
+          type: string
+          format: uuid
+          nullable: true
+        circuit_name:
+          type: string
+          nullable: true
+        external_status:
+          type: string
+          enum: [DRAFT, RUNNING, FINISHED]
+        status:
+          type: string
+          enum: [closed]
+        laps_per_round:
+          type: integer
+          nullable: true
+        updated_at:
+          type: string
+          description: Client timestamp; if older than server → 409
+    RoundStage:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        competition_id:
+          $ref: '#/components/schemas/Uuid'
+        round_number:
+          type: integer
+        circuit_id:
+          type: string
+          format: uuid
+          nullable: true
+        circuit_name:
+          type: string
+          nullable: true
+        laps_per_round:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      additionalProperties: true
+    CompetitionParticipant:
+      type: object
+      required: [id, driver_name]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        competition_id:
+          $ref: '#/components/schemas/Uuid'
+        driver_name:
+          type: string
+        vehicle_id:
+          type: string
+          format: uuid
+          nullable: true
+        vehicle_model:
+          type: string
+          nullable: true
+        start_order:
+          type: integer
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+      additionalProperties: true
+    CompetitionTiming:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        participant_id:
+          $ref: '#/components/schemas/Uuid'
+        round_number:
+          type: integer
+        best_lap_time:
+          type: string
+        total_time:
+          type: string
+        laps:
+          type: integer
+        average_time:
+          type: string
+        lane:
+          nullable: true
+      additionalProperties: true
+    CompetitionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Competition'
+        - type: object
+          required: [participants, categories, rules, timings, round_stages]
+          properties:
+            participants:
+              type: array
+              items:
+                $ref: '#/components/schemas/CompetitionParticipant'
+            categories:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            rules:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            timings:
+              type: array
+              items:
+                $ref: '#/components/schemas/CompetitionTiming'
+            round_stages:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoundStage'
+    CompetitionProgress:
+      type: object
+      required:
+        - competition_id
+        - participants_count
+        - rounds
+        - times_registered
+        - total_required_times
+        - times_remaining
+        - is_completed
+        - progress_percentage
+        - times_by_round
+        - participant_stats
+        - category_rankings
+      properties:
+        competition_id:
+          $ref: '#/components/schemas/Uuid'
+        participants_count:
+          type: integer
+        rounds:
+          type: integer
+        times_registered:
+          type: integer
+        total_required_times:
+          type: integer
+        times_remaining:
+          type: integer
+        is_completed:
+          type: boolean
+        progress_percentage:
+          type: integer
+        times_by_round:
+          type: object
+          additionalProperties: true
+        participant_stats:
+          description: UNKNOWN exact item schema — points calculator output
+          additionalProperties: true
+        category_rankings:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        has_category_rules:
+          type: boolean
+      additionalProperties: true
+    ParticipantsWrite:
+      type: object
+      required: [participants]
+      properties:
+        participants:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [driver_name]
+            properties:
+              id:
+                $ref: '#/components/schemas/Uuid'
+              driver_name:
+                type: string
+              vehicle_id:
+                type: string
+                format: uuid
+                nullable: true
+              vehicle_model:
+                type: string
+                nullable: true
+              start_order:
+                type: integer
+                nullable: true
+    ParticipantsWriteResponse:
+      type: object
+      required: [participants]
+      properties:
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionParticipant'
+    CompetitionTimingsWrite:
+      type: object
+      required: [timings]
+      properties:
+        timings:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - participant_id
+              - round_number
+              - best_lap_time
+              - total_time
+              - laps
+            properties:
+              participant_id:
+                $ref: '#/components/schemas/Uuid'
+              round_number:
+                type: integer
+                minimum: 1
+                description: Heat / manga number already mapped. Do not send heat_number.
+              best_lap_time:
+                type: string
+                example: '00:08.210'
+              total_time:
+                type: string
+              laps:
+                type: integer
+                minimum: 0
+              average_time:
+                type: string
+                description: Optional; server derives average from total_time + laps
+              lane:
+                description: Lane (string or number)
+              driver:
+                type: string
+              timing_date:
+                type: string
+                format: date
+              best_lap_timestamp:
+                type: number
+              total_time_timestamp:
+                type: number
+              penalty_seconds:
+                type: number
+              circuit:
+                type: string
+              circuit_id:
+                $ref: '#/components/schemas/Uuid'
+              setup_snapshot:
+                description: UNKNOWN shape — passed through when present
+              lap_times:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LapTime'
+    CompetitionTimingsWriteResponse:
+      type: object
+      required: [created, updated]
+      properties:
+        created:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionTiming'
+        updated:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionTiming'

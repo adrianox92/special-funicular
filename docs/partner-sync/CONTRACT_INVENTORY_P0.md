@@ -82,7 +82,7 @@ Headers en cada llamada: `X-API-Key`, `Content-Type: application/json`, `X-Clien
 | `GET` | `/api/sync/competitions/:id/progress` | **A** | Sí | `slotlaptimer/get-competition-progress.json` |
 | `POST` | `/api/sync/competitions/:id/timings` | **A** — `{ timings: CompetitionTimingPayload[] }` | **Sí (crítico)** | `slotlaptimer/post-competition-timings.json` |
 | `PUT` | `/api/sync/competitions/:id` | **A** — `{ external_status, status? }` | Sí | `slotlaptimer/put-competition.json` |
-| `GET` | `/api/sync/clubs/:id/members` | — | **No existe** (D10) | — |
+| `GET` | `/api/sync/clubs/:id/members` | — | **P1 D10** (`backend/routes/sync.js`) | — |
 
 Paths en cliente a veces se escriben `/sync/...`; el mount real es `/api/sync/...`.
 
@@ -159,7 +159,7 @@ Headers: **`X-API-Key` + `Content-Type` solamente.** No manda `X-Client-App` ni 
 | `POST` | `/api/sync/competitions/:id/participants` | **A** — `{ participants }` | **Sí (crítico)** | `ds200-manager/post-participants.json` |
 | `POST` | `/api/sync/competitions/:id/timings` | **A** — `buildCompetitionSyncTimingRows` | **Sí (crítico)** | `ds200-manager/post-competition-timings.json` |
 | `GET` | `/api/sync/clubs/admin` | **U** — no está en las llamadas confirmadas | No en fuente actual | — |
-| `GET` | `/api/sync/clubs/:id/members` | — | **No existe** (D10) | — |
+| `GET` | `/api/sync/clubs/:id/members` | — | **P1 D10** (`backend/routes/sync.js`) | — |
 
 **Adyacente (A, no `/api/sync`):** login credenciales → `api_key`. `POST /api/license/register` sigue siendo adyacente (licencia), no re-confirmado en este extracto.
 
@@ -230,7 +230,7 @@ Checklist: `docs/partner-sync/SMOKE_CHECKLIST.md`
 8. **`GET /timings?session_type`:** SLT lo manda; el handler **no lee** `session_type`. No se cambia el runtime.
 9. **`X-Client-App`:** SLT sí (`lap-timer`); DS no. Los POST de DS se graban como `recorded_from=web` salvo body explícito.
 10. **1 key vs N keys:** copy de Slot Race Manager vs D8. Runtime = 1 key = 1 `user_id`.
-11. **D10:** `GET /api/sync/clubs/:id/members` no existe.
+11. **D10:** `GET /api/sync/clubs/:id/members` implementado en P1 (admin/owner, API key). Los clientes actuales aún no lo llaman.
 12. **Formato de tiempos:** competitions exigen `mm:ss.mmm` estricto para derivar media; garaje solo “truthy”.
 
 ---
@@ -241,9 +241,11 @@ Nada de esto se elimina ni se hace required si hoy es optional.
 
 **Garaje:** `GET /vehicles`, `GET|POST /circuits`, `GET|POST /timings`  
 **Club:** `GET /clubs/admin`, `GET /clubs/:id/circuits`, `GET /clubs/:id/guest-members`, `POST /clubs/:id/guest-members/:guestId/timings`  
+**Club (P1 aditivo):** `GET /clubs/:id/members` (D10)  
 **Competitions:** `GET|POST /competitions`, `GET|PUT /competitions/:id`, `GET /competitions/:id/progress`, `POST /competitions/:id/participants`, `POST /competitions/:id/timings`
 
-**Fuera de P0:** OpenAPI, Swagger, Developers, D10 members, idempotency, key de club.
+**Fuera de P0:** Swagger UI, Developers, idempotency, key de club.  
+**P1:** OpenAPI en `docs/openapi/slot-database-api.v1.yaml` + D10 members.
 
 ---
 
@@ -258,8 +260,8 @@ La fuente cliente actual ya cierra headers, paths y builders. Queda:
 
 ---
 
-## 8. Nota P1 (stub, no implementar)
+## 8. Nota P1
 
-- OpenAPI 3 del allowlist §6.
-- `GET /api/sync/clubs/:id/members` (D10) — **no existe**; no inventar fixture 200.
-- No citar SlotLapTimer / ds200-manager en copy público.
+- OpenAPI 3: `docs/openapi/slot-database-api.v1.yaml` (marca pública Slot Database API; sin nombres de cliente).
+- `GET /api/sync/clubs/:id/members` (D10) — implementado (admin/owner). Sin fixture de cliente 200 (los clientes actuales no lo llaman).
+- `guest-members` sigue igual.
