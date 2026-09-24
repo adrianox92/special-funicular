@@ -40,6 +40,7 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
   const pickerRequestId = useRef(0);
   const [deductFromInventory, setDeductFromInventory] = useState(null);
   const [matchedPart, setMatchedPart] = useState(null);
+  const [inventoryPresence, setInventoryPresence] = useState('unknown');
 
   useEffect(() => {
     const loadTechnicalSpecs = async () => {
@@ -139,6 +140,7 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
     setSelectedInventoryMaxQty(null);
     setDeductFromInventory(null);
     setMatchedPart(null);
+    setInventoryPresence('unknown');
     setNewSpec({ ...EMPTY_SPEC });
   };
 
@@ -213,6 +215,7 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
   useEffect(() => {
     if (editingSpec || selectedInventoryItemId) {
       setMatchedPart(null);
+      setInventoryPresence('unknown');
       return undefined;
     }
     const type = newSpec.component_type;
@@ -220,16 +223,20 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
     const manufacturer = (newSpec.manufacturer || '').trim();
     if (!type || !name || !manufacturer) {
       setMatchedPart(null);
+      setInventoryPresence('unknown');
       return undefined;
     }
     if ((type === 'pinion' || type === 'crown') && (newSpec.teeth === '' || Number.isNaN(Number(newSpec.teeth)))) {
       setMatchedPart(null);
+      setInventoryPresence('unknown');
       return undefined;
     }
     if (type === 'motor' && (newSpec.rpm === '' || Number.isNaN(Number(newSpec.rpm)))) {
       setMatchedPart(null);
+      setInventoryPresence('unknown');
       return undefined;
     }
+    setInventoryPresence('unknown');
     const tmr = setTimeout(async () => {
       try {
         const params = {
@@ -241,10 +248,18 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
         if (newSpec.teeth !== '') params.teeth = newSpec.teeth;
         if (newSpec.rpm !== '') params.rpm = newSpec.rpm;
         const { data } = await api.get('/inventory/parts/match', { params });
-        setMatchedPart(data && data.part ? data : null);
+        if (data && data.part) {
+          const lines = Array.isArray(data.inventory_lines) ? data.inventory_lines : [];
+          setMatchedPart(data);
+          setInventoryPresence(lines.length > 0 ? 'present' : 'missing');
+        } else {
+          setMatchedPart(null);
+          setInventoryPresence('missing');
+        }
       } catch (e) {
         console.error(e);
         setMatchedPart(null);
+        setInventoryPresence('unknown');
       }
     }, 350);
     return () => clearTimeout(tmr);
@@ -334,12 +349,16 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
         toast.success(t('edit.toasts.modSavedDeducted', { qty: res.data.inventory_deducted_qty }));
       }
     } else {
-      await api.post(`/vehicles/${id}/technical-specs`, specData);
-      toast.success(
-        specData.deduct_from_inventory
-          ? t('edit.toasts.mountedAndDeducted')
-          : t('edit.toasts.specCreated'),
-      );
+      const created = await api.post(`/vehicles/${id}/technical-specs`, specData);
+      if (created.data?.inventory_created_at_zero) {
+        toast.success(t('edit.toasts.specCreatedInventoryZero'));
+      } else {
+        toast.success(
+          specData.deduct_from_inventory
+            ? t('edit.toasts.mountedAndDeducted')
+            : t('edit.toasts.specCreated'),
+        );
+      }
     }
 
     const response = await api.get(`/vehicles/${id}/technical-specs`);
@@ -558,6 +577,7 @@ export function useVehicleSpecs(id, { t, setError, setDeleteConfirm, deleteConfi
     deductFromInventory,
     setDeductFromInventory,
     matchedPart,
+    inventoryPresence,
     handleSpecChange,
     handleEditSpec,
     handleCancelEdit,
