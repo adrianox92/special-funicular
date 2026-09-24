@@ -1,0 +1,53 @@
+{
+  "id": "slotlaptimer-post-guest-timings",
+  "client": "slotlaptimer",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "server": ["backend/routes/sync.js", "backend/lib/clubGuestMembers.js"]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/sync/clubs/33333333-3333-4333-8333-333333333333/guest-members/44444444-4444-4444-8444-444444444444/timings",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer"
+    },
+    "query": {},
+    "body": {
+      "circuit_id": "22222222-2222-4222-8222-222222222222",
+      "best_lap_time": "00:11.987",
+      "best_lap_timestamp": 11.987,
+      "laps": 12,
+      "lane": "2",
+      "timing_date": "2026-09-24",
+      "vehicle_id": "11111111-1111-4111-8111-111111111111"
+    }
+  },
+  "expect": {
+    "status": 201,
+    "response_required_keys": [
+      "id",
+      "club_id",
+      "guest_member_id",
+      "circuit_id",
+      "best_lap_time"
+    ],
+    "example_response": {
+      "id": "77777777-7777-4777-8777-777777777777",
+      "club_id": "33333333-3333-4333-8333-333333333333",
+      "guest_member_id": "44444444-4444-4444-8444-444444444444",
+      "circuit_id": "22222222-2222-4222-8222-222222222222",
+      "best_lap_time": "00:11.987",
+      "best_lap_timestamp": 11.987,
+      "laps": 12,
+      "lane": "2",
+      "timing_date": "2026-09-24",
+      "vehicle_model": "Ferrari 488",
+      "vehicle_type": "GT",
+      "source": "app"
+    }
+  },
+  "notes": "sync.js attributes this path to Slot Lap Timer. Does NOT require total_time or average_time. circuit_id is mandatory and must be a club circuit."
+}

@@ -1,0 +1,32 @@
+{
+  "id": "slotlaptimer-get-clubs-admin",
+  "client": "slotlaptimer",
+  "critical": false,
+  "evidence": "C",
+  "source": {
+    "server": ["backend/routes/sync.js"]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/clubs/admin",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "X-Client-App": "lap-timer"
+    },
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": ["clubs"],
+    "example_response": {
+      "clubs": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Club prueba",
+          "slug": "club-prueba"
+        }
+      ]
+    }
+  }
+}

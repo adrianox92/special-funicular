@@ -1,0 +1,92 @@
+{
+  "version": "p0",
+  "api_prefix": "/api/sync",
+  "auth_header": "X-API-Key",
+  "notes": "Internal regression fixtures. Do not cite client names in public Developers copy.",
+  "clients": {
+    "slotlaptimer": {
+      "internal_name": "SlotLapTimer",
+      "github": "adrianox92/SlotLapTimer",
+      "expected_client_app_header": "lap-timer",
+      "source_status": "repo_not_readable_2026-09-24",
+      "fixtures": [
+        "slotlaptimer/get-vehicles.json",
+        "slotlaptimer/get-circuits.json",
+        "slotlaptimer/post-circuits.json",
+        "slotlaptimer/get-timings-baseline.json",
+        "slotlaptimer/post-timings-garage.json",
+        "slotlaptimer/post-timings-guided.json",
+        "slotlaptimer/get-clubs-admin.json",
+        "slotlaptimer/get-club-circuits.json",
+        "slotlaptimer/get-guest-members.json",
+        "slotlaptimer/post-guest-timings.json",
+        "slotlaptimer/get-competition-detail.json"
+      ]
+    },
+    "ds200-manager": {
+      "internal_name": "ds200-manager",
+      "github": "adrianox92/ds200-manager",
+      "expected_client_app_header": "slot-race-manager",
+      "source_status": "repo_not_readable_2026-09-24",
+      "client_file_cited_in_server": "src/core/syncService.js",
+      "fixtures": [
+        "ds200-manager/get-vehicles.json",
+        "ds200-manager/get-circuits.json",
+        "ds200-manager/post-timings-training.json",
+        "ds200-manager/get-competitions.json",
+        "ds200-manager/post-competition.json",
+        "ds200-manager/get-competition-detail.json",
+        "ds200-manager/put-competition.json",
+        "ds200-manager/get-competition-progress.json",
+        "ds200-manager/post-participants.json",
+        "ds200-manager/post-competition-timings.json",
+        "ds200-manager/get-clubs-admin.json"
+      ]
+    }
+  },
+  "shared": ["shared/unauthorized-missing-key.json"],
+  "critical_paths": [
+    {
+      "client": "slotlaptimer",
+      "method": "POST",
+      "path": "/api/sync/timings",
+      "fixture": "slotlaptimer/post-timings-garage.json"
+    },
+    {
+      "client": "slotlaptimer",
+      "method": "GET",
+      "path": "/api/sync/timings",
+      "fixture": "slotlaptimer/get-timings-baseline.json"
+    },
+    {
+      "client": "slotlaptimer",
+      "method": "POST",
+      "path": "/api/sync/clubs/:id/guest-members/:guestId/timings",
+      "fixture": "slotlaptimer/post-guest-timings.json"
+    },
+    {
+      "client": "ds200-manager",
+      "method": "POST",
+      "path": "/api/sync/competitions",
+      "fixture": "ds200-manager/post-competition.json"
+    },
+    {
+      "client": "ds200-manager",
+      "method": "POST",
+      "path": "/api/sync/competitions/:id/participants",
+      "fixture": "ds200-manager/post-participants.json"
+    },
+    {
+      "client": "ds200-manager",
+      "method": "POST",
+      "path": "/api/sync/competitions/:id/timings",
+      "fixture": "ds200-manager/post-competition-timings.json"
+    },
+    {
+      "client": "ds200-manager",
+      "method": "PUT",
+      "path": "/api/sync/competitions/:id",
+      "fixture": "ds200-manager/put-competition.json"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "shared-unauthorized-missing-key",
+  "client": "shared",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "server": ["backend/middleware/apiKeyAuth.js"],
+    "docs": ["docs/API_SYNC_INTEGRATION.md"]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/vehicles",
+    "headers": {},
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 401,
+    "response_required_keys": ["error"],
+    "example_response": {
+      "error": "No se proporcionó API key. Usa el header X-API-Key."
+    }
+  },
+  "notes": "Any /api/sync route without X-API-Key. Same error string is stable."
+}

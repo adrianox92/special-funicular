@@ -1,0 +1,33 @@
+{
+  "id": "ds200-manager-get-clubs-admin",
+  "client": "ds200-manager",
+  "critical": false,
+  "evidence": "C",
+  "source": {
+    "server": ["backend/routes/sync.js"]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/clubs/admin",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "X-Client-App": "slot-race-manager"
+    },
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": ["clubs"],
+    "example_response": {
+      "clubs": [
+        {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Club prueba",
+          "slug": "club-prueba"
+        }
+      ]
+    }
+  },
+  "notes": "Needed if the desktop app posts competitions with club_id. Live capture must confirm."
+}

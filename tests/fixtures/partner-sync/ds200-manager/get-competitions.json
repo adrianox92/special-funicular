@@ -1,0 +1,39 @@
+{
+  "id": "ds200-manager-get-competitions",
+  "client": "ds200-manager",
+  "critical": false,
+  "evidence": "A",
+  "source": {
+    "server": ["backend/routes/syncCompetitions.js", "backend/README_COMPETITIONS.md"]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/competitions",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "X-Client-App": "slot-race-manager"
+    },
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": ["competitions"],
+    "example_response": {
+      "competitions": [
+        {
+          "id": "55555555-5555-4555-8555-555555555555",
+          "name": "Copa club",
+          "num_slots": 8,
+          "rounds": 4,
+          "club_id": "33333333-3333-4333-8333-333333333333",
+          "circuit_id": "22222222-2222-4222-8222-222222222222",
+          "circuit_name": "Pista club",
+          "laps_per_round": 20,
+          "external_status": "DRAFT",
+          "participants_count": 2
+        }
+      ]
+    }
+  }
+}
