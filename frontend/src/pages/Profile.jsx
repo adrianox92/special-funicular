@@ -18,8 +18,9 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Switch } from '../components/ui/switch';
-import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2 } from 'lucide-react';
+import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2, BookOpen, ExternalLink } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import { PARTNER_SWAGGER_PRODUCTION_URL } from '../utils/partnerApiUrls';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -429,6 +430,24 @@ const Profile = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/developers">
+                <BookOpen className="size-4 mr-2" />
+                Documentación para integradores
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a
+                href={PARTNER_SWAGGER_PRODUCTION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Swagger (probar API)
+                <ExternalLink className="size-3.5 ml-2 opacity-70" />
+              </a>
+            </Button>
+          </div>
           {loading ? (
             <div className="flex items-center gap-2">
               <Spinner className="size-4" />

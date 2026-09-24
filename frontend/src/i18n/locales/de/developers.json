@@ -1,0 +1,101 @@
+{
+  "seo": {
+    "title": "Slot Database API | Developers",
+    "description": "Öffentliche Dokumentation der Slot Database API: Authentifizierung mit X-API-Key, Quickstart für Privat und Club, Swagger und Kompatibilitätsrichtlinie."
+  },
+  "nav": {
+    "login": "Anmelden",
+    "dashboard": "Zum Dashboard",
+    "profile": "Profil"
+  },
+  "hero": {
+    "kicker": "Slot Database API",
+    "title": "Dokumentation für Integratoren",
+    "lead": "Die Slot Database API ist der öffentliche Sync-Vertrag für Zeitnahme-Tools und Streckenmanager. Sie listet Fahrzeuge und Strecken, speichert Zeit-Sessions und synchronisiert Club-Wettkämpfe, ohne dass jeder Fahrer die Website nutzen muss.",
+    "lead2": "Die API wird bereits in Produktion von Drittanbietern genutzt. Diese Seite beschreibt den stabilen v1-Vertrag: Authentifizierung, Integrationsmodi, Zuordnung zur persönlichen Historie und Kompatibilitätsrichtlinie."
+  },
+  "cta": {
+    "swagger": "Swagger öffnen",
+    "openapi": "OpenAPI herunterladen",
+    "getKey": "API-Key im Profil holen"
+  },
+  "auth": {
+    "title": "Authentifizierung",
+    "lead": "Jede Partner-Anfrage verwendet den Header X-API-Key. Der Schlüssel gehört zu einem Slot-Database-Benutzer: erstellen, kopieren oder neu erzeugen im Profil. Der Klartext-Secret erscheint nur beim Erstellen oder Regenerieren.",
+    "personal": "Persönlicher Modus: der Key wirkt auf die Garage des Inhabers (Fahrzeuge, Strecken und Zeiten).",
+    "club": "Club-Modus: ein einziger Admin- oder Owner-Key konfiguriert das Tool vor Ort. Es braucht keinen Key pro Mitglied.",
+    "profileCta": "Zum Profil, um den Key zu verwalten"
+  },
+  "personal": {
+    "title": "Quickstart · persönlicher Modus",
+    "lead": "Für ein Heim-Tool, das in die Garage des Fahrers schreibt.",
+    "step1": "Erstelle deinen API-Key im Profil (nur sichtbar beim Erstellen oder Regenerieren).",
+    "step2": "Öffne Swagger, klicke Authorize und trage den Key als X-API-Key ein.",
+    "step3": "GET /api/sync/vehicles und wähle eine vehicle_id.",
+    "step4": "Optional: GET /api/sync/circuits (oder POST zum Find-or-Create) und nimm eine circuit_id.",
+    "step5": "POST /api/sync/timings mit der minimalen Payload aus dem Spec.",
+    "step6": "Prüfe die 201-Session in deiner Slot-Database-Garage."
+  },
+  "club": {
+    "title": "Quickstart · Club-Modus",
+    "lead": "Ein Admin-/Owner-Key konfiguriert den Standort. Der Roster kommt aus Slot Database; die Zuordnung zum persönlichen Profil erfolgt nur mit vehicle_id.",
+    "step1": "Admin oder Owner des Clubs holt einen API-Key im Profil.",
+    "step2": "GET /api/sync/clubs/admin und wähle den Club.",
+    "step3": "GET /api/sync/clubs/:id/members und GET /api/sync/clubs/:id/guest-members für den Roster.",
+    "step4": "Erstelle Läufe, Wettkämpfe oder Events in deinem Tool mit diesen Fahrern.",
+    "step5": "Füge bei Bedarf externe Fahrer hinzu (ohne user_id von Slot Database).",
+    "step6": "Synchronisiere Competitions und Timings. Nur wer eine vehicle_id hat, erhält eine Kopie in der persönlichen Historie oder Garage."
+  },
+  "attribution": {
+    "title": "Zuordnung zum persönlichen Profil",
+    "lead": "Wer schreibt (der Club-Key) ist nicht, wem die Zeit gehört. Die Kopie in die persönliche Historie oder Garage verlangt eine zugewiesene vehicle_id. Eine user_id allein reicht nicht.",
+    "colType": "Fahrer im Tool",
+    "colInDb": "In Slot Database",
+    "colHistory": "Persönliche Historie?",
+    "memberWithVehicleType": "Mitglied mit user_id und vehicle_id",
+    "memberWithVehicleInDb": "Verknüpfter Teilnehmer + Fahrzeug",
+    "memberWithVehicleHistory": "Ja",
+    "memberWithoutVehicleType": "Mitglied oder Gast mit Konto, ohne vehicle_id",
+    "memberWithoutVehicleInDb": "Teilnehmer am Event",
+    "memberWithoutVehicleHistory": "Nein (nur Event-Ergebnis)",
+    "guestWithVehicleType": "Gast mit linked_user_id und vehicle_id",
+    "guestWithVehicleInDb": "Verknüpfter Gast oder Teilnehmer + Fahrzeug",
+    "guestWithVehicleHistory": "Ja",
+    "externalType": "Externer Fahrer ohne user_id",
+    "externalInDb": "In der Online-Competition erlaubt, ohne Profil",
+    "externalHistory": "Nein"
+  },
+  "docs": {
+    "title": "Swagger und Vertrag",
+    "lead": "Teste die Endpunkte mit deinem API-Key. Die OpenAPI-Spezifikation ist die Quelle der Wahrheit für den v1-Vertrag.",
+    "swaggerLabel": "Swagger UI (Produktion)",
+    "openapiLabel": "OpenAPI YAML",
+    "localLabel": "Lokale Entwicklung",
+    "localHint": "Wenn du die API lokal startest: {{swagger}} · {{openapi}}"
+  },
+  "compat": {
+    "title": "Kompatibilität und Versionierung",
+    "lead": "v1 ist ein additiver Vertrag. Integratoren können sich darauf verlassen, dass er sich nicht still ändert.",
+    "rule1": "Stabile /api/sync/…-Pfade werden nicht entfernt oder umbenannt.",
+    "rule2": "Der Authentifizierungs-Header bleibt X-API-Key.",
+    "rule3": "Ein heute optionales Feld wird ohne neue Version nicht Pflicht.",
+    "rule4": "Antworten dürfen Felder hinzufügen; stabile Felder werden nicht entfernt oder umbenannt.",
+    "rule5": "Ein Breaking Change kommt nur auf einem neuen versionierten Pfad oder nach einer in diesem Changelog angekündigten Abkündigung."
+  },
+  "changelog": {
+    "title": "Changelog",
+    "lead": "Hinweise zur öffentlichen API. Diese Liste aktualisieren wir mit jedem Release.",
+    "v1Title": "Öffentlicher Start der Slot Database API",
+    "v1NoteLaunch": "Developers-Portal und öffentliche Marke Slot Database API.",
+    "v1NoteSwagger": "Swagger UI und OpenAPI 3 für den /api/sync/*-Vertrag in Produktion.",
+    "v1NoteModes": "Dokumentiert: persönlicher Modus (Fahrer-Key) und Club-Modus (ein Admin-/Owner-Key).",
+    "v1NoteMembers": "GET /api/sync/clubs/:id/members zum Abruf des Mitglieder-Rosters.",
+    "v1NoteVehicleId": "Die Kopie in die persönliche Historie erfordert eine zugewiesene vehicle_id.",
+    "v1NoteExternals": "Externe Fahrer ohne user_id dürfen in der Online-Competition stehen; sie erhalten kein persönliches Profil."
+  },
+  "support": {
+    "title": "Kontakt und Support",
+    "lead": "Fragen zur Integration, zum Vertrag oder zu einem Key? Nutze dasselbe Kontaktformular des Produkts und erwähne, dass du als Integrator schreibst.",
+    "cta": "Kontaktformular öffnen"
+  }
+}

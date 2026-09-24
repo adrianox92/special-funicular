@@ -67,6 +67,7 @@ export function getDocumentTitle(pathname) {
   if (normalized === '/privacidad') return withBrand(i18n.t('privacy', { ns: 'meta' }));
   if (normalized === '/terminos') return withBrand(i18n.t('terms', { ns: 'meta' }));
   if (normalized === '/contacto') return withBrand(i18n.t('contact', { ns: 'meta' }));
+  if (normalized === '/developers') return withBrand(i18n.t('developers', { ns: 'meta' }));
   if (normalized === '/slot-race-manager') return withBrand(i18n.t('slotRaceManager', { ns: 'meta' }));
   if (normalized.startsWith('/piloto/')) return withBrand(i18n.t('pilot', { ns: 'meta' }));
   if (normalized === '/catalogo') {

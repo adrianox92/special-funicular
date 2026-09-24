@@ -44,6 +44,7 @@ import ResetPassword from './components/ResetPassword';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
+import DevelopersPage from './pages/DevelopersPage';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
@@ -112,6 +113,7 @@ const AppContent = () => {
     '/privacidad',
     '/terminos',
     '/contacto',
+    '/developers',
     '/catalogo',
     '/politicas',
   ];
@@ -168,6 +170,7 @@ const AppContent = () => {
         <Route path="/privacidad" element={<PrivacyPolicy />} />
         <Route path="/terminos" element={<TermsOfService />} />
         <Route path="/contacto" element={<Contact />} />
+        <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/politicas/:slug" element={<PoliciesPage />} />
         <Route path="/slot-race-manager" element={<SlotRaceManagerPage />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
