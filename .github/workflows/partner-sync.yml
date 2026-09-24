@@ -1,0 +1,38 @@
+name: Slot Database API
+
+on:
+  pull_request:
+  push:
+    branches:
+      - staging
+
+concurrency:
+  group: partner-sync-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  openapi-and-smoke:
+    name: OpenAPI drift + partner-sync smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Validate OpenAPI + partner-sync contract smokes
+        run: npm run test:partner-sync

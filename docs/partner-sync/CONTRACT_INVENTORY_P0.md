@@ -265,3 +265,9 @@ La fuente cliente actual ya cierra headers, paths y builders. Queda:
 - OpenAPI 3: `docs/openapi/slot-database-api.v1.yaml` (marca pública Slot Database API; sin nombres de cliente).
 - `GET /api/sync/clubs/:id/members` (D10) — implementado (admin/owner). Sin fixture de cliente 200 (los clientes actuales no lo llaman).
 - `guest-members` sigue igual.
+
+---
+
+## 9. Nota P4
+
+CI anti-divergencia: `docs/partner-sync/CI.md`. Workflow **Slot Database API** corre `npm run test:partner-sync` (OpenAPI válido + smokes + drift de rutas). No cambia el runtime.
