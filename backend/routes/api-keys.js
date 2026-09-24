@@ -1,9 +1,18 @@
 const express = require('express');
-const crypto = require('crypto');
+const { param } = require('express-validator');
 const { getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
-const { hashApiKey } = require('../lib/apiKeyHash');
-const { encryptApiKey } = require('../lib/apiKeyEncrypt');
+const { handleValidationErrors } = require('../middleware/validateRequest');
+const {
+  MAX_USER_API_KEYS,
+  isMissingTable,
+  listUserApiKeys,
+  getDefaultUserApiKey,
+  createUserApiKey,
+  rotateDefaultUserApiKey,
+  revokeUserApiKey,
+  publicKeyListItem,
+} = require('../lib/userApiKeys');
 
 const router = express.Router();
 const isProd = process.env.NODE_ENV === 'production';
@@ -20,84 +29,72 @@ function getSupabase() {
   return c;
 }
 
+function handleKeyError(res, error, fallbackMessage) {
+  if (!error) return res.status(500).json({ error: fallbackMessage });
+  if (isMissingTable(error)) {
+    return serverConfigError(
+      res,
+      503,
+      error,
+      'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
+    );
+  }
+  if (error.status === 503) {
+    return serverConfigError(res, 503, error.cause, error.message);
+  }
+  if (error.status) {
+    return res.status(error.status).json({ error: error.message });
+  }
+  return serverConfigError(res, 500, error, error.message || fallbackMessage);
+}
+
 router.use(authMiddleware);
 
-function generateApiKey() {
-  return crypto.randomBytes(32).toString('hex');
-}
+/**
+ * GET /api/api-keys
+ * List personal keys (prefix only). Additive; does not replace /me.
+ */
+router.get('/', async (req, res) => {
+  try {
+    const { error, keys } = await listUserApiKeys(getSupabase(), req.user.id);
+    if (error) return handleKeyError(res, error, 'Error al listar las API keys');
+    res.json({
+      keys: keys.map(publicKeyListItem),
+      max_keys: MAX_USER_API_KEYS,
+    });
+  } catch (error) {
+    console.error('Error en GET /api/api-keys:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
 
 /**
  * GET /api/api-keys/me
- * Returns the user's API key when recién creada en esta sesión no aplica; si solo hay hash, no se expone el texto.
+ * Backward compatible: default (oldest active) key metadata.
+ * Plaintext only when a key is created in this request.
  */
 router.get('/me', async (req, res) => {
   try {
     const userId = req.user.id;
-
-    let { data: existing, error: fetchError } = await getSupabase()
-      .from('user_api_keys')
-      .select('api_key_hash, created_at')
-      .eq('user_id', userId)
-      .single();
+    const { error: fetchError, key: existing, active } = await getDefaultUserApiKey(
+      getSupabase(),
+      userId,
+    );
 
     if (fetchError && fetchError.code !== 'PGRST116') {
-      if (fetchError.code === '42P01') {
-        return serverConfigError(
-          res,
-          503,
-          fetchError,
-          'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
-        );
-      }
-      return serverConfigError(
-        res,
-        500,
-        fetchError,
-        `Error al obtener la API key: ${fetchError.message}`,
-      );
+      return handleKeyError(res, fetchError, `Error al obtener la API key: ${fetchError.message}`);
     }
 
     if (!existing) {
-      const apiKey = generateApiKey();
-      const apiKeyHash = hashApiKey(apiKey);
-      let apiKeyEnc;
-      try {
-        apiKeyEnc = encryptApiKey(apiKey);
-      } catch (encErr) {
-        return serverConfigError(
-          res,
-          503,
-          encErr,
-          encErr.message || 'API_KEY_ENCRYPT_SECRET no configurada correctamente',
-        );
+      const created = await createUserApiKey(getSupabase(), userId, { name: 'default' });
+      if (created.error) {
+        return handleKeyError(res, created.error, 'Error al crear la API key');
       }
-      const { data: inserted, error: insertError } = await getSupabase()
-        .from('user_api_keys')
-        .insert([{ user_id: userId, api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc }])
-        .select('created_at')
-        .single();
-
-      if (insertError) {
-        if (insertError.code === '42P01') {
-          return serverConfigError(
-            res,
-            503,
-            insertError,
-            'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
-          );
-        }
-        return serverConfigError(
-          res,
-          500,
-          insertError,
-          `Error al crear la API key: ${insertError.message}`,
-        );
-      }
-
       return res.json({
-        api_key: apiKey,
+        api_key: created.api_key,
         key_exists: false,
-        created_at: inserted.created_at,
+        created_at: created.row.created_at,
+        keys_count: 1,
       });
     }
 
@@ -105,6 +102,7 @@ router.get('/me', async (req, res) => {
       api_key: null,
       key_exists: true,
       created_at: existing.created_at,
+      keys_count: active.length,
       message:
         'La clave solo se muestra al crearla o al regenerarla. Usa «Regenerar» si necesitas una nueva.',
     });
@@ -115,64 +113,64 @@ router.get('/me', async (req, res) => {
 });
 
 /**
+ * POST /api/api-keys
+ * Create an additional personal key. Body: { name? }
+ */
+router.post('/', async (req, res) => {
+  try {
+    const created = await createUserApiKey(getSupabase(), req.user.id, {
+      name: req.body?.name,
+    });
+    if (created.error) {
+      return handleKeyError(res, created.error, 'Error al crear la API key');
+    }
+    res.status(201).json({
+      api_key: created.api_key,
+      id: created.row.id,
+      name: created.row.name,
+      key_prefix: created.row.key_prefix,
+      created_at: created.row.created_at,
+    });
+  } catch (error) {
+    console.error('Error en POST /api/api-keys:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+/**
  * POST /api/api-keys/regenerate
+ * Rotates the default (oldest active) key only. Extra keys stay valid.
  */
 router.post('/regenerate', async (req, res) => {
   try {
-    const userId = req.user.id;
-
-    const { error: deleteError } = await getSupabase().from('user_api_keys').delete().eq('user_id', userId);
-
-    if (deleteError) {
-      if (deleteError.code === '42P01') {
-        return serverConfigError(
-          res,
-          503,
-          deleteError,
-          'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
-        );
-      }
-      return res.status(500).json({ error: 'Error al regenerar la API key' });
+    const rotated = await rotateDefaultUserApiKey(getSupabase(), req.user.id);
+    if (rotated.error) {
+      return handleKeyError(res, rotated.error, 'Error al regenerar la API key');
     }
-
-    const apiKey = generateApiKey();
-    const apiKeyHash = hashApiKey(apiKey);
-    let apiKeyEnc;
-    try {
-      apiKeyEnc = encryptApiKey(apiKey);
-    } catch (encErr) {
-      return serverConfigError(
-        res,
-        503,
-        encErr,
-        encErr.message || 'API_KEY_ENCRYPT_SECRET no configurada correctamente',
-      );
-    }
-    const { data: inserted, error: insertError } = await getSupabase()
-      .from('user_api_keys')
-      .insert([{ user_id: userId, api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc }])
-      .select('created_at')
-      .single();
-
-    if (insertError) {
-      if (insertError.code === '42P01') {
-        return serverConfigError(
-          res,
-          503,
-          insertError,
-          'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
-        );
-      }
-      return res.status(500).json({ error: 'Error al regenerar la API key' });
-    }
-
     res.json({
-      api_key: apiKey,
-      created_at: inserted.created_at,
+      api_key: rotated.api_key,
+      created_at: rotated.row.created_at,
       message: 'API key regenerada correctamente',
     });
   } catch (error) {
     console.error('Error en POST /api/api-keys/regenerate:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+/**
+ * DELETE /api/api-keys/:id
+ * Revoke one key. At least one active key must remain.
+ */
+router.delete('/:id', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const revoked = await revokeUserApiKey(getSupabase(), req.user.id, req.params.id);
+    if (revoked.error) {
+      return handleKeyError(res, revoked.error, 'Error al revocar la API key');
+    }
+    res.json({ ok: true, id: revoked.row.id, revoked_at: revoked.row.revoked_at });
+  } catch (error) {
+    console.error('Error en DELETE /api/api-keys/:id:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

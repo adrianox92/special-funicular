@@ -7,7 +7,7 @@ import { PARTNER_SWAGGER_PRODUCTION_URL } from '../../utils/partnerApiUrls';
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn(), patch: jest.fn() },
+  default: { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() },
   invalidateApiAccessTokenCache: jest.fn(),
 }));
 
@@ -29,6 +29,9 @@ describe('Profile API key docs links', () => {
         return Promise.resolve({
           data: { api_key: null, key_exists: false, message: null, created_at: null },
         });
+      }
+      if (url === '/api-keys') {
+        return Promise.resolve({ data: { keys: [], max_keys: 8 } });
       }
       if (url === '/pilot-profile') {
         return Promise.resolve({ data: { slug: '', display_name: '', enabled: false } });

@@ -1,6 +1,6 @@
 {
   "auth_header": "X-API-Key",
-  "optional_headers": ["X-Client-App", "X-Client-Version", "Content-Type"],
+  "optional_headers": ["X-Client-App", "X-Client-Version", "Content-Type", "Idempotency-Key"],
   "time_format": "^(\\d{2}):(\\d{2})\\.(\\d{3})$",
   "date_format": "^\\d{4}-\\d{2}-\\d{2}$",
   "uuid_format": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",

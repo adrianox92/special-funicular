@@ -50,6 +50,12 @@ Si cliente y servidor discrepan, **se documenta**. No se “arregla” el client
 - Error sin key: `401` `{ "error": "No se proporcionó API key. Usa el header X-API-Key." }`
 - Error key inválida: `401` `{ "error": "API key inválida o expirada" }`
 
+**D15 (aditivo, no lo envían los clientes actuales):**
+
+- `Idempotency-Key` — opcional en POST/PUT. Sin header = semántica actual.
+- `429` + `Retry-After` — rate limit por API key (default 600/min). Los clientes actuales no lo manejan; el techo es alto a propósito.
+- Varias keys personales + key de club: mismos header `X-API-Key` y paths. Una key de club no abre garaje personal.
+
 **Bootstrap de key (fuera de `/api/sync`):**
 
 - SlotLapTimer: key de Perfil (no confirmado un login email/password en `api.ts` para sync).

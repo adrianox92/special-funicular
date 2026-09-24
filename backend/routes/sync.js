@@ -2,6 +2,8 @@ const express = require('express');
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
 const authMiddleware = require('../middleware/auth');
+const { syncIdempotencyMiddleware } = require('../lib/syncIdempotency');
+const { enforceClubKeyScope, clubScopeClubId } = require('../lib/syncKeyScope');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
 const { resolveClientContext } = require('../lib/clientApp');
 const { findOrCreateCircuit } = require('../lib/circuitResolver');
@@ -37,6 +39,8 @@ router.post('/test-notification', authMiddleware, async (req, res) => {
 });
 
 router.use(apiKeyAuth);
+router.use(enforceClubKeyScope);
+router.use(syncIdempotencyMiddleware);
 
 router.use((req, res, next) => {
   if (req.method === 'GET' && req.path === '/timings') {
@@ -365,6 +369,15 @@ router.get('/clubs/admin', async (req, res) => {
   try {
     const sb = supabaseForSyncWrite();
     const userId = req.user.id;
+    const scopedClubId = clubScopeClubId(req);
+    if (scopedClubId) {
+      const { data: scoped } = await sb
+        .from('clubs')
+        .select('id, name, slug')
+        .eq('id', scopedClubId)
+        .maybeSingle();
+      return res.json({ clubs: scoped ? [{ id: scoped.id, name: scoped.name, slug: scoped.slug }] : [] });
+    }
 
     const { data: owned } = await sb.from('clubs').select('id, name, slug').eq('owner_user_id', userId);
     const { data: adminMemberships } = await sb

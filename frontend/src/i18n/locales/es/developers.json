@@ -21,10 +21,10 @@
   },
   "auth": {
     "title": "Autenticación",
-    "lead": "Todas las peticiones partner usan el header X-API-Key. La clave es de un usuario de Slot Database: créala, cópiala o regenerala en Perfil. El secreto en claro solo se muestra al crear o regenerar.",
+    "lead": "Todas las peticiones partner usan el header X-API-Key. Puedes tener varias keys personales (crear / listar / revocar en Perfil; siempre queda al menos una activa). El secreto en claro solo se muestra al crear o regenerar.",
     "personal": "Modo personal: la key actúa sobre el garaje del titular (vehículos, circuitos y timings).",
-    "club": "Modo club: una sola key de un admin u owner del club configura la herramienta del local. No hace falta una key por socio.",
-    "profileCta": "Ir a Perfil para gestionar tu key"
+    "club": "Modo club: una key de admin/owner o la API key del club (una por club, el admin la rota en la ficha del club) configura la herramienta del local. No hace falta una key por socio. La key de club no accede al garaje personal.",
+    "profileCta": "Ir a Perfil para gestionar tus keys"
   },
   "personal": {
     "title": "Quickstart · modo personal",
@@ -39,7 +39,7 @@
   "club": {
     "title": "Quickstart · modo club",
     "lead": "Una key de admin/owner configura el local. El roster se baja de Slot Database; la atribución al perfil personal solo ocurre con vehicle_id.",
-    "step1": "El admin u owner del club obtiene una API key en Perfil.",
+    "step1": "El admin u owner obtiene una API key en Perfil, o rota la API key del club en la ficha del club.",
     "step2": "GET /api/sync/clubs/admin y elige el club.",
     "step3": "GET /api/sync/clubs/:id/members y GET /api/sync/clubs/:id/guest-members para el roster.",
     "step4": "Crea mangas, competiciones o pruebas en tu herramienta con esos pilotos.",
@@ -91,7 +91,12 @@
     "v1NoteModes": "Documentados el modo personal (key del piloto) y el modo club (una key de admin/owner).",
     "v1NoteMembers": "GET /api/sync/clubs/:id/members para bajar el roster de socios.",
     "v1NoteVehicleId": "La copia a historial personal requiere vehicle_id asignado.",
-    "v1NoteExternals": "Los externos sin user_id pueden figurar en la competición online; no reciben perfil personal."
+    "v1NoteExternals": "Los externos sin user_id pueden figurar en la competición online; no reciben perfil personal.",
+    "v11Title": "Idempotencia, varias keys y key de club",
+    "v11NoteIdempotency": "Header opcional Idempotency-Key en escrituras: sin él, el comportamiento no cambia; con la misma key se reenvía la primera respuesta.",
+    "v11NoteRateLimit": "Límite por API key en /api/sync/* (techo alto para una carrera). Si se supera: 429 y Retry-After.",
+    "v11NoteMultiKey": "Varias API keys personales: crear, listar y revocar en Perfil. Siempre queda al menos una activa. Regenerar rota solo la key principal.",
+    "v11NoteClubKey": "API key de club (una por club). El admin la rota en la ficha del club. Sirve para roster y competiciones; no abre el garaje personal."
   },
   "support": {
     "title": "Contacto y soporte",

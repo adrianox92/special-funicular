@@ -10,6 +10,7 @@ const { handleValidationErrors } = require('../middleware/validateRequest');
 const { deriveCompetitionAverageFromTotalAndLaps } = require('../lib/competitionTimingDerivation');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
+const { clubScopeClubId } = require('../lib/syncKeyScope');
 const {
   countCompetitionTimings,
   promoteCompetitionToRunningOnFirstTiming,
@@ -38,13 +39,17 @@ async function getClubIdsForUser(userId) {
   return [...new Set((data || []).map((r) => r.club_id))];
 }
 
-async function assertCompetitionAccess(userId, competitionId) {
+async function assertCompetitionAccess(userId, competitionId, scopeClubId) {
   const { data: comp, error } = await supabaseAdmin
     .from('competitions')
     .select('id, organizer, club_id, rounds, updated_at')
     .eq('id', competitionId)
     .maybeSingle();
   if (error || !comp) return { ok: false, status: 404, error: 'Competición no encontrada', competition: null };
+  if (scopeClubId) {
+    if (comp.club_id === scopeClubId) return { ok: true, competition: comp };
+    return { ok: false, status: 403, error: 'Sin acceso a esta competición', competition: null };
+  }
   if (comp.organizer === userId) return { ok: true, competition: comp };
   if (comp.club_id) {
     const { data: mem } = await supabaseAdmin
@@ -150,6 +155,27 @@ async function ensureDefaultCategory(competitionId) {
 router.get('/competitions', async (req, res) => {
   try {
     const userId = req.user.id;
+    const scopedClubId = clubScopeClubId(req);
+    if (scopedClubId) {
+      const { data: scoped, error: scopedErr } = await supabaseAdmin
+        .from('competitions')
+        .select(`
+        *,
+        circuits(id, name, num_lanes, lane_lengths),
+        competition_participants(count)
+      `)
+        .eq('club_id', scopedClubId)
+        .order('created_at', { ascending: false });
+      if (scopedErr) return res.status(500).json({ error: scopedErr.message });
+      const list = (scoped || []).map((c) => {
+        const { competition_participants, ...rest } = c;
+        return {
+          ...rest,
+          participants_count: competition_participants?.[0]?.count || 0,
+        };
+      });
+      return res.json({ competitions: list });
+    }
     const clubIds = await getClubIdsForUser(userId);
 
     const { data: owned, error: e1 } = await supabaseAdmin
@@ -206,7 +232,7 @@ router.get('/competitions', async (req, res) => {
 
 router.get('/competitions/:id', param('id').isUUID(), handleValidationErrors, async (req, res) => {
   try {
-    const access = await assertCompetitionAccess(req.user.id, req.params.id);
+    const access = await assertCompetitionAccess(req.user.id, req.params.id, clubScopeClubId(req));
     if (!access.ok) return res.status(access.status).json({ error: access.error });
 
     const id = req.params.id;
@@ -272,7 +298,7 @@ router.get('/competitions/:id', param('id').isUUID(), handleValidationErrors, as
 
 router.get('/competitions/:id/progress', param('id').isUUID(), handleValidationErrors, async (req, res) => {
   try {
-    const access = await assertCompetitionAccess(req.user.id, req.params.id);
+    const access = await assertCompetitionAccess(req.user.id, req.params.id, clubScopeClubId(req));
     if (!access.ok) return res.status(access.status).json({ error: access.error });
 
     const { data: competition, error: cErr } = await supabaseAdmin
@@ -308,16 +334,24 @@ router.post(
   async (req, res) => {
     try {
       const userId = req.user.id;
+      const scopedClubId = clubScopeClubId(req);
       const {
         name,
         num_slots: numSlots,
         rounds,
         id: clientId,
-        club_id: clubId,
         circuit_id: circuitId,
         circuit_name: circuitName,
         laps_per_round: lapsPerRound,
       } = req.body;
+      let { club_id: clubId } = req.body;
+
+      if (scopedClubId) {
+        if (clubId && clubId !== scopedClubId) {
+          return res.status(403).json({ error: 'Esta API key de club no puede crear competiciones de otro club' });
+        }
+        clubId = scopedClubId;
+      }
 
       if (clubId && !(await assertClubMembership(userId, clubId))) {
         return res.status(403).json({ error: 'No perteneces a este club' });
@@ -384,7 +418,7 @@ router.put(
   handleValidationErrors,
   async (req, res) => {
     try {
-      const access = await assertCompetitionAccess(req.user.id, req.params.id);
+      const access = await assertCompetitionAccess(req.user.id, req.params.id, clubScopeClubId(req));
       if (!access.ok) return res.status(access.status).json({ error: access.error });
 
       const { id } = req.params;
@@ -459,7 +493,7 @@ router.post(
   handleValidationErrors,
   async (req, res) => {
     try {
-      const access = await assertCompetitionAccess(req.user.id, req.params.id);
+      const access = await assertCompetitionAccess(req.user.id, req.params.id, clubScopeClubId(req));
       if (!access.ok) return res.status(access.status).json({ error: access.error });
 
       const competitionId = req.params.id;
@@ -535,7 +569,7 @@ router.post(
   handleValidationErrors,
   async (req, res) => {
     try {
-      const access = await assertCompetitionAccess(req.user.id, req.params.id);
+      const access = await assertCompetitionAccess(req.user.id, req.params.id, clubScopeClubId(req));
       if (!access.ok) return res.status(access.status).json({ error: access.error });
 
       const competitionId = req.params.id;

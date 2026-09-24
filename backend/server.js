@@ -45,6 +45,7 @@ const {
   publicRefereeLimiter,
   authSoftLimiter,
   contactLimiter,
+  syncApiKeyLimiter,
 } = require('./middleware/rateLimits');
 
 const app = express();
@@ -93,7 +94,8 @@ const corsSyncOptions = {
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Admin-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Admin-Key', 'Idempotency-Key'],
+  exposedHeaders: ['Retry-After', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Idempotent-Replayed'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
@@ -255,7 +257,7 @@ app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
 app.use('/api/onboarding', onboardingRoute);
-app.use('/api/sync', syncRoute);
+app.use('/api/sync', syncApiKeyLimiter, syncRoute);
 app.use('/api/auth', authSoftLimiter, authRoute);
 // Webhook RevenueCat: montado ANTES de /api/license + apiKeyAuth.
 // Si RC apunta a /api/license/webhook (ruta habitual por error), no exige X-API-Key.

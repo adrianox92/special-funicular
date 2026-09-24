@@ -459,6 +459,10 @@ Si ya tienes datos con circuitos en texto (`vehicle_timings.circuit`, `competiti
 
 - Usa variables de entorno para almacenar la API key
 - Si crees que la key ha sido comprometida, regenérala desde tu perfil
+- Puedes tener **varias keys personales** (Perfil → crear / revocar). Siempre queda al menos una activa. `POST /api/api-keys/regenerate` solo rota la key principal (la más antigua).
+- **Key de club** (una por club): el admin la crea o rota en la ficha del club (`GET/POST /api/clubs/:id/sync-api-key`). Sirve para roster y competiciones; no abre el garaje personal.
+- Escrituras de sync aceptan el header opcional `Idempotency-Key` (misma key + mismo cuerpo = misma respuesta). Sin header, el comportamiento no cambia.
+- `/api/sync/*` tiene un rate limit alto por API key (por defecto 600/min). Si se supera: `429` + `Retry-After`.
 
 ---
 

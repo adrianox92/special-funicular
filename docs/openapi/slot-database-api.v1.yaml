@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Slot Database API
-  version: 1.0.0
+  version: 1.1.0
   termsOfService: https://slotdatabase.es/developers
   contact:
     name: Slot Database
@@ -15,9 +15,16 @@ info:
 
     - **Modo personal:** la key actúa sobre el garaje del titular (`/vehicles`,
       `/circuits`, `/timings`).
-    - **Modo club:** con key de un admin/owner se listan clubes, circuitos del
-      club, **socios** (`/members`) e invitados (`/guest-members`), y se
-      sincronizan competiciones.
+    - **Modo club:** con key de un admin/owner **o** con la API key de club
+      (una por club; el admin la rota en la ficha del club) se listan clubes,
+      circuitos, **socios** (`/members`) e invitados (`/guest-members`), y se
+      sincronizan competiciones. La key de club no accede al garaje personal.
+    - **Idempotencia (opcional):** header `Idempotency-Key` en escrituras
+      (sobre todo timings / competiciones). Sin header, el comportamiento
+      actual no cambia. Misma key + mismo cuerpo reenvía la primera respuesta.
+    - **Rate limit:** por API key, techo alto para una sesión de carrera.
+      Si se supera: `429` + `Retry-After`. Los clientes actuales que no
+      gestionan 429 no se ven afectados en uso normal.
     - Copia a historial / garaje personal: hace falta **`vehicle_id` asignado**.
       Un `user_id` solo no basta. Pilotos externos sin cuenta son válidos en
       la prueba; no reciben perfil personal.
@@ -28,10 +35,16 @@ info:
     **EN — Slot Database API (Partner Sync v1)**
 
     As-built contract for `/api/sync/*`. Authenticate with a user API key
-    (`X-API-Key`) from **Profile** (create / copy / regenerate). Personal mode writes to the key owner's garage. Club mode
-    (admin/owner key) lists club roster (`members` + `guest-members`) and
-    syncs competitions. Personal-history copy requires an assigned
-    `vehicle_id`. External pilots without an account are allowed online.
+    (`X-API-Key`) from **Profile** (create / copy / regenerate; multiple
+    personal keys are allowed) or a **club/station key** (one per club,
+    rotatable by an admin). Personal mode writes to the key owner's garage.
+    Club mode lists club roster (`members` + `guest-members`) and syncs
+    competitions. A club key cannot access a personal garage. Optional
+    `Idempotency-Key` on writes replays the first response; omitting it keeps
+    current behavior. Per-key rate limits may return `429` + `Retry-After`
+    (defaults are high enough for a live race). Personal-history copy requires
+    an assigned `vehicle_id`. External pilots without an account are allowed
+    online.
 
     Field names and required/optional rules below are taken from the live
     validators and handlers. Extra columns from `SELECT *` may appear on some
@@ -124,6 +137,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XClientApp'
         - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -236,6 +250,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XClientApp'
         - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -288,6 +303,10 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/ServerError'
   /api/sync/clubs/admin:
@@ -422,6 +441,7 @@ paths:
             format: uuid
         - $ref: '#/components/parameters/XClientApp'
         - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -488,6 +508,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XClientApp'
         - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -560,6 +581,7 @@ paths:
         - $ref: '#/components/parameters/CompetitionId'
         - $ref: '#/components/parameters/XClientApp'
         - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -630,6 +652,7 @@ paths:
         - $ref: '#/components/parameters/CompetitionId'
         - $ref: '#/components/parameters/XClientApp'
         - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -684,6 +707,7 @@ paths:
         - $ref: '#/components/parameters/CompetitionId'
         - $ref: '#/components/parameters/XClientApp'
         - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -726,8 +750,9 @@ components:
       in: header
       name: X-API-Key
       description: |
-        User API key from Profile (or `POST /api/auth/api-key`).
-        Case-insensitive header name. Missing/invalid → `401`.
+        User API key from Profile (or `POST /api/auth/api-key`), or a
+        club/station key rotated by a club admin. Case-insensitive header
+        name. Missing/invalid → `401`. Revoked personal keys are rejected.
   parameters:
     Page:
       name: page
@@ -775,6 +800,18 @@ components:
       schema:
         type: string
       description: Optional client version. Not validated by the server.
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+      description: |
+        Optional. Scoped to the API-key owner, 24h TTL. Same key + same
+        method/path/body replays the first response (`Idempotent-Replayed: true`).
+        Same key + different body → `409`. Omit the header to keep current
+        (non-idempotent) behavior.
   responses:
     Unauthorized:
       description: Missing or invalid API key
@@ -809,8 +846,24 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: |
+        Too many requests for this API key. Retry after the `Retry-After`
+        seconds. Defaults are high (600/min) so live race sessions should
+        not hit this.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Demasiadas solicitudes. Inténtalo más tarde.
     Conflict:
-      description: Duplicate id or stale `updated_at`
+      description: Duplicate id, stale `updated_at`, or Idempotency-Key reuse with a different body
       content:
         application/json:
           schema:

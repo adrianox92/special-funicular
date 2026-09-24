@@ -192,5 +192,20 @@
     "save": "Save",
     "saving": "Saving…",
     "delete": "Delete"
+  },
+  "syncApiKey": {
+    "title": "Club API key",
+    "lead": "One station key for the venue: roster and competitions, without using an admin’s personal key. It does not open a personal garage.",
+    "loading": "Loading…",
+    "exists": "Active key ({{prefix}}). The secret is shown only when created or rotated.",
+    "missing": "This club does not have a station API key yet.",
+    "create": "Create club API key",
+    "rotate": "Rotate API key",
+    "confirm": "Rotate the club API key? The previous key will stop working immediately.",
+    "confirmYes": "Yes, rotate",
+    "cancel": "Cancel",
+    "copyNow": "Copy the key now. It will not be shown again.",
+    "loadError": "Could not load the club API key",
+    "rotateError": "Could not rotate the club API key"
   }
 }
