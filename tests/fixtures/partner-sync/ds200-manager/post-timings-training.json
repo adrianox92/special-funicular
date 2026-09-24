@@ -1,0 +1,88 @@
+{
+  "id": "ds200-manager-post-timings-training",
+  "client": "ds200-manager",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "client": "adrianox92/ds200-manager/src/core/syncService.js",
+    "builders": [
+      "buildTimingPayload",
+      "pushTiming"
+    ],
+    "server": [
+      "backend/routes/sync.js",
+      "backend/lib/vehicleTimingInsert.js"
+    ]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/sync/timings",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {},
+    "body": {
+      "vehicle_id": "11111111-1111-4111-8111-111111111111",
+      "best_lap_time": "00:08.210",
+      "total_time": "01:22.100",
+      "laps": 10,
+      "average_time": "00:08.210",
+      "lane": "1",
+      "circuit_id": "22222222-2222-4222-8222-222222222222",
+      "circuit": "Pista club",
+      "timing_date": "2026-09-24",
+      "session_type": "TRAINING",
+      "best_lap_timestamp": 8.21,
+      "total_time_timestamp": 82.1,
+      "average_time_timestamp": 8.21,
+      "supply_voltage_volts": 12.5,
+      "reaction_time_ms": 180,
+      "lap_times": [
+        {
+          "lap_number": 1,
+          "time_seconds": 8.3,
+          "time_text": "00:08.300"
+        },
+        {
+          "lap_number": 2,
+          "time_seconds": 8.21,
+          "time_text": "00:08.210"
+        },
+        {
+          "lap_number": 3,
+          "time_seconds": 8.25,
+          "time_text": "00:08.250"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "status": 201,
+    "response_required_keys": [
+      "id",
+      "vehicle_id",
+      "best_lap_time",
+      "total_time",
+      "laps",
+      "average_time",
+      "sync_meta"
+    ],
+    "example_response": {
+      "id": "77777777-7777-4777-8777-777777777777",
+      "vehicle_id": "11111111-1111-4111-8111-111111111111",
+      "best_lap_time": "00:08.210",
+      "total_time": "01:22.100",
+      "laps": 10,
+      "average_time": "00:08.210",
+      "session_type": "TRAINING",
+      "recorded_from": "web",
+      "sync_meta": {
+        "previous_best_lap_seconds": 8.4,
+        "delta_vs_pb_seconds": -0.19,
+        "is_personal_best": true
+      }
+    }
+  },
+  "notes": "buildTimingPayload + pushTiming confirmed. Client does not send X-Client-App, so recorded_from defaults to web unless the body sets recorded_from. lap_times shape is {lap_number, time_seconds, time_text}."
+}

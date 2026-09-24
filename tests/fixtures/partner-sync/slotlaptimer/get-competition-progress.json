@@ -1,0 +1,55 @@
+{
+  "id": "slotlaptimer-get-competition-progress",
+  "client": "slotlaptimer",
+  "critical": false,
+  "evidence": "A",
+  "source": {
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts",
+    "server": [
+      "backend/routes/syncCompetitions.js",
+      "backend/lib/competitionProgress.js"
+    ]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555/progress",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
+    },
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": [
+      "competition_id",
+      "participants_count",
+      "rounds",
+      "times_registered",
+      "total_required_times",
+      "times_remaining",
+      "is_completed",
+      "progress_percentage",
+      "times_by_round",
+      "participant_stats",
+      "category_rankings"
+    ],
+    "example_response": {
+      "competition_id": "55555555-5555-4555-8555-555555555555",
+      "participants_count": 2,
+      "rounds": 2,
+      "times_registered": 1,
+      "total_required_times": 4,
+      "times_remaining": 3,
+      "is_completed": false,
+      "progress_percentage": 25,
+      "times_by_round": {},
+      "participant_stats": {},
+      "category_rankings": [],
+      "has_category_rules": false
+    }
+  }
+}

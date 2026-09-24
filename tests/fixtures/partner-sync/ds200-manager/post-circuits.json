@@ -1,0 +1,46 @@
+{
+  "id": "ds200-manager-post-circuits",
+  "client": "ds200-manager",
+  "critical": false,
+  "evidence": "A",
+  "source": {
+    "client": "adrianox92/ds200-manager/src/core/syncService.js",
+    "server": [
+      "backend/routes/sync.js",
+      "backend/lib/circuitResolver.js"
+    ]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/sync/circuits",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {},
+    "body": {
+      "name": "Pista club"
+    }
+  },
+  "expect": {
+    "status": [
+      200,
+      201
+    ],
+    "response_required_keys": [
+      "id",
+      "name"
+    ],
+    "example_response": {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Pista club",
+      "description": null,
+      "num_lanes": 1,
+      "lane_lengths": [
+        0
+      ],
+      "user_id": "88888888-8888-4888-8888-888888888888"
+    }
+  },
+  "notes": "syncService.js calls POST /api/sync/circuits. Response is the circuit object, not { circuit, created }. No X-Client-App."
+}

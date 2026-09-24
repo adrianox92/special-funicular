@@ -1,0 +1,54 @@
+{
+  "id": "ds200-manager-get-competition-progress",
+  "client": "ds200-manager",
+  "critical": false,
+  "evidence": "C",
+  "source": {
+    "server": [
+      "backend/routes/syncCompetitions.js",
+      "backend/lib/competitionProgress.js"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555/progress",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": [
+      "competition_id",
+      "participants_count",
+      "rounds",
+      "times_registered",
+      "total_required_times",
+      "times_remaining",
+      "is_completed",
+      "progress_percentage",
+      "times_by_round",
+      "participant_stats",
+      "category_rankings"
+    ],
+    "example_response": {
+      "competition_id": "55555555-5555-4555-8555-555555555555",
+      "participants_count": 2,
+      "rounds": 4,
+      "times_registered": 1,
+      "total_required_times": 8,
+      "times_remaining": 7,
+      "is_completed": false,
+      "progress_percentage": 13,
+      "times_by_round": {},
+      "participant_stats": {},
+      "category_rankings": [],
+      "has_category_rules": false
+    }
+  },
+  "notes": "Not listed in the 2026-09-24 syncService.js extract; kept as C."
+}

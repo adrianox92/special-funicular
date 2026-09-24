@@ -1,0 +1,40 @@
+{
+  "id": "ds200-manager-put-competition",
+  "client": "ds200-manager",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "server": [
+      "backend/routes/syncCompetitions.js",
+      "backend/README_COMPETITIONS.md"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
+  },
+  "request": {
+    "method": "PUT",
+    "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {},
+    "body": {
+      "external_status": "RUNNING",
+      "updated_at": "2026-09-24T12:00:00.000Z"
+    }
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": [
+      "id",
+      "name"
+    ],
+    "example_response": {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Copa club",
+      "external_status": "RUNNING",
+      "updated_at": "2026-09-24T12:00:01.000Z"
+    }
+  },
+  "notes": "external_status must be DRAFT|RUNNING|FINISHED. If client updated_at is older than server, response is 409 { error: 'conflict' }. Empty patch returns current row."
+}

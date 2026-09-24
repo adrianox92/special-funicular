@@ -1,0 +1,140 @@
+{
+  "auth_header": "X-API-Key",
+  "optional_headers": ["X-Client-App", "X-Client-Version", "Content-Type"],
+  "time_format": "^(\\d{2}):(\\d{2})\\.(\\d{3})$",
+  "date_format": "^\\d{4}-\\d{2}-\\d{2}$",
+  "uuid_format": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+  "allowed_methods": ["GET", "POST", "PUT"],
+  "endpoints": {
+    "GET /api/sync/vehicles": {
+      "query_optional": ["page", "limit"],
+      "response_required_keys": ["vehicles", "pagination"],
+      "pagination_keys": ["total", "page", "limit", "totalPages"],
+      "vehicle_keys": ["id", "model", "manufacturer", "type", "traction", "image"]
+    },
+    "GET /api/sync/circuits": {
+      "response_required_keys": ["circuits"],
+      "circuit_keys": ["id", "name", "description", "num_lanes", "lane_lengths"]
+    },
+    "POST /api/sync/circuits": {
+      "body_required": ["name"],
+      "expected_status": [200, 201],
+      "response_required_keys": ["id", "name"]
+    },
+    "GET /api/sync/timings": {
+      "query_required": ["vehicle_id"],
+      "query_optional": ["circuit_id", "lane", "limit", "session_type"],
+      "response_required_keys": ["timings", "meta"],
+      "timing_keys": [
+        "id",
+        "vehicle_id",
+        "best_lap_time",
+        "best_lap_timestamp",
+        "lane",
+        "circuit_id",
+        "circuit",
+        "timing_date",
+        "laps"
+      ],
+      "meta_keys": ["rawCount", "filteredCount", "laneFallback"]
+    },
+    "POST /api/sync/timings": {
+      "body_required": ["vehicle_id", "best_lap_time", "total_time", "laps", "average_time"],
+      "expected_status": [201],
+      "response_required_keys": [
+        "id",
+        "vehicle_id",
+        "best_lap_time",
+        "total_time",
+        "laps",
+        "average_time",
+        "sync_meta"
+      ],
+      "sync_meta_keys": [
+        "previous_best_lap_seconds",
+        "delta_vs_pb_seconds",
+        "is_personal_best"
+      ]
+    },
+    "GET /api/sync/clubs/admin": {
+      "response_required_keys": ["clubs"],
+      "club_keys": ["id", "name", "slug"]
+    },
+    "GET /api/sync/clubs/:id/circuits": {
+      "response_required_keys": ["circuits"]
+    },
+    "GET /api/sync/clubs/:id/guest-members": {
+      "response_required_keys": ["guest_members"],
+      "guest_keys": [
+        "id",
+        "club_id",
+        "name",
+        "email",
+        "linked_user_id",
+        "created_at",
+        "linked_user_email"
+      ]
+    },
+    "POST /api/sync/clubs/:id/guest-members/:guestId/timings": {
+      "body_required": ["circuit_id", "best_lap_time"],
+      "expected_status": [201],
+      "response_required_keys": ["id", "club_id", "guest_member_id", "circuit_id", "best_lap_time"]
+    },
+    "GET /api/sync/competitions": {
+      "response_required_keys": ["competitions"]
+    },
+    "POST /api/sync/competitions": {
+      "body_required": ["name", "num_slots", "rounds"],
+      "expected_status": [201],
+      "response_required_keys": ["id", "name", "num_slots", "rounds", "public_slug", "organizer"]
+    },
+    "GET /api/sync/competitions/:id": {
+      "response_required_keys": [
+        "id",
+        "name",
+        "participants",
+        "categories",
+        "rules",
+        "timings",
+        "round_stages"
+      ]
+    },
+    "PUT /api/sync/competitions/:id": {
+      "expected_status": [200],
+      "response_required_keys": ["id", "name"]
+    },
+    "GET /api/sync/competitions/:id/progress": {
+      "response_required_keys": [
+        "competition_id",
+        "participants_count",
+        "rounds",
+        "times_registered",
+        "total_required_times",
+        "times_remaining",
+        "is_completed",
+        "progress_percentage",
+        "times_by_round",
+        "participant_stats",
+        "category_rankings"
+      ]
+    },
+    "POST /api/sync/competitions/:id/participants": {
+      "body_required": ["participants"],
+      "participant_item_required": ["driver_name"],
+      "expected_status": [201],
+      "response_required_keys": ["participants"]
+    },
+    "POST /api/sync/competitions/:id/timings": {
+      "body_required": ["timings"],
+      "timing_item_required": [
+        "participant_id",
+        "round_number",
+        "best_lap_time",
+        "total_time",
+        "laps"
+      ],
+      "expected_status": [201],
+      "response_required_keys": ["created", "updated"]
+    }
+  }
+}
