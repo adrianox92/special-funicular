@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
@@ -60,16 +60,16 @@ const Profile = () => {
 
   const isLicenseAdmin = isLicenseAdminUser(user);
 
-  const fetchKeyList = async () => {
+  const fetchKeyList = useCallback(async () => {
     try {
       const { data } = await api.get('/api-keys');
       setExtraKeys(Array.isArray(data?.keys) ? data.keys : []);
     } catch {
       setExtraKeys([]);
     }
-  };
+  }, []);
 
-  const fetchApiKey = async () => {
+  const fetchApiKey = useCallback(async () => {
     try {
       setError(null);
       const { data } = await api.get('/api-keys/me');
@@ -83,11 +83,11 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchKeyList]);
 
   useEffect(() => {
     fetchApiKey();
-  }, []);
+  }, [fetchApiKey]);
 
   const fetchPilotProfile = async () => {
     setPilotLoading(true);
