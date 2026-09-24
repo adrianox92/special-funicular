@@ -260,8 +260,54 @@ async function consumeInventoryStock(supabase, { userId, partId, itemId, qty }) 
   };
 }
 
+const INVENTORY_CREATED_AT_ZERO_NOTICE =
+  'La pieza se ha creado en el inventario con stock 0. Puedes añadir más stock más adelante desde la sección Inventario.';
+
+function optionalNonNegativePrice(val) {
+  if (val == null || val === '') return null;
+  const n = Number(val);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+/**
+ * Alta de una línea de inventario a stock 0 cuando la pieza aún no tiene cajón.
+ * No descuenta ni altera líneas existentes.
+ * @returns {Promise<{ ok: true, item: object } | { ok: false, error: string }>}
+ */
+async function createZeroStockInventoryItem(supabase, { userId, part, purchasePrice }) {
+  if (!part?.id || !part?.name) {
+    return { ok: false, error: 'No se pudo crear la pieza en inventario' };
+  }
+  const row = {
+    user_id: userId,
+    part_id: part.id,
+    name: part.name,
+    reference: part.reference ?? null,
+    url: part.url ?? null,
+    category: part.category || 'otro',
+    quantity: 0,
+    unit: 'uds',
+    purchase_price: optionalNonNegativePrice(purchasePrice),
+    manufacturer: part.manufacturer ?? null,
+    material: part.material ?? null,
+    size: part.size ?? null,
+    color: part.color ?? null,
+    teeth: part.teeth ?? null,
+    rpm: part.rpm ?? null,
+    gaus: part.gaus ?? null,
+    description: part.description ?? null,
+    notes: 'Creada desde la ficha del coche con stock 0',
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase.from('inventory_items').insert([row]).select('*').single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, item: data };
+}
+
 module.exports = {
   insufficientStockMessage,
+  INVENTORY_CREATED_AT_ZERO_NOTICE,
   deductInventoryQuantity,
   restoreInventoryQuantity,
   getPartStock,
@@ -269,4 +315,5 @@ module.exports = {
   restoreStockDeductions,
   restorePartStockDeductions,
   consumeInventoryStock,
+  createZeroStockInventoryItem,
 };

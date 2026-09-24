@@ -57,6 +57,7 @@ export default function VehicleSpecsTab({ isModificationTab = false }) {
     openInventoryPicker,
     clearInventoryLink,
     matchedPart,
+    inventoryPresence,
     deductFromInventory,
     setDeductFromInventory,
     handleSpecChange,
@@ -155,6 +156,12 @@ export default function VehicleSpecsTab({ isModificationTab = false }) {
             </div>
             <p className="text-xs text-muted-foreground">{t('edit.specs.deductFromInventoryHint')}</p>
           </AlertDescription>
+        </Alert>
+      )}
+      {isModificationTab && !editingSpec && !fromInventory && inventoryPresence === 'missing' && deductFromInventory !== false && (
+        <Alert>
+          <Info className="size-4 shrink-0" aria-hidden />
+          <AlertDescription>{t('edit.specs.willCreateInventoryZero')}</AlertDescription>
         </Alert>
       )}
       <form onSubmit={e => handleAddSpec(e, isModificationTab)}>

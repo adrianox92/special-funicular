@@ -181,6 +181,7 @@
       "stockMatchAlert": "Hay {{count}} {{unit}} de «{{name}}» en el inventario.",
       "deductFromInventory": "Descontar del inventario",
       "deductFromInventoryHint": "Si está activo, se restarán las unidades montadas del stock de esta pieza. En la especificación de serie viene desactivado porque la pieza suele venir de fábrica.",
+      "willCreateInventoryZero": "Esta referencia no está en el inventario. Al guardar, la pieza se creará con stock 0. Podrás añadir más stock más adelante desde la sección Inventario.",
       "modHistoryHint": "Al guardar, el componente actual quedará registrado en el historial con la fecha indicada (si cambias algún dato respecto al que había). Puedes revisar los valores anteriores en esta misma pestaña y en el detalle del vehículo.",
       "changeDate": "Fecha del cambio",
       "componentType": "Tipo de Componente",
@@ -282,6 +283,7 @@
       "modDeletedInventory": "Modificación eliminada y pieza añadida al inventario",
       "mountedAndDeducted": "Pieza montada y stock actualizado",
       "specCreated": "Pieza registrada en el vehículo",
+      "specCreatedInventoryZero": "Modificación guardada. La pieza se ha creado en el inventario con stock 0. Puedes añadir más stock más adelante desde la sección Inventario.",
       "specCreatedPartialDeduct": "Pieza registrada. Se descontaron {{deducted}} de {{requested}} ud(s) (stock insuficiente)."
     },
     "notices": {
