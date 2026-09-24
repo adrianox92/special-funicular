@@ -4,15 +4,18 @@
   "critical": true,
   "evidence": "A",
   "source": {
-    "server": ["backend/routes/syncCompetitions.js", "backend/README_COMPETITIONS.md"]
+    "server": [
+      "backend/routes/syncCompetitions.js",
+      "backend/README_COMPETITIONS.md"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
   },
   "request": {
     "method": "POST",
     "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555/participants",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "Content-Type": "application/json",
-      "X-Client-App": "slot-race-manager"
+      "Content-Type": "application/json"
     },
     "query": {},
     "body": {
@@ -33,7 +36,9 @@
   },
   "expect": {
     "status": 201,
-    "response_required_keys": ["participants"],
+    "response_required_keys": [
+      "participants"
+    ],
     "example_response": {
       "participants": [
         {

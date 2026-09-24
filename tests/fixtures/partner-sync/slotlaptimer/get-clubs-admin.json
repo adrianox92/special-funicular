@@ -2,23 +2,30 @@
   "id": "slotlaptimer-get-clubs-admin",
   "client": "slotlaptimer",
   "critical": false,
-  "evidence": "C",
+  "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js"]
+    "server": [
+      "backend/routes/sync.js"
+    ],
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts"
   },
   "request": {
     "method": "GET",
     "path": "/api/sync/clubs/admin",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "X-Client-App": "lap-timer"
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
     },
     "query": {},
     "body": null
   },
   "expect": {
     "status": 200,
-    "response_required_keys": ["clubs"],
+    "response_required_keys": [
+      "clubs"
+    ],
     "example_response": {
       "clubs": [
         {

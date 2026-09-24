@@ -145,6 +145,17 @@ describe('partner-sync contract fixtures (P0, no runtime hit)', () => {
 
     expect(fixture.request.headers['X-API-Key']).toEqual(expect.any(String));
     expect(fixture.request.headers['X-API-Key'].length).toBeGreaterThan(8);
+    expect(fixture.request.headers['Content-Type']).toBe('application/json');
+
+    if (fixture.client === 'slotlaptimer') {
+      expect(fixture.request.headers['X-Client-App']).toBe('lap-timer');
+      expect(fixture.request.headers['X-Client-Version']).toEqual(expect.any(String));
+      expect(fixture.evidence).toBe('A');
+    }
+    if (fixture.client === 'ds200-manager') {
+      expect(fixture.request.headers['X-Client-App']).toBeUndefined();
+      expect(fixture.request.headers['X-Client-Version']).toBeUndefined();
+    }
 
     const key = routeKey(fixture.request.method, fixture.request.path);
     const endpoint = rules.endpoints[key];
@@ -222,7 +233,31 @@ describe('partner-sync contract fixtures (P0, no runtime hit)', () => {
         expect(Number.isInteger(t.round_number)).toBe(true);
         expect(t.round_number).toBeGreaterThanOrEqual(1);
         expect(uuidRe.test(t.participant_id)).toBe(true);
+        if (fixture.client === 'ds200-manager') {
+          expect(t.driver).toBeUndefined();
+        }
       }
+    }
+
+    const lapTimes = fixture.request.body?.lap_times
+      || (Array.isArray(fixture.request.body?.timings)
+        ? fixture.request.body.timings.flatMap((t) => t.lap_times || [])
+        : []);
+    for (const lap of lapTimes) {
+      expect(lap).toEqual(
+        expect.objectContaining({
+          lap_number: expect.any(Number),
+          time_seconds: expect.any(Number),
+          time_text: expect.any(String),
+        }),
+      );
+    }
+
+    if (rel === 'slotlaptimer/post-guest-timings.json') {
+      expect(fixture.request.body.laps).toBeDefined();
+    }
+    if (rel === 'slotlaptimer/get-timings-baseline.json') {
+      expect(fixture.request.query.session_type).toBeTruthy();
     }
 
     walkTimeFields(fixture.request.body, timeRe, (bad) => {

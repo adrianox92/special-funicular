@@ -4,16 +4,20 @@
   "critical": true,
   "evidence": "A",
   "source": {
-    "server": ["backend/routes/syncCompetitions.js", "backend/README_COMPETITIONS.md"],
-    "client_file_cited": "ds200-manager/src/core/syncService.js"
+    "client": "adrianox92/ds200-manager/src/core/syncService.js",
+    "builders": [
+      "buildCompetitionSyncTimingRows"
+    ],
+    "server": [
+      "backend/routes/syncCompetitions.js"
+    ]
   },
   "request": {
     "method": "POST",
     "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555/timings",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "Content-Type": "application/json",
-      "X-Client-App": "slot-race-manager"
+      "Content-Type": "application/json"
     },
     "query": {},
     "body": {
@@ -25,23 +29,20 @@
           "total_time": "01:22.100",
           "laps": 10,
           "lane": "1",
-          "driver": "Ada",
           "timing_date": "2026-09-24",
           "best_lap_timestamp": 8.21,
           "total_time_timestamp": 82.1,
-          "circuit_id": "22222222-2222-4222-8222-222222222222",
-          "lap_times": [
-            { "lap_number": 1, "time_seconds": 8.3 },
-            { "lap_number": 2, "time_seconds": 8.21 },
-            { "lap_number": 3, "time_seconds": 8.25 }
-          ]
+          "penalty_seconds": 0
         }
       ]
     }
   },
   "expect": {
     "status": 201,
-    "response_required_keys": ["created", "updated"],
+    "response_required_keys": [
+      "created",
+      "updated"
+    ],
     "example_response": {
       "created": [
         {
@@ -58,5 +59,5 @@
       "updated": []
     }
   },
-  "notes": "Client comment cited in README_COMPETITIONS.md maps heat_number → round_number before POST. Server does not accept heat_number. average_time is derived server-side; mm:ss.mmm must match /^(\\d{2}):(\\d{2})\\.(\\d{3})$/. If participant.vehicle_id is set, a personal HEAT copy is attempted (recorded_from hardcoded lap_timer — see inventory §5)."
+  "notes": "buildCompetitionSyncTimingRows emits round_number (= heat number already mapped). No driver, no heat_number, no lap_times on this builder. penalty_seconds is optional. Server derives average_time."
 }

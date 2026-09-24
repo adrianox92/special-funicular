@@ -4,15 +4,18 @@
   "critical": true,
   "evidence": "A",
   "source": {
-    "server": ["backend/routes/syncCompetitions.js", "backend/README_COMPETITIONS.md"]
+    "server": [
+      "backend/routes/syncCompetitions.js",
+      "backend/README_COMPETITIONS.md"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
   },
   "request": {
     "method": "PUT",
     "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "Content-Type": "application/json",
-      "X-Client-App": "slot-race-manager"
+      "Content-Type": "application/json"
     },
     "query": {},
     "body": {
@@ -22,7 +25,10 @@
   },
   "expect": {
     "status": 200,
-    "response_required_keys": ["id", "name"],
+    "response_required_keys": [
+      "id",
+      "name"
+    ],
     "example_response": {
       "id": "55555555-5555-4555-8555-555555555555",
       "name": "Copa club",

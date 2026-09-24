@@ -4,8 +4,12 @@
   "critical": true,
   "evidence": "A",
   "source": {
-    "server": ["backend/middleware/apiKeyAuth.js"],
-    "docs": ["docs/API_SYNC_INTEGRATION.md"]
+    "server": [
+      "backend/middleware/apiKeyAuth.js"
+    ],
+    "docs": [
+      "docs/API_SYNC_INTEGRATION.md"
+    ]
   },
   "request": {
     "method": "GET",
@@ -16,7 +20,9 @@
   },
   "expect": {
     "status": 401,
-    "response_required_keys": ["error"],
+    "response_required_keys": [
+      "error"
+    ],
     "example_response": {
       "error": "No se proporcionó API key. Usa el header X-API-Key."
     }

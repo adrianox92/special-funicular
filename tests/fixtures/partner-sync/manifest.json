@@ -1,14 +1,21 @@
 {
-  "version": "p0",
+  "version": "p0.1",
   "api_prefix": "/api/sync",
   "auth_header": "X-API-Key",
-  "notes": "Internal regression fixtures. Do not cite client names in public Developers copy.",
+  "source_captured_at": "2026-09-24",
+  "notes": "Internal regression fixtures from client source (api.ts / syncService.js). Do not cite client names in public Developers copy.",
   "clients": {
     "slotlaptimer": {
       "internal_name": "SlotLapTimer",
       "github": "adrianox92/SlotLapTimer",
-      "expected_client_app_header": "lap-timer",
-      "source_status": "repo_not_readable_2026-09-24",
+      "client_file": "src/services/api.ts",
+      "headers": {
+        "X-API-Key": "required",
+        "Content-Type": "application/json",
+        "X-Client-App": "lap-timer",
+        "X-Client-Version": "<APP_VERSION>"
+      },
+      "source_status": "client_source_2026-09-24",
       "fixtures": [
         "slotlaptimer/get-vehicles.json",
         "slotlaptimer/get-circuits.json",
@@ -20,18 +27,28 @@
         "slotlaptimer/get-club-circuits.json",
         "slotlaptimer/get-guest-members.json",
         "slotlaptimer/post-guest-timings.json",
-        "slotlaptimer/get-competition-detail.json"
+        "slotlaptimer/get-competitions.json",
+        "slotlaptimer/get-competition-detail.json",
+        "slotlaptimer/get-competition-progress.json",
+        "slotlaptimer/post-competition-timings.json",
+        "slotlaptimer/put-competition.json"
       ]
     },
     "ds200-manager": {
       "internal_name": "ds200-manager",
       "github": "adrianox92/ds200-manager",
-      "expected_client_app_header": "slot-race-manager",
-      "source_status": "repo_not_readable_2026-09-24",
-      "client_file_cited_in_server": "src/core/syncService.js",
+      "client_file": "src/core/syncService.js",
+      "headers": {
+        "X-API-Key": "required",
+        "Content-Type": "application/json",
+        "X-Client-App": null,
+        "X-Client-Version": null
+      },
+      "source_status": "client_source_2026-09-24",
       "fixtures": [
         "ds200-manager/get-vehicles.json",
         "ds200-manager/get-circuits.json",
+        "ds200-manager/post-circuits.json",
         "ds200-manager/post-timings-training.json",
         "ds200-manager/get-competitions.json",
         "ds200-manager/post-competition.json",
@@ -39,8 +56,7 @@
         "ds200-manager/put-competition.json",
         "ds200-manager/get-competition-progress.json",
         "ds200-manager/post-participants.json",
-        "ds200-manager/post-competition-timings.json",
-        "ds200-manager/get-clubs-admin.json"
+        "ds200-manager/post-competition-timings.json"
       ]
     }
   },
@@ -63,6 +79,18 @@
       "method": "POST",
       "path": "/api/sync/clubs/:id/guest-members/:guestId/timings",
       "fixture": "slotlaptimer/post-guest-timings.json"
+    },
+    {
+      "client": "slotlaptimer",
+      "method": "POST",
+      "path": "/api/sync/competitions/:id/timings",
+      "fixture": "slotlaptimer/post-competition-timings.json"
+    },
+    {
+      "client": "ds200-manager",
+      "method": "POST",
+      "path": "/api/sync/timings",
+      "fixture": "ds200-manager/post-timings-training.json"
     },
     {
       "client": "ds200-manager",

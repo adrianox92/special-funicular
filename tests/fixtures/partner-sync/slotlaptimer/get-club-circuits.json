@@ -2,23 +2,30 @@
   "id": "slotlaptimer-get-club-circuits",
   "client": "slotlaptimer",
   "critical": false,
-  "evidence": "C",
+  "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js"]
+    "server": [
+      "backend/routes/sync.js"
+    ],
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts"
   },
   "request": {
     "method": "GET",
     "path": "/api/sync/clubs/33333333-3333-4333-8333-333333333333/circuits",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "X-Client-App": "lap-timer"
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
     },
     "query": {},
     "body": null
   },
   "expect": {
     "status": 200,
-    "response_required_keys": ["circuits"],
+    "response_required_keys": [
+      "circuits"
+    ],
     "example_response": {
       "circuits": [
         {
@@ -26,7 +33,12 @@
           "name": "Pista club",
           "description": null,
           "num_lanes": 4,
-          "lane_lengths": [11.2, 11.4, 11.6, 11.8]
+          "lane_lengths": [
+            11.2,
+            11.4,
+            11.6,
+            11.8
+          ]
         }
       ]
     }

@@ -2,18 +2,24 @@
   "id": "ds200-manager-post-timings-training",
   "client": "ds200-manager",
   "critical": true,
-  "evidence": "B",
+  "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js", "backend/lib/vehicleTimingInsert.js"],
-    "product_ui": ["frontend/src/pages/SlotRaceManagerPage.jsx"]
+    "client": "adrianox92/ds200-manager/src/core/syncService.js",
+    "builders": [
+      "buildTimingPayload",
+      "pushTiming"
+    ],
+    "server": [
+      "backend/routes/sync.js",
+      "backend/lib/vehicleTimingInsert.js"
+    ]
   },
   "request": {
     "method": "POST",
     "path": "/api/sync/timings",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "Content-Type": "application/json",
-      "X-Client-App": "slot-race-manager"
+      "Content-Type": "application/json"
     },
     "query": {},
     "body": {
@@ -24,15 +30,30 @@
       "average_time": "00:08.210",
       "lane": "1",
       "circuit_id": "22222222-2222-4222-8222-222222222222",
+      "circuit": "Pista club",
       "timing_date": "2026-09-24",
       "session_type": "TRAINING",
       "best_lap_timestamp": 8.21,
       "total_time_timestamp": 82.1,
       "average_time_timestamp": 8.21,
+      "supply_voltage_volts": 12.5,
+      "reaction_time_ms": 180,
       "lap_times": [
-        { "lap_number": 1, "time_seconds": 8.3 },
-        { "lap_number": 2, "time_seconds": 8.21 },
-        { "lap_number": 3, "time_seconds": 8.25 }
+        {
+          "lap_number": 1,
+          "time_seconds": 8.3,
+          "time_text": "00:08.300"
+        },
+        {
+          "lap_number": 2,
+          "time_seconds": 8.21,
+          "time_text": "00:08.210"
+        },
+        {
+          "lap_number": 3,
+          "time_seconds": 8.25,
+          "time_text": "00:08.250"
+        }
       ]
     }
   },
@@ -55,7 +76,7 @@
       "laps": 10,
       "average_time": "00:08.210",
       "session_type": "TRAINING",
-      "recorded_from": "slot_race_manager",
+      "recorded_from": "web",
       "sync_meta": {
         "previous_best_lap_seconds": 8.4,
         "delta_vs_pb_seconds": -0.19,
@@ -63,5 +84,5 @@
       }
     }
   },
-  "notes": "Inferred from Slot Race Manager marketing (training sessions uploaded with per-lap detail). Same required fields as garage POST. Not proven in client source."
+  "notes": "buildTimingPayload + pushTiming confirmed. Client does not send X-Client-App, so recorded_from defaults to web unless the body sets recorded_from. lap_times shape is {lap_number, time_seconds, time_text}."
 }

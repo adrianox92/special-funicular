@@ -2,16 +2,22 @@
   "id": "slotlaptimer-get-vehicles",
   "client": "slotlaptimer",
   "critical": false,
-  "evidence": "C",
+  "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js"],
-    "docs": ["docs/API_SYNC_INTEGRATION.md"]
+    "server": [
+      "backend/routes/sync.js"
+    ],
+    "docs": [
+      "docs/API_SYNC_INTEGRATION.md"
+    ],
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts"
   },
   "request": {
     "method": "GET",
     "path": "/api/sync/vehicles",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json",
       "X-Client-App": "lap-timer",
       "X-Client-Version": "1.0.0"
     },
@@ -23,7 +29,10 @@
   },
   "expect": {
     "status": 200,
-    "response_required_keys": ["vehicles", "pagination"],
+    "response_required_keys": [
+      "vehicles",
+      "pagination"
+    ],
     "example_response": {
       "vehicles": [
         {

@@ -2,23 +2,31 @@
   "id": "slotlaptimer-get-guest-members",
   "client": "slotlaptimer",
   "critical": false,
-  "evidence": "C",
+  "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js", "backend/lib/clubGuestMembers.js"]
+    "server": [
+      "backend/routes/sync.js",
+      "backend/lib/clubGuestMembers.js"
+    ],
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts"
   },
   "request": {
     "method": "GET",
     "path": "/api/sync/clubs/33333333-3333-4333-8333-333333333333/guest-members",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "X-Client-App": "lap-timer"
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
     },
     "query": {},
     "body": null
   },
   "expect": {
     "status": 200,
-    "response_required_keys": ["guest_members"],
+    "response_required_keys": [
+      "guest_members"
+    ],
     "example_response": {
       "guest_members": [
         {

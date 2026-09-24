@@ -1,0 +1,41 @@
+{
+  "id": "slotlaptimer-put-competition",
+  "client": "slotlaptimer",
+  "critical": false,
+  "evidence": "A",
+  "source": {
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts",
+    "server": [
+      "backend/routes/syncCompetitions.js"
+    ]
+  },
+  "request": {
+    "method": "PUT",
+    "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
+    },
+    "query": {},
+    "body": {
+      "external_status": "FINISHED",
+      "status": "closed"
+    }
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": [
+      "id",
+      "name"
+    ],
+    "example_response": {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Copa club",
+      "external_status": "FINISHED",
+      "status": "closed"
+    }
+  },
+  "notes": "api.ts PUT body is { external_status, status? }. status must be 'closed' if sent. Server also accepts updated_at (conflict 409); this client builder does not send it."
+}

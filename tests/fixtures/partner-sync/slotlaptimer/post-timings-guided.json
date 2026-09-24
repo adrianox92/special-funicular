@@ -2,14 +2,14 @@
   "id": "slotlaptimer-post-timings-guided",
   "client": "slotlaptimer",
   "critical": true,
-  "evidence": "B",
+  "evidence": "A",
   "source": {
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts",
     "server": [
       "backend/routes/sync.js",
       "backend/lib/vehicleTimingInsert.js",
       "backend/lib/guidedSessionParse.js"
-    ],
-    "docs": ["docs/API_SYNC_INTEGRATION.md"]
+    ]
   },
   "request": {
     "method": "POST",
@@ -17,7 +17,8 @@
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
       "Content-Type": "application/json",
-      "X-Client-App": "lap-timer"
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
     },
     "query": {},
     "body": {
@@ -31,12 +32,25 @@
       "timing_date": "2026-09-24",
       "session_type": "TRAINING",
       "best_lap_timestamp": 12.1,
-      "total_time_timestamp": 185.0,
+      "total_time_timestamp": 185,
       "average_time_timestamp": 12.333,
+      "supply_voltage_volts": 13,
       "lap_times": [
-        { "lap_number": 1, "time_seconds": 12.4 },
-        { "lap_number": 2, "time_seconds": 12.2 },
-        { "lap_number": 3, "time_seconds": 12.1 }
+        {
+          "lap_number": 1,
+          "time_seconds": 12.4,
+          "time_text": "00:12.400"
+        },
+        {
+          "lap_number": 2,
+          "time_seconds": 12.2,
+          "time_text": "00:12.200"
+        },
+        {
+          "lap_number": 3,
+          "time_seconds": 12.1,
+          "time_text": "00:12.100"
+        }
       ],
       "guided_session": {
         "baseline_lap_seconds": 12.345,
@@ -81,5 +95,5 @@
       }
     }
   },
-  "notes": "Guided + per-lap shape the server accepts (snake_case). Aliases camelCase / lap_time_seconds are also valid. Live capture must confirm which alias the app sends."
+  "notes": "TimingPayload from api.ts including guided_session and lap_times {lap_number, time_seconds, time_text}."
 }

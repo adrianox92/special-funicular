@@ -23,7 +23,7 @@
     },
     "GET /api/sync/timings": {
       "query_required": ["vehicle_id"],
-      "query_optional": ["circuit_id", "lane", "limit"],
+      "query_optional": ["circuit_id", "lane", "limit", "session_type"],
       "response_required_keys": ["timings", "meta"],
       "timing_keys": [
         "id",

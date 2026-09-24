@@ -4,7 +4,11 @@
   "critical": true,
   "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js", "backend/lib/clubGuestMembers.js"]
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts",
+    "server": [
+      "backend/routes/sync.js",
+      "backend/lib/clubGuestMembers.js"
+    ]
   },
   "request": {
     "method": "POST",
@@ -12,14 +16,15 @@
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
       "Content-Type": "application/json",
-      "X-Client-App": "lap-timer"
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
     },
     "query": {},
     "body": {
       "circuit_id": "22222222-2222-4222-8222-222222222222",
       "best_lap_time": "00:11.987",
-      "best_lap_timestamp": 11.987,
       "laps": 12,
+      "best_lap_timestamp": 11.987,
       "lane": "2",
       "timing_date": "2026-09-24",
       "vehicle_id": "11111111-1111-4111-8111-111111111111"
@@ -49,5 +54,5 @@
       "source": "app"
     }
   },
-  "notes": "sync.js attributes this path to Slot Lap Timer. Does NOT require total_time or average_time. circuit_id is mandatory and must be a club circuit."
+  "notes": "GuestMemberTimingPayload requires circuit_id, best_lap_time, laps. Server only requires circuit_id + best_lap_time. Optional vehicle fields."
 }

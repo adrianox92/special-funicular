@@ -4,8 +4,14 @@
   "critical": true,
   "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js", "backend/lib/vehicleTimingInsert.js"],
-    "docs": ["docs/API_SYNC_INTEGRATION.md"]
+    "server": [
+      "backend/routes/sync.js",
+      "backend/lib/vehicleTimingInsert.js"
+    ],
+    "docs": [
+      "docs/API_SYNC_INTEGRATION.md"
+    ],
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts"
   },
   "request": {
     "method": "POST",
@@ -59,5 +65,5 @@
       }
     }
   },
-  "notes": "Minimal garage session plus the fields the deep-link flow already has (vehicle_id, circuit_id, lane). X-Client-App inferred from clientApp.js map; live capture must confirm the header."
+  "notes": "TimingPayload minimum from api.ts. Headers include confirmed X-Client-App: lap-timer and X-Client-Version."
 }

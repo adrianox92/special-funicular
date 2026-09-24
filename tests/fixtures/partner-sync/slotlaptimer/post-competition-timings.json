@@ -1,0 +1,79 @@
+{
+  "id": "slotlaptimer-post-competition-timings",
+  "client": "slotlaptimer",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts",
+    "server": [
+      "backend/routes/syncCompetitions.js"
+    ]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555/timings",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
+    },
+    "query": {},
+    "body": {
+      "timings": [
+        {
+          "participant_id": "66666666-6666-4666-8666-666666666666",
+          "round_number": 1,
+          "best_lap_time": "00:12.100",
+          "total_time": "03:05.000",
+          "laps": 15,
+          "average_time": "00:12.333",
+          "lane": "1",
+          "driver": "Ada",
+          "best_lap_timestamp": 12.1,
+          "total_time_timestamp": 185,
+          "lap_times": [
+            {
+              "lap_number": 1,
+              "time_seconds": 12.4,
+              "time_text": "00:12.400"
+            },
+            {
+              "lap_number": 2,
+              "time_seconds": 12.2,
+              "time_text": "00:12.200"
+            },
+            {
+              "lap_number": 3,
+              "time_seconds": 12.1,
+              "time_text": "00:12.100"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "status": 201,
+    "response_required_keys": [
+      "created",
+      "updated"
+    ],
+    "example_response": {
+      "created": [
+        {
+          "id": "77777777-7777-4777-8777-777777777777",
+          "participant_id": "66666666-6666-4666-8666-666666666666",
+          "round_number": 1,
+          "best_lap_time": "00:12.100",
+          "total_time": "03:05.000",
+          "laps": 15,
+          "average_time": "00:12.333",
+          "lane": "1"
+        }
+      ],
+      "updated": []
+    }
+  },
+  "notes": "CompetitionTimingPayload from api.ts. Wire field is round_number, not heat_number. average_time is optional on the client; server derives it from total_time + laps."
+}

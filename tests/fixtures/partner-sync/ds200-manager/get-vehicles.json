@@ -2,17 +2,22 @@
   "id": "ds200-manager-get-vehicles",
   "client": "ds200-manager",
   "critical": false,
-  "evidence": "B",
+  "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js"],
-    "product_ui": ["frontend/src/pages/SlotRaceManagerPage.jsx"]
+    "server": [
+      "backend/routes/sync.js"
+    ],
+    "product_ui": [
+      "frontend/src/pages/SlotRaceManagerPage.jsx"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
   },
   "request": {
     "method": "GET",
     "path": "/api/sync/vehicles",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "X-Client-App": "slot-race-manager"
+      "Content-Type": "application/json"
     },
     "query": {
       "page": "1",
@@ -22,7 +27,10 @@
   },
   "expect": {
     "status": 200,
-    "response_required_keys": ["vehicles", "pagination"],
+    "response_required_keys": [
+      "vehicles",
+      "pagination"
+    ],
     "example_response": {
       "vehicles": [
         {

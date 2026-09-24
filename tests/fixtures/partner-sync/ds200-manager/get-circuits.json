@@ -2,23 +2,28 @@
   "id": "ds200-manager-get-circuits",
   "client": "ds200-manager",
   "critical": false,
-  "evidence": "C",
+  "evidence": "A",
   "source": {
-    "server": ["backend/routes/sync.js"]
+    "server": [
+      "backend/routes/sync.js"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
   },
   "request": {
     "method": "GET",
     "path": "/api/sync/circuits",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "X-Client-App": "slot-race-manager"
+      "Content-Type": "application/json"
     },
     "query": {},
     "body": null
   },
   "expect": {
     "status": 200,
-    "response_required_keys": ["circuits"],
+    "response_required_keys": [
+      "circuits"
+    ],
     "example_response": {
       "circuits": [
         {
@@ -26,7 +31,12 @@
           "name": "Pista club",
           "description": null,
           "num_lanes": 4,
-          "lane_lengths": [11.2, 11.4, 11.6, 11.8]
+          "lane_lengths": [
+            11.2,
+            11.4,
+            11.6,
+            11.8
+          ]
         }
       ]
     }

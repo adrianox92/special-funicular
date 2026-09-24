@@ -4,14 +4,17 @@
   "critical": false,
   "evidence": "A",
   "source": {
-    "server": ["backend/routes/syncCompetitions.js"]
+    "server": [
+      "backend/routes/syncCompetitions.js"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
   },
   "request": {
     "method": "GET",
     "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "X-Client-App": "slot-race-manager"
+      "Content-Type": "application/json"
     },
     "query": {},
     "body": null

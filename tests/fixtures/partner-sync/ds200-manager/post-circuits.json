@@ -1,27 +1,25 @@
 {
-  "id": "slotlaptimer-post-circuits",
-  "client": "slotlaptimer",
+  "id": "ds200-manager-post-circuits",
+  "client": "ds200-manager",
   "critical": false,
   "evidence": "A",
   "source": {
+    "client": "adrianox92/ds200-manager/src/core/syncService.js",
     "server": [
       "backend/routes/sync.js",
       "backend/lib/circuitResolver.js"
-    ],
-    "client": "adrianox92/SlotLapTimer/src/services/api.ts"
+    ]
   },
   "request": {
     "method": "POST",
     "path": "/api/sync/circuits",
     "headers": {
       "X-API-Key": "sc_test_fixture_not_a_secret",
-      "Content-Type": "application/json",
-      "X-Client-App": "lap-timer",
-      "X-Client-Version": "1.0.0"
+      "Content-Type": "application/json"
     },
     "query": {},
     "body": {
-      "name": "Pista casa"
+      "name": "Pista club"
     }
   },
   "expect": {
@@ -35,7 +33,7 @@
     ],
     "example_response": {
       "id": "22222222-2222-4222-8222-222222222222",
-      "name": "Pista casa",
+      "name": "Pista club",
       "description": null,
       "num_lanes": 1,
       "lane_lengths": [
@@ -44,5 +42,5 @@
       "user_id": "88888888-8888-4888-8888-888888888888"
     }
   },
-  "notes": "Returns the circuit object, not { circuit, created }. Status 200 if found, 201 if created. Omitted from API_SYNC_INTEGRATION.md."
+  "notes": "syncService.js calls POST /api/sync/circuits. Response is the circuit object, not { circuit, created }. No X-Client-App."
 }
