@@ -21,10 +21,10 @@
   },
   "auth": {
     "title": "Authentication",
-    "lead": "Every partner request uses the X-API-Key header. The key belongs to a Slot Database user: create, copy, or regenerate it in Profile. The plaintext secret is shown only when you create or regenerate it.",
+    "lead": "Every partner request uses the X-API-Key header. You can have several personal keys (create / list / revoke in Profile; at least one stays active). The plaintext secret is shown only when you create or regenerate it.",
     "personal": "Personal mode: the key acts on the owner’s garage (vehicles, circuits, and timings).",
-    "club": "Club mode: a single admin or owner key configures the venue tool. You do not need one key per member.",
-    "profileCta": "Go to Profile to manage your key"
+    "club": "Club mode: an admin/owner key or the club API key (one per club, rotated by an admin on the club page) configures the venue tool. You do not need one key per member. A club key cannot access a personal garage.",
+    "profileCta": "Go to Profile to manage your keys"
   },
   "personal": {
     "title": "Quickstart · personal mode",
@@ -39,7 +39,7 @@
   "club": {
     "title": "Quickstart · club mode",
     "lead": "One admin/owner key configures the venue. The roster is pulled from Slot Database; personal-profile attribution happens only with a vehicle_id.",
-    "step1": "The club admin or owner gets an API key in Profile.",
+    "step1": "The admin or owner gets an API key in Profile, or rotates the club API key on the club page.",
     "step2": "GET /api/sync/clubs/admin and choose the club.",
     "step3": "GET /api/sync/clubs/:id/members and GET /api/sync/clubs/:id/guest-members for the roster.",
     "step4": "Create heats, competitions, or events in your tool with those drivers.",
@@ -91,7 +91,12 @@
     "v1NoteModes": "Documented personal mode (driver key) and club mode (one admin/owner key).",
     "v1NoteMembers": "GET /api/sync/clubs/:id/members to pull the member roster.",
     "v1NoteVehicleId": "Personal-history copy requires an assigned vehicle_id.",
-    "v1NoteExternals": "External drivers without a user_id may appear in the online competition; they do not get a personal profile."
+    "v1NoteExternals": "External drivers without a user_id may appear in the online competition; they do not get a personal profile.",
+    "v11Title": "Idempotency, multiple keys, and club key",
+    "v11NoteIdempotency": "Optional Idempotency-Key header on writes: omit it to keep current behavior; the same key replays the first response.",
+    "v11NoteRateLimit": "Per-API-key limit on /api/sync/* (high enough for a race). If exceeded: 429 and Retry-After.",
+    "v11NoteMultiKey": "Multiple personal API keys: create, list, and revoke in Profile. At least one stays active. Regenerate rotates only the primary key.",
+    "v11NoteClubKey": "Club API key (one per club). An admin rotates it on the club page. It covers roster and competitions; it does not open a personal garage."
   },
   "support": {
     "title": "Contact and support",

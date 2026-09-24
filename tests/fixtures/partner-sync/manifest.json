@@ -60,7 +60,10 @@
       ]
     }
   },
-  "shared": ["shared/unauthorized-missing-key.json"],
+  "shared": [
+    "shared/unauthorized-missing-key.json",
+    "shared/post-timings-idempotency-key.json"
+  ],
   "critical_paths": [
     {
       "client": "slotlaptimer",

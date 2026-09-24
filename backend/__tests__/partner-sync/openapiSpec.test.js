@@ -107,6 +107,8 @@ describe('Slot Database API OpenAPI (P1 + P4)', () => {
     expect(spec).toContain('round_number');
     expect(spec).toContain('time_seconds');
     expect(spec).toContain('time_text');
+    expect(spec).toContain('Idempotency-Key');
+    expect(spec).toContain('RateLimited');
   });
 
   test('does not cite internal client names in public spec (D13)', () => {

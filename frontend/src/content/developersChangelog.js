@@ -5,6 +5,17 @@
  */
 export const DEVELOPERS_CHANGELOG = [
   {
+    version: '1.1.0',
+    date: '2026-09-24',
+    titleKey: 'v11Title',
+    noteKeys: [
+      'v11NoteIdempotency',
+      'v11NoteRateLimit',
+      'v11NoteMultiKey',
+      'v11NoteClubKey',
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2026-09-24',
     titleKey: 'v1Title',

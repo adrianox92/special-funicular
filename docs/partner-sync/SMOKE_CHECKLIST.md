@@ -35,6 +35,8 @@ Base: `https://slotdatabase.es` (D14: no hay staging partner). Header: `X-API-Ke
 - [ ] `POST /competitions/:id/timings` (`slotlaptimer/post-competition-timings.json`) → 201 `{ created, updated }`
 - [ ] `PUT /competitions/:id` `{ external_status }` → 200
 - [ ] Sin header → 401 `{ error }`
+- [ ] D15: `POST /timings` con `Idempotency-Key` repetida → misma 201 (no duplicar)
+- [ ] D15: 3ª+ petición con el mismo key a 600/min no debería 429 en uso normal; un techo de prueba bajo sí devuelve `429` + `Retry-After`
 
 ### ds200-manager (training + competiciones)
 

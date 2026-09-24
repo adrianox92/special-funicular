@@ -24,6 +24,7 @@ const {
   normalizeGuestTimingBody,
   enrichGuestMembersWithLinkedEmails,
 } = require('../lib/clubGuestMembers');
+const { getClubApiKeyMeta, rotateClubApiKey, isMissingTable: isMissingClubKeyTable } = require('../lib/clubApiKeys');
 
 const router = express.Router();
 
@@ -809,6 +810,66 @@ router.get('/:id/competitions', param('id').isUUID(), handleValidationErrors, as
     res.json(data || []);
   } catch (e) {
     console.error('GET /clubs/:id/competitions', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /api/clubs/:id/sync-api-key
+ * Club/station key metadata (admin/owner). Plaintext only after rotate.
+ */
+router.get('/:id/sync-api-key', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const admin = await userIsClubAdmin(req.user.id, id);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const { error, row } = await getClubApiKeyMeta(supabaseAdmin, id);
+    if (error) {
+      if (isMissingClubKeyTable(error)) {
+        return res.status(503).json({ error: 'La tabla club_api_keys no existe. Ejecuta la migración SQL en Supabase.' });
+      }
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({
+      key_exists: Boolean(row),
+      key_prefix: row?.key_prefix || null,
+      created_at: row?.created_at || null,
+      last_used_at: row?.last_used_at || null,
+    });
+  } catch (e) {
+    console.error('GET /clubs/:id/sync-api-key', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/clubs/:id/sync-api-key/rotate
+ * Create or rotate the single club/station key (v1).
+ */
+router.post('/:id/sync-api-key/rotate', param('id').isUUID(), handleValidationErrors, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const admin = await userIsClubAdmin(req.user.id, id);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const rotated = await rotateClubApiKey(supabaseAdmin, id, req.user.id);
+    if (rotated.error) {
+      if (isMissingClubKeyTable(rotated.error) || rotated.error.status === 503) {
+        return res.status(503).json({
+          error: rotated.error.message || 'La tabla club_api_keys no existe. Ejecuta la migración SQL en Supabase.',
+        });
+      }
+      return res.status(rotated.error.status || 500).json({ error: rotated.error.message || 'Error al rotar la API key del club' });
+    }
+    res.json({
+      api_key: rotated.api_key,
+      key_prefix: rotated.row.key_prefix,
+      created_at: rotated.row.created_at,
+      created: rotated.created,
+    });
+  } catch (e) {
+    console.error('POST /clubs/:id/sync-api-key/rotate', e);
     res.status(500).json({ error: e.message });
   }
 });

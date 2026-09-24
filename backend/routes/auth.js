@@ -4,6 +4,7 @@ const router = express.Router();
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { hashApiKey } = require('../lib/apiKeyHash');
 const { encryptApiKey, decryptApiKey } = require('../lib/apiKeyEncrypt');
+const { getDefaultUserApiKey, createUserApiKey } = require('../lib/userApiKeys');
 const { removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const authMiddleware = require('../middleware/auth');
 
@@ -97,11 +98,11 @@ router.post('/api-key', async (req, res) => {
 
     const userId = authData.user.id;
 
-    let { data: existing, error: fetchError } = await getSupabaseAdmin()
-      .from('user_api_keys')
-      .select('api_key_hash, api_key_enc, created_at')
-      .eq('user_id', userId)
-      .single();
+    const { key: existing, error: fetchError } = await getDefaultUserApiKey(
+      getSupabaseAdmin(),
+      userId,
+      { includeSecretCols: true },
+    );
 
     if (fetchError && fetchError.code !== 'PGRST116') {
       if (fetchError.code === '42P01') {
@@ -158,7 +159,7 @@ router.post('/api-key', async (req, res) => {
       const { data: updated, error: updateError } = await getSupabaseAdmin()
         .from('user_api_keys')
         .update({ api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc })
-        .eq('user_id', userId)
+        .eq('id', existing.id)
         .select('created_at')
         .single();
 
@@ -187,46 +188,27 @@ router.post('/api-key', async (req, res) => {
       });
     }
 
-    const apiKey = generateApiKey();
-    const apiKeyHash = hashApiKey(apiKey);
-    let apiKeyEnc;
-    try {
-      apiKeyEnc = encryptApiKey(apiKey);
-    } catch (encErr) {
-      return serverConfigErrorResponse(
-        res,
-        503,
-        encErr,
-        encErr.message || 'API_KEY_ENCRYPT_SECRET no configurada correctamente',
-      );
-    }
-
-    const { data: inserted, error: insertError } = await getSupabaseAdmin()
-      .from('user_api_keys')
-      .insert([{ user_id: userId, api_key_hash: apiKeyHash, api_key_enc: apiKeyEnc }])
-      .select('created_at')
-      .single();
-
-    if (insertError) {
-      if (insertError.code === '42P01') {
+    const created = await createUserApiKey(getSupabaseAdmin(), userId, { name: 'default' });
+    if (created.error) {
+      if (created.error.code === '42P01' || created.error.status === 503) {
         return serverConfigErrorResponse(
           res,
           503,
-          insertError,
-          'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
+          created.error.cause || created.error,
+          created.error.message || 'La tabla user_api_keys no existe. Ejecuta la migración SQL en Supabase.',
         );
       }
       return serverConfigErrorResponse(
         res,
         500,
-        insertError,
-        `Error al crear la API key: ${insertError.message}`,
+        created.error,
+        `Error al crear la API key: ${created.error.message}`,
       );
     }
 
     return res.json({
-      api_key: apiKey,
-      created_at: inserted.created_at,
+      api_key: created.api_key,
+      created_at: created.row.created_at,
       regenerated: false,
       source: 'created',
     });

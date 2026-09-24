@@ -6,20 +6,22 @@ import { SUPPORTED_LOCALES, localizePath, toOgLocale, getOgLocaleAlternates } fr
 import { LANDING_PAGE_DESCRIPTION, LANDING_PAGE_TITLE } from './landingSeo';
 import { BRAND } from './documentTitle';
 import { catalogSlugify } from './catalogSlug';
-import {
+import { cachedStorageImageUrl } from './cachedStorageImageUrl';
+
+// CJS module: named ESM imports fail in CRA production webpack ("Attempted import error").
+const {
   buildCatalogItemHeadline,
-  buildCatalogItemImageAlt as buildCatalogItemImageAltLocalized,
-  buildCatalogItemPageTitle as buildCatalogItemPageTitleLocalized,
-  buildCatalogItemMetaDescription as buildCatalogItemMetaDescriptionLocalized,
-  buildCatalogItemLeadParagraph as buildCatalogItemLeadParagraphLocalized,
-  buildCatalogItemKeywords as buildCatalogItemKeywordsLocalized,
+  buildCatalogItemImageAlt: buildCatalogItemImageAltLocalized,
+  buildCatalogItemPageTitle: buildCatalogItemPageTitleLocalized,
+  buildCatalogItemMetaDescription: buildCatalogItemMetaDescriptionLocalized,
+  buildCatalogItemLeadParagraph: buildCatalogItemLeadParagraphLocalized,
+  buildCatalogItemKeywords: buildCatalogItemKeywordsLocalized,
   buildPublicCatalogListMeta,
   buildItemJsonLd,
   seoFor,
   interpolate,
   toIsoDateModified,
-} from './catalogSeoCopy';
-import { cachedStorageImageUrl } from './cachedStorageImageUrl';
+} = require('./catalogSeoCopy');
 
 function currentLocale() {
   return i18n.language?.split('-')[0] || 'es';

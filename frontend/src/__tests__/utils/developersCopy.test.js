@@ -61,7 +61,8 @@ describe('developers i18n', () => {
   });
 
   test('changelog v1.0.0 tiene claves editables', () => {
-    expect(DEVELOPERS_CHANGELOG[0].version).toBe('1.0.0');
+    expect(DEVELOPERS_CHANGELOG.map((e) => e.version)).toEqual(expect.arrayContaining(['1.0.0', '1.1.0']));
+    expect(DEVELOPERS_CHANGELOG[0].version).toBe('1.1.0');
     DEVELOPERS_CHANGELOG.forEach((entry) => {
       expect(es.changelog[entry.titleKey]).toBeTruthy();
       entry.noteKeys.forEach((key) => {
