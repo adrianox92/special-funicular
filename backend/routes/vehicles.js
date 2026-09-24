@@ -22,6 +22,9 @@ const { insertReturnedComponentToInventory } = require('../lib/inventoryReturnFr
 const {
   consumeInventoryStock,
   restoreStockDeductions,
+  getPartStock,
+  createZeroStockInventoryItem,
+  INVENTORY_CREATED_AT_ZERO_NOTICE,
 } = require('../lib/inventoryStockOps');
 const { resolvePartId } = require('../lib/partsRegistry');
 const { parseSupplyVoltageVolts } = require('../lib/pilotProfileUtils');
@@ -1676,6 +1679,14 @@ router.post('/:id/technical-specs', async (req, res) => {
     // Crear los componentes asociados (con identidad canónica y descuento de inventario)
     let createdComponents = [];
     const allDeductions = [];
+    const createdZeroStockItemIds = [];
+    let createdInventoryAtZero = false;
+    const rollbackStockSideEffects = async () => {
+      await restoreStockDeductions(req.supabase, req.user.id, allDeductions);
+      for (const itemId of createdZeroStockItemIds) {
+        await req.supabase.from('inventory_items').delete().eq('id', itemId).eq('user_id', req.user.id);
+      }
+    };
     if (Array.isArray(components) && components.length > 0) {
       const compsToInsert = [];
       for (const c of components) {
@@ -1700,7 +1711,7 @@ router.post('/:id/technical-specs', async (req, res) => {
           description: picked.description,
         });
         if (!resolved.ok) {
-          await restoreStockDeductions(req.supabase, req.user.id, allDeductions);
+          await rollbackStockSideEffects();
           return res.status(500).json({ error: resolved.error });
         }
 
@@ -1711,21 +1722,46 @@ router.post('/:id/technical-specs', async (req, res) => {
 
         let sourceInventoryItemId = c?.source_inventory_item_id || null;
         if (wantDeduct) {
-          const consumed = await consumeInventoryStock(req.supabase, {
-            userId: req.user.id,
-            partId: resolved.part.id,
-            itemId: sourceInventoryItemId,
-            qty: mountedQty,
-          });
-          if (!consumed.ok) {
-            await restoreStockDeductions(req.supabase, req.user.id, allDeductions);
-            return res.status(consumed.status || 400).json({
-              error: consumed.error,
-              ...(consumed.code ? { code: consumed.code } : {}),
-            });
+          let missingFromInventory = false;
+          if (is_modification) {
+            const stock = await getPartStock(req.supabase, req.user.id, resolved.part.id);
+            if (!stock.ok) {
+              await rollbackStockSideEffects();
+              return res.status(500).json({ error: stock.error });
+            }
+            missingFromInventory = (stock.lines || []).length === 0;
           }
-          allDeductions.push(...consumed.deductions);
-          sourceInventoryItemId = consumed.sourceInventoryItemId || sourceInventoryItemId;
+
+          if (missingFromInventory) {
+            const createdInv = await createZeroStockInventoryItem(req.supabase, {
+              userId: req.user.id,
+              part: resolved.part,
+              purchasePrice: picked.price,
+            });
+            if (!createdInv.ok) {
+              await rollbackStockSideEffects();
+              return res.status(500).json({ error: createdInv.error });
+            }
+            createdZeroStockItemIds.push(createdInv.item.id);
+            sourceInventoryItemId = createdInv.item.id;
+            createdInventoryAtZero = true;
+          } else {
+            const consumed = await consumeInventoryStock(req.supabase, {
+              userId: req.user.id,
+              partId: resolved.part.id,
+              itemId: sourceInventoryItemId,
+              qty: mountedQty,
+            });
+            if (!consumed.ok) {
+              await rollbackStockSideEffects();
+              return res.status(consumed.status || 400).json({
+                error: consumed.error,
+                ...(consumed.code ? { code: consumed.code } : {}),
+              });
+            }
+            allDeductions.push(...consumed.deductions);
+            sourceInventoryItemId = consumed.sourceInventoryItemId || sourceInventoryItemId;
+          }
         }
 
         compsToInsert.push({
@@ -1743,7 +1779,7 @@ router.post('/:id/technical-specs', async (req, res) => {
         .insert(compsToInsert)
         .select();
       if (compsError) {
-        await restoreStockDeductions(req.supabase, req.user.id, allDeductions);
+        await rollbackStockSideEffects();
         return res.status(500).json({ error: compsError.message });
       }
       createdComponents = comps;
@@ -1756,6 +1792,12 @@ router.post('/:id/technical-specs', async (req, res) => {
     res.status(201).json({
       ...targetSpec,
       components: createdComponents,
+      ...(createdInventoryAtZero
+        ? {
+            inventory_created_at_zero: true,
+            inventory_notice: INVENTORY_CREATED_AT_ZERO_NOTICE,
+          }
+        : {}),
     });
   } catch (err) {
     console.error('Error al crear componente:', err);
