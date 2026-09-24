@@ -7,10 +7,11 @@ Nombres de cliente solo aquí / CI. No en Developers.
 
 ```bash
 cd backend && npm run test:partner-sync
-# D10 + OpenAPI: npm test -- --testPathPattern='sync-club-members|clubMembers|openapiSpec|partner-sync'
 ```
 
 Schema-checkea `tests/fixtures/partner-sync/**` contra el contrato congelado (sin pegar a prod). OpenAPI: `docs/openapi/slot-database-api.v1.yaml`.
+
+**CI (P4):** el mismo comando es obligatorio en GitHub Actions (`.github/workflows/partner-sync.yml`) en cada PR y en push a `staging`. Valida OpenAPI 3, que `/api/docs` sirva ese YAML, y que los paths `/api/sync/*` no se desvíen de `sync.js` / `syncCompetitions.js`. Detalle: `docs/partner-sync/CI.md`.
 
 - [ ] El test `contractFixtures` está verde
 - [ ] `git diff` de handlers sync está **vacío** (P0 es docs + fixtures)
