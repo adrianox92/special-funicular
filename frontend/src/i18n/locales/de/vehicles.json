@@ -181,6 +181,7 @@
       "stockMatchAlert": "Es sind {{count}} {{unit}} von «{{name}}» im Inventar.",
       "deductFromInventory": "Vom Inventar abziehen",
       "deductFromInventoryHint": "Wenn aktiv, werden die montierten Einheiten vom Bestand dieses Teils abgezogen. Bei Werksangaben bleibt das aus, weil das Teil meist ab Werk kam.",
+      "willCreateInventoryZero": "Diese Referenz ist nicht im Inventar. Beim Speichern wird das Teil mit Bestand 0 angelegt. Mehr Bestand kannst du später im Bereich Inventar hinzufügen.",
       "modHistoryHint": "Beim Speichern wird die aktuelle Komponente mit dem angegebenen Datum im Verlauf gespeichert (bei Datenänderung). Frühere Werte findest du in diesem Tab und in der Fahrzeugdetailseite.",
       "changeDate": "Änderungsdatum",
       "componentType": "Komponententyp",
@@ -282,6 +283,7 @@
       "modDeletedInventory": "Modifikation gelöscht und Teil zum Inventar hinzugefügt",
       "mountedAndDeducted": "Teil montiert und Bestand aktualisiert",
       "specCreated": "Teil am Fahrzeug erfasst",
+      "specCreatedInventoryZero": "Modifikation gespeichert. Das Teil wurde im Inventar mit Bestand 0 angelegt. Mehr Bestand kannst du später im Bereich Inventar hinzufügen.",
       "specCreatedPartialDeduct": "Teil erfasst. {{deducted}} von {{requested}} Einheit(en) abgezogen (Bestand unzureichend)."
     },
     "notices": {
