@@ -11,6 +11,7 @@ info:
 
     Contrato **as-built** de `/api/sync/*` para integradores de cronometraje y
     gestores de pista. Autenticación con API key de usuario (`X-API-Key`).
+    Obtén la key en **Perfil** (crear / copiar / regenerar).
 
     - **Modo personal:** la key actúa sobre el garaje del titular (`/vehicles`,
       `/circuits`, `/timings`).
@@ -27,7 +28,7 @@ info:
     **EN — Slot Database API (Partner Sync v1)**
 
     As-built contract for `/api/sync/*`. Authenticate with a user API key
-    (`X-API-Key`). Personal mode writes to the key owner's garage. Club mode
+    (`X-API-Key`) from **Profile** (create / copy / regenerate). Personal mode writes to the key owner's garage. Club mode
     (admin/owner key) lists club roster (`members` + `guest-members`) and
     syncs competitions. Personal-history copy requires an assigned
     `vehicle_id`. External pilots without an account are allowed online.
