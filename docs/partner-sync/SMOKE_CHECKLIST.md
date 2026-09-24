@@ -7,9 +7,10 @@ Nombres de cliente solo aquí / CI. No en Developers.
 
 ```bash
 cd backend && npm run test:partner-sync
+# D10 + OpenAPI: npm test -- --testPathPattern='sync-club-members|clubMembers|openapiSpec|partner-sync'
 ```
 
-Schema-checkea `tests/fixtures/partner-sync/**` contra el contrato congelado (sin pegar a prod).
+Schema-checkea `tests/fixtures/partner-sync/**` contra el contrato congelado (sin pegar a prod). OpenAPI: `docs/openapi/slot-database-api.v1.yaml`.
 
 - [ ] El test `contractFixtures` está verde
 - [ ] `git diff` de handlers sync está **vacío** (P0 es docs + fixtures)

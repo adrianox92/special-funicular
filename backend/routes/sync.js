@@ -341,6 +341,7 @@ const {
   normalizeGuestTimingBody,
   enrichGuestMembersWithLinkedEmails,
 } = require('../lib/clubGuestMembers');
+const { listClubAccountMembers } = require('../lib/clubMembers');
 
 async function syncUserIsClubAdmin(userId, clubId) {
   const sb = supabaseForSyncWrite();
@@ -436,6 +437,26 @@ router.get('/clubs/:id/guest-members', async (req, res) => {
     res.json({ guest_members: guests });
   } catch (error) {
     console.error('GET /api/sync/clubs/:id/guest-members', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+});
+
+/**
+ * GET /api/sync/clubs/:id/members
+ * Socios con cuenta (admin/owner). Complementa guest-members; no lo sustituye (D10).
+ */
+router.get('/clubs/:id/members', async (req, res) => {
+  try {
+    const clubId = req.params.id;
+    const sb = supabaseForSyncWrite();
+    const admin = await syncUserIsClubAdmin(req.user.id, clubId);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const result = await listClubAccountMembers(sb, clubId);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json(result.payload);
+  } catch (error) {
+    console.error('GET /api/sync/clubs/:id/members', error);
     res.status(500).json({ error: error.message || 'Error interno del servidor' });
   }
 });

@@ -39,6 +39,7 @@ function routeKey(method, rawPath) {
       /^\/api\/sync\/clubs\/[0-9a-fA-F-]{36}\/guest-members$/,
       '/api/sync/clubs/:id/guest-members',
     )
+    .replace(/^\/api\/sync\/clubs\/[0-9a-fA-F-]{36}\/members$/, '/api/sync/clubs/:id/members')
     .replace(/^\/api\/sync\/clubs\/[0-9a-fA-F-]{36}\/circuits$/, '/api/sync/clubs/:id/circuits')
     .replace(
       /^\/api\/sync\/competitions\/[0-9a-fA-F-]{36}\/progress$/,
@@ -273,12 +274,13 @@ describe('partner-sync contract fixtures (P0, no runtime hit)', () => {
     }
   });
 
-  test('does not invent D10 members endpoint', () => {
+  test('D10 members is documented but unused by current client fixtures', () => {
     for (const rel of listed) {
       const fixture = readJson(path.join(FIXTURE_ROOT, rel));
       expect(fixture.request.path).not.toMatch(/\/members$/);
     }
-    expect(rules.endpoints['GET /api/sync/clubs/:id/members']).toBeUndefined();
+    expect(rules.endpoints['GET /api/sync/clubs/:id/members']).toBeDefined();
+    expect(rules.endpoints['GET /api/sync/clubs/:id/guest-members']).toBeDefined();
   });
 
   test('allowlist stays additive-only (no surprise methods)', () => {
