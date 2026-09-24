@@ -1,0 +1,101 @@
+{
+  "seo": {
+    "title": "Slot Database API | Developers",
+    "description": "Documentación pública de Slot Database API: autenticación con X-API-Key, quickstart personal y de club, Swagger y política de compatibilidad."
+  },
+  "nav": {
+    "login": "Iniciar sesión",
+    "dashboard": "Ir al panel",
+    "profile": "Perfil"
+  },
+  "hero": {
+    "kicker": "Slot Database API",
+    "title": "Documentación para integradores",
+    "lead": "Slot Database API es el contrato público de sincronización para herramientas de cronometraje y gestores de pista. Permite listar vehículos y circuitos, registrar sesiones de tiempos y sincronizar competiciones de club sin que cada piloto tenga que usar la web.",
+    "lead2": "La API ya se usa en producción por integradores de terceros. Esta página describe el contrato estable v1: autenticación, modos de integración, atribución al historial personal y política de compatibilidad."
+  },
+  "cta": {
+    "swagger": "Abrir Swagger",
+    "openapi": "Descargar OpenAPI",
+    "getKey": "Obtener API key en Perfil"
+  },
+  "auth": {
+    "title": "Autenticación",
+    "lead": "Todas las peticiones partner usan el header X-API-Key. La clave es de un usuario de Slot Database: créala, cópiala o regenerala en Perfil. El secreto en claro solo se muestra al crear o regenerar.",
+    "personal": "Modo personal: la key actúa sobre el garaje del titular (vehículos, circuitos y timings).",
+    "club": "Modo club: una sola key de un admin u owner del club configura la herramienta del local. No hace falta una key por socio.",
+    "profileCta": "Ir a Perfil para gestionar tu key"
+  },
+  "personal": {
+    "title": "Quickstart · modo personal",
+    "lead": "Para una herramienta en casa que escribe en el garaje del piloto.",
+    "step1": "Genera tu API key en Perfil (solo visible al crear o regenerar).",
+    "step2": "Abre Swagger, pulsa Authorize e introduce la key en X-API-Key.",
+    "step3": "GET /api/sync/vehicles y elige un vehicle_id.",
+    "step4": "Opcional: GET /api/sync/circuits (o POST para find-or-create) y toma un circuit_id.",
+    "step5": "POST /api/sync/timings con el payload mínimo del spec.",
+    "step6": "Comprueba la sesión 201 en tu garaje de Slot Database."
+  },
+  "club": {
+    "title": "Quickstart · modo club",
+    "lead": "Una key de admin/owner configura el local. El roster se baja de Slot Database; la atribución al perfil personal solo ocurre con vehicle_id.",
+    "step1": "El admin u owner del club obtiene una API key en Perfil.",
+    "step2": "GET /api/sync/clubs/admin y elige el club.",
+    "step3": "GET /api/sync/clubs/:id/members y GET /api/sync/clubs/:id/guest-members para el roster.",
+    "step4": "Crea mangas, competiciones o pruebas en tu herramienta con esos pilotos.",
+    "step5": "Añade externos si hace falta (sin user_id de Slot Database).",
+    "step6": "Sincroniza competitions y timings. Solo quienes tienen vehicle_id reciben copia a historial o garaje personal."
+  },
+  "attribution": {
+    "title": "Atribución al perfil personal",
+    "lead": "Quién escribe (la key del club) no es para quién es el tiempo. La copia a historial o garaje personal exige un vehicle_id asignado. Un user_id solo no basta.",
+    "colType": "Piloto en la herramienta",
+    "colInDb": "En Slot Database",
+    "colHistory": "¿Historial personal?",
+    "memberWithVehicleType": "Socio con user_id y vehicle_id",
+    "memberWithVehicleInDb": "Participante enlazado + vehículo",
+    "memberWithVehicleHistory": "Sí",
+    "memberWithoutVehicleType": "Socio o invitado con cuenta, sin vehicle_id",
+    "memberWithoutVehicleInDb": "Participante en la prueba",
+    "memberWithoutVehicleHistory": "No (solo resultado de prueba)",
+    "guestWithVehicleType": "Invitado con linked_user_id y vehicle_id",
+    "guestWithVehicleInDb": "Guest o participante enlazado + vehículo",
+    "guestWithVehicleHistory": "Sí",
+    "externalType": "Externo sin user_id",
+    "externalInDb": "Válido en la competición online, sin perfil",
+    "externalHistory": "No"
+  },
+  "docs": {
+    "title": "Swagger y contrato",
+    "lead": "Prueba los endpoints con tu API key. El spec OpenAPI es la fuente de verdad del contrato v1.",
+    "swaggerLabel": "Swagger UI (producción)",
+    "openapiLabel": "OpenAPI YAML",
+    "localLabel": "Desarrollo local",
+    "localHint": "Si ejecutas la API en tu máquina: {{swagger}} · {{openapi}}"
+  },
+  "compat": {
+    "title": "Compatibilidad y versionado",
+    "lead": "v1 es un contrato aditivo. Los integradores pueden confiar en que no cambia en silencio.",
+    "rule1": "No se eliminan ni se renombran paths /api/sync/… estables.",
+    "rule2": "El header de autenticación sigue siendo X-API-Key.",
+    "rule3": "Un campo hoy opcional no se vuelve obligatorio sin una versión nueva.",
+    "rule4": "Las respuestas pueden añadir campos; no se quitan ni se renombran campos estables.",
+    "rule5": "Un breaking change solo llega en un path versionado nuevo o tras deprecación anunciada en este changelog."
+  },
+  "changelog": {
+    "title": "Changelog",
+    "lead": "Notas de la API pública. Editamos esta lista en cada lanzamiento.",
+    "v1Title": "Lanzamiento público de Slot Database API",
+    "v1NoteLaunch": "Portal Developers y marca pública Slot Database API.",
+    "v1NoteSwagger": "Swagger UI e OpenAPI 3 del contrato /api/sync/* en producción.",
+    "v1NoteModes": "Documentados el modo personal (key del piloto) y el modo club (una key de admin/owner).",
+    "v1NoteMembers": "GET /api/sync/clubs/:id/members para bajar el roster de socios.",
+    "v1NoteVehicleId": "La copia a historial personal requiere vehicle_id asignado.",
+    "v1NoteExternals": "Los externos sin user_id pueden figurar en la competición online; no reciben perfil personal."
+  },
+  "support": {
+    "title": "Contacto y soporte",
+    "lead": "¿Dudas de integración, el contrato o una key? Usa el mismo formulario de contacto del producto; indica que escribes como integrador.",
+    "cta": "Abrir formulario de contacto"
+  }
+}
