@@ -36,6 +36,9 @@ const Footer = () => {
             <Link to="/contacto" className={linkClass}>
               {t('footer.contact')}
             </Link>
+            <Link to="/developers" className={linkClass}>
+              {t('footer.developers')}
+            </Link>
             <Link to={localizePath(locale, '/catalogo')} className={linkClass}>
               {t('footer.catalog')}
             </Link>

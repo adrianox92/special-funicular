@@ -1,0 +1,63 @@
+{
+  "id": "ds200-manager-post-competition-timings",
+  "client": "ds200-manager",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "client": "adrianox92/ds200-manager/src/core/syncService.js",
+    "builders": [
+      "buildCompetitionSyncTimingRows"
+    ],
+    "server": [
+      "backend/routes/syncCompetitions.js"
+    ]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555/timings",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {},
+    "body": {
+      "timings": [
+        {
+          "participant_id": "66666666-6666-4666-8666-666666666666",
+          "round_number": 1,
+          "best_lap_time": "00:08.210",
+          "total_time": "01:22.100",
+          "laps": 10,
+          "lane": "1",
+          "timing_date": "2026-09-24",
+          "best_lap_timestamp": 8.21,
+          "total_time_timestamp": 82.1,
+          "penalty_seconds": 0
+        }
+      ]
+    }
+  },
+  "expect": {
+    "status": 201,
+    "response_required_keys": [
+      "created",
+      "updated"
+    ],
+    "example_response": {
+      "created": [
+        {
+          "id": "77777777-7777-4777-8777-777777777777",
+          "participant_id": "66666666-6666-4666-8666-666666666666",
+          "round_number": 1,
+          "best_lap_time": "00:08.210",
+          "total_time": "01:22.100",
+          "laps": 10,
+          "average_time": "00:08.210",
+          "lane": "1"
+        }
+      ],
+      "updated": []
+    }
+  },
+  "notes": "buildCompetitionSyncTimingRows emits round_number (= heat number already mapped). No driver, no heat_number, no lap_times on this builder. penalty_seconds is optional. Server derives average_time."
+}

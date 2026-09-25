@@ -1,0 +1,54 @@
+{
+  "id": "ds200-manager-get-vehicles",
+  "client": "ds200-manager",
+  "critical": false,
+  "evidence": "A",
+  "source": {
+    "server": [
+      "backend/routes/sync.js"
+    ],
+    "product_ui": [
+      "frontend/src/pages/SlotRaceManagerPage.jsx"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/vehicles",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {
+      "page": "1",
+      "limit": "100"
+    },
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": [
+      "vehicles",
+      "pagination"
+    ],
+    "example_response": {
+      "vehicles": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "model": "Ferrari 488",
+          "manufacturer": "Scalextric",
+          "type": "GT",
+          "traction": "RWD",
+          "image": null
+        }
+      ],
+      "pagination": {
+        "total": 1,
+        "page": 1,
+        "limit": 100,
+        "totalPages": 1
+      }
+    }
+  },
+  "notes": "Marketing: local cars are paired with web vehicles. Default server limit is 25; live capture should confirm the client's limit."
+}

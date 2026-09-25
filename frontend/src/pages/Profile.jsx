@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
@@ -18,8 +18,9 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Switch } from '../components/ui/switch';
-import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2 } from 'lucide-react';
+import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2, BookOpen, ExternalLink } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import { PARTNER_SWAGGER_PRODUCTION_URL } from '../utils/partnerApiUrls';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -34,6 +35,11 @@ const Profile = () => {
   const [success, setSuccess] = useState(null);
   const [showKey, setShowKey] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [extraKeys, setExtraKeys] = useState([]);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [newPlainKey, setNewPlainKey] = useState(null);
+  const [revokingId, setRevokingId] = useState(null);
 
   const [licenseInfo, setLicenseInfo] = useState(null);
   const [licenseLoading, setLicenseLoading] = useState(false);
@@ -54,7 +60,16 @@ const Profile = () => {
 
   const isLicenseAdmin = isLicenseAdminUser(user);
 
-  const fetchApiKey = async () => {
+  const fetchKeyList = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api-keys');
+      setExtraKeys(Array.isArray(data?.keys) ? data.keys : []);
+    } catch {
+      setExtraKeys([]);
+    }
+  }, []);
+
+  const fetchApiKey = useCallback(async () => {
     try {
       setError(null);
       const { data } = await api.get('/api-keys/me');
@@ -62,16 +77,17 @@ const Profile = () => {
       setKeyExists(!!data.key_exists);
       setKeyMessage(data.message || null);
       setCreatedAt(data.created_at);
+      await fetchKeyList();
     } catch (err) {
       setError(err.response?.data?.error || 'Error al obtener la API key');
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchKeyList]);
 
   useEffect(() => {
     fetchApiKey();
-  }, []);
+  }, [fetchApiKey]);
 
   const fetchPilotProfile = async () => {
     setPilotLoading(true);
@@ -190,10 +206,44 @@ const Profile = () => {
       setShowRegenerateConfirm(false);
       setSuccess('API key regenerada correctamente. Guarda la nueva clave de forma segura.');
       setTimeout(() => setSuccess(null), 5000);
+      await fetchKeyList();
     } catch (err) {
       setError(err.response?.data?.error || 'Error al regenerar la API key');
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handleCreateExtraKey = async () => {
+    setCreatingKey(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const { data } = await api.post('/api-keys', { name: newKeyName.trim() || undefined });
+      setNewPlainKey(data.api_key);
+      setNewKeyName('');
+      setSuccess('Nueva API key creada. Cópiala ahora; no se volverá a mostrar.');
+      await fetchKeyList();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al crear la API key');
+    } finally {
+      setCreatingKey(false);
+    }
+  };
+
+  const handleRevokeKey = async (id) => {
+    setRevokingId(id);
+    setError(null);
+    try {
+      await api.delete(`/api-keys/${id}`);
+      if (newPlainKey) setNewPlainKey(null);
+      await fetchKeyList();
+      setSuccess('API key revocada.');
+      setTimeout(() => setSuccess(null), 4000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al revocar la API key');
+    } finally {
+      setRevokingId(null);
     }
   };
 
@@ -429,6 +479,24 @@ const Profile = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/developers">
+                <BookOpen className="size-4 mr-2" />
+                Documentación para integradores
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a
+                href={PARTNER_SWAGGER_PRODUCTION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Swagger (probar API)
+                <ExternalLink className="size-3.5 ml-2 opacity-70" />
+              </a>
+            </Button>
+          </div>
           {loading ? (
             <div className="flex items-center gap-2">
               <Spinner className="size-4" />
@@ -491,8 +559,8 @@ const Profile = () => {
                 <Alert variant="destructive">
                   <AlertDescription>
                     <span className="block mb-2">
-                      ¿Regenerar la API key? La clave actual dejará de funcionar de inmediato.
-                      Asegúrate de actualizar la clave en tu otro proyecto.
+                      ¿Regenerar la API key principal? Esa clave dejará de funcionar de inmediato.
+                      Las keys adicionales no se tocan. Actualiza la clave en tu otro proyecto.
                     </span>
                     <div className="flex gap-2 mt-2">
                       <Button size="sm" variant="destructive" onClick={handleRegenerate} disabled={regenerating}>
@@ -511,6 +579,68 @@ const Profile = () => {
                   Creada el {new Date(createdAt).toLocaleString('es-ES')}
                 </p>
               )}
+
+              <div className="space-y-3 border-t pt-4">
+                <p className="text-sm font-medium">Otras API keys</p>
+                <p className="text-xs text-muted-foreground">
+                  Puedes crear keys adicionales (hasta 8 activas). Revocar no elimina la principal.
+                  Regenerar solo rota la clave principal de arriba.
+                </p>
+                {extraKeys.filter((k) => !k.revoked_at).length > 0 && (
+                  <ul className="space-y-2 text-sm">
+                    {extraKeys
+                      .filter((k) => !k.revoked_at)
+                      .map((k) => (
+                        <li
+                          key={k.id}
+                          className="flex flex-col gap-1 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div>
+                            <span className="font-medium">{k.name || 'Sin nombre'}</span>
+                            <span className="ml-2 font-mono text-xs text-muted-foreground">
+                              {k.key_prefix ? `${k.key_prefix}…` : ''}
+                            </span>
+                            {k.created_at && (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {new Date(k.created_at).toLocaleDateString('es-ES')}
+                              </span>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={revokingId === k.id || extraKeys.filter((x) => !x.revoked_at).length <= 1}
+                            onClick={() => handleRevokeKey(k.id)}
+                          >
+                            {revokingId === k.id ? <Spinner className="size-4 mr-2" /> : null}
+                            Revocar
+                          </Button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+                {newPlainKey && (
+                  <Alert>
+                    <AlertDescription>
+                      <span className="block mb-2">Nueva clave (cópiala ahora):</span>
+                      <code className="block break-all rounded bg-muted px-2 py-1 text-xs">{newPlainKey}</code>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    placeholder="Nombre (opcional), ej. Pista casa"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    maxLength={80}
+                  />
+                  <Button type="button" variant="outline" onClick={handleCreateExtraKey} disabled={creatingKey}>
+                    {creatingKey ? <Spinner className="size-4 mr-2" /> : null}
+                    Crear otra key
+                  </Button>
+                </div>
+              </div>
             </>
           )}
 

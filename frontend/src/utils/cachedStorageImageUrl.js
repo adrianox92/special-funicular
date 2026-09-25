@@ -259,6 +259,7 @@ function pathSegmentsFromReq(req) {
 }
 
 module.exports = {
+  __esModule: true,
   ALLOWED_BUCKETS,
   STORAGE_PUBLIC_PREFIX,
   PROXY_PREFIX,

@@ -43,6 +43,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
 import ClubGuestMemberTimings from './ClubGuestMemberTimings';
+import ClubSyncApiKeyCard from './ClubSyncApiKeyCard';
 
 const ClubMembersPanel = ({
   clubId,
@@ -202,6 +203,7 @@ const ClubMembersPanel = ({
 
   return (
     <div className="space-y-4">
+      {clubId ? <ClubSyncApiKeyCard clubId={clubId} /> : null}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{gm('registeredTitle')}</CardTitle>

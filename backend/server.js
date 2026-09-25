@@ -37,6 +37,7 @@ if (isTelegramBotConfigured()) {
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
+const { isPartnerDocsPath } = require('./lib/partnerOpenApi');
 const {
   publicSignupLimiter,
   publicCatalogReadLimiter,
@@ -44,6 +45,7 @@ const {
   publicRefereeLimiter,
   authSoftLimiter,
   contactLimiter,
+  syncApiKeyLimiter,
 } = require('./middleware/rateLimits');
 
 const app = express();
@@ -52,10 +54,23 @@ const app = express();
 // lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR y req.ip no refleja al cliente real.
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
-  app.use(helmet());
-} else {
-  app.use(helmet({ contentSecurityPolicy: false }));
 }
+
+// Swagger UI: inline init + allow slotdatabase.es (P3) to fetch the YAML.
+// Default Helmet stays on every other route.
+app.use((req, res, next) => {
+  if (isPartnerDocsPath(req.path)) {
+    return helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })(req, res, next);
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return helmet()(req, res, next);
+  }
+  return helmet({ contentSecurityPolicy: false })(req, res, next);
+});
 
 // Configuración de CORS
 const allowedOrigins = [
@@ -79,7 +94,8 @@ const corsSyncOptions = {
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Admin-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Admin-Key', 'Idempotency-Key'],
+  exposedHeaders: ['Retry-After', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Idempotent-Replayed'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
@@ -104,6 +120,7 @@ function pickCorsOptions(path) {
   if (path.startsWith('/api/lap-timer/license')) return corsSyncOptions;
   if (path.startsWith('/api/lap-timer/promo')) return corsSyncOptions;
   if (
+    path.startsWith('/api/docs') ||
     path.startsWith('/api/sync') ||
     path === '/api/auth/api-key' ||
     path.startsWith('/api/license')
@@ -205,6 +222,8 @@ const publicRefereeRoute = require('./routes/publicReferee');
 app.use('/api/referee', publicRefereeLimiter, publicRefereeRoute);
 const publicLeaguesRoute = require('./routes/publicLeagues');
 app.use('/api/public-leagues', publicSignupLimiter, publicLeaguesRoute);
+const partnerDocsRoute = require('./routes/partnerDocs');
+app.use('/api/docs', partnerDocsRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');
@@ -238,7 +257,7 @@ app.use('/api/vehicles', vehiclesRoute);
 app.use('/api/timings', timingsRoute);
 app.use('/api/dashboard', dashboardRoute);
 app.use('/api/onboarding', onboardingRoute);
-app.use('/api/sync', syncRoute);
+app.use('/api/sync', syncApiKeyLimiter, syncRoute);
 app.use('/api/auth', authSoftLimiter, authRoute);
 // Webhook RevenueCat: montado ANTES de /api/license + apiKeyAuth.
 // Si RC apunta a /api/license/webhook (ruta habitual por error), no exige X-API-Key.

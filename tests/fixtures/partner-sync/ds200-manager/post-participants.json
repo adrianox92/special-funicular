@@ -1,0 +1,62 @@
+{
+  "id": "ds200-manager-post-participants",
+  "client": "ds200-manager",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "server": [
+      "backend/routes/syncCompetitions.js",
+      "backend/README_COMPETITIONS.md"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/sync/competitions/55555555-5555-4555-8555-555555555555/participants",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {},
+    "body": {
+      "participants": [
+        {
+          "id": "66666666-6666-4666-8666-666666666666",
+          "driver_name": "Ada",
+          "vehicle_id": "11111111-1111-4111-8111-111111111111",
+          "start_order": 1
+        },
+        {
+          "driver_name": "Bob",
+          "vehicle_model": "Externo",
+          "start_order": 2
+        }
+      ]
+    }
+  },
+  "expect": {
+    "status": 201,
+    "response_required_keys": [
+      "participants"
+    ],
+    "example_response": {
+      "participants": [
+        {
+          "id": "66666666-6666-4666-8666-666666666666",
+          "competition_id": "55555555-5555-4555-8555-555555555555",
+          "driver_name": "Ada",
+          "vehicle_id": "11111111-1111-4111-8111-111111111111",
+          "start_order": 1
+        },
+        {
+          "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "competition_id": "55555555-5555-4555-8555-555555555555",
+          "driver_name": "Bob",
+          "vehicle_model": "Externo",
+          "start_order": 2
+        }
+      ]
+    }
+  },
+  "notes": "vehicle_id XOR vehicle_model. Sending both → 400. Sending neither → vehicle_model 'Externo'. vehicle_id must belong to the API-key user. D17: external without user_id is allowed."
+}

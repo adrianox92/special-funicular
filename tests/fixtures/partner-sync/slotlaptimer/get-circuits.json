@@ -1,0 +1,47 @@
+{
+  "id": "slotlaptimer-get-circuits",
+  "client": "slotlaptimer",
+  "critical": false,
+  "evidence": "A",
+  "source": {
+    "server": [
+      "backend/routes/sync.js"
+    ],
+    "docs": [
+      "docs/API_SYNC_INTEGRATION.md"
+    ],
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/circuits",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
+    },
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": [
+      "circuits"
+    ],
+    "example_response": {
+      "circuits": [
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Pista casa",
+          "description": "2 carriles",
+          "num_lanes": 2,
+          "lane_lengths": [
+            12.5,
+            13
+          ]
+        }
+      ]
+    }
+  }
+}

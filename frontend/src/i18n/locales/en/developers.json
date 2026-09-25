@@ -1,0 +1,106 @@
+{
+  "seo": {
+    "title": "Slot Database API | Developers",
+    "description": "Public docs for Slot Database API: X-API-Key auth, personal and club quickstarts, Swagger, and compatibility policy."
+  },
+  "nav": {
+    "login": "Log in",
+    "dashboard": "Go to dashboard",
+    "profile": "Profile"
+  },
+  "hero": {
+    "kicker": "Slot Database API",
+    "title": "Documentation for integrators",
+    "lead": "Slot Database API is the public sync contract for timing tools and track managers. It lets you list vehicles and circuits, record timing sessions, and sync club competitions without every driver using the website.",
+    "lead2": "The API is already used in production by third-party integrators. This page describes the stable v1 contract: authentication, integration modes, personal-history attribution, and compatibility policy."
+  },
+  "cta": {
+    "swagger": "Open Swagger",
+    "openapi": "Download OpenAPI",
+    "getKey": "Get an API key in Profile"
+  },
+  "auth": {
+    "title": "Authentication",
+    "lead": "Every partner request uses the X-API-Key header. You can have several personal keys (create / list / revoke in Profile; at least one stays active). The plaintext secret is shown only when you create or regenerate it.",
+    "personal": "Personal mode: the key acts on the owner’s garage (vehicles, circuits, and timings).",
+    "club": "Club mode: an admin/owner key or the club API key (one per club, rotated by an admin on the club page) configures the venue tool. You do not need one key per member. A club key cannot access a personal garage.",
+    "profileCta": "Go to Profile to manage your keys"
+  },
+  "personal": {
+    "title": "Quickstart · personal mode",
+    "lead": "For a home tool that writes to the driver’s garage.",
+    "step1": "Create your API key in Profile (visible only when created or regenerated).",
+    "step2": "Open Swagger, click Authorize, and enter the key as X-API-Key.",
+    "step3": "GET /api/sync/vehicles and pick a vehicle_id.",
+    "step4": "Optional: GET /api/sync/circuits (or POST to find-or-create) and take a circuit_id.",
+    "step5": "POST /api/sync/timings with the minimum payload from the spec.",
+    "step6": "Confirm the 201 session in your Slot Database garage."
+  },
+  "club": {
+    "title": "Quickstart · club mode",
+    "lead": "One admin/owner key configures the venue. The roster is pulled from Slot Database; personal-profile attribution happens only with a vehicle_id.",
+    "step1": "The admin or owner gets an API key in Profile, or rotates the club API key on the club page.",
+    "step2": "GET /api/sync/clubs/admin and choose the club.",
+    "step3": "GET /api/sync/clubs/:id/members and GET /api/sync/clubs/:id/guest-members for the roster.",
+    "step4": "Create heats, competitions, or events in your tool with those drivers.",
+    "step5": "Add external drivers if needed (no Slot Database user_id).",
+    "step6": "Sync competitions and timings. Only drivers with a vehicle_id get a copy in their personal history or garage."
+  },
+  "attribution": {
+    "title": "Personal-profile attribution",
+    "lead": "Who writes (the club key) is not who the time belongs to. Copying into personal history or garage requires an assigned vehicle_id. A user_id alone is not enough.",
+    "colType": "Driver in the tool",
+    "colInDb": "In Slot Database",
+    "colHistory": "Personal history?",
+    "memberWithVehicleType": "Member with user_id and vehicle_id",
+    "memberWithVehicleInDb": "Linked participant + vehicle",
+    "memberWithVehicleHistory": "Yes",
+    "memberWithoutVehicleType": "Member or guest with an account, no vehicle_id",
+    "memberWithoutVehicleInDb": "Participant in the event",
+    "memberWithoutVehicleHistory": "No (event result only)",
+    "guestWithVehicleType": "Guest with linked_user_id and vehicle_id",
+    "guestWithVehicleInDb": "Linked guest or participant + vehicle",
+    "guestWithVehicleHistory": "Yes",
+    "externalType": "External driver with no user_id",
+    "externalInDb": "Allowed in the online competition, no profile",
+    "externalHistory": "No"
+  },
+  "docs": {
+    "title": "Swagger and contract",
+    "lead": "Try the endpoints with your API key. The OpenAPI spec is the source of truth for the v1 contract.",
+    "swaggerLabel": "Swagger UI (production)",
+    "openapiLabel": "OpenAPI YAML",
+    "localLabel": "Local development",
+    "localHint": "If you run the API on your machine: {{swagger}} · {{openapi}}"
+  },
+  "compat": {
+    "title": "Compatibility and versioning",
+    "lead": "v1 is an additive contract. Integrators can rely on it not changing silently.",
+    "rule1": "Stable /api/sync/… paths are not removed or renamed.",
+    "rule2": "The authentication header remains X-API-Key.",
+    "rule3": "A field that is optional today will not become required without a new version.",
+    "rule4": "Responses may add fields; stable fields are not removed or renamed.",
+    "rule5": "A breaking change only ships on a new versioned path or after a deprecation announced in this changelog."
+  },
+  "changelog": {
+    "title": "Changelog",
+    "lead": "Notes for the public API. We update this list with each release.",
+    "v1Title": "Public launch of Slot Database API",
+    "v1NoteLaunch": "Developers portal and public brand Slot Database API.",
+    "v1NoteSwagger": "Swagger UI and OpenAPI 3 for the /api/sync/* contract in production.",
+    "v1NoteModes": "Documented personal mode (driver key) and club mode (one admin/owner key).",
+    "v1NoteMembers": "GET /api/sync/clubs/:id/members to pull the member roster.",
+    "v1NoteVehicleId": "Personal-history copy requires an assigned vehicle_id.",
+    "v1NoteExternals": "External drivers without a user_id may appear in the online competition; they do not get a personal profile.",
+    "v11Title": "Idempotency, multiple keys, and club key",
+    "v11NoteIdempotency": "Optional Idempotency-Key header on writes: omit it to keep current behavior; the same key replays the first response.",
+    "v11NoteRateLimit": "Per-API-key limit on /api/sync/* (high enough for a race). If exceeded: 429 and Retry-After.",
+    "v11NoteMultiKey": "Multiple personal API keys: create, list, and revoke in Profile. At least one stays active. Regenerate rotates only the primary key.",
+    "v11NoteClubKey": "Club API key (one per club). An admin rotates it on the club page. It covers roster and competitions; it does not open a personal garage."
+  },
+  "support": {
+    "title": "Contact and support",
+    "lead": "Questions about integration, the contract, or a key? Use the same product contact form and mention that you are an integrator.",
+    "cta": "Open the contact form"
+  }
+}

@@ -28,6 +28,7 @@ export const NAMESPACES = [
   'legal',
   'presentation',
   'landing',
+  'developers',
   'meta',
   'public',
   'data',

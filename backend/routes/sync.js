@@ -2,6 +2,8 @@ const express = require('express');
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const apiKeyAuth = require('../middleware/apiKeyAuth');
 const authMiddleware = require('../middleware/auth');
+const { syncIdempotencyMiddleware } = require('../lib/syncIdempotency');
+const { enforceClubKeyScope, clubScopeClubId } = require('../lib/syncKeyScope');
 const { insertVehicleTimingFromSyncBody } = require('../lib/vehicleTimingInsert');
 const { resolveClientContext } = require('../lib/clientApp');
 const { findOrCreateCircuit } = require('../lib/circuitResolver');
@@ -37,6 +39,8 @@ router.post('/test-notification', authMiddleware, async (req, res) => {
 });
 
 router.use(apiKeyAuth);
+router.use(enforceClubKeyScope);
+router.use(syncIdempotencyMiddleware);
 
 router.use((req, res, next) => {
   if (req.method === 'GET' && req.path === '/timings') {
@@ -341,6 +345,7 @@ const {
   normalizeGuestTimingBody,
   enrichGuestMembersWithLinkedEmails,
 } = require('../lib/clubGuestMembers');
+const { listClubAccountMembers } = require('../lib/clubMembers');
 
 async function syncUserIsClubAdmin(userId, clubId) {
   const sb = supabaseForSyncWrite();
@@ -364,6 +369,15 @@ router.get('/clubs/admin', async (req, res) => {
   try {
     const sb = supabaseForSyncWrite();
     const userId = req.user.id;
+    const scopedClubId = clubScopeClubId(req);
+    if (scopedClubId) {
+      const { data: scoped } = await sb
+        .from('clubs')
+        .select('id, name, slug')
+        .eq('id', scopedClubId)
+        .maybeSingle();
+      return res.json({ clubs: scoped ? [{ id: scoped.id, name: scoped.name, slug: scoped.slug }] : [] });
+    }
 
     const { data: owned } = await sb.from('clubs').select('id, name, slug').eq('owner_user_id', userId);
     const { data: adminMemberships } = await sb
@@ -436,6 +450,26 @@ router.get('/clubs/:id/guest-members', async (req, res) => {
     res.json({ guest_members: guests });
   } catch (error) {
     console.error('GET /api/sync/clubs/:id/guest-members', error);
+    res.status(500).json({ error: error.message || 'Error interno del servidor' });
+  }
+});
+
+/**
+ * GET /api/sync/clubs/:id/members
+ * Socios con cuenta (admin/owner). Complementa guest-members; no lo sustituye (D10).
+ */
+router.get('/clubs/:id/members', async (req, res) => {
+  try {
+    const clubId = req.params.id;
+    const sb = supabaseForSyncWrite();
+    const admin = await syncUserIsClubAdmin(req.user.id, clubId);
+    if (!admin) return res.status(403).json({ error: 'Sin permiso' });
+
+    const result = await listClubAccountMembers(sb, clubId);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json(result.payload);
+  } catch (error) {
+    console.error('GET /api/sync/clubs/:id/members', error);
     res.status(500).json({ error: error.message || 'Error interno del servidor' });
   }
 });

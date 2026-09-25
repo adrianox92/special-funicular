@@ -192,5 +192,20 @@
     "save": "Guardar",
     "saving": "Guardando…",
     "delete": "Eliminar"
+  },
+  "syncApiKey": {
+    "title": "API key del club",
+    "lead": "Una clave para la estación del local: roster y competiciones, sin usar la key personal de un admin. No abre el garaje personal.",
+    "loading": "Cargando…",
+    "exists": "Clave activa ({{prefix}}). El secreto solo se muestra al crear o rotar.",
+    "missing": "Este club aún no tiene API key de estación.",
+    "create": "Crear API key del club",
+    "rotate": "Rotar API key",
+    "confirm": "¿Rotar la API key del club? La anterior dejará de funcionar de inmediato.",
+    "confirmYes": "Sí, rotar",
+    "cancel": "Cancelar",
+    "copyNow": "Copia la clave ahora. No se volverá a mostrar.",
+    "loadError": "No se pudo cargar la API key del club",
+    "rotateError": "No se pudo rotar la API key del club"
   }
 }

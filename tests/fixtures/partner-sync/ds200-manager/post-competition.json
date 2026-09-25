@@ -1,0 +1,55 @@
+{
+  "id": "ds200-manager-post-competition",
+  "client": "ds200-manager",
+  "critical": true,
+  "evidence": "A",
+  "source": {
+    "server": [
+      "backend/routes/syncCompetitions.js",
+      "backend/README_COMPETITIONS.md"
+    ],
+    "client": "adrianox92/ds200-manager/src/core/syncService.js"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/sync/competitions",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json"
+    },
+    "query": {},
+    "body": {
+      "name": "Copa club",
+      "num_slots": 8,
+      "rounds": 4,
+      "club_id": "33333333-3333-4333-8333-333333333333",
+      "circuit_id": "22222222-2222-4222-8222-222222222222",
+      "circuit_name": "Pista club",
+      "laps_per_round": 20
+    }
+  },
+  "expect": {
+    "status": 201,
+    "response_required_keys": [
+      "id",
+      "name",
+      "num_slots",
+      "rounds",
+      "public_slug",
+      "organizer"
+    ],
+    "example_response": {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Copa club",
+      "public_slug": "copa-club-a1b2c3d4",
+      "organizer": "88888888-8888-4888-8888-888888888888",
+      "num_slots": 8,
+      "rounds": 4,
+      "club_id": "33333333-3333-4333-8333-333333333333",
+      "circuit_id": "22222222-2222-4222-8222-222222222222",
+      "circuit_name": "Pista club",
+      "laps_per_round": 20
+    }
+  },
+  "notes": "Optional client-generated id (UUID) is accepted. Duplicate id → 409. Rally: rounds must cover the heat plan or later timing POST is 400."
+}

@@ -1,4 +1,5 @@
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { hashApiKey } = require('../lib/apiKeyHash');
 
 // Nota de memoria: el store in-memory de express-rate-limit expira automáticamente las
 // entradas al final de cada ventana (windowMs). Mantener ventanas ≤ 15 min para que el GC
@@ -104,6 +105,54 @@ const publicRefereeLimiter = rateLimit({
   message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
 });
 
+/**
+ * Partner Sync (`/api/sync/*`): per API key, high enough for a live race.
+ * SYNC_RATE_LIMIT_MAX=0 disables. Default 600 req / 60s.
+ */
+function getSyncRateLimitMax() {
+  const raw = process.env.SYNC_RATE_LIMIT_MAX;
+  if (raw === '0') return 0;
+  if (raw == null || raw === '') return 600;
+  const n = parseInt(String(raw), 10);
+  return Number.isFinite(n) && n >= 0 ? n : 600;
+}
+
+function syncRateLimitKey(req) {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey && typeof apiKey === 'string' && apiKey.trim()) {
+    try {
+      return `sync:${hashApiKey(apiKey)}`;
+    } catch {
+      // fall through to IP
+    }
+  }
+  return `sync-ip:${ipKeyGenerator(req.ip)}`;
+}
+
+function createSyncApiKeyLimiter(overrides = {}) {
+  const windowMs = overrides.windowMs || 60 * 1000;
+  return rateLimit({
+    windowMs,
+    max: (req, res) => {
+      const configured = overrides.max != null ? overrides.max : getSyncRateLimitMax();
+      if (configured === 0) return 10_000_000;
+      return configured;
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
+    keyGenerator: (req) => syncRateLimitKey(req),
+    skip: () => (overrides.max != null ? overrides.max === 0 : getSyncRateLimitMax() === 0),
+    handler(req, res, _next, options) {
+      const retryAfterSec = Math.max(1, Math.ceil((options.windowMs || windowMs) / 1000));
+      res.setHeader('Retry-After', String(retryAfterSec));
+      res.status(429).json({ error: 'Demasiadas solicitudes. Inténtalo más tarde.' });
+    },
+  });
+}
+
+const syncApiKeyLimiter = createSyncApiKeyLimiter();
+
 module.exports = {
   publicSignupLimiter,
   publicCatalogReadLimiter,
@@ -113,4 +162,8 @@ module.exports = {
   contactLimiter,
   helpAskLimiter,
   catalogContributionsLimiter,
+  syncApiKeyLimiter,
+  createSyncApiKeyLimiter,
+  getSyncRateLimitMax,
+  syncRateLimitKey,
 };

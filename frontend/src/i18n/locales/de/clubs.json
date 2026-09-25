@@ -192,5 +192,20 @@
     "save": "Speichern",
     "saving": "Speichern…",
     "delete": "Löschen"
+  },
+  "syncApiKey": {
+    "title": "Club-API-Key",
+    "lead": "Ein Stations-Key für den Standort: Roster und Competitions, ohne den persönlichen Admin-Key. Öffnet keine persönliche Garage.",
+    "loading": "Laden…",
+    "exists": "Aktiver Key ({{prefix}}). Der Secret erscheint nur beim Erstellen oder Rotieren.",
+    "missing": "Dieser Club hat noch keinen Stations-API-Key.",
+    "create": "Club-API-Key erstellen",
+    "rotate": "API-Key rotieren",
+    "confirm": "Club-API-Key rotieren? Der bisherige Key funktioniert sofort nicht mehr.",
+    "confirmYes": "Ja, rotieren",
+    "cancel": "Abbrechen",
+    "copyNow": "Key jetzt kopieren. Er wird nicht erneut angezeigt.",
+    "loadError": "Club-API-Key konnte nicht geladen werden",
+    "rotateError": "Club-API-Key konnte nicht rotiert werden"
   }
 }

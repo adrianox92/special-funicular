@@ -1,0 +1,46 @@
+{
+  "id": "slotlaptimer-get-competitions",
+  "client": "slotlaptimer",
+  "critical": false,
+  "evidence": "A",
+  "source": {
+    "client": "adrianox92/SlotLapTimer/src/services/api.ts",
+    "server": [
+      "backend/routes/syncCompetitions.js"
+    ]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/api/sync/competitions",
+    "headers": {
+      "X-API-Key": "sc_test_fixture_not_a_secret",
+      "Content-Type": "application/json",
+      "X-Client-App": "lap-timer",
+      "X-Client-Version": "1.0.0"
+    },
+    "query": {},
+    "body": null
+  },
+  "expect": {
+    "status": 200,
+    "response_required_keys": [
+      "competitions"
+    ],
+    "example_response": {
+      "competitions": [
+        {
+          "id": "55555555-5555-4555-8555-555555555555",
+          "name": "Copa club",
+          "num_slots": 8,
+          "rounds": 2,
+          "laps_per_round": 15,
+          "circuit_id": "22222222-2222-4222-8222-222222222222",
+          "circuit_name": "Pista club",
+          "external_status": "DRAFT",
+          "participants_count": 2
+        }
+      ]
+    }
+  },
+  "notes": "api.ts lists competitions. Path in client may be written /sync/competitions; mount is /api/sync."
+}
