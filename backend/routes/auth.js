@@ -77,26 +77,37 @@ router.post('/login', async (req, res) => {
 
 /**
  * POST /api/auth/api-key
- * Public endpoint: authenticate with email/password and return API key.
+ * Public endpoint: authenticate with email/password or a Supabase access_token
+ * and return API key.
  * Never regenerates an existing key; creates one only on first login.
  * Rows with hash-only (pre-migration) are migrated once on login.
  */
 router.post('/api-key', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Se requieren email y password' });
+    const accessToken = typeof req.body?.access_token === 'string'
+      ? req.body.access_token.trim()
+      : '';
+    let userId;
+    if (accessToken) {
+      const { data: { user }, error } = await getSupabase().auth.getUser(accessToken);
+      if (error || !user) {
+        return res.status(401).json({ error: 'Token inválido o expirado' });
+      }
+      userId = user.id;
+    } else {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Se requieren email y password' });
+      }
+      const { data: authData, error: authError } = await getSupabase().auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (authError) {
+        return res.status(401).json({ error: authError.message });
+      }
+      userId = authData.user.id;
     }
-
-    const { data: authData, error: authError } = await getSupabase().auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (authError) {
-      return res.status(401).json({ error: authError.message });
-    }
-
-    const userId = authData.user.id;
 
     const { key: existing, error: fetchError } = await getDefaultUserApiKey(
       getSupabaseAdmin(),
