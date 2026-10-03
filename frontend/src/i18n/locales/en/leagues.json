@@ -218,5 +218,28 @@
     "empty": "No participants are entered in the league.",
     "emptyHint": "Standings can also come from event results. A league entry can be marked DNS, DSQ or Adjusted.",
     "emptyImportHint": "If your events already have drivers, use “Import from competitions”."
+  },
+  "publicSignup": {
+    "notFound": "League not found",
+    "signupError": "Could not sign up",
+    "backHome": "Back to home",
+    "slots": "{{count}}/{{max}} places",
+    "participants_one": "{{count}} participant",
+    "participants_other": "{{count}} participants",
+    "waitlistCount": "Waitlist: {{count}}",
+    "closed": "This league is closed and is not accepting new entries.",
+    "name": "Driver name *",
+    "email": "Email",
+    "vehicle": "Vehicle",
+    "vehiclePlaceholder": "E.g. Porsche 911",
+    "joinWaitlist": "Join the waitlist",
+    "joinLeague": "Enter the league",
+    "confirmed": "Entry confirmed!",
+    "waitlisted": "You are on the waitlist",
+    "waitlistedBody": "You joined the waitlist for {{name}} in position {{position}}.",
+    "confirmedBody": "You entered {{name}}. You will be able to enter each event when its sign-up opens.",
+    "viewSeason": "View my season",
+    "viewStandings": "View standings",
+    "close": "Close"
   }
 }

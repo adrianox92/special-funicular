@@ -485,9 +485,9 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                 <DetailRow label={t('detail.fieldReference')} value={item.reference} mono />
                 <DetailRow label={t('detail.fieldBrand')} value={item.manufacturer} />
                 <DetailRow label={t('detail.fieldName')} value={item.model_name} />
-                <DetailRow label={t('detail.fieldType')} value={item.vehicle_type || '—'} />
-                <DetailRow label={t('detail.fieldTraction')} value={item.traction || '—'} />
-                <DetailRow label={t('detail.fieldMotor')} value={labelMotorPosition(item.motor_position)} />
+                <DetailRow label={t('detail.fieldType')} value={item.vehicle_type ? t(`values.vehicleTypes.${item.vehicle_type}`, { defaultValue: item.vehicle_type }) : '—'} />
+                <DetailRow label={t('detail.fieldTraction')} value={item.traction ? t(`values.traction.${item.traction}`, { defaultValue: item.traction }) : '—'} />
+                <DetailRow label={t('detail.fieldMotor')} value={labelMotorPosition(item.motor_position, t)} />
                 <DetailRow
                   label={t('detail.fieldYear')}
                   value={item.commercial_release_year != null ? String(item.commercial_release_year) : '—'}
@@ -683,7 +683,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                   <SelectItem value="__none__">{t('detail.noType')}</SelectItem>
                   {VEHICLE_TYPES.map((typeName) => (
                     <SelectItem key={typeName} value={typeName}>
-                      {typeName}
+                      {t(`values.vehicleTypes.${typeName}`, { defaultValue: typeName })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -703,13 +703,13 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Opcional" />
+                  <SelectValue placeholder={t('detail.optional')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">{t('detail.unspecified')}</SelectItem>
                   {MOTOR_POSITION_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {labelMotorPosition(o.value, t)}
                     </SelectItem>
                   ))}
                 </SelectContent>

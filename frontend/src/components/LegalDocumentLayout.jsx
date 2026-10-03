@@ -1,14 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
 import Footer from './Footer';
+import LanguageSelector from './LanguageSelector';
 
 /**
  * Páginas legales públicas: sin navbar principal; enlace a inicio o al panel si hay sesión.
  */
 const LegalDocumentLayout = ({ title, children }) => {
   const { user } = useAuth();
+  const { t } = useTranslation('legal');
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-muted/50 to-background">
@@ -18,13 +21,14 @@ const LegalDocumentLayout = ({ title, children }) => {
             Slot Database
           </Link>
           <div className="flex items-center gap-2">
+            <LanguageSelector size="compact" />
             {user ? (
               <Button asChild variant="outline" size="sm">
-                <Link to="/dashboard">Ir al panel</Link>
+                <Link to="/dashboard">{t('layout.goDashboard')}</Link>
               </Button>
             ) : (
               <Button asChild variant="outline" size="sm">
-                <Link to="/login">Iniciar sesión</Link>
+                <Link to="/login">{t('layout.login')}</Link>
               </Button>
             )}
           </div>

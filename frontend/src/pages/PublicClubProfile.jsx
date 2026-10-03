@@ -22,10 +22,11 @@ import ClubCircuitLeaderboard from '../components/ClubCircuitLeaderboard';
 import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
 import LeagueStatusBadge from '../components/league/LeagueStatusBadge';
 
-function formatClubDate(iso) {
+function formatClubDate(iso, locale) {
   if (!iso) return null;
   try {
-    return new Date(iso).toLocaleDateString('es-ES', {
+    const intl = locale === 'de' ? 'de-DE' : locale === 'en' ? 'en-GB' : 'es-ES';
+    return new Date(iso).toLocaleDateString(intl, {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -48,6 +49,7 @@ const pageShellClass = 'w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8';
 export default function PublicClubProfile() {
   const { slug } = useParams();
   const { t } = useTranslation('leagues');
+  const { t: tc, i18n } = useTranslation('clubs');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
@@ -70,7 +72,7 @@ export default function PublicClubProfile() {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e.response?.data?.error || 'Club no encontrado');
+          setError(e.response?.data?.error || tc('publicProfile.notFound'));
           setData(null);
         }
       } finally {
@@ -87,7 +89,7 @@ export default function PublicClubProfile() {
       <div className="flex min-h-screen flex-col">
         <div className={`flex flex-1 flex-col items-center justify-center py-24 ${pageShellClass}`}>
           <Spinner className="size-8 mb-4" />
-          <p className="text-muted-foreground">Cargando club...</p>
+          <p className="text-muted-foreground">{tc('publicProfile.loading')}</p>
         </div>
         <Footer />
       </div>
@@ -98,9 +100,9 @@ export default function PublicClubProfile() {
     return (
       <div className="flex min-h-screen flex-col">
         <div className={`${pageShellClass} flex flex-1 flex-col items-center justify-center py-16 text-center`}>
-          <p className="text-muted-foreground mb-6">{error || 'Club no encontrado'}</p>
+          <p className="text-muted-foreground mb-6">{error || tc('publicProfile.notFound')}</p>
           <Button asChild variant="outline">
-            <Link to="/">Volver al inicio</Link>
+            <Link to="/">{tc('publicProfile.backHome')}</Link>
           </Button>
         </div>
         <Footer />
@@ -139,7 +141,7 @@ export default function PublicClubProfile() {
                 className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
               >
                 <Globe className="size-4" />
-                Sitio web
+                {tc('publicProfile.website')}
               </a>
             ) : null}
           </CardHeader>
@@ -147,11 +149,11 @@ export default function PublicClubProfile() {
             {club.description ? (
               <p className="text-muted-foreground whitespace-pre-wrap">{club.description}</p>
             ) : (
-              <p className="text-muted-foreground italic">Este club aún no ha añadido una descripción pública.</p>
+              <p className="text-muted-foreground italic">{tc('publicProfile.noDescription')}</p>
             )}
             <Button className="gap-2" onClick={() => setJoinOpen(true)}>
               <Users className="size-4" />
-              Unirme al club
+              {tc('publicProfile.join')}
             </Button>
           </CardContent>
         </Card>
@@ -161,7 +163,7 @@ export default function PublicClubProfile() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Flag className="size-5" />
-                Circuitos y rankings
+                {tc('publicProfile.circuitsTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -194,14 +196,14 @@ export default function PublicClubProfile() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Megaphone className="size-5" />
-                Tablón público
+                {tc('publicProfile.boardTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="space-y-4">
                 {boardItems.map((item) => {
                   const snippet = bodySnippet(item.body);
-                  const published = formatClubDate(item.created_at);
+                  const published = formatClubDate(item.created_at, i18n.language);
                   return (
                     <li key={item.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
                       <p className="font-medium">{item.title}</p>
@@ -226,12 +228,12 @@ export default function PublicClubProfile() {
                             className="inline-flex items-center gap-2 text-primary underline-offset-4 hover:underline"
                           >
                             <FileText className="size-4 shrink-0" />
-                            {item.document_label || 'Documento'}
+                            {item.document_label || tc('publicProfile.document')}
                           </a>
                         ) : null}
                       </div>
                       {published ? (
-                        <p className="text-xs text-muted-foreground mt-2">Publicado el {published}</p>
+                        <p className="text-xs text-muted-foreground mt-2">{tc('publicProfile.publishedOn', { date: published })}</p>
                       ) : null}
                     </li>
                   );
@@ -286,12 +288,12 @@ export default function PublicClubProfile() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <CalendarDays className="size-5" />
-              Próximos eventos
+              {tc('publicProfile.upcomingEvents')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {!upcomingEvents?.length ? (
-              <p className="text-muted-foreground text-sm">No hay eventos públicos próximos.</p>
+              <p className="text-muted-foreground text-sm">{tc('publicProfile.noUpcoming')}</p>
             ) : (
               <ul className="space-y-4">
                 {upcomingEvents.map((ev) => {
@@ -321,15 +323,14 @@ export default function PublicClubProfile() {
         <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Unirme a {club.name}</DialogTitle>
+              <DialogTitle>{tc('publicProfile.joinTitle', { name: club.name })}</DialogTitle>
               <DialogDescription>
-                Para formar parte del club necesitas un enlace de invitación del administrador o que te envíen una
-                invitación por correo. Si conoces a algún miembro, contacta con ellos para obtener acceso.
+                {tc('publicProfile.joinBody')}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setJoinOpen(false)}>
-                Cerrar
+                {tc('publicProfile.close')}
               </Button>
             </DialogFooter>
           </DialogContent>

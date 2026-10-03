@@ -1,0 +1,116 @@
+{
+  "themeToggle": "Toggle theme",
+  "backHome": "Home",
+  "backHomeAria": "Back to home",
+  "goDashboard": "Go to dashboard",
+  "login": "Log in",
+  "register": "Sign up",
+  "hero": {
+    "kicker": "Desktop app for Windows",
+    "title": "Track performance, connected to your collection",
+    "lead": "Slot Race Manager connects to the DS200 timer, runs training and competitions on your computer, and can sync with Scalextric Collection so you can see your times and stats on the web after each session."
+  },
+  "badges": {
+    "desktop": "Desktop app",
+    "offline": "Works offline",
+    "ds200": "DS200 timer",
+    "localData": "Data on your PC",
+    "sync": "Web sync"
+  },
+  "cards": {
+    "timing": {
+      "title": "Track timing",
+      "blurb": "Connect the DS200 timer and record every lap with precision."
+    },
+    "training": {
+      "title": "Solo training",
+      "blurb": "One lane, live metrics, history and files you can analyse in Excel."
+    },
+    "competitions": {
+      "title": "Ranked competitions",
+      "blurb": "Rally or simultaneous, heats, standings and TV mode."
+    }
+  },
+  "ctaOpen": "Open Scalextric Collection",
+  "ctaSyncAccount": "Create an account to sync",
+  "ctaDownload": "Download (Windows)",
+  "pillars": {
+    "aria": "Slot Race Manager pillars",
+    "realtime": {
+      "title": "Real time",
+      "text": "Standings and metrics update lap by lap during a heat or a training session."
+    },
+    "offline": {
+      "title": "Offline or with a cloud copy",
+      "text": "Works without internet. If you have a Scalextric Collection account and a connection, results upload when each session or heat ends; otherwise they are stored and sent when the network returns."
+    },
+    "lights": {
+      "title": "F1-style lights",
+      "text": "Optional: connect electronic lights on a second cable and start races like in F1."
+    },
+    "pilots": {
+      "title": "Multi-driver platform",
+      "text": "Each driver links their own account and sees their times and stats on the web."
+    }
+  },
+  "features": {
+    "ds200": {
+      "title": "DS200 timing",
+      "description": "The app connects to the DS200 timer, shows live standings and stores everything on your computer.",
+      "bullets": [
+        "Millisecond times; duplicate timer readings are ignored automatically",
+        "Live standings: position, laps, total times, last lap, average, best time and gap to the leader",
+        "Adjustable minimum lap time to ignore bounce reads",
+        "You can void the last valid lap on each lane if there was a mistake",
+        "A heat can end by lap count, by time or by a timer signal"
+      ]
+    },
+    "training": {
+      "title": "Training mode",
+      "description": "A single-lane session with no target laps: stop when you want. Ideal for setup and rhythm work.",
+      "bullets": [
+        "Last lap, delta vs the previous lap and your best, average of the last five",
+        "Trend, consistency and a chart of the last fifty laps",
+        "Session history with detail and a file download for Excel analysis"
+      ]
+    },
+    "competition": {
+      "title": "Competition management",
+      "description": "Competitions with planned heats, overall and per-heat standings, and a second window for TV or projector.",
+      "bullets": [
+        "Rally and Simultaneous modes; automatic heat plan and lane rotation",
+        "Start on first crossing, countdown or optional F1 lights hardware",
+        "Optional qualifying and heat generation from times",
+        "TV window and live standings for a second monitor",
+        "Download lap lists, summaries and full data for archive or Excel"
+      ]
+    },
+    "sync": {
+      "title": "Sync with Scalextric Collection",
+      "description": "Optional: set this site’s address, the circuit and each driver’s access so times appear on their account.",
+      "bullets": [
+        "Each driver gets access by signing in with email and password from the desktop app",
+        "Local cars are paired with the cars on the web account",
+        "Heats and training sessions are sent with every lap",
+        "If there is no network, results stay pending and can be sent later in one click"
+      ]
+    }
+  },
+  "download": {
+    "title": "Download on the circuit PC",
+    "lead": "Available for Windows: recommended installer or a single-file portable build. On the circuit PC you only need to install or copy the program, connect the DS200 timer and, if you use it, the optional lights.",
+    "installerTitle": "Installer (recommended)",
+    "installerText": "Includes the usual Windows setup wizard. The easiest way to get the program ready on the circuit computer.",
+    "installerBadge": "Slot Race Manager installer",
+    "portableTitle": "Portable",
+    "portableText": "A single executable with no installer: handy for a quick try or a USB stick.",
+    "portableBadge": "Portable build (single file)",
+    "footnote": "Built for Windows. Get the installer or executable from whoever distributes Slot Race Manager; on track you only need the program installed or copied."
+  },
+  "finalCta": {
+    "title": "Turn on sync with Scalextric Collection",
+    "lead": "Create your account on this site, sign in from Slot Race Manager as a driver to link access, and pair cars and circuit so every session is reflected on your profile.",
+    "register": "Create free account",
+    "backLanding": "Back to the landing page"
+  }
+}
