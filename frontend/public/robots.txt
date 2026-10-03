@@ -1,9 +1,10 @@
 # https://www.robotstxt.org/robotstxt.html
 # Origen canónico del sitio: https://www.slotdatabase.es
+# El bloqueo real del catálogo está en servidor (UA + verificación de Googlebot).
+# robots.txt es la señal para crawlers que lo respetan; no basta por sí solo.
+
 User-agent: *
 Allow: /
-
-# Aplicación (login / paneles): sin valor para búsqueda; ahorra rastreo.
 Disallow: /dashboard
 Disallow: /login
 Disallow: /reset-password
@@ -17,5 +18,114 @@ Disallow: /profile
 Disallow: /settings
 Disallow: /help
 Disallow: /admin/
+# Catálogo de referencias: solo indexación de Google (ver grupos Googlebot* abajo).
+Disallow: /catalogo
+Disallow: /en/catalog
+Disallow: /de/katalog
+Disallow: /api/public/catalog
+Disallow: /sitemap-catalog-
+
+# Google Search y derivados de indexación (imagen, vídeo, inspección).
+# Google no fusiona grupos: hay que repetir los Disallow de la app.
+User-agent: Googlebot
+Allow: /catalogo
+Allow: /en/catalog
+Allow: /de/katalog
+Allow: /api/public/catalog
+Allow: /sitemap-catalog-
+Disallow: /dashboard
+Disallow: /login
+Disallow: /reset-password
+Disallow: /mis-sugerencias-catalogo
+Disallow: /proponer-alta-catalogo
+Disallow: /vehicles
+Disallow: /timings
+Disallow: /circuits
+Disallow: /inventory
+Disallow: /profile
+Disallow: /settings
+Disallow: /help
+Disallow: /admin/
+
+User-agent: Googlebot-Image
+Allow: /catalogo
+Allow: /en/catalog
+Allow: /de/katalog
+Allow: /api/public/catalog
+Allow: /sitemap-catalog-
+Disallow: /dashboard
+Disallow: /login
+Disallow: /reset-password
+Disallow: /mis-sugerencias-catalogo
+Disallow: /proponer-alta-catalogo
+Disallow: /vehicles
+Disallow: /timings
+Disallow: /circuits
+Disallow: /inventory
+Disallow: /profile
+Disallow: /settings
+Disallow: /help
+Disallow: /admin/
+
+User-agent: Googlebot-Video
+Allow: /catalogo
+Allow: /en/catalog
+Allow: /de/katalog
+Allow: /api/public/catalog
+Allow: /sitemap-catalog-
+Disallow: /dashboard
+Disallow: /login
+Disallow: /reset-password
+Disallow: /mis-sugerencias-catalogo
+Disallow: /proponer-alta-catalogo
+Disallow: /vehicles
+Disallow: /timings
+Disallow: /circuits
+Disallow: /inventory
+Disallow: /profile
+Disallow: /settings
+Disallow: /help
+Disallow: /admin/
+
+User-agent: Google-InspectionTool
+Allow: /catalogo
+Allow: /en/catalog
+Allow: /de/katalog
+Allow: /api/public/catalog
+Allow: /sitemap-catalog-
+Disallow: /dashboard
+Disallow: /login
+Disallow: /reset-password
+Disallow: /mis-sugerencias-catalogo
+Disallow: /proponer-alta-catalogo
+Disallow: /vehicles
+Disallow: /timings
+Disallow: /circuits
+Disallow: /inventory
+Disallow: /profile
+Disallow: /settings
+Disallow: /help
+Disallow: /admin/
+
+# Entrenamiento de Gemini / Vertex: no es indexación de Search.
+User-agent: Google-Extended
+Disallow: /catalogo
+Disallow: /en/catalog
+Disallow: /de/katalog
+Disallow: /api/public/catalog
+Disallow: /sitemap-catalog-
+
+# Vista previa al compartir un enlace (OG). No indexan el catálogo.
+User-agent: facebookexternalhit
+User-agent: Facebot
+User-agent: WhatsApp
+User-agent: Twitterbot
+User-agent: Slackbot
+User-agent: LinkedInBot
+User-agent: Discordbot
+User-agent: TelegramBot
+Allow: /catalogo
+Allow: /en/catalog
+Allow: /de/katalog
 
 Sitemap: https://www.slotdatabase.es/sitemap.xml
