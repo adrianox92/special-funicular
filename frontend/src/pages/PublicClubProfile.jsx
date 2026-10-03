@@ -82,7 +82,7 @@ export default function PublicClubProfile() {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, tc]);
 
   if (loading) {
     return (

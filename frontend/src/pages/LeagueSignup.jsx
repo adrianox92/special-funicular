@@ -53,7 +53,7 @@ const LeagueSignup = () => {
       }
     };
     load();
-  }, [slug]);
+  }, [slug, t]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
