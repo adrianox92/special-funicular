@@ -1,0 +1,218 @@
+{
+  "title": "Inventory",
+  "subtitle": {
+    "parts": "All parts: warehouse stock and units mounted on cars, consolidated by identity.",
+    "stock": "Stock lines. For more units of the same item at a different price or store, use «Restock» and check purchase history."
+  },
+  "tabs": {
+    "parts": "All parts",
+    "stock": "Stock lines"
+  },
+  "filters": {
+    "category": "Category",
+    "allCategories": "All",
+    "searchLabel": "Search (name or reference)",
+    "searchPlaceholder": "Search…",
+    "lowStockOnly": "Low stock only",
+    "onlyMounted": "Mounted on cars only"
+  },
+  "pagination": {
+    "showing": "Showing {{start}}–{{end}} of {{total}} {{unit}}",
+    "perPage": "Per page:",
+    "unitPartsOne": "part",
+    "unitPartsMany": "parts",
+    "unitItemsOne": "item",
+    "unitItemsMany": "items"
+  },
+  "empty": {
+    "partsTitle": "No parts",
+    "itemsTitle": "No items",
+    "description": "Add spare parts or adjust your search filters.",
+    "addFirst": "Add first item"
+  },
+  "actions": {
+    "newItem": "New item",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "delete": "Delete",
+    "restock": "Restock",
+    "history": "Purchase history",
+    "mount": "Mount on vehicle",
+    "edit": "Edit",
+    "editPart": "Edit part (affects inventory and cars)",
+    "duplicate": "Duplicate",
+    "savePart": "Save part"
+  },
+  "a11y": {
+    "partToolbar": "Part actions",
+    "itemToolbar": "Item actions"
+  },
+  "card": {
+    "ref": "Ref:",
+    "inStock": "In stock:",
+    "mountedQty": "Mounted:",
+    "quantity": "Quantity:",
+    "unitPrice": "Unit price:",
+    "purchase": "Purchase:",
+    "openLink": "Open link",
+    "mountedOn": "Mounted on"
+  },
+  "badges": {
+    "lowStock": "Low stock",
+    "mountedOnly": "Mounted only"
+  },
+  "list": {
+    "separatorAnd": " and ",
+    "separatorComma": ", "
+  },
+  "duplicate": {
+    "nameSuffix": " (copy)"
+  },
+  "notes": {
+    "purchasePrefix": "Purchase: {{supplier}}"
+  },
+  "units": {
+    "uds": "Units",
+    "pares": "Pairs",
+    "ml": "ml",
+    "metros": "Metres",
+    "juego": "Set"
+  },
+  "errors": {
+    "load": "Error loading inventory",
+    "save": "Error saving",
+    "delete": "Error deleting",
+    "mount": "Error mounting",
+    "restock": "Error restocking",
+    "historyLoad": "Error loading history",
+    "partSave": "Error saving part",
+    "openItem": "Could not open the inventory item."
+  },
+  "formErrors": {
+    "nameRequired": "Name is required",
+    "quantityInvalid": "Quantity must be a whole number greater than or equal to 0",
+    "teethInvalid": "Invalid teeth count",
+    "rpmInvalid": "Invalid RPM",
+    "gausInvalid": "Invalid gauss",
+    "minStockInvalid": "Invalid minimum stock",
+    "priceInvalid": "Invalid price"
+  },
+  "mountErrors": {
+    "manufacturerRequired": "Manufacturer brand is required",
+    "selectVehicle": "Select a vehicle",
+    "mountQtyMin": "Quantity to deduct must be at least 1",
+    "insufficientStock": "Not enough stock (available: {{available}})",
+    "teethRequired": "Teeth are required for pinion/crown",
+    "rpmRequired": "RPM are required for motor"
+  },
+  "restockErrors": {
+    "quantityMin": "Enter how many units you are adding (minimum 1)",
+    "supplierRequired": "Enter where you bought it (store or supplier)",
+    "purchasePriceRequired": "Enter the purchase price per unit",
+    "purchasePriceInvalid": "Invalid purchase price"
+  },
+  "toasts": {
+    "itemNotFound": "Item not found.",
+    "itemUpdated": "Item updated",
+    "itemCreated": "Item created",
+    "itemDeleted": "Item deleted",
+    "mounted": "Part mounted and stock updated",
+    "restockSuccess": "Stock updated and purchase recorded",
+    "partUpdated": "Part updated in inventory and cars",
+    "noPartHistory": "This part has no stock lines or purchase history yet."
+  },
+  "deleteDialog": {
+    "title": "Delete item?",
+    "description": "«{{name}}» will be deleted. This cannot be undone.",
+    "descriptionFallback": "This cannot be undone."
+  },
+  "mountDialog": {
+    "title": "Mount on vehicle",
+    "description": "A component will be created from «{{name}}». {{count}} {{unitWord}} will be deducted from stock ({{left}} will remain).",
+    "unitOne": "unit",
+    "unitMany": "units",
+    "vehicle": "Vehicle",
+    "selectVehicle": "Select vehicle",
+    "selectPlaceholder": "Select…",
+    "registerAsModification": "Record as modification",
+    "mountQtyLabel": "Units to deduct from inventory",
+    "mountQtyHint": "For example 2 for a pair of tyres or wheels, or 1 if you only change one.",
+    "mounting": "Mounting…",
+    "submit": "Mount and deduct"
+  },
+  "restockDialog": {
+    "title": "Restock",
+    "description": "Add units to «{{name}}». Where you bought and the price will be recorded for history.",
+    "qtyLabel": "Units added to stock",
+    "supplierLabel": "Where you bought it",
+    "supplierPlaceholder": "Store, website, supplier…",
+    "unitPriceLabel": "Purchase unit price (€)",
+    "purchaseDateLabel": "Purchase date",
+    "notesLabel": "Notes (optional)",
+    "notesPlaceholder": "Order, invoice, remarks…",
+    "saving": "Saving…",
+    "submit": "Record purchase and add stock"
+  },
+  "historyDialog": {
+    "title": "Purchase history",
+    "description": "Restocks recorded for «{{name}}».",
+    "empty": "No purchases recorded with «Restock» yet. The item’s initial purchase does not appear here unless you record it with a restock.",
+    "where": "Where:",
+    "unitPrice": "Unit price:",
+    "purchaseDate": "Purchase date:"
+  },
+  "itemDialog": {
+    "editTitle": "Edit item",
+    "newTitle": "New item",
+    "description": "One row per purchase. Category defines the part type and which technical fields apply when mounting on a vehicle.",
+    "sectionProduct": "Product",
+    "sectionStock": "Stock and purchase",
+    "sectionTech": "Technical specification",
+    "sectionTechHint": "Optional. Same information as when adding a component on the car: proposed when mounting from inventory or linking the item when editing a vehicle.",
+    "sectionLocation": "Location and notes",
+    "stockUnit": "Stock unit",
+    "namePlaceholder": "E.g. Anglewinder 26t crown",
+    "referencePlaceholder": "SKU / manufacturer ref. (optional)",
+    "urlPlaceholder": "https://… (optional)",
+    "qtyInStock": "Quantity in stock",
+    "minStockAlert": "Low stock alert",
+    "optional": "Optional",
+    "unitPriceHint": "Per unit. If you mount several on a car, the modification cost will be this price × units.",
+    "manufacturerPlaceholder": "You can leave empty and fill when mounting",
+    "teethPlaceholder": "E.g. 26",
+    "rpmPlaceholder": "E.g. 20000",
+    "techDescPlaceholder": "Part detail (not the purchase «Notes» below)",
+    "mountedVehicle": "Vehicle where mounted",
+    "none": "None",
+    "mountedVehicleHint": "Optional. Indicate if this purchase is already on a car.",
+    "purchaseNotes": "Purchase / warehouse notes",
+    "purchaseNotesPlaceholder": "Store, drawer location, reminders…",
+    "saving": "Saving…"
+  },
+  "partDialog": {
+    "title": "Edit part",
+    "description": "Changes to name, brand, reference and technical data apply to inventory lines and parts mounted on cars. Quantities and prices are not changed.",
+    "saving": "Saving…"
+  },
+  "fields": {
+    "name": "Name",
+    "category": "Category",
+    "reference": "Reference",
+    "url": "Link",
+    "quantity": "Quantity in stock",
+    "minStock": "Low stock alert",
+    "unitPrice": "Purchase unit price (€)",
+    "purchaseDate": "Purchase date",
+    "manufacturer": "Brand (manufacturer)",
+    "brand": "Brand",
+    "material": "Material",
+    "size": "Size",
+    "color": "Colour",
+    "teeth": "Teeth",
+    "rpm": "RPM",
+    "gaus": "Gauss",
+    "description": "Description",
+    "techDescription": "Technical description"
+  }
+}

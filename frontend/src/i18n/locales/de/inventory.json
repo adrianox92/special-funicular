@@ -1,0 +1,218 @@
+{
+  "title": "Inventar",
+  "subtitle": {
+    "parts": "Alle Teile: Lagerbestand und auf Fahrzeugen montierte Einheiten, nach Identität zusammengefasst.",
+    "stock": "Bestandszeilen. Für weitere Einheiten desselben Artikels mit anderem Preis oder Händler «Auffüllen» nutzen und Kaufhistorie prüfen."
+  },
+  "tabs": {
+    "parts": "Alle Teile",
+    "stock": "Bestandszeilen"
+  },
+  "filters": {
+    "category": "Kategorie",
+    "allCategories": "Alle",
+    "searchLabel": "Suchen (Name oder Referenz)",
+    "searchPlaceholder": "Suchen…",
+    "lowStockOnly": "Nur niedriger Bestand",
+    "onlyMounted": "Nur auf Fahrzeugen montiert"
+  },
+  "pagination": {
+    "showing": "{{start}}–{{end}} von {{total}} {{unit}}",
+    "perPage": "Pro Seite:",
+    "unitPartsOne": "Teil",
+    "unitPartsMany": "Teile",
+    "unitItemsOne": "Eintrag",
+    "unitItemsMany": "Einträge"
+  },
+  "empty": {
+    "partsTitle": "Keine Teile",
+    "itemsTitle": "Keine Einträge",
+    "description": "Ersatzteile hinzufügen oder Suchfilter anpassen.",
+    "addFirst": "Ersten Eintrag hinzufügen"
+  },
+  "actions": {
+    "newItem": "Neuer Eintrag",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "close": "Schließen",
+    "delete": "Löschen",
+    "restock": "Auffüllen",
+    "history": "Kaufhistorie",
+    "mount": "Auf Fahrzeug montieren",
+    "edit": "Bearbeiten",
+    "editPart": "Teil bearbeiten (betrifft Inventar und Fahrzeuge)",
+    "duplicate": "Duplizieren",
+    "savePart": "Teil speichern"
+  },
+  "a11y": {
+    "partToolbar": "Teil-Aktionen",
+    "itemToolbar": "Eintrag-Aktionen"
+  },
+  "card": {
+    "ref": "Ref.:",
+    "inStock": "Im Lager:",
+    "mountedQty": "Montiert:",
+    "quantity": "Menge:",
+    "unitPrice": "Stückpreis:",
+    "purchase": "Kauf:",
+    "openLink": "Link öffnen",
+    "mountedOn": "Montiert auf"
+  },
+  "badges": {
+    "lowStock": "Niedriger Bestand",
+    "mountedOnly": "Nur montiert"
+  },
+  "list": {
+    "separatorAnd": " und ",
+    "separatorComma": ", "
+  },
+  "duplicate": {
+    "nameSuffix": " (Kopie)"
+  },
+  "notes": {
+    "purchasePrefix": "Kauf: {{supplier}}"
+  },
+  "units": {
+    "uds": "Einheiten",
+    "pares": "Paare",
+    "ml": "ml",
+    "metros": "Meter",
+    "juego": "Satz"
+  },
+  "errors": {
+    "load": "Fehler beim Laden des Inventars",
+    "save": "Fehler beim Speichern",
+    "delete": "Fehler beim Löschen",
+    "mount": "Fehler beim Montieren",
+    "restock": "Fehler beim Auffüllen",
+    "historyLoad": "Fehler beim Laden der Historie",
+    "partSave": "Fehler beim Speichern des Teils",
+    "openItem": "Inventareintrag konnte nicht geöffnet werden."
+  },
+  "formErrors": {
+    "nameRequired": "Name ist erforderlich",
+    "quantityInvalid": "Menge muss eine ganze Zahl ≥ 0 sein",
+    "teethInvalid": "Ungültige Zähnezahl",
+    "rpmInvalid": "Ungültige RPM",
+    "gausInvalid": "Ungültiges Gauss",
+    "minStockInvalid": "Ungültiger Mindestbestand",
+    "priceInvalid": "Ungültiger Preis"
+  },
+  "mountErrors": {
+    "manufacturerRequired": "Herstellermarke ist erforderlich",
+    "selectVehicle": "Fahrzeug auswählen",
+    "mountQtyMin": "Abzuziehende Menge muss mindestens 1 sein",
+    "insufficientStock": "Nicht genug Bestand (verfügbar: {{available}})",
+    "teethRequired": "Zähne sind für Ritzel/Krone erforderlich",
+    "rpmRequired": "RPM sind für Motor erforderlich"
+  },
+  "restockErrors": {
+    "quantityMin": "Anzahl hinzugefügter Einheiten angeben (mindestens 1)",
+    "supplierRequired": "Angeben, wo gekauft (Geschäft oder Lieferant)",
+    "purchasePriceRequired": "Kaufpreis pro Einheit angeben",
+    "purchasePriceInvalid": "Ungültiger Kaufpreis"
+  },
+  "toasts": {
+    "itemNotFound": "Eintrag nicht gefunden.",
+    "itemUpdated": "Eintrag aktualisiert",
+    "itemCreated": "Eintrag erstellt",
+    "itemDeleted": "Eintrag gelöscht",
+    "mounted": "Teil montiert und Bestand aktualisiert",
+    "restockSuccess": "Bestand aktualisiert und Kauf erfasst",
+    "partUpdated": "Teil in Inventar und Fahrzeugen aktualisiert",
+    "noPartHistory": "Dieses Teil hat noch keine Bestandszeilen oder Kaufhistorie."
+  },
+  "deleteDialog": {
+    "title": "Eintrag löschen?",
+    "description": "«{{name}}» wird gelöscht. Dies kann nicht rückgängig gemacht werden.",
+    "descriptionFallback": "Dies kann nicht rückgängig gemacht werden."
+  },
+  "mountDialog": {
+    "title": "Auf Fahrzeug montieren",
+    "description": "Ein Bauteil wird aus «{{name}}» erstellt. {{count}} {{unitWord}} werden vom Bestand abgezogen ({{left}} bleiben).",
+    "unitOne": "Einheit",
+    "unitMany": "Einheiten",
+    "vehicle": "Fahrzeug",
+    "selectVehicle": "Fahrzeug wählen",
+    "selectPlaceholder": "Wählen…",
+    "registerAsModification": "Als Modifikation erfassen",
+    "mountQtyLabel": "Vom Inventar abzuziehende Einheiten",
+    "mountQtyHint": "Z. B. 2 für ein Reifen- oder Felgenpaar, oder 1 wenn nur eines gewechselt wird.",
+    "mounting": "Montiere…",
+    "submit": "Montieren und abziehen"
+  },
+  "restockDialog": {
+    "title": "Auffüllen",
+    "description": "Einheiten zu «{{name}}» hinzufügen. Kaufort und Preis werden für die Historie erfasst.",
+    "qtyLabel": "Einheiten, die ins Lager kommen",
+    "supplierLabel": "Wo gekauft",
+    "supplierPlaceholder": "Geschäft, Webseite, Lieferant…",
+    "unitPriceLabel": "Kauf-Stückpreis (€)",
+    "purchaseDateLabel": "Kaufdatum",
+    "notesLabel": "Notizen (optional)",
+    "notesPlaceholder": "Bestellung, Rechnung, Hinweise…",
+    "saving": "Speichern…",
+    "submit": "Kauf erfassen und Bestand erhöhen"
+  },
+  "historyDialog": {
+    "title": "Kaufhistorie",
+    "description": "Auffüllungen für «{{name}}».",
+    "empty": "Noch keine Käufe mit «Auffüllen» erfasst. Der Erstkauf des Eintrags erscheint hier nicht, außer du erfasst ihn mit einer Auffüllung.",
+    "where": "Wo:",
+    "unitPrice": "Stückpreis:",
+    "purchaseDate": "Kaufdatum:"
+  },
+  "itemDialog": {
+    "editTitle": "Eintrag bearbeiten",
+    "newTitle": "Neuer Eintrag",
+    "description": "Eine Zeile pro Kauf. Die Kategorie legt den Teiltyp und die technischen Felder beim Montieren auf ein Fahrzeug fest.",
+    "sectionProduct": "Produkt",
+    "sectionStock": "Bestand und Kauf",
+    "sectionTech": "Technische Spezifikation",
+    "sectionTechHint": "Optional. Gleiche Angaben wie beim Anlegen eines Bauteils am Fahrzeug: wird beim Montieren aus dem Inventar oder beim Verknüpfen beim Bearbeiten vorgeschlagen.",
+    "sectionLocation": "Standort und Notizen",
+    "stockUnit": "Bestandseinheit",
+    "namePlaceholder": "z. B. Anglewinder-Krone 26Z",
+    "referencePlaceholder": "SKU / Hersteller-Ref. (optional)",
+    "urlPlaceholder": "https://… (optional)",
+    "qtyInStock": "Menge im Lager",
+    "minStockAlert": "Mindestbestand-Warnung",
+    "optional": "Optional",
+    "unitPriceHint": "Pro Einheit. Bei mehreren montierten Teilen am Fahrzeug: Modifikationskosten = Preis × Einheiten.",
+    "manufacturerPlaceholder": "Kann leer bleiben und beim Montieren ergänzt werden",
+    "teethPlaceholder": "z. B. 26",
+    "rpmPlaceholder": "z. B. 20000",
+    "techDescPlaceholder": "Teiledetail (nicht die Kauf-«Notizen» unten)",
+    "mountedVehicle": "Fahrzeug, auf dem montiert",
+    "none": "Keines",
+    "mountedVehicleHint": "Optional. Angeben, ob dieser Kauf bereits auf einem Fahrzeug ist.",
+    "purchaseNotes": "Kauf- / Lager-Notizen",
+    "purchaseNotesPlaceholder": "Geschäft, Schublade, Erinnerungen…",
+    "saving": "Speichern…"
+  },
+  "partDialog": {
+    "title": "Teil bearbeiten",
+    "description": "Änderungen an Name, Marke, Referenz und technischen Daten gelten für Inventarzeilen und montierte Teile. Mengen und Preise werden nicht geändert.",
+    "saving": "Speichern…"
+  },
+  "fields": {
+    "name": "Name",
+    "category": "Kategorie",
+    "reference": "Referenz",
+    "url": "Link",
+    "quantity": "Menge im Lager",
+    "minStock": "Mindestbestand-Warnung",
+    "unitPrice": "Kauf-Stückpreis (€)",
+    "purchaseDate": "Kaufdatum",
+    "manufacturer": "Marke (Hersteller)",
+    "brand": "Marke",
+    "material": "Material",
+    "size": "Größe",
+    "color": "Farbe",
+    "teeth": "Zähne",
+    "rpm": "RPM",
+    "gaus": "Gauss",
+    "description": "Beschreibung",
+    "techDescription": "Technische Beschreibung"
+  }
+}

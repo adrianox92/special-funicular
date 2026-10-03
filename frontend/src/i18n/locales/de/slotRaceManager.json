@@ -1,0 +1,116 @@
+{
+  "themeToggle": "Design wechseln",
+  "backHome": "Start",
+  "backHomeAria": "Zurück zur Startseite",
+  "goDashboard": "Zum Panel",
+  "login": "Anmelden",
+  "register": "Registrieren",
+  "hero": {
+    "kicker": "Desktop-App für Windows",
+    "title": "Leistung auf der Bahn, verbunden mit deiner Sammlung",
+    "lead": "Slot Race Manager verbindet sich mit der DS200-Zeitnahme, verwaltet Training und Wettkämpfe auf deinem Rechner und kann mit Scalextric Collection synchronisieren, damit du Zeiten und Statistiken nach jeder Session im Web siehst."
+  },
+  "badges": {
+    "desktop": "Desktop-App",
+    "offline": "Funktioniert ohne Internet",
+    "ds200": "DS200-Zeitnahme",
+    "localData": "Daten auf deinem PC",
+    "sync": "Sync mit der Website"
+  },
+  "cards": {
+    "timing": {
+      "title": "Zeitmessung auf der Bahn",
+      "blurb": "Verbinde die DS200-Zeitnahme und erfasse jede Runde präzise."
+    },
+    "training": {
+      "title": "Einzeltraining",
+      "blurb": "Eine Spur, Live-Metriken, Verlauf und Dateien zum Auswerten in Excel."
+    },
+    "competitions": {
+      "title": "Wettkämpfe mit Ranking",
+      "blurb": "Rally oder simultan, Läufe, Wertung und TV-Modus."
+    }
+  },
+  "ctaOpen": "Scalextric Collection öffnen",
+  "ctaSyncAccount": "Konto zum Synchronisieren erstellen",
+  "ctaDownload": "Download (Windows)",
+  "pillars": {
+    "aria": "Säulen von Slot Race Manager",
+    "realtime": {
+      "title": "Echtzeit",
+      "text": "Wertung und Metriken aktualisieren sich Runde für Runde während des Laufs oder Trainings."
+    },
+    "offline": {
+      "title": "Offline oder mit Cloud-Kopie",
+      "text": "Funktioniert ohne Internet. Mit Scalextric-Collection-Konto und Verbindung werden Ergebnisse nach jeder Session oder jedem Lauf hochgeladen; sonst werden sie gespeichert und gesendet, sobald das Netz wieder da ist."
+    },
+    "lights": {
+      "title": "Ampel im F1-Stil",
+      "text": "Optional: schließe eine elektronische Ampel über ein zweites Kabel an und starte wie in der F1."
+    },
+    "pilots": {
+      "title": "Multi-Fahrer-Plattform",
+      "text": "Jeder Fahrer verknüpft sein eigenes Konto und sieht Zeiten und Statistiken im Web."
+    }
+  },
+  "features": {
+    "ds200": {
+      "title": "DS200-Zeitmessung",
+      "description": "Die App verbindet sich mit der DS200-Zeitnahme, zeigt die Wertung sofort und speichert alles auf deinem Rechner.",
+      "bullets": [
+        "Zeiten auf die Millisekunde; doppelte Timer-Lesungen werden automatisch ignoriert",
+        "Live-Wertung: Position, Runden, Gesamtzeiten, letzte Runde, Schnitt, Bestzeit und Abstand zum Führenden",
+        "Mindest-Rundenzeit einstellbar, um Preller zu ignorieren",
+        "Du kannst die letzte gültige Runde pro Spur annullieren, wenn etwas schiefging",
+        "Ein Lauf kann nach Rundenzahl, Zeit oder Timer-Signal enden"
+      ]
+    },
+    "training": {
+      "title": "Trainingsmodus",
+      "description": "Session auf einer Spur ohne Zielrunden: du stoppst, wann du willst. Ideal für Setup und Rhythmus.",
+      "bullets": [
+        "Letzte Runde, Differenz zur vorherigen und zu deiner Bestzeit, Schnitt der letzten fünf",
+        "Trend, Konstanz und Diagramm der letzten fünfzig Runden",
+        "Session-Verlauf mit Details und Dateidownload für die Auswertung in Excel"
+      ]
+    },
+    "competition": {
+      "title": "Wettkampfverwaltung",
+      "description": "Wettkämpfe mit geplanten Läufen, Gesamt- und Laufwertung sowie einem zweiten Fenster für TV oder Beamer.",
+      "bullets": [
+        "Modi Rally und Simultan; automatischer Laufplan und Spurrotation",
+        "Start beim ersten Überfahren, Countdown oder optionale F1-Ampel",
+        "Optionales Qualifying und Lauferzeugung aus Zeiten",
+        "TV-Fenster und Live-Wertung für einen zweiten Monitor",
+        "Download von Rundenlisten, Zusammenfassungen und vollständigen Daten für Archiv oder Excel"
+      ]
+    },
+    "sync": {
+      "title": "Sync mit Scalextric Collection",
+      "description": "Optional: hinterlege die Adresse dieser Website, die Strecke und den Zugang jedes Fahrers, damit die Zeiten in seinem Konto erscheinen.",
+      "bullets": [
+        "Jeder Fahrer holt sich den Zugang per E-Mail und Passwort in der Desktop-App",
+        "Lokale Autos werden mit den Autos im Webkonto gepaart",
+        "Läufe und Trainings werden mit jeder Runde gesendet",
+        "Ohne Netz bleiben Ergebnisse ausstehend und lassen sich später mit einem Klick senden"
+      ]
+    }
+  },
+  "download": {
+    "title": "Download auf dem Bahn-PC",
+    "lead": "Für Windows: empfohlener Installer oder portable Einzeldatei. Auf dem Bahn-PC musst du das Programm nur installieren oder kopieren, die DS200-Zeitnahme anschließen und — falls genutzt — die optionale Ampel.",
+    "installerTitle": "Installer (empfohlen)",
+    "installerText": "Enthält den üblichen Windows-Setup-Assistenten. Die bequemste Variante, um das Programm auf dem Bahnrechner startklar zu machen.",
+    "installerBadge": "Slot-Race-Manager-Installer",
+    "portableTitle": "Portable",
+    "portableText": "Eine einzige ausführbare Datei ohne Installer: praktisch zum schnellen Testen oder für einen USB-Stick.",
+    "portableBadge": "Portable Version (eine Datei)",
+    "footnote": "Für Windows gedacht. Hol dir Installer oder Executable bei der Stelle, die Slot Race Manager verteilt; auf der Bahn reicht das installierte oder kopierte Programm."
+  },
+  "finalCta": {
+    "title": "Sync mit Scalextric Collection aktivieren",
+    "lead": "Erstelle dein Konto auf dieser Website, melde dich in Slot Race Manager als Fahrer an, um den Zugang zu verknüpfen, und paare Autos und Strecke, damit jede Session in deinem Profil landet.",
+    "register": "Kostenloses Konto",
+    "backLanding": "Zurück zur Landingpage"
+  }
+}

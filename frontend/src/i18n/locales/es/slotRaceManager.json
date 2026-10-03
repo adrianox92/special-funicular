@@ -1,0 +1,116 @@
+{
+  "themeToggle": "Cambiar tema",
+  "backHome": "Inicio",
+  "backHomeAria": "Volver al inicio",
+  "goDashboard": "Ir al panel",
+  "login": "Iniciar sesión",
+  "register": "Registrarse",
+  "hero": {
+    "kicker": "Aplicación de escritorio para Windows",
+    "title": "Rendimiento en pista, conectado a tu colección",
+    "lead": "Slot Race Manager se conecta al cronómetro DS200, gestiona entrenamientos y competiciones en tu ordenador, y si quieres sincroniza con Scalextric Collection para ver tus tiempos y estadísticas en la web después de cada sesión."
+  },
+  "badges": {
+    "desktop": "App de escritorio",
+    "offline": "Funciona sin internet",
+    "ds200": "Cronómetro DS200",
+    "localData": "Datos en tu PC",
+    "sync": "Sincronización con la web"
+  },
+  "cards": {
+    "timing": {
+      "title": "Cronometraje en pista",
+      "blurb": "Conecta el cronómetro DS200 y registra cada vuelta con precisión."
+    },
+    "training": {
+      "title": "Entrenamiento individual",
+      "blurb": "Un carril, métricas en vivo, historial y archivos para analizar en Excel."
+    },
+    "competitions": {
+      "title": "Competiciones con ranking",
+      "blurb": "Rally o simultáneo, mangas, clasificación y modo TV."
+    }
+  },
+  "ctaOpen": "Abrir Scalextric Collection",
+  "ctaSyncAccount": "Crear cuenta para sincronizar",
+  "ctaDownload": "Descarga (Windows)",
+  "pillars": {
+    "aria": "Pilares de Slot Race Manager",
+    "realtime": {
+      "title": "Tiempo real",
+      "text": "Clasificación y métricas actualizadas vuelta a vuelta durante la manga o el entrenamiento."
+    },
+    "offline": {
+      "title": "Sin conexión o con copia en la nube",
+      "text": "Funciona sin internet. Si tienes cuenta en Scalextric Collection y hay conexión, los resultados se suben al terminar cada sesión o manga; si no, se guardan y se envían cuando vuelva la red."
+    },
+    "lights": {
+      "title": "Semáforo tipo F1",
+      "text": "Opcional: conecta un semáforo electrónico por un segundo cable y coordina salidas como en la F1."
+    },
+    "pilots": {
+      "title": "Multiplataforma de pilotos",
+      "text": "Cada piloto vincula su propia cuenta y ve sus tiempos y estadísticas en la web."
+    }
+  },
+  "features": {
+    "ds200": {
+      "title": "Cronometraje DS200",
+      "description": "La app se conecta al cronómetro DS200, muestra la clasificación al instante y guarda todo en tu ordenador.",
+      "bullets": [
+        "Tiempos al milisegundo; lecturas duplicadas del cronómetro se ignoran automáticamente",
+        "Clasificación en vivo: posición, vueltas, tiempos totales, última vuelta, media, mejor tiempo y distancia respecto al líder",
+        "Tiempo mínimo de vuelta ajustable para ignorar rebotes",
+        "Puedes anular la última vuelta válida en cada carril si hubo un error",
+        "La manga puede terminar por número de vueltas, por tiempo o por señal del cronómetro"
+      ]
+    },
+    "training": {
+      "title": "Modo entrenamiento",
+      "description": "Sesión en un solo carril sin vueltas objetivo: paras cuando quieras. Ideal para mejorar reglaje y ritmo.",
+      "bullets": [
+        "Última vuelta, diferencia respecto a la anterior y a tu mejor vuelta, media de las últimas cinco",
+        "Tendencia, regularidad y gráfico de las últimas cincuenta vueltas",
+        "Historial de sesiones con detalle y descarga de archivo para analizar en Excel"
+      ]
+    },
+    "competition": {
+      "title": "Gestión de competiciones",
+      "description": "Competiciones con mangas planificadas, clasificación general y por manga, y ventana auxiliar para TV o proyector.",
+      "bullets": [
+        "Modos Rally y Simultáneo; plan automático de mangas y rotación de carriles",
+        "Salida por primer cruce, cuenta atrás o semáforo F1 con hardware opcional",
+        "Clasificatoria opcional y generación de mangas desde tiempos",
+        "Ventana TV y clasificación en vivo para segundo monitor",
+        "Descarga de listados de vueltas, resúmenes y datos completos para archivo o Excel"
+      ]
+    },
+    "sync": {
+      "title": "Sincronización con Scalextric Collection",
+      "description": "Opcional: indica la dirección de esta web, el circuito y el acceso de cada piloto para que los tiempos aparezcan en su cuenta.",
+      "bullets": [
+        "Cada piloto obtiene su acceso iniciando sesión con correo y contraseña desde la app de escritorio",
+        "Los coches locales se emparejan con los de la cuenta en la web",
+        "Se envían las mangas y los entrenamientos con el detalle de cada vuelta",
+        "Si no hay red, los resultados quedan pendientes y se pueden enviar después con un solo clic"
+      ]
+    }
+  },
+  "download": {
+    "title": "Descarga en el PC del circuito",
+    "lead": "Disponible para Windows: instalador recomendado o versión portable en un solo archivo. En el PC del circuito solo necesitas instalar o copiar el programa, conectar el cronómetro DS200 y, si lo usas, el semáforo opcional.",
+    "installerTitle": "Instalador (recomendado)",
+    "installerText": "Incluye el asistente de instalación habitual en Windows. Es la opción más cómoda para dejar el programa listo en el ordenador del circuito.",
+    "installerBadge": "Instalador de Slot Race Manager",
+    "portableTitle": "Portable",
+    "portableText": "Un solo archivo ejecutable sin instalador: práctico para probar rápido o llevar en una memoria USB.",
+    "portableBadge": "Versión portable (un solo archivo)",
+    "footnote": "Pensado para Windows. Obtén el instalador o el ejecutable desde quien distribuya Slot Race Manager; en pista solo hace falta el programa instalado o copiado."
+  },
+  "finalCta": {
+    "title": "Activa la sincronización con Scalextric Collection",
+    "lead": "Crea tu cuenta en esta web, inicia sesión desde Slot Race Manager como piloto para vincular tu acceso, y empareja coches y circuito para que cada sesión quede reflejada en tu perfil.",
+    "register": "Crear cuenta gratis",
+    "backLanding": "Volver a la landing"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "page": {
+    "title": "Onboarding and help",
+    "lead": "A guide to get started with Slot Database and a reference for each section: what it does, a sensible setup order and good practices. You can also use the search below with questions in natural language.",
+    "tocTitle": "Contents",
+    "tocDesc": "Jump to a section or open it in the app.",
+    "tocAria": "Help contents",
+    "recommended": "Recommended",
+    "steps": "Steps",
+    "tips": "Things to keep in mind",
+    "qa": "Expected behaviour (QA)",
+    "gotchas": "Common pitfalls",
+    "footer": "Something does not match what you see on screen? Make sure you are on the latest version of the app and reload the page."
+  },
+  "assistant": {
+    "title": "Ask the guide",
+    "lead": "Write in natural language (for example: “how do I add a car?”). The answer is based on this guide.",
+    "label": "Your question",
+    "placeholder": "E.g.: How do I log a timing session?",
+    "submit": "Find answer",
+    "searching": "Searching for an answer…",
+    "minLength": "Write at least 3 characters.",
+    "unavailableHint": "The assistant is not available right now. Use the contents and sections on this page.",
+    "unavailableNow": "The assistant is not available at the moment. You can use the contents and sections on this page.",
+    "genericError": "Could not get an answer. Please try again later.",
+    "requestFailed": "Could not get a response.",
+    "answerPlaceholder": "The answer will appear here.",
+    "guideSections": "Guide sections:"
+  },
+  "plain": {
+    "guideTitle": "Slot Database — Guide and onboarding",
+    "firstSteps": "Getting started",
+    "steps": "Steps:",
+    "tips": "Tips:",
+    "qa": "Expected behaviour (QA):",
+    "faq": "Frequently asked questions",
+    "related": "Related topics: {{topics}}."
+  }
+}

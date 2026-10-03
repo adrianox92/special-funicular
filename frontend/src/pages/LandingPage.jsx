@@ -35,117 +35,29 @@ import { cn } from '../lib/utils';
 import { applyLandingPageSeo } from '../utils/landingSeo';
 import LanguageSelector from '../components/LanguageSelector';
 import useLocale from '../hooks/useLocale';
+import { localizePath } from '../i18n/localeUtils';
 
-const keyStats = [
-  {
-    icon: LayoutGrid,
-    title: 'Gestión completa',
-    text: 'Fotos multi-vista, especificaciones técnicas y modificaciones con coste.',
-  },
-  {
-    icon: Zap,
-    title: 'Precisión al ms',
-    text: 'Cronometraje por vuelta, consistencia y gráficos de evolución.',
-  },
-  {
-    icon: Monitor,
-    title: 'Competiciones pro',
-    text: 'Ranking en vivo y modo presentación tipo TV para tu evento.',
-  },
-  {
-    icon: Package,
-    title: 'Inventario de piezas',
-    text: 'Stock, categorías, reposición y vínculo con montajes en vehículos.',
-  },
+const STAT_DEFS = [
+  { id: 'complete', icon: LayoutGrid },
+  { id: 'precision', icon: Zap },
+  { id: 'competitions', icon: Monitor },
+  { id: 'inventory', icon: Package },
 ];
 
-const featureBlocks = [
-  {
-    id: 'collection',
-    title: 'Gestión de colección',
-    description:
-      'Catálogo profesional para coches de slot (Scalextric, Ninco, Avant Slot, Scaleauto, etc.): imágenes, datos de compra, reglaje y documentación lista para compartir.',
-    bullets: [
-      'Fotos por 6 vistas (frontal, perfiles, trasera, superior, chasis, 3/4)',
-      'Especificaciones técnicas con componentes (motor, piñón, corona, guía, ejes…)',
-      'Registro de modificaciones con coste y evolución',
-      'Exportación a PDF de la ficha técnica completa',
-      'Filtros avanzados, vista grid/tabla y exportación CSV',
-      'Badges Digital, Museo y Taller',
-    ],
-    visualIcons: [Car, FileText, Layers, Download],
-    reverse: false,
-  },
-  {
-    id: 'inventory',
-    title: 'Inventario de piezas',
-    description:
-      'Piezas y consumibles con el mismo rigor que tu colección: stock, precios y trazabilidad hasta el coche donde las montas.',
-    bullets: [
-      'Categorías, unidades, precio de compra, fechas y notas por ítem',
-      'Stock mínimo, alertas y reposición cuando toca reponer',
-      'Filtros por categoría, búsqueda y piezas con stock bajo',
-      'Montaje en vehículos desde inventario (descuenta stock automáticamente)',
-      'Historial de movimientos y enlace con modificaciones del coche',
-      'Campos específicos según tipo de pieza (material, piñonería, etc.)',
-    ],
-    visualIcons: [Package, Banknote, Layers, FileText],
-    reverse: true,
-  },
-  {
-    id: 'timing',
-    title: 'Cronometraje y rendimiento',
-    description:
-      'Entiende cómo rinde cada coche y cada cambio de setup con datos granulares y comparativas claras.',
-    bullets: [
-      'Tiempos por vuelta con precisión de milisegundos',
-      'Análisis de sesión: evolución, histograma y delta vs mejor vuelta',
-      'Comparativa de dos sesiones lado a lado',
-      'Análisis de configuraciones: compara reglajes entre sesiones',
-      'Comparativa de rendimiento por carril',
-      'Gráficos de evolución de tiempos y velocidad',
-    ],
-    visualIcons: [Clock, Gauge, BarChart3, TrendingUp],
-    reverse: false,
-  },
-  {
-    id: 'competitions',
-    title: 'Sistema de competiciones',
-    description:
-      'Organiza eventos con el mismo rigor que llevas en el garaje: categorías, reglas y resultados trazables.',
-    bullets: [
-      'Competiciones con circuitos y categorías',
-      'Inscripciones públicas por enlace compartible',
-      'Reglas de puntuación personalizables y plantillas',
-      'Tiempos por ronda con penalizaciones',
-      'Ranking en vivo y modo presentación (Live TV)',
-      'Exportación CSV y PDF de resultados',
-    ],
-    visualIcons: [Trophy, Users, Settings, Monitor],
-    reverse: true,
-  },
-  {
-    id: 'analytics',
-    title: 'Dashboard y analítica',
-    description:
-      'Un panel que resume inversión, distribución de la flota y rendimiento para decidir con datos.',
-    bullets: [
-      'Métricas de colección: vehículos, inversiones y tendencias',
-      'Gráficos por marca, tipo, tienda y modificaciones',
-      'Evolución de la inversión en el tiempo',
-      'Top vehículos por coste y componentes más usados',
-    ],
-    visualIcons: [BarChart3, TrendingUp, Banknote, PieChart],
-    reverse: false,
-  },
+const FEATURE_DEFS = [
+  { id: 'collection', visualIcons: [Car, FileText, Layers, Download], reverse: false },
+  { id: 'inventory', visualIcons: [Package, Banknote, Layers, FileText], reverse: true },
+  { id: 'timing', visualIcons: [Clock, Gauge, BarChart3, TrendingUp], reverse: false },
+  { id: 'competitions', visualIcons: [Trophy, Users, Settings, Monitor], reverse: true },
+  { id: 'analytics', visualIcons: [BarChart3, TrendingUp, Banknote, PieChart], reverse: false },
 ];
 
-const extraCapabilities = [
-  { icon: Smartphone, title: 'PWA', text: 'Instalable en móvil y escritorio.' },
-  { icon: KeyRound, title: 'API & sync', text: 'API keys y endpoints para apps externas.' },
-  { icon: Palette, title: 'Tema claro / oscuro', text: 'Cómodo en cualquier entorno.' },
-  { icon: Layers, title: 'Responsive', text: 'Móvil, tablet y escritorio.' },
-  { icon: LayoutGrid, title: 'Circuitos', text: 'Varios carriles y longitudes por carril.' },
+const EXTRA_DEFS = [
+  { id: 'pwa', icon: Smartphone },
+  { id: 'api', icon: KeyRound },
+  { id: 'theme', icon: Palette },
+  { id: 'responsive', icon: Layers },
+  { id: 'circuits', icon: LayoutGrid },
 ];
 
 const FeatureVisual = ({ icons }) => (
@@ -183,7 +95,7 @@ const FeatureSection = ({ block }) => {
           </h2>
           <p className="text-muted-foreground">{description}</p>
           <ul className="space-y-2.5">
-            {bullets.map((item) => (
+            {(Array.isArray(bullets) ? bullets : []).map((item) => (
               <li key={item} className="flex gap-2 text-sm">
                 <Check className="mt-0.5 size-4 shrink-0 text-green-600 dark:text-green-400" aria-hidden />
                 <span>{item}</span>
@@ -225,6 +137,27 @@ const LandingPage = () => {
     { icon: Package, title: t('cards.inventory.title'), blurb: t('cards.inventory.blurb'), className: 'border-border bg-card/80', iconClass: 'text-primary' },
   ];
 
+  const keyStats = STAT_DEFS.map((s) => ({
+    ...s,
+    title: t(`stats.${s.id}.title`),
+    text: t(`stats.${s.id}.text`),
+  }));
+
+  const featureBlocks = FEATURE_DEFS.map((block) => ({
+    ...block,
+    title: t(`features.${block.id}.title`),
+    description: t(`features.${block.id}.description`),
+    bullets: t(`features.${block.id}.bullets`, { returnObjects: true }),
+  }));
+
+  const extraCapabilities = EXTRA_DEFS.map((c) => ({
+    ...c,
+    title: t(`extras.${c.id}.title`),
+    text: t(`extras.${c.id}.text`),
+  }));
+
+  const catalogHref = localizePath(locale, '/catalogo');
+
   useEffect(() => {
     applyLandingPageSeo(locale);
   }, [locale]);
@@ -252,21 +185,21 @@ const LandingPage = () => {
               variant="outline"
               size="icon"
               onClick={toggleTheme}
-              aria-label="Cambiar tema"
+              aria-label={t('themeToggle')}
             >
               {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
             <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-              <Link to="/catalogo">Catálogo</Link>
+              <Link to={catalogHref}>{t('nav.catalog')}</Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-              <Link to="/slot-race-manager">Slot Race Manager</Link>
+              <Link to="/slot-race-manager">{t('nav.slotRaceManager')}</Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-              <Link to="/login">Iniciar sesión</Link>
+              <Link to="/login">{t('nav.login')}</Link>
             </Button>
             <Button asChild size="sm">
-              <Link to="/login?register=true">Registrarse</Link>
+              <Link to="/login?register=true">{t('nav.register')}</Link>
             </Button>
           </div>
         </div>
@@ -300,13 +233,11 @@ const LandingPage = () => {
                 />
               </span>
               <span className="mt-3 block text-2xl font-bold tracking-tight text-foreground md:text-3xl lg:text-4xl">
-                Tu base de datos de slot: Coches, recambios, reglajes y más
+                {t('hero.tagline')}
               </span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
-             Gestiona coches de slot con fichas completas,
-              inventario de piezas y consumibles, cronometra por vuelta, compara reglajes y organiza
-              competiciones con inscripción pública y ranking en vivo — todo en una sola plataforma.
+              {t('hero.lead')}
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start" role="list">
               {heroHighlights.map((h) => (
@@ -317,15 +248,15 @@ const LandingPage = () => {
             </div>
             <div className="mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
               <Button asChild size="lg">
-                <Link to="/login">Iniciar sesión</Link>
+                <Link to="/login">{t('hero.ctaLogin')}</Link>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <Link to="/login?register=true">Registrarse</Link>
+                <Link to="/login?register=true">{t('hero.ctaRegisterShort')}</Link>
               </Button>
             </div>
             <Button asChild variant="link" className="mt-2 px-0 lg:justify-start">
               <Link to="/login" className="text-muted-foreground">
-                ¿Ya tienes cuenta? Entra aquí
+                {t('hero.ctaHaveAccount')}
               </Link>
             </Button>
           </div>
@@ -361,7 +292,7 @@ const LandingPage = () => {
       <section className="border-y bg-muted/40 py-14 px-4" aria-labelledby="key-stats-heading">
         <div className="mx-auto max-w-6xl">
           <h2 id="key-stats-heading" className="sr-only">
-            Pilares de la plataforma
+            {t('stats.aria')}
           </h2>
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {keyStats.map((s) => (
@@ -386,10 +317,10 @@ const LandingPage = () => {
       <section className="py-16 px-4" aria-labelledby="extras-heading">
         <div className="mx-auto max-w-6xl">
           <h2 id="extras-heading" className="text-center text-2xl font-bold md:text-3xl">
-            Y además…
+            {t('extras.heading')}
           </h2>
           <p className="mx-auto mt-2 max-w-2xl text-center text-muted-foreground">
-            Detalles que marcan la diferencia para usar la herramienta cada día.
+            {t('extras.lead')}
           </p>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {extraCapabilities.map((c) => (
@@ -415,13 +346,13 @@ const LandingPage = () => {
         />
         <div className="relative z-10 mx-auto max-w-3xl text-center">
           <h2 id="cta-final-heading" className="text-2xl font-bold md:text-3xl">
-            Empieza a gestionar tu colección hoy
+            {t('cta.title')}
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Crea tu cuenta en segundos y lleva registro de cada coche, cada vuelta y cada evento.
+            {t('cta.lead')}
           </p>
           <Button asChild size="lg" className="mt-8">
-            <Link to="/login?register=true">Crear cuenta gratis</Link>
+            <Link to="/login?register=true">{t('cta.register')}</Link>
           </Button>
         </div>
       </section>

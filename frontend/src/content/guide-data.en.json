@@ -1,0 +1,1052 @@
+{
+  "primerosPasos": {
+    "title": "Getting started",
+    "intro": "Recommended order to start using Slot Database without getting lost. You can adapt it to your case (for example, if you only want to catalog cars without lap times).",
+    "steps": [
+      {
+        "title": "Review the Home dashboard",
+        "body": "It gives you an overall picture of investment, vehicle types, and quick links. The more data you record, the more useful it becomes.",
+        "linkTo": "/dashboard",
+        "linkLabel": "Go to Home"
+      },
+      {
+        "title": "Add your tracks (if you will record lap times or competitions)",
+        "body": "Lap times and many competitions reference an existing track. Create them beforehand or right when you need them.",
+        "linkTo": "/circuits",
+        "linkLabel": "Go to Tracks"
+      },
+      {
+        "title": "Add your vehicles or import them from a file",
+        "body": "From Vehicles you can create records with photos, type, modifications, and more, or upload CSV/Excel: the system suggests column mapping, shows a preview, and respects possible header rows or empty columns. A complete record improves metrics and reports.",
+        "linkTo": "/vehicles",
+        "linkLabel": "Go to Vehicles"
+      },
+      {
+        "title": "Record session lap times",
+        "body": "The fastest way is «New session» (Home or menu): pick track, car, and the minimum times. You can also do it from the Times list or each car's «Lap Times Table» tab, and import CSV or JSON with «Import sessions».",
+        "linkTo": "/session",
+        "linkLabel": "New session"
+      },
+      {
+        "title": "Optional: parts inventory",
+        "body": "If you keep spare stock, register it here and you can install parts on vehicles when appropriate.",
+        "linkTo": "/inventory",
+        "linkLabel": "Go to Inventory"
+      },
+      {
+        "title": "Optional: competitions",
+        "body": "Create an event, manage participants and times. There are public URLs for registration and follow-up. In the menu, «Competitions» opens a submenu: «My competitions» and «Favorite drivers» (a list of regular drivers to add without relying only on the public link).",
+        "linkTo": "/competitions",
+        "linkLabel": "Go to Competitions"
+      },
+      {
+        "title": "Set up alerts and account",
+        "body": "In Settings adjust dashboard alerts and notifications; in Profile, the integration API and Slot Race Manager license.",
+        "linkTo": "/settings",
+        "linkLabel": "Settings"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "inicio",
+      "title": "Home",
+      "pathBadge": "/dashboard",
+      "description": "Summary of your collection: key figures, charts, and suggested actions.",
+      "intro": "Here you see total investment, breakdown by vehicle type, brands, shops, highest-cost components, and trends. Active competitions and quick-access blocks to the rest of the site also appear.",
+      "steps": [
+        "Open Home from the sidebar to load the dashboard.",
+        "Review the charts and cards: they are fed by vehicles, components, and times you have recorded.",
+        "Use the quick links to jump to Vehicles, Times, or other sections without returning to the menu.",
+        "For your first timing session use «New session»: track, car, and minimum times, without opening the vehicle record."
+      ],
+      "tips": [
+        "The data depends on what you record in vehicles, components, and times.",
+        "If something fails to load, check your connection; some information comes from several server requests.",
+        "If you already have cars and no times (or none in 30 days), Home shows a prominent link to «New session» (/session)."
+      ],
+      "gotchas": [],
+      "linkTo": "/dashboard",
+      "linkLabel": "Go to Home",
+      "keywords": [
+        "dashboard",
+        "inicio",
+        "resumen",
+        "gráficos",
+        "inversión",
+        "colección",
+        "métricas",
+        "home",
+        "summary",
+        "charts",
+        "investment",
+        "collection",
+        "metrics"
+      ]
+    },
+    {
+      "id": "vehiculos",
+      "title": "Vehicles",
+      "pathBadge": "/vehicles",
+      "description": "Car catalog: create, edit, bulk import (CSV/Excel), filters, and export.",
+      "intro": "You can view the list in grid or table, filter by manufacturer, type, modified/analog-digital, and mark criteria such as museum or workshop. Filters are saved in this browser for your next visit. From the list you can also import many vehicles at once with a wizard that reads the sheet (including headers below blank rows or empty columns) and aligns mapping with Excel or Numbers column letters.",
+      "steps": [
+        "Go to Vehicles in the menu.",
+        "Single add: «Add vehicle» (or the new vehicle route), complete the form, optionally add photos, and save.",
+        "Import: in the Vehicles list click «Import» (next to Export CSV), choose a CSV or Excel file (.xlsx, .xlsm, .xlsb, .xls, .xltx, .xltm). Optional: sheet index in workbooks with multiple tabs.",
+        "Review mapping: the system suggests which column in your file matches each field (model, brand, type, drive, dates, etc.). You can ignore columns. Only brand and model are required in mapping; the rest is optional. The preview updates when you change mapping.",
+        "Handle duplicates: you can skip rows that match what you already have, import them anyway, or update existing records depending on the mode you choose (reference+manufacturer or manufacturer+model).",
+        "Confirm the import. If you did not map type or other fields that are usually required in the manual form, the app prompts you to complete them by editing the record after import.",
+        "After adding, open the vehicle record to add specifications, components, maintenance, and times."
+      ],
+      "tips": [
+        "Each vehicle has a detailed record (components, maintenance, associated times, etc.).",
+        "«Add vehicle» and editing use the same data model: the more complete the record, the better metrics on Home and Times.",
+        "Dates and year in the importer: purchase date is stored as YYYY-MM-DD; it accepts ISO, European d/m/y or d-m-y, Excel serials, a standalone year (January 1 of that year), and serial as text. Release year is stored as a number (year only, full date, or Excel serial). If a value is not recognized, the preview shows a warning on that row.",
+        "On the record's «Lap Times Table» tab you can import sessions from CSV or JSON with «Import sessions»; they are assigned automatically to that vehicle (same flow as the global Times list). That is different from importing **vehicle records** from the list.",
+        "Export and pagination respect filters and limits you set on screen."
+      ],
+      "gotchas": [],
+      "linkTo": "/vehicles",
+      "linkLabel": "Go to Vehicles",
+      "keywords": [
+        "vehículo",
+        "vehiculos",
+        "coche",
+        "coches",
+        "añadir",
+        "alta",
+        "ficha",
+        "catálogo",
+        "filtros",
+        "fotos",
+        "imágenes",
+        "importar",
+        "importación",
+        "csv",
+        "excel",
+        "xlsx",
+        "mapeo",
+        "duplicados",
+        "vista previa",
+        "fechas",
+        "año de comercialización",
+        "marca",
+        "modelo",
+        "vehicle",
+        "vehicles",
+        "car",
+        "cars",
+        "add",
+        "create",
+        "record",
+        "catalog",
+        "filters",
+        "photos",
+        "images",
+        "import",
+        "mapping",
+        "duplicates",
+        "preview",
+        "dates",
+        "release year",
+        "brand",
+        "model"
+      ]
+    },
+    {
+      "id": "tiempos",
+      "title": "Times",
+      "pathBadge": "/timings",
+      "description": "Session log by vehicle, track, and lane: best laps, speed, and comparisons.",
+      "intro": "Times are grouped by vehicle, track, and lane. For home practice use «New session» (/session): track → car → best lap, total, and laps, without opening the vehicle record. In the list (/timings) you can expand history, view specifications, compare sessions, analyze performance, and import CSV (custom format or SmartRace) or JSON. On a vehicle record, «Lap Times Table» tab, the same import wizard assigns sessions to that car.",
+      "steps": [
+        "From Home or the menu, open «New session», choose track (or create one if needed) and car, enter best lap, total time and laps, and save.",
+        "From Times, view history grouped by vehicle, track, and lane.",
+        "For bulk import: in Times click «Import sessions», choose CSV or JSON, paste content or upload a file, select the vehicle (required unless each row/object includes vehicle_id) and confirm; with multi-driver SmartRace CSV you can mark rows and, if track or lane is missing from the file, pick them from your registered tracks.",
+        "Alternative: open the vehicle record (edit), go to the «Lap Times Table» tab and click «Import sessions»; the flow is the same (CSV/JSON, template, SmartRace) but the car is fixed and you do not need to choose it.",
+        "View history and comparisons from the same area of the app."
+      ],
+      "tips": [
+        "Tracks must exist in the Tracks section for records to stay consistent; with SmartRace imports you sometimes must pick track and lane manually.",
+        "Lane and distance affect rankings and statistics per track.",
+        "When SmartRace CSV is detected, the session car is the one you choose in the modal (not the export's «Car» column).",
+        "If you use external integrations (for example sending times), check the API and notifications in Profile."
+      ],
+      "gotchas": [],
+      "linkTo": "/timings",
+      "linkLabel": "Go to Times",
+      "keywords": [
+        "tiempos",
+        "vueltas",
+        "sesión",
+        "carril",
+        "circuito",
+        "cronometrar",
+        "ranking",
+        "importar",
+        "csv",
+        "json",
+        "smartrace",
+        "entrenar",
+        "nueva sesión",
+        "times",
+        "laps",
+        "session",
+        "lane",
+        "track",
+        "timekeeping",
+        "train",
+        "new session"
+      ]
+    },
+    {
+      "id": "circuitos",
+      "title": "Tracks",
+      "pathBadge": "/circuits",
+      "description": "Your tracks: name, description, number of lanes, and length per lane.",
+      "intro": "Define here the tracks you will use for times and competitions. When creating or editing, specify how many lanes it has and, if applicable, the length of each.",
+      "steps": [
+        "Open Tracks and create a new track.",
+        "Enter name, number of lanes, and lengths if you use them in statistics.",
+        "Save. You can then select this track when recording times or creating competitions."
+      ],
+      "tips": [
+        "When creating a competition you can link a track; it helps to have it registered beforehand.",
+        "Deleting a track may affect data that references it: only do so if you are sure."
+      ],
+      "gotchas": [],
+      "linkTo": "/circuits",
+      "linkLabel": "Go to Tracks",
+      "keywords": [
+        "circuito",
+        "circuitos",
+        "pista",
+        "carriles",
+        "longitud",
+        "track",
+        "tracks",
+        "lanes",
+        "length"
+      ]
+    },
+    {
+      "id": "inventario",
+      "title": "Inventory",
+      "pathBadge": "/inventory",
+      "description": "Parts and consumables: stock, categories, prices, and link to vehicles.",
+      "intro": "Manage spares with category, units, purchase price, dates, and notes. You can filter by category, search, and low stock, restock quantities, install parts on a vehicle, and view movement history.",
+      "steps": [
+        "Create inventory items with category and quantity.",
+        "Use filters to see low stock or search by name.",
+        "From a vehicle record you can install inventory parts when the app allows it; stock updates according to the application logic."
+      ],
+      "tips": [
+        "Minimum stock helps you see what you need to restock.",
+        "Installing a part on a vehicle deducts from inventory according to the application logic.",
+        "Some fields are specific to the part type (material, gearing, etc.)."
+      ],
+      "gotchas": [],
+      "linkTo": "/inventory",
+      "linkLabel": "Go to Inventory",
+      "keywords": [
+        "inventario",
+        "stock",
+        "piezas",
+        "repuestos",
+        "montar",
+        "consumibles",
+        "inventory",
+        "parts",
+        "spares",
+        "install",
+        "consumables"
+      ]
+    },
+    {
+      "id": "competiciones",
+      "title": "Competitions",
+      "pathBadge": "/competitions",
+      "description": "Events with seats, rounds, track, participants, favorite drivers, and time management.",
+      "intro": "In the main menu, «Competitions» is a submenu: «My competitions» (list and create) and «Favorite drivers» (a personal list of regular drivers to add without relying only on the public link). Create competitions with name, seats, number of rounds, and optionally track or club. When creating an event you can optionally mark favorite drivers to add them as confirmed participants immediately (a category is created with the name you specify, default «General»). On the participants screen you can add manually, use «Favorite» mode for individual add, or «Add from favorites» for several at once; when confirmed participants reach the seat quota, add participant and add from favorites buttons are disabled until you free seats. After creating it, you access participant management (registrations, categories, rules) and the competition times screen. Public URLs exist for registration, status, and presentation using the event identifier (slug); they do not require logging in on the main site. As organizer, in the by-round view you can record times, edit them, apply penalties, mark «Did not participate» (NP), and use quick links for pending drivers each round.",
+      "steps": [
+        "Menu «Competitions»: choose «My competitions» or «Favorite drivers». In Favorite drivers you maintain your list (name, optional default vehicle, notes and, if you want, link to another driver's public profile via slug, with optional validation).",
+        "In My competitions, create a new event with name, seats, rounds, and basic data.",
+        "Optional when creating: expand «Add favorite drivers now», mark favorites and vehicle source per row; the indicated category will be created and they will be registered as confirmed participants.",
+        "In event Participants: categories, registrations if applicable, manual add, Favorite mode or «Add from favorites» in bulk; those already added from a favorite are not duplicated from that same favorite.",
+        "In Participants, set start order with the «Start order» column or up/down arrows; that order is used in presentation/TV mode for the «Next driver» block.",
+        "Link a track if needed (it must exist under Tracks).",
+        "Manage participants and times from the event screens.",
+        "In competition Times, «By Rounds» tab: record times with the general button or, for each driver without a time in that round yet, use «Times» in the «Pending this round» list to open the form with round and driver already chosen.",
+        "To fix a saved time, on the driver row use the pencil icon (edit time); the modal shows the correct driver and does not lock selection as for a new entry.",
+        "Penalties: flag icon button; opens a box to add seconds to total time. Does not apply to rows marked NP. Hover action buttons for short descriptions.",
+        "Did not participate (NP): toggle in the time form or «NP» button next to a pending driver. That driver scores 0 points in that round, but the round still counts as recorded for them to complete the round and unlock points for others.",
+        "Share public registration or status URLs with whoever applies."
+      ],
+      "tips": [
+        "Favorite drivers are private: only you see your list; it helps repeat lineups without retyping data.",
+        "If you link a favorite to a driver's public slug, you can validate it exists before saving; the name you save in the favorite is still the one you specify.",
+        "You need at least one category to add participants manually; when adding favorites while creating the event that category is created automatically.",
+        "You need tracks created if you want to link one when creating the competition.",
+        "From the list you can open participants and times depending on each event's flow.",
+        "In standings and public views, difference columns vs leader or previous show the correct sign (+ slower, − faster) even when the table is ordered by points.",
+        "Deleting a time from a round leaves the driver pending again that round; you can give them a time again or mark NP."
+      ],
+      "qa": [
+        "Presentation/TV mode (`/competitions/presentation/:slug`, `?tv=1`, OBS overlay): the «Next driver» block shows who should go on track next.",
+        "Round priority: the first round (1, then 2, …) that still has pending drivers (no recorded time and no NP) is used. Even if someone already started a later round, the block stays on the oldest round with gaps.",
+        "Within that round, the driver shown is the pending one with lowest start order (`start_order` in Participants). If no explicit order, registration date is used.",
+        "The «Current position: P…» label reflects points standings, not start order.",
+        "Example (2 rounds, 5 drivers): if 4 completed R1, 1 driver still pending in R1 and another already in R2, the pending R1 driver is shown (e.g. Eva, «Round 1 · Next on track»), not the next in R2.",
+        "When everyone completed all rounds, the block shows no pending runs left."
+      ],
+      "gotchas": [],
+      "linkTo": "/competitions",
+      "linkLabel": "Go to Competitions",
+      "keywords": [
+        "competición",
+        "competiciones",
+        "evento",
+        "participantes",
+        "inscripción",
+        "rondas",
+        "favoritos",
+        "pilotos favoritos",
+        "slug",
+        "cupo",
+        "plazas",
+        "menú",
+        "submenú",
+        "NP",
+        "no participado",
+        "penalización",
+        "editar tiempo",
+        "pendientes",
+        "organizador",
+        "tiempos",
+        "presentación",
+        "tv",
+        "próximo piloto",
+        "orden de salida",
+        "broadcast",
+        "competition",
+        "competitions",
+        "event",
+        "participants",
+        "registration",
+        "rounds",
+        "favorites",
+        "favorite drivers",
+        "quota",
+        "seats",
+        "menu",
+        "submenu",
+        "penalty",
+        "edit time",
+        "pending",
+        "organizer",
+        "presentation",
+        "next driver",
+        "start order"
+      ]
+    },
+    {
+      "id": "configuracion",
+      "title": "Settings",
+      "pathBadge": "/settings",
+      "description": "Dashboard preferences, notifications, and password change.",
+      "intro": "Threshold of days without a session on your usual track (for the Home «Pending and alerts» block), Discord webhook and Telegram Chat ID. The Account tab lets you change your password without entering the previous one (while logged in), or set one if you only use Google. You can use ?tab=notifications or ?tab=cuenta in the URL to open the desired tab.",
+      "steps": [
+        "Open Settings from the menu or user menu.",
+        "Adjust dashboard alerts and notifications (Discord/Telegram) if you use them.",
+        "On the Account tab change your password if needed."
+      ],
+      "tips": [
+        "After changing the day threshold, reload the dashboard to see the new alert criteria.",
+        "Password change on Account does not ask for the previous one: being logged in is enough.",
+        "Regenerating API key is not done here: the integration key is in My profile."
+      ],
+      "gotchas": [],
+      "linkTo": "/settings",
+      "linkLabel": "Go to Settings",
+      "keywords": [
+        "configuración",
+        "settings",
+        "alertas",
+        "discord",
+        "telegram",
+        "contraseña",
+        "cuenta",
+        "notificaciones",
+        "alerts",
+        "password",
+        "account",
+        "notifications"
+      ]
+    },
+    {
+      "id": "perfil",
+      "title": "Profile",
+      "pathBadge": "/profile",
+      "description": "Account, integration API key, and Slot Race Manager license.",
+      "intro": "View your email, generate or regenerate the API key for the X-API-Key header, and review desktop license installations. Dashboard preferences and Discord/Telegram are in Settings.",
+      "steps": [
+        "Open My profile.",
+        "Copy or regenerate the API key for integrations with the X-API-Key header.",
+        "Review Slot Race Manager license status if applicable."
+      ],
+      "tips": [
+        "Regenerating the API key invalidates the previous one: update any script or device that uses it.",
+        "User metadata syncs with the authentication provider; if something does not save, check session permissions."
+      ],
+      "gotchas": [],
+      "linkTo": "/profile",
+      "linkLabel": "Go to Profile",
+      "keywords": [
+        "perfil",
+        "api",
+        "api key",
+        "licencia",
+        "slot race",
+        "cuenta",
+        "email",
+        "profile",
+        "license",
+        "account"
+      ]
+    },
+    {
+      "id": "catalogo-admin",
+      "adminOnly": true,
+      "title": "Slot catalog (administrators)",
+      "pathBadge": "/admin/slot-catalog",
+      "description": "Shared reference catalog: CRUD, CSV/Excel import, and moderation queues.",
+      "intro": "Only users whose email is on the administrator list (LICENSE_ADMIN_EMAILS). References are maintained here with brand, name, vehicle type (same list as when creating a car), release date, and image; bulk import and request queues are available.",
+      "steps": [
+        "User menu → Slot catalog (admin).",
+        "In Items create or edit records; in Import upload CSV or Excel with columns reference, manufacturer, model_name, vehicle_type (optional) and commercial_release_year (optional, year only).",
+        "In Queues approve or reject edit or new entry requests."
+      ],
+      "tips": [
+        "In Add vehicle, the «Search catalog» tab fills data by reference for any registered user.",
+        "Import from PDF is not supported: convert to CSV or Excel first.",
+        "On import, duplicate means same reference and same brand; several brands can share the same reference code."
+      ],
+      "gotchas": [],
+      "linkTo": "/admin/slot-catalog",
+      "linkLabel": "Go to catalog (admin)",
+      "keywords": [
+        "catálogo",
+        "admin",
+        "referencia",
+        "importar",
+        "csv",
+        "excel",
+        "marca",
+        "moderación",
+        "catalog",
+        "reference",
+        "moderation"
+      ]
+    },
+    {
+      "id": "catalogo-publico",
+      "title": "Reference catalog (public)",
+      "pathBadge": "/catalogo",
+      "description": "Listing and record for each model; browse without an account; with an account you can rate and suggest changes.",
+      "intro": "From the landing page or footer you can open the public catalog: filter by brand, type, and release year, paginate, and open each reference record (image and details). Average ratings and counts appear in the list and record. When logged in you can score 1–5, suggest corrections on a record, propose a new model, and see the status of your proposals.",
+      "steps": [
+        "Open Reference catalog (route /catalogo).",
+        "Use filters or the list; click a card to view the full record.",
+        "Share the record URL; the link includes a readable fragment of the name plus the identifier.",
+        "Log in to rate (stars), open «Suggest correction», or link to «Propose new model» and «My suggestions» (routes /proponer-alta-catalogo and /mis-sugerencias-catalogo)."
+      ],
+      "tips": [
+        "Approvals are done by the team from Slot catalog (admin); until then your suggestions stay pending.",
+        "You cannot have two pending changes on the same item or two pending new entries with the same reference and brand.",
+        "In Add vehicle, the «Search catalog» tab is available to any registered user."
+      ],
+      "gotchas": [],
+      "linkTo": "/catalogo",
+      "linkLabel": "Go to public catalog",
+      "keywords": [
+        "catálogo",
+        "público",
+        "referencia",
+        "marca",
+        "slot",
+        "consultar",
+        "valorar",
+        "sugerencia",
+        "colaborar",
+        "public",
+        "rate",
+        "suggestion",
+        "collaborate"
+      ]
+    }
+  ],
+  "faq": [
+    {
+      "id": "crear-vehiculo",
+      "question": "How do I create or register a vehicle?",
+      "keywords": [
+        "crear",
+        "coche",
+        "vehículo",
+        "alta",
+        "añadir",
+        "nuevo",
+        "registrar",
+        "create",
+        "car",
+        "vehicle",
+        "add",
+        "new",
+        "register"
+      ],
+      "answerSteps": [
+        "In the menu, go to Vehicles.",
+        "Click «Add vehicle» (or go to the new vehicle route).",
+        "Fill required fields and optional ones you want (type, manufacturer, notes, etc.).",
+        "Optional: add photos to the record.",
+        "Save. You can complete specifications, components, and times later from the same record."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles/new",
+      "linkLabel": "Add vehicle"
+    },
+    {
+      "id": "api-integracion",
+      "question": "Where is the API key for integrations?",
+      "keywords": [
+        "api",
+        "clave",
+        "integración",
+        "x-api-key",
+        "header",
+        "key",
+        "integration"
+      ],
+      "answerSteps": [
+        "The integration key is in My profile, not Settings.",
+        "It is sent in the X-API-Key header on requests documented by the API.",
+        "If you regenerate the key, the old one stops working: update scripts and devices."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Go to Profile"
+    },
+    {
+      "id": "registrar-tiempos",
+      "question": "How do I record a timing session or a lap?",
+      "keywords": [
+        "tiempos",
+        "sesión",
+        "vueltas",
+        "cronómetro",
+        "registrar",
+        "carril",
+        "times",
+        "session",
+        "laps",
+        "stopwatch",
+        "register",
+        "lane"
+      ],
+      "answerSteps": [
+        "It helps to have the track registered under Tracks and the vehicle under Vehicles first.",
+        "Go to Times and locate the matching vehicle and track.",
+        "Add or edit the session with lane, lap data, and whatever the form asks for.",
+        "From a vehicle record (edit), «Lap Times Table» tab, you can add sessions manually or use «Import sessions» to load CSV (including SmartRace) or JSON; sessions are assigned to that car directly."
+      ],
+      "sectionId": "tiempos",
+      "linkTo": "/timings",
+      "linkLabel": "Go to Times"
+    },
+    {
+      "id": "circuito-antes-tiempos",
+      "question": "Do I have to create the track before entering times?",
+      "keywords": [
+        "circuito",
+        "pista",
+        "antes",
+        "orden",
+        "tiempos",
+        "track",
+        "before",
+        "order"
+      ],
+      "answerSteps": [
+        "Yes: time records stay consistent if the track exists in the Tracks section.",
+        "Create the track with name, lanes, and lengths if you use them.",
+        "You can then select it when recording sessions and in competitions."
+      ],
+      "sectionId": "circuitos",
+      "linkTo": "/circuits",
+      "linkLabel": "Go to Tracks"
+    },
+    {
+      "id": "crear-circuito",
+      "question": "How do I create or edit a track?",
+      "keywords": [
+        "circuito",
+        "pista",
+        "nuevo",
+        "carriles",
+        "longitud",
+        "track",
+        "new",
+        "lanes",
+        "length"
+      ],
+      "answerSteps": [
+        "Open Tracks in the menu.",
+        "Create a new track and enter name, optional description, number of lanes, and length per lane when applicable.",
+        "Save. The track can be used in Times and when creating competitions."
+      ],
+      "sectionId": "circuitos",
+      "linkTo": "/circuits",
+      "linkLabel": "Go to Tracks"
+    },
+    {
+      "id": "competicion-publica",
+      "question": "How do I share registration or status for a competition?",
+      "keywords": [
+        "competición",
+        "público",
+        "url",
+        "inscripción",
+        "slug",
+        "compartir",
+        "competition",
+        "public",
+        "registration",
+        "share"
+      ],
+      "answerSteps": [
+        "In Competitions create or open the event; each has an identifier (slug) in the app.",
+        "Public URLs exist for registration, status, and presentation without logging in on the main site.",
+        "Share the appropriate link with drivers or organizers depending on the event flow."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Go to Competitions"
+    },
+    {
+      "id": "pilotos-favoritos",
+      "question": "What are favorite drivers and how do I use them in a competition?",
+      "keywords": [
+        "favoritos",
+        "pilotos",
+        "habituales",
+        "amigos",
+        "lista",
+        "competición",
+        "slug",
+        "favorites",
+        "drivers",
+        "regular",
+        "friends",
+        "list"
+      ],
+      "answerSteps": [
+        "In the menu, open «Competitions» and choose «Favorite drivers» (route /pilots/favorites). Register regular drivers with name, optional default vehicle, notes, and optionally another user's public profile slug to validate the link.",
+        "When creating a competition you can expand «Add favorite drivers now»: a category is created (default «General» or your name) and selected drivers become confirmed participants without relying only on the registration link.",
+        "On event Participants you can «Add from favorites» in bulk or use «Favorite» mode for an individual participant. The same favorite is not duplicated if already registered in that competition."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/pilots/favorites",
+      "linkLabel": "Go to Favorite drivers"
+    },
+    {
+      "id": "cupo-competicion",
+      "question": "Why can't I add more participants to a competition?",
+      "keywords": [
+        "cupo",
+        "plazas",
+        "completo",
+        "límite",
+        "participantes",
+        "añadir",
+        "quota",
+        "seats",
+        "full",
+        "limit",
+        "participants",
+        "add"
+      ],
+      "answerSteps": [
+        "Each competition has a maximum number of seats defined when created.",
+        "Confirmed participants cannot exceed that quota: when reached, «Add Participant» and «Add from favorites» are disabled.",
+        "To add someone new, free a seat (e.g. remove a confirmed participant) or create another competition with more seats."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Go to Competitions"
+    },
+    {
+      "id": "competicion-tiempos-np-penalizacion",
+      "question": "How do I edit times, mark NP, or add penalties in a competition?",
+      "keywords": [
+        "competición",
+        "tiempos",
+        "editar",
+        "NP",
+        "no participado",
+        "penalización",
+        "pendientes",
+        "organizador",
+        "ronda",
+        "puntos",
+        "competition",
+        "times",
+        "edit",
+        "did not participate",
+        "penalty",
+        "pending",
+        "organizer",
+        "round",
+        "points"
+      ],
+      "answerSteps": [
+        "Open the competition as organizer and go to time management. In «By Rounds», each row has actions: pencil (edit time), flag (penalty in seconds), trash (delete that round entry). Tooltips describe each action.",
+        "If a driver has no time in that round yet, they appear in «Pending this round»: «Times» opens the form with round and driver selected; «NP» marks did not participate without valid times.",
+        "You can also record a new time or NP from the general form; when editing an existing time the driver is correctly selected.",
+        "NP: that driver gets 0 points in that round; the round still counts as completed for them and others can get round points when everyone has a record (time or NP).",
+        "Standings tables show time gaps with consistent sign (+ or −) vs leader or previous, even when ordered by points."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Go to Competitions"
+    },
+    {
+      "id": "presentacion-proximo-piloto",
+      "question": "What does the «Next driver» block show in presentation or TV?",
+      "keywords": [
+        "presentación",
+        "tv",
+        "próximo piloto",
+        "orden de salida",
+        "broadcast",
+        "obs",
+        "proyector",
+        "modo presentación",
+        "presentation",
+        "next driver",
+        "start order",
+        "projector",
+        "presentation mode"
+      ],
+      "answerSteps": [
+        "The block follows start order set in competition Participants («Start order» column), not points standings.",
+        "First the oldest round that still has pending drivers (no time and no NP) is chosen. If someone has not run round 1, the block stays on round 1 even if others started round 2.",
+        "Among pending drivers in that round, the one with lowest start order is shown; if no explicit order, registration date is used.",
+        "«Current position: P…» is points standings position, different from start order.",
+        "Access: public presentation URL (`/competitions/presentation/:slug`), TV mode (`?tv=1`), or OBS overlays from the event links hub."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Go to Competitions"
+    },
+    {
+      "id": "cambiar-contrasena",
+      "question": "How do I change my password?",
+      "keywords": [
+        "contraseña",
+        "password",
+        "cuenta",
+        "google",
+        "account"
+      ],
+      "answerSteps": [
+        "Go to Settings and open the Account tab (you can also use ?tab=cuenta in the URL).",
+        "While logged in you can set or change your password without entering the old one.",
+        "If you only sign in with Google, you can set a local password there if the app allows."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Go to Settings"
+    },
+    {
+      "id": "discord-telegram",
+      "question": "Where do I configure Discord or Telegram?",
+      "keywords": [
+        "discord",
+        "telegram",
+        "webhook",
+        "notificaciones",
+        "chat id",
+        "notifications"
+      ],
+      "answerSteps": [
+        "Notifications (Discord webhook, Telegram Chat ID) are configured in Settings, notifications tab (?tab=notifications).",
+        "My profile has account and API key; dashboard alerts and day threshold are also adjusted in Settings."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Go to Settings"
+    },
+    {
+      "id": "inventario-montar",
+      "question": "How do I deduct or install an inventory part on a vehicle?",
+      "keywords": [
+        "inventario",
+        "pieza",
+        "montar",
+        "stock",
+        "repuesto",
+        "part",
+        "install",
+        "spare"
+      ],
+      "answerSteps": [
+        "Register parts in Inventory first with category and quantity.",
+        "Open the vehicle record (edit) and use the flow to install a part from inventory when the app offers it.",
+        "Stock updates per app logic when installing or removing components."
+      ],
+      "sectionId": "inventario",
+      "linkTo": "/inventory",
+      "linkLabel": "Go to Inventory"
+    },
+    {
+      "id": "busqueda-rapida",
+      "question": "Is there quick search in the app?",
+      "keywords": [
+        "buscar",
+        "búsqueda",
+        "atajo",
+        "teclado",
+        "comando",
+        "search",
+        "shortcut",
+        "keyboard",
+        "command"
+      ],
+      "answerSteps": [
+        "The top bar has quick search for vehicles, tracks, inventory, and more.",
+        "On desktop the keyboard shortcut (e.g. Ctrl+K or Cmd+K on Mac) is usually shown next to the search field.",
+        "Open it, type, and pick a result to go to that screen."
+      ],
+      "sectionId": "inicio",
+      "linkTo": "/dashboard",
+      "linkLabel": "Go to Home"
+    },
+    {
+      "id": "exportar-vehiculos",
+      "question": "Can I export the vehicle list?",
+      "keywords": [
+        "exportar",
+        "csv",
+        "excel",
+        "descargar",
+        "lista",
+        "export",
+        "download",
+        "list"
+      ],
+      "answerSteps": [
+        "In Vehicles you can export respecting active filters and pagination.",
+        "Adjust filters first if you only want a subset of the collection.",
+        "Export reflects what you see according to limits set on screen."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Go to Vehicles"
+    },
+    {
+      "id": "importar-vehiculos",
+      "question": "How do I import vehicles from Excel or CSV?",
+      "keywords": [
+        "importar",
+        "vehículos",
+        "excel",
+        "csv",
+        "xlsx",
+        "hoja",
+        "mapeo",
+        "columnas",
+        "vista previa",
+        "duplicados",
+        "plantilla",
+        "vehicles",
+        "sheet",
+        "columns",
+        "template"
+      ],
+      "answerSteps": [
+        "Open Vehicles and click «Import» (next to «Export CSV»). Choose a supported CSV or Excel file; if the workbook has multiple sheets, specify the sheet index (Excel).",
+        "The wizard detects rows and headers even with blank rows above or empty columns; column letters (A, B, C…) align with Excel or Numbers when mapping.",
+        "Review or adjust mapping: which file column maps to model, brand, type, dates, reference, etc. You can set columns to «ignore». Only brand and model are required in mapping; the rest is optional.",
+        "Check the preview: it updates when mapping changes. Choose how to handle duplicates vs your collection (skip, import, or update) and confirm.",
+        "About type: in the manual add form type is required; in import it is not. If unmapped or empty, complete type by editing the record after import. Purchase dates and release year accept several formats (ISO, European, Excel serial) and save in the app format.",
+        "See the Vehicles section of the help for format details and the full flow."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Go to Vehicles"
+    },
+    {
+      "id": "importar-tiempos",
+      "question": "Can I import lap times?",
+      "keywords": [
+        "importar",
+        "tiempos",
+        "csv",
+        "json",
+        "smartrace",
+        "pegar",
+        "ficha",
+        "sesiones",
+        "times",
+        "paste",
+        "record",
+        "sessions"
+      ],
+      "answerSteps": [
+        "Yes. In Times click «Import sessions»: choose CSV or JSON, download the template if needed, paste text or pick a file. Select the vehicle to associate sessions with (unless CSV/JSON includes vehicle_id per row or object).",
+        "On the vehicle record, «Lap Times Table» tab, there is also «Import sessions» with the same flow (custom CSV, SmartRace, or JSON); the car is fixed and sessions save for that vehicle.",
+        "With multi-driver SmartRace CSV you can choose rows to import; if track or lane is missing, pick from your registered tracks. The session car in SmartRace is the one you choose in the modal, not the export «Car» column.",
+        "Have tracks created under Tracks that you will use and check errors from the wizard before closing."
+      ],
+      "sectionId": "tiempos",
+      "linkTo": "/timings",
+      "linkLabel": "Go to Times"
+    },
+    {
+      "id": "licencia-srm",
+      "question": "What is the Slot Race Manager license and where do I see it?",
+      "keywords": [
+        "licencia",
+        "slot race",
+        "srm",
+        "escritorio",
+        "instalaciones",
+        "license",
+        "desktop",
+        "installations"
+      ],
+      "answerSteps": [
+        "In My profile you can view Slot Race Manager license information and associated desktop installations.",
+        "The API key for integrations with X-API-Key header is also managed in My profile.",
+        "Dashboard alert and notification preferences are in Settings."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Go to Profile"
+    },
+    {
+      "id": "filtros-vehiculos",
+      "question": "Are filters saved in Vehicles?",
+      "keywords": [
+        "filtros",
+        "guardar",
+        "navegador",
+        "tabla",
+        "cuadrícula",
+        "filters",
+        "save",
+        "browser",
+        "table",
+        "grid"
+      ],
+      "answerSteps": [
+        "Vehicle list filters are saved in this browser for your next visit.",
+        "You can switch grid or table view and filter by manufacturer, type, museum/workshop, etc.",
+        "Export respects active filters."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Go to Vehicles"
+    },
+    {
+      "id": "mantenimiento-coche",
+      "question": "Where do I record a car's maintenance?",
+      "keywords": [
+        "mantenimiento",
+        "revision",
+        "historial",
+        "ficha",
+        "maintenance",
+        "service",
+        "history",
+        "record"
+      ],
+      "answerSteps": [
+        "Open the vehicle from Vehicles and enter its detailed record.",
+        "The record has sections for maintenance and components as exposed by the app.",
+        "Times and maintenance can be related to see performance evolution."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Go to Vehicles"
+    },
+    {
+      "id": "alertas-dashboard",
+      "question": "What are alerts or pending items on Home?",
+      "keywords": [
+        "alertas",
+        "pendientes",
+        "días",
+        "circuito",
+        "dashboard",
+        "alerts",
+        "pending",
+        "days",
+        "track"
+      ],
+      "answerSteps": [
+        "In Settings you can set a threshold of days without a session on your usual track.",
+        "That value feeds the pending and alerts block on the Home panel.",
+        "After changing the threshold, reload Home to see the updated criteria."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Go to Settings"
+    },
+    {
+      "id": "datos-no-cargan",
+      "question": "Data or charts do not load properly. What should I do?",
+      "keywords": [
+        "error",
+        "carga",
+        "conexión",
+        "vacío",
+        "gráficos",
+        "load",
+        "connection",
+        "empty",
+        "charts"
+      ],
+      "answerSteps": [
+        "Check your internet connection; the dashboard combines several server requests.",
+        "Reload the page and make sure you use the latest app version.",
+        "If the problem continues, log out and back in in case the token expired."
+      ],
+      "sectionId": "inicio",
+      "linkTo": "/dashboard",
+      "linkLabel": "Go to Home"
+    },
+    {
+      "id": "diferencia-perfil-settings",
+      "question": "What is the difference between Profile and Settings?",
+      "keywords": [
+        "perfil",
+        "configuración",
+        "diferencia",
+        "api",
+        "alertas",
+        "difference",
+        "alerts"
+      ],
+      "answerSteps": [
+        "My profile: email, API key (X-API-Key header), Slot Race Manager license and similar integrations.",
+        "Settings: dashboard alerts, day threshold, Discord, Telegram, and Account tab (password).",
+        "Regenerate the API key only from Profile, not Settings."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Go to Profile"
+    }
+  ]
+}
