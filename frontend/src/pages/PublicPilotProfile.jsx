@@ -173,7 +173,7 @@ const PublicPilotProfile = () => {
     };
   }, [slug, t]);
 
-  const vehicles = data?.vehicles || [];
+  const vehicles = useMemo(() => data?.vehicles || [], [data?.vehicles]);
   const types = useMemo(() => {
     const set = new Set();
     for (const v of vehicles) {

@@ -142,8 +142,7 @@ describe('PublicPilotProfile', () => {
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Adrian Palomera');
     });
 
-    const collection = screen.getByRole('heading', { name: /colección|collection|sammlung/i }).closest('section');
-    expect(collection).toBeTruthy();
+    const collection = screen.getByRole('region', { name: /colección|collection|sammlung/i });
     expect(within(collection).getByText('Porsche 911 RSR')).toBeInTheDocument();
     expect(within(collection).getByText('Audi R8')).toBeInTheDocument();
     expect(within(collection).getByText('Ferrari F1')).toBeInTheDocument();
