@@ -31,7 +31,7 @@ const PROFILE = {
       manufacturer: 'Slot.it',
       model: 'Porsche 911 RSR',
       type: 'GT',
-      image: 'https://cdn.example/vehicle-images/porshe.webp',
+      image: 'https://abcdxyz.supabase.co/storage/v1/object/public/vehicle-images/vehicles/u1/porsche.webp',
     },
     {
       id: 'v2',
@@ -45,7 +45,7 @@ const PROFILE = {
       manufacturer: 'Scalextric',
       model: 'Ferrari F1',
       type: 'F1',
-      image: 'https://cdn.example/vehicle-images/ferrari.webp',
+      image: 'https://abcdxyz.supabase.co/storage/v1/object/public/vehicle-images/vehicles/u1/ferrari.webp',
     },
   ],
   best_times_by_circuit: [
@@ -149,7 +149,7 @@ describe('PublicPilotProfile', () => {
     expect(within(collection).getByText('Ferrari F1')).toBeInTheDocument();
 
     const porscheImg = screen.getByRole('img', { name: 'Slot.it Porsche 911 RSR' });
-    expect(porscheImg).toHaveAttribute('src', expect.stringContaining('porshe.webp'));
+    expect(porscheImg).toHaveAttribute('src', expect.stringContaining('porsche.webp'));
     expect(screen.queryByRole('img', { name: 'Ninco Audi R8' })).not.toBeInTheDocument();
     expect(within(collection).getByText(/sin imagen|no image|kein bild/i)).toBeInTheDocument();
 
@@ -159,6 +159,23 @@ describe('PublicPilotProfile', () => {
     expect(screen.getByText('Test Copa')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /comparar|compare|vergleichen/i })).toBeInTheDocument();
     expect(screen.getByTestId('footer')).toBeInTheDocument();
+  });
+
+  test('no muestra una foto ajena (picsum) en la card', async () => {
+    await renderProfile({
+      ...PROFILE,
+      vehicles: [
+        {
+          id: 'v-fake',
+          manufacturer: 'Slot.it',
+          model: 'Porsche 911 RSR',
+          type: 'GT',
+          image: 'https://picsum.photos/seed/slot-porsche/640/480',
+        },
+      ],
+    });
+    expect(screen.queryByRole('img', { name: 'Slot.it Porsche 911 RSR' })).not.toBeInTheDocument();
+    expect(screen.getByText(/sin imagen|no image|kein bild/i)).toBeInTheDocument();
   });
 
   test('filtra la parrilla de la colección', async () => {

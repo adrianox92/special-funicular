@@ -26,7 +26,7 @@ import {
 } from '../components/ui/table';
 import Footer from '../components/Footer';
 import { formatDate } from '../utils/formatUtils';
-import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import { publicVehicleImageSrc } from '../utils/publicVehicleImageSrc';
 import { BRAND } from '../utils/documentTitle';
 import { useLocale } from '../hooks/useLocale';
 import { localizePath } from '../i18n/localeUtils';
@@ -90,7 +90,7 @@ function StatRow({ label, value }) {
 
 function PublicVehicleCard({ vehicle, highlight, t }) {
   const title = [vehicle.manufacturer, vehicle.model].filter(Boolean).join(' ');
-  const src = cachedStorageImageUrl(vehicle.image);
+  const src = publicVehicleImageSrc(vehicle.image);
 
   return (
     <article className="group h-full overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md">

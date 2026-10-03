@@ -3,7 +3,7 @@ const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { normalizePilotSlug } = require('../lib/pilotProfileUtils');
 const { calculatePoints } = require('../lib/pointsCalculator');
 const { fetchVehicleImagesForVehicleIds } = require('../lib/fetchVehicleImagesForVehicleIds');
-const { pickPreferredVehicleImageUrl } = require('../lib/vehicleImagePick');
+const { resolvePublicVehicleCardImage } = require('../lib/publicVehicleCardImage');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -143,7 +143,7 @@ router.get('/:slug', async (req, res) => {
 
     const { data: vehicles, error: vErr } = await supabase
       .from('vehicles')
-      .select('id, model, manufacturer, type')
+      .select('id, model, manufacturer, type, catalog_item_id')
       .eq('user_id', userId)
       .order('model', { ascending: true });
 
@@ -154,10 +154,27 @@ router.get('/:slug', async (req, res) => {
     const vehicleIds = (vehicles || []).map((v) => v.id);
     const imagesByVehicle = new Map();
     if (vehicleIds.length > 0) {
-      const { data: images } = await fetchVehicleImagesForVehicleIds(supabase, vehicleIds);
+      // Service role: vehicle_images suele estar restringido por RLS al dueño.
+      // El perfil es público a propósito; solo devolvemos la URL de la foto.
+      const { data: images } = await fetchVehicleImagesForVehicleIds(supabaseAdmin, vehicleIds);
       for (const img of images || []) {
         if (!imagesByVehicle.has(img.vehicle_id)) imagesByVehicle.set(img.vehicle_id, []);
         imagesByVehicle.get(img.vehicle_id).push(img);
+      }
+    }
+
+    const catalogIds = [
+      ...new Set((vehicles || []).map((v) => v.catalog_item_id).filter(Boolean)),
+    ];
+    const catalogImageById = new Map();
+    if (catalogIds.length > 0) {
+      const { data: catalogRows } = await supabaseAdmin
+        .from('slot_catalog_items')
+        .select('id, image_url')
+        .in('id', catalogIds);
+      for (const row of catalogRows || []) {
+        const url = row.image_url != null ? String(row.image_url).trim() : '';
+        if (url) catalogImageById.set(row.id, url);
       }
     }
 
@@ -166,7 +183,10 @@ router.get('/:slug', async (req, res) => {
       model: v.model,
       manufacturer: v.manufacturer,
       type: v.type,
-      image: pickPreferredVehicleImageUrl(imagesByVehicle.get(v.id) || []) || null,
+      image: resolvePublicVehicleCardImage({
+        vehicleImages: imagesByVehicle.get(v.id) || [],
+        catalogImageUrl: catalogImageById.get(v.catalog_item_id) || null,
+      }),
     }));
 
     /** @type {Map<string, any>} */
