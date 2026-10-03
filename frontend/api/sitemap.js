@@ -3,6 +3,7 @@
  * Cubre /sitemap.xml (índice) y /sitemap-static.xml, /sitemap-catalog-N.xml.
  */
 const { getBackendOrigin, sitemapBackendPath } = require('./_lib/backendUrls');
+const { catalogInternalHeaders, gateCatalogRequest } = require('./_lib/catalogBotGate');
 
 module.exports = async function handler(req, res) {
   const origin = getBackendOrigin();
@@ -21,18 +22,30 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  if (path.startsWith('/sitemap-catalog-')) {
+    const allowed = await gateCatalogRequest(req, res, { html: false });
+    if (!allowed) return;
+  }
+
   const target = `${origin}${path}`;
+  const upstreamHeaders = { Accept: 'application/xml, text/xml, */*' };
+  if (path.startsWith('/sitemap-catalog-')) {
+    Object.assign(upstreamHeaders, catalogInternalHeaders());
+  }
 
   try {
     const upstream = await fetch(target, {
-      headers: { Accept: 'application/xml, text/xml, */*' },
+      headers: upstreamHeaders,
       redirect: 'follow',
     });
     const body = await upstream.text();
     const ct = upstream.headers.get('content-type') || 'application/xml; charset=utf-8';
     res.status(upstream.status).setHeader('Content-Type', ct);
     if (upstream.ok) {
-      res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      const cache = path.startsWith('/sitemap-catalog-')
+        ? 'private, max-age=300'
+        : 'public, s-maxage=3600, stale-while-revalidate=86400';
+      res.setHeader('Cache-Control', cache);
     }
     res.send(body);
   } catch (e) {
