@@ -13,6 +13,21 @@ import deCatalog from '../../i18n/locales/de/catalog.json';
 import esCommon from '../../i18n/locales/es/common.json';
 import enCommon from '../../i18n/locales/en/common.json';
 import deCommon from '../../i18n/locales/de/common.json';
+import esInventory from '../../i18n/locales/es/inventory.json';
+import enInventory from '../../i18n/locales/en/inventory.json';
+import deInventory from '../../i18n/locales/de/inventory.json';
+import esSeller from '../../i18n/locales/es/seller.json';
+import enSeller from '../../i18n/locales/en/seller.json';
+import deSeller from '../../i18n/locales/de/seller.json';
+import esHelp from '../../i18n/locales/es/help.json';
+import enHelp from '../../i18n/locales/en/help.json';
+import deHelp from '../../i18n/locales/de/help.json';
+import esProfile from '../../i18n/locales/es/profile.json';
+import enProfile from '../../i18n/locales/en/profile.json';
+import deProfile from '../../i18n/locales/de/profile.json';
+import esCompetitions from '../../i18n/locales/es/competitions.json';
+import enCompetitions from '../../i18n/locales/en/competitions.json';
+import deCompetitions from '../../i18n/locales/de/competitions.json';
 
 function leafKeys(obj, prefix = '') {
   return Object.entries(obj).flatMap(([key, value]) => {
@@ -35,6 +50,13 @@ describe('i18n key parity es/en/de', () => {
   test('legal', () => expectSameKeys(esLegal, enLegal, deLegal));
   test('slotRaceManager', () => expectSameKeys(esSrm, enSrm, deSrm));
   test('catalog', () => expectSameKeys(esCatalog, enCatalog, deCatalog));
+  test('inventory', () => expectSameKeys(esInventory, enInventory, deInventory));
+  test('seller', () => expectSameKeys(esSeller, enSeller, deSeller));
+  test('help', () => expectSameKeys(esHelp, enHelp, deHelp));
+  test('profile', () => expectSameKeys(esProfile, enProfile, deProfile));
+  test('competitions manage', () => {
+    expectSameKeys(esCompetitions.manage, enCompetitions.manage, deCompetitions.manage);
+  });
   test('common cookies', () => {
     expectSameKeys(esCommon.cookies, enCommon.cookies, deCommon.cookies);
   });

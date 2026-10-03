@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { Button } from '../components/ui/button';
@@ -21,9 +22,16 @@ import { Switch } from '../components/ui/switch';
 import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2, BookOpen, ExternalLink } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { PARTNER_SWAGGER_PRODUCTION_URL } from '../utils/partnerApiUrls';
+import { toIntlLocale } from '../i18n/localeUtils';
+
+const API_HEADER_NAME = 'X-API-Key';
+const LICENSE_ADMIN_SERVER_ENV = 'LICENSE_ADMIN_EMAILS';
+const LICENSE_ADMIN_CLIENT_ENV = 'REACT_APP_LICENSE_ADMIN_EMAILS';
 
 const Profile = () => {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation('profile');
+  const intlLocale = toIntlLocale(i18n.language);
   const { user, logout } = useAuth();
   const [apiKey, setApiKey] = useState(null);
   const [keyExists, setKeyExists] = useState(false);
@@ -60,6 +68,25 @@ const Profile = () => {
 
   const isLicenseAdmin = isLicenseAdminUser(user);
 
+  const apiDescriptionParts = useMemo(
+    () => t('api.description', { header: '__HDR__' }).split('__HDR__'),
+    [t, i18n.language],
+  );
+
+  const licenseAdminDescriptionParts = useMemo(() => {
+    const linkText = t('license.adminSearchLink');
+    const full = t('license.adminDescription');
+    const linkIdx = full.indexOf(linkText);
+    if (linkIdx < 0) {
+      return { beforeFirst: full, between: '', afterSecond: '', linkText, suffix: '' };
+    }
+    const prefix = full.slice(0, linkIdx);
+    const suffix = full.slice(linkIdx + linkText.length);
+    const [beforeFirst, betweenAndAfter] = prefix.split(LICENSE_ADMIN_SERVER_ENV);
+    const [between, afterSecond] = (betweenAndAfter || '').split(LICENSE_ADMIN_CLIENT_ENV);
+    return { beforeFirst, between, afterSecond, linkText, suffix };
+  }, [t, i18n.language]);
+
   const fetchKeyList = useCallback(async () => {
     try {
       const { data } = await api.get('/api-keys');
@@ -79,11 +106,11 @@ const Profile = () => {
       setCreatedAt(data.created_at);
       await fetchKeyList();
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al obtener la API key');
+      setError(err.response?.data?.error || t('api.fetchError'));
     } finally {
       setLoading(false);
     }
-  }, [fetchKeyList]);
+  }, [fetchKeyList, t]);
 
   useEffect(() => {
     fetchApiKey();
@@ -100,7 +127,7 @@ const Profile = () => {
         enabled: !!data.enabled,
       });
     } catch (err) {
-      setPilotError(err.response?.data?.error || 'Error al cargar el perfil público');
+      setPilotError(err.response?.data?.error || t('pilot.loadError'));
     } finally {
       setPilotLoading(false);
     }
@@ -125,10 +152,10 @@ const Profile = () => {
         display_name: data.display_name || '',
         enabled: !!data.enabled,
       });
-      setPilotSuccess('Perfil público guardado.');
+      setPilotSuccess(t('pilot.saved'));
       setTimeout(() => setPilotSuccess(null), 4000);
     } catch (err) {
-      setPilotError(err.response?.data?.error || 'Error al guardar');
+      setPilotError(err.response?.data?.error || t('pilot.saveError'));
     } finally {
       setPilotSaving(false);
     }
@@ -140,10 +167,10 @@ const Profile = () => {
     const url = `${window.location.origin}/piloto/${encodeURIComponent(s)}`;
     try {
       await navigator.clipboard.writeText(url);
-      setPilotSuccess('Enlace copiado al portapapeles');
+      setPilotSuccess(t('pilot.copied'));
       setTimeout(() => setPilotSuccess(null), 3000);
     } catch {
-      setPilotError('No se pudo copiar el enlace');
+      setPilotError(t('pilot.copyFailed'));
     }
   };
 
@@ -154,7 +181,7 @@ const Profile = () => {
       const { data } = await api.get('/license-account/me');
       setLicenseInfo(data);
     } catch (err) {
-      setLicenseError(err.response?.data?.error || err.message || 'Error al cargar licencia');
+      setLicenseError(err.response?.data?.error || err.message || t('license.loadError'));
       setLicenseInfo(null);
     } finally {
       setLicenseLoading(false);
@@ -176,7 +203,7 @@ const Profile = () => {
       });
       await fetchLicenseInfo();
     } catch (err) {
-      setLicenseError(err.response?.data?.error || err.message || 'Error al actualizar');
+      setLicenseError(err.response?.data?.error || err.message || t('license.updateError'));
     } finally {
       setAdminPaidSaving(false);
     }
@@ -186,10 +213,10 @@ const Profile = () => {
     if (!apiKey) return;
     try {
       await navigator.clipboard.writeText(apiKey);
-      setSuccess('API key copiada al portapapeles');
+      setSuccess(t('api.copied'));
       setTimeout(() => setSuccess(null), 3000);
     } catch {
-      setError('No se pudo copiar al portapapeles');
+      setError(t('api.copyFailed'));
     }
   };
 
@@ -204,11 +231,11 @@ const Profile = () => {
       setKeyMessage(null);
       setCreatedAt(data.created_at);
       setShowRegenerateConfirm(false);
-      setSuccess('API key regenerada correctamente. Guarda la nueva clave de forma segura.');
+      setSuccess(t('api.regenerated'));
       setTimeout(() => setSuccess(null), 5000);
       await fetchKeyList();
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al regenerar la API key');
+      setError(err.response?.data?.error || t('api.regenerateError'));
     } finally {
       setRegenerating(false);
     }
@@ -222,10 +249,10 @@ const Profile = () => {
       const { data } = await api.post('/api-keys', { name: newKeyName.trim() || undefined });
       setNewPlainKey(data.api_key);
       setNewKeyName('');
-      setSuccess('Nueva API key creada. Cópiala ahora; no se volverá a mostrar.');
+      setSuccess(t('api.created'));
       await fetchKeyList();
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al crear la API key');
+      setError(err.response?.data?.error || t('api.createError'));
     } finally {
       setCreatingKey(false);
     }
@@ -238,10 +265,10 @@ const Profile = () => {
       await api.delete(`/api-keys/${id}`);
       if (newPlainKey) setNewPlainKey(null);
       await fetchKeyList();
-      setSuccess('API key revocada.');
+      setSuccess(t('api.revoked'));
       setTimeout(() => setSuccess(null), 4000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al revocar la API key');
+      setError(err.response?.data?.error || t('api.revokeError'));
     } finally {
       setRevokingId(null);
     }
@@ -267,7 +294,7 @@ const Profile = () => {
       await logout();
       navigate('/login', { replace: true });
     } catch (err) {
-      setAccountDeleteError(err.response?.data?.error || 'No se pudo eliminar la cuenta');
+      setAccountDeleteError(err.response?.data?.error || t('danger.deleteFailed'));
     } finally {
       setAccountDeleting(false);
     }
@@ -276,11 +303,11 @@ const Profile = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mi Perfil</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
         <p className="text-muted-foreground">
-          Cuenta, API de integración y licencia Slot Race Manager. Las preferencias del dashboard y las notificaciones están en{' '}
+          {t('lead')}{' '}
           <Link to="/settings" className="text-primary font-medium underline-offset-4 hover:underline">
-            Configuración
+            {t('settingsLink')}
           </Link>
           .
         </p>
@@ -288,10 +315,10 @@ const Profile = () => {
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="general">{t('tabs.general')}</TabsTrigger>
           <TabsTrigger value="license">
             <KeyRound className="size-4 mr-1 inline" aria-hidden />
-            Licencia
+            {t('tabs.license')}
           </TabsTrigger>
         </TabsList>
 
@@ -300,13 +327,13 @@ const Profile = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="size-5" />
-            Información de la cuenta
+            {t('account.title')}
           </CardTitle>
-          <CardDescription>Datos básicos de tu cuenta</CardDescription>
+          <CardDescription>{t('account.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Email</label>
+            <label className="text-sm font-medium text-muted-foreground">{t('account.email')}</label>
             <p className="text-base">{user?.email || '—'}</p>
           </div>
         </CardContent>
@@ -316,9 +343,9 @@ const Profile = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Trash2 className="size-5" aria-hidden />
-            Zona peligrosa
+            {t('danger.title')}
           </CardTitle>
-          <CardDescription>Eliminar tu cuenta y todos los datos asociados de forma permanente.</CardDescription>
+          <CardDescription>{t('danger.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!showDeleteAccountConfirm ? (
@@ -331,14 +358,14 @@ const Profile = () => {
                 setDeleteAccountPassword('');
               }}
             >
-              Eliminar mi cuenta
+              {t('danger.deleteAccount')}
             </Button>
           ) : (
             <Alert variant="destructive">
               <AlertDescription>
-                <span className="block mb-3">¿Estás seguro? Esta acción no se puede deshacer.</span>
+                <span className="block mb-3">{t('danger.confirm')}</span>
                 <div className="space-y-2 mb-3">
-                  <Label htmlFor="delete-account-password">Contraseña</Label>
+                  <Label htmlFor="delete-account-password">{t('danger.password')}</Label>
                   <div className="relative">
                     <Input
                       id="delete-account-password"
@@ -356,7 +383,7 @@ const Profile = () => {
                       className="absolute right-1 top-1/2 -translate-y-1/2 size-8"
                       onClick={() => setShowDeleteAccountPassword((v) => !v)}
                       disabled={accountDeleting}
-                      aria-label={showDeleteAccountPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-label={showDeleteAccountPassword ? t('danger.hidePassword') : t('danger.showPassword')}
                     >
                       {showDeleteAccountPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </Button>
@@ -371,10 +398,10 @@ const Profile = () => {
                     disabled={accountDeleting || !deleteAccountPassword.trim()}
                   >
                     {accountDeleting ? <Spinner className="size-4 mr-2" /> : null}
-                    Sí, eliminar
+                    {t('danger.confirmDelete')}
                   </Button>
                   <Button type="button" size="sm" variant="outline" onClick={cancelDeleteAccount} disabled={accountDeleting}>
-                    Cancelar
+                    {t('danger.cancel')}
                   </Button>
                 </div>
                 {accountDeleteError && (
@@ -390,18 +417,15 @@ const Profile = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Globe className="size-5" />
-            Perfil público de piloto
+            {t('pilot.title')}
           </CardTitle>
-          <CardDescription>
-            Página agregada con tus mejores tiempos por circuito e historial de competiciones. Solo se muestra si
-            activas la visibilidad y defines un slug único.
-          </CardDescription>
+          <CardDescription>{t('pilot.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {pilotLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner className="size-4" />
-              Cargando…
+              {t('pilot.loading')}
             </div>
           ) : (
             <>
@@ -413,30 +437,30 @@ const Profile = () => {
                   disabled={pilotSaving}
                 />
                 <Label htmlFor="pilot-enabled" className="cursor-pointer">
-                  Mostrar perfil público
+                  {t('pilot.showPublic')}
                 </Label>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="pilot-slug">Slug (URL)</Label>
+                <Label htmlFor="pilot-slug">{t('pilot.slug')}</Label>
                 <Input
                   id="pilot-slug"
-                  placeholder="ej. mi-nick"
+                  placeholder={t('pilot.slugPlaceholder')}
                   value={pilotForm.slug}
                   onChange={(e) => setPilotForm((prev) => ({ ...prev, slug: e.target.value }))}
                   disabled={pilotSaving}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Solo minúsculas, números y guiones (3–40 caracteres). URL:{' '}
+                  {t('pilot.slugHint')}{' '}
                   <code className="rounded bg-muted px-1">
-                    /piloto/{pilotForm.slug?.trim() || 'tu-slug'}
+                    /piloto/{pilotForm.slug?.trim() || t('pilot.slugFallback')}
                   </code>
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="pilot-display">Nombre para mostrar</Label>
+                <Label htmlFor="pilot-display">{t('pilot.displayName')}</Label>
                 <Input
                   id="pilot-display"
-                  placeholder="Nombre público (opcional)"
+                  placeholder={t('pilot.displayPlaceholder')}
                   value={pilotForm.display_name}
                   onChange={(e) => setPilotForm((prev) => ({ ...prev, display_name: e.target.value }))}
                   disabled={pilotSaving}
@@ -445,11 +469,11 @@ const Profile = () => {
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={savePilotProfile} disabled={pilotSaving}>
                   {pilotSaving ? <Spinner className="size-4 mr-2" /> : null}
-                  Guardar
+                  {t('pilot.save')}
                 </Button>
                 <Button type="button" variant="outline" onClick={copyPilotUrl} disabled={pilotSaving || !pilotForm.enabled || !pilotForm.slug?.trim()}>
                   <Copy className="size-4 mr-2" />
-                  Copiar enlace público
+                  {t('pilot.copyPublic')}
                 </Button>
               </div>
               {pilotError && (
@@ -471,11 +495,12 @@ const Profile = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="size-5" />
-            API Key de integración
+            {t('api.title')}
           </CardTitle>
           <CardDescription>
-            Usa esta clave para conectar tu proyecto de gestión de tiempos con esta aplicación.
-            Envía el header <code className="rounded bg-muted px-1 py-0.5 text-xs">X-API-Key</code> en tus peticiones.
+            {apiDescriptionParts[0]}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">{API_HEADER_NAME}</code>
+            {apiDescriptionParts[1]}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -483,7 +508,7 @@ const Profile = () => {
             <Button asChild variant="outline" size="sm">
               <Link to="/developers">
                 <BookOpen className="size-4 mr-2" />
-                Documentación para integradores
+                {t('api.docs')}
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
@@ -492,7 +517,7 @@ const Profile = () => {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Swagger (probar API)
+                {t('api.swagger')}
                 <ExternalLink className="size-3.5 ml-2 opacity-70" />
               </a>
             </Button>
@@ -500,7 +525,7 @@ const Profile = () => {
           {loading ? (
             <div className="flex items-center gap-2">
               <Spinner className="size-4" />
-              <span className="text-sm text-muted-foreground">Cargando API key...</span>
+              <span className="text-sm text-muted-foreground">{t('api.loading')}</span>
             </div>
           ) : (
             <>
@@ -523,7 +548,7 @@ const Profile = () => {
                       className="size-8"
                       onClick={() => setShowKey(!showKey)}
                       disabled={!apiKey}
-                      aria-label={showKey ? 'Ocultar' : 'Mostrar'}
+                      aria-label={showKey ? t('api.hide') : t('api.show')}
                     >
                       {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </Button>
@@ -533,7 +558,7 @@ const Profile = () => {
                       className="size-8"
                       onClick={handleCopy}
                       disabled={!apiKey}
-                      aria-label="Copiar"
+                      aria-label={t('api.copy')}
                     >
                       <Copy className="size-4" />
                     </Button>
@@ -551,23 +576,20 @@ const Profile = () => {
                   ) : (
                     <RefreshCw className="size-4 mr-2" />
                   )}
-                  {apiKey || keyExists ? 'Regenerar' : 'Generar API key'}
+                  {apiKey || keyExists ? t('api.regenerate') : t('api.generate')}
                 </Button>
               </div>
 
               {showRegenerateConfirm && (
                 <Alert variant="destructive">
                   <AlertDescription>
-                    <span className="block mb-2">
-                      ¿Regenerar la API key principal? Esa clave dejará de funcionar de inmediato.
-                      Las keys adicionales no se tocan. Actualiza la clave en tu otro proyecto.
-                    </span>
+                    <span className="block mb-2">{t('api.regenerateConfirm')}</span>
                     <div className="flex gap-2 mt-2">
                       <Button size="sm" variant="destructive" onClick={handleRegenerate} disabled={regenerating}>
-                        Sí, regenerar
+                        {t('api.confirmRegenerate')}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setShowRegenerateConfirm(false)} disabled={regenerating}>
-                        Cancelar
+                        {t('api.cancel')}
                       </Button>
                     </div>
                   </AlertDescription>
@@ -576,16 +598,13 @@ const Profile = () => {
 
               {createdAt && (
                 <p className="text-xs text-muted-foreground">
-                  Creada el {new Date(createdAt).toLocaleString('es-ES')}
+                  {t('api.createdAt', { date: new Date(createdAt).toLocaleString(intlLocale) })}
                 </p>
               )}
 
               <div className="space-y-3 border-t pt-4">
-                <p className="text-sm font-medium">Otras API keys</p>
-                <p className="text-xs text-muted-foreground">
-                  Puedes crear keys adicionales (hasta 8 activas). Revocar no elimina la principal.
-                  Regenerar solo rota la clave principal de arriba.
-                </p>
+                <p className="text-sm font-medium">{t('api.extraTitle')}</p>
+                <p className="text-xs text-muted-foreground">{t('api.extraHint')}</p>
                 {extraKeys.filter((k) => !k.revoked_at).length > 0 && (
                   <ul className="space-y-2 text-sm">
                     {extraKeys
@@ -596,13 +615,13 @@ const Profile = () => {
                           className="flex flex-col gap-1 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div>
-                            <span className="font-medium">{k.name || 'Sin nombre'}</span>
+                            <span className="font-medium">{k.name || t('api.unnamed')}</span>
                             <span className="ml-2 font-mono text-xs text-muted-foreground">
                               {k.key_prefix ? `${k.key_prefix}…` : ''}
                             </span>
                             {k.created_at && (
                               <span className="ml-2 text-xs text-muted-foreground">
-                                {new Date(k.created_at).toLocaleDateString('es-ES')}
+                                {new Date(k.created_at).toLocaleDateString(intlLocale)}
                               </span>
                             )}
                           </div>
@@ -614,7 +633,7 @@ const Profile = () => {
                             onClick={() => handleRevokeKey(k.id)}
                           >
                             {revokingId === k.id ? <Spinner className="size-4 mr-2" /> : null}
-                            Revocar
+                            {t('api.revoke')}
                           </Button>
                         </li>
                       ))}
@@ -623,21 +642,21 @@ const Profile = () => {
                 {newPlainKey && (
                   <Alert>
                     <AlertDescription>
-                      <span className="block mb-2">Nueva clave (cópiala ahora):</span>
+                      <span className="block mb-2">{t('api.newKeyCopied')}</span>
                       <code className="block break-all rounded bg-muted px-2 py-1 text-xs">{newPlainKey}</code>
                     </AlertDescription>
                   </Alert>
                 )}
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
-                    placeholder="Nombre (opcional), ej. Pista casa"
+                    placeholder={t('api.newKeyNamePlaceholder')}
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
                     maxLength={80}
                   />
                   <Button type="button" variant="outline" onClick={handleCreateExtraKey} disabled={creatingKey}>
                     {creatingKey ? <Spinner className="size-4 mr-2" /> : null}
-                    Crear otra key
+                    {t('api.createAnother')}
                   </Button>
                 </div>
               </div>
@@ -655,7 +674,7 @@ const Profile = () => {
                   onClick={() => { setLoading(true); setError(null); fetchApiKey(); }}
                   className="mt-2"
                 >
-                  Reintentar
+                  {t('api.retry')}
                 </Button>
               </AlertDescription>
             </Alert>
@@ -675,38 +694,38 @@ const Profile = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <KeyRound className="size-5" />
-                Slot Race Manager (DS200)
+                {t('license.title')}
               </CardTitle>
-              <CardDescription>
-                Instalaciones registradas de la app de escritorio. Máximo 3 ordenadores por cuenta con licencia. Para
-                liberar un dispositivo, contacta con soporte.
-              </CardDescription>
+              <CardDescription>{t('license.description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {licenseLoading && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Spinner className="size-4" />
-                  Cargando…
+                  {t('license.loading')}
                 </div>
               )}
               {!licenseLoading && licenseInfo && (
                 <>
                   <p className="text-sm">
-                    Estado:{' '}
+                    {t('license.status')}{' '}
                     <strong className={licenseInfo.is_paid ? 'text-green-600' : 'text-amber-600'}>
-                      {licenseInfo.is_paid ? 'Licencia completa' : 'Versión de prueba (solo en la app)'}
+                      {licenseInfo.is_paid ? t('license.paid') : t('license.trial')}
                     </strong>
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Instalaciones: {licenseInfo.installations_used ?? 0} / {licenseInfo.installations_max ?? 3}
+                    {t('license.installations', {
+                      used: licenseInfo.installations_used ?? 0,
+                      max: licenseInfo.installations_max ?? 3,
+                    })}
                   </p>
                   {Array.isArray(licenseInfo.installations) && licenseInfo.installations.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>ID instalación</TableHead>
-                          <TableHead>Registro</TableHead>
-                          <TableHead>Última conexión</TableHead>
+                          <TableHead>{t('license.colId')}</TableHead>
+                          <TableHead>{t('license.colRegistered')}</TableHead>
+                          <TableHead>{t('license.colLastSeen')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -717,12 +736,12 @@ const Profile = () => {
                             </TableCell>
                             <TableCell className="text-xs">
                               {row.registered_at
-                                ? new Date(row.registered_at).toLocaleString('es-ES')
+                                ? new Date(row.registered_at).toLocaleString(intlLocale)
                                 : '—'}
                             </TableCell>
                             <TableCell className="text-xs">
                               {row.last_seen_at
-                                ? new Date(row.last_seen_at).toLocaleString('es-ES')
+                                ? new Date(row.last_seen_at).toLocaleString(intlLocale)
                                 : '—'}
                             </TableCell>
                           </TableRow>
@@ -730,7 +749,7 @@ const Profile = () => {
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Aún no hay instalaciones registradas.</p>
+                    <p className="text-sm text-muted-foreground">{t('license.empty')}</p>
                   )}
                 </>
               )}
@@ -745,14 +764,17 @@ const Profile = () => {
           {isLicenseAdmin && (
             <Card>
               <CardHeader>
-                <CardTitle>Administración (licencia de pago)</CardTitle>
+                <CardTitle>{t('license.adminTitle')}</CardTitle>
                 <CardDescription>
-                  Solo visible si tu email está en <code className="text-xs">LICENSE_ADMIN_EMAILS</code> del servidor y en{' '}
-                  <code className="text-xs">REACT_APP_LICENSE_ADMIN_EMAILS</code> del frontend. Para{' '}
+                  {licenseAdminDescriptionParts.beforeFirst}
+                  <code className="text-xs">{LICENSE_ADMIN_SERVER_ENV}</code>
+                  {licenseAdminDescriptionParts.between}
+                  <code className="text-xs">{LICENSE_ADMIN_CLIENT_ENV}</code>
+                  {licenseAdminDescriptionParts.afterSecond}
                   <Link to="/admin/slot-race-licenses" className="text-primary underline-offset-4 hover:underline font-medium">
-                    buscar otras cuentas por email
+                    {licenseAdminDescriptionParts.linkText}
                   </Link>
-                  , usa la página de admin.
+                  {licenseAdminDescriptionParts.suffix}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -762,15 +784,15 @@ const Profile = () => {
                     checked={!!licenseInfo?.is_paid}
                     onCheckedChange={handleAdminTogglePaid}
                     disabled={adminPaidSaving || !licenseInfo}
-                    aria-label="Licencia de pago Slot Race Manager"
+                    aria-label={t('license.adminPaidAria')}
                   />
                   <Label htmlFor="admin-paid" className="cursor-pointer">
-                    Marcar mi cuenta como licencia de pago (Slot Race Manager)
+                    {t('license.adminPaidLabel')}
                   </Label>
                 </div>
                 {adminPaidSaving && (
                   <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Spinner className="size-4" /> Guardando…
+                    <Spinner className="size-4" /> {t('license.saving')}
                   </p>
                 )}
               </CardContent>

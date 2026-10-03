@@ -198,11 +198,36 @@ export const INVENTORY_CATEGORIES = [
 ].sort((a, b) => a.label.localeCompare(b.label, getIntlLocale()));
 
 export const INVENTORY_UNITS = [
-  { value: 'uds', label: 'Unidades' },
-  { value: 'pares', label: 'Pares' },
-  { value: 'ml', label: 'ml' },
-  { value: 'metros', label: 'Metros' },
-  { value: 'juego', label: 'Juego' },
+  {
+    value: 'uds',
+    get label() {
+      return i18n.t('units.uds', { ns: 'inventory', defaultValue: 'Unidades' });
+    },
+  },
+  {
+    value: 'pares',
+    get label() {
+      return i18n.t('units.pares', { ns: 'inventory', defaultValue: 'Pares' });
+    },
+  },
+  {
+    value: 'ml',
+    get label() {
+      return i18n.t('units.ml', { ns: 'inventory', defaultValue: 'ml' });
+    },
+  },
+  {
+    value: 'metros',
+    get label() {
+      return i18n.t('units.metros', { ns: 'inventory', defaultValue: 'Metros' });
+    },
+  },
+  {
+    value: 'juego',
+    get label() {
+      return i18n.t('units.juego', { ns: 'inventory', defaultValue: 'Juego' });
+    },
+  },
 ];
 
 const FORBIDDEN_FILE_NAME_CHARS = new Set('<>:"/\\|?*');

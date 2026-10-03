@@ -68,6 +68,9 @@ export function useLocale() {
       } catch {
         /* ignore */
       }
+      import('../lib/supabase')
+        .then(({ supabase }) => supabase.auth.updateUser({ data: { locale: lng } }))
+        .catch(() => {});
     },
     [i18n, location.hash, location.pathname, location.search, navigate, pathWithoutLocale],
   );

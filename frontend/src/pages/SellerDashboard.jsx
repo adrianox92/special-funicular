@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
@@ -38,11 +39,12 @@ import {
   Upload,
 } from 'lucide-react';
 import { catalogSlugify } from '../utils/catalogSlug';
+import { getIntlLocale } from '../utils/formatUtils';
 
 function formatPrice(price, currency) {
   if (price == null) return '—';
   try {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat(getIntlLocale(), {
       style: 'currency',
       currency: currency || 'EUR',
       minimumFractionDigits: 2,
@@ -69,6 +71,7 @@ const emptyListingForm = {
 // Sección: Perfil de tienda
 // ----------------------------------------------------------------
 function ProfileSection({ profile, onProfileUpdate }) {
+  const { t } = useTranslation('seller');
   const [form, setForm] = useState({
     store_name:                profile?.store_name                ?? '',
     store_description:         profile?.store_description         ?? '',
@@ -96,7 +99,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
   const saveProfile = async (e) => {
     e.preventDefault();
     if (!form.store_name.trim()) {
-      toast.error('El nombre de la tienda es obligatorio');
+      toast.error(t('profile.toastStoreRequired'));
       return;
     }
     setSaving(true);
@@ -110,9 +113,9 @@ function ProfileSection({ profile, onProfileUpdate }) {
         affiliate_param_template: form.affiliate_param_template.trim() || null,
       });
       onProfileUpdate(data);
-      toast.success('Perfil actualizado');
+      toast.success(t('profile.toastUpdated'));
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al guardar el perfil');
+      toast.error(err.response?.data?.error || t('profile.toastSaveError'));
     } finally {
       setSaving(false);
     }
@@ -143,9 +146,9 @@ function ProfileSection({ profile, onProfileUpdate }) {
       onProfileUpdate(data);
       setLogoFile(null);
       if (logoInputRef.current) logoInputRef.current.value = '';
-      toast.success('Logo actualizado');
+      toast.success(t('profile.toastLogoUpdated'));
     } catch (err) {
-      toast.error(err.message || 'Error al subir el logo');
+      toast.error(err.message || t('profile.toastLogoError'));
     } finally {
       setLogoUploading(false);
     }
@@ -156,7 +159,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Store className="size-4" />
-          Perfil de tienda
+          {t('profile.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -166,7 +169,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
             {profile?.logo_url ? (
               <img
                 src={cachedStorageImageUrl(profile.logo_url)}
-                alt="Logo de la tienda"
+                alt={t('profile.logoAlt')}
                 className="h-16 w-28 rounded-md object-contain bg-muted border border-border"
               />
             ) : (
@@ -176,7 +179,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
             )}
           </div>
           <div className="flex-1 space-y-2">
-            <Label htmlFor="logo-input">Logo de la tienda</Label>
+            <Label htmlFor="logo-input">{t('profile.logoLabel')}</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="logo-input"
@@ -198,16 +201,16 @@ function ProfileSection({ profile, onProfileUpdate }) {
                 ) : (
                   <Upload className="size-4 mr-1.5" />
                 )}
-                Subir
+                {t('profile.upload')}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">PNG, JPG o WebP. Máx. 4 MB.</p>
+            <p className="text-xs text-muted-foreground">{t('profile.logoHint')}</p>
           </div>
         </div>
 
         <form onSubmit={saveProfile} className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="store_name">Nombre de la tienda *</Label>
+            <Label htmlFor="store_name">{t('profile.storeName')}</Label>
             <Input
               id="store_name"
               value={form.store_name}
@@ -216,7 +219,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="store_description">Descripción (opcional)</Label>
+            <Label htmlFor="store_description">{t('profile.description')}</Label>
             <Input
               id="store_description"
               value={form.store_description}
@@ -224,7 +227,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="store_url">Enlace a la tienda (opcional)</Label>
+            <Label htmlFor="store_url">{t('profile.storeUrl')}</Label>
             <Input
               id="store_url"
               type="url"
@@ -237,14 +240,14 @@ function ProfileSection({ profile, onProfileUpdate }) {
           {/* Configuración de tracking UTM/afiliados */}
           <details className="border rounded-lg p-3 space-y-3">
             <summary className="cursor-pointer text-sm font-medium select-none">
-              Configuración de tracking y afiliados
+              {t('profile.trackingSummary')}
             </summary>
             <p className="text-xs text-muted-foreground">
-              Estos valores se añaden automáticamente a todos tus enlaces de listado al hacer clic.
+              {t('profile.trackingLead')}
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="utm_source" className="text-xs">utm_source</Label>
+                <Label htmlFor="utm_source" className="text-xs">{t('profile.utmSource')}</Label>
                 <Input
                   id="utm_source"
                   value={form.default_utm_source}
@@ -253,7 +256,7 @@ function ProfileSection({ profile, onProfileUpdate }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="utm_medium" className="text-xs">utm_medium</Label>
+                <Label htmlFor="utm_medium" className="text-xs">{t('profile.utmMedium')}</Label>
                 <Input
                   id="utm_medium"
                   value={form.default_utm_medium}
@@ -263,22 +266,22 @@ function ProfileSection({ profile, onProfileUpdate }) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="affiliate_tpl" className="text-xs">Parámetro de afiliado (opcional)</Label>
+              <Label htmlFor="affiliate_tpl" className="text-xs">{t('profile.affiliateParam')}</Label>
               <Input
                 id="affiliate_tpl"
                 value={form.affiliate_param_template}
-                placeholder="aff=XYZ123  o  tag=mi-tag"
+                placeholder={t('profile.affiliatePlaceholder')}
                 onChange={(e) => setForm((f) => ({ ...f, affiliate_param_template: e.target.value }))}
               />
               <p className="text-xs text-muted-foreground">
-                Formato: <code className="font-mono">clave=valor</code> sin el símbolo <code className="font-mono">?</code>. Solo se añade si la clave no existe ya en la URL.
+                {t('profile.affiliateHint')}
               </p>
             </div>
           </details>
 
           <Button type="submit" disabled={saving} size="sm">
             {saving ? <Spinner className="size-4 mr-2" /> : null}
-            Guardar perfil
+            {t('profile.save')}
           </Button>
         </form>
       </CardContent>
@@ -290,13 +293,14 @@ function ProfileSection({ profile, onProfileUpdate }) {
 // Sección: solicitar alta como vendedor
 // ----------------------------------------------------------------
 function RequestAccessSection({ onCreated }) {
+  const { t } = useTranslation('seller');
   const [form, setForm] = useState({ store_name: '', store_description: '', store_url: '' });
   const [saving, setSaving] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.store_name.trim()) {
-      toast.error('El nombre de la tienda es obligatorio');
+      toast.error(t('requestAccess.toastStoreRequired'));
       return;
     }
     setSaving(true);
@@ -307,9 +311,9 @@ function RequestAccessSection({ onCreated }) {
         store_url: form.store_url.trim() || null,
       });
       onCreated(data);
-      toast.success('Solicitud enviada. El equipo la revisará pronto.');
+      toast.success(t('requestAccess.toastSubmitted'));
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al enviar la solicitud');
+      toast.error(err.response?.data?.error || t('requestAccess.toastError'));
     } finally {
       setSaving(false);
     }
@@ -318,16 +322,15 @@ function RequestAccessSection({ onCreated }) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Solicitar acceso como vendedor</CardTitle>
+        <CardTitle className="text-base">{t('requestAccess.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
-          Para poder añadir productos del catálogo a la venta, necesitas que el equipo apruebe tu tienda.
-          Rellena el formulario y recibirás confirmación por correo.
+          {t('requestAccess.lead')}
         </p>
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="req_store_name">Nombre de la tienda *</Label>
+            <Label htmlFor="req_store_name">{t('requestAccess.storeName')}</Label>
             <Input
               id="req_store_name"
               value={form.store_name}
@@ -336,7 +339,7 @@ function RequestAccessSection({ onCreated }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="req_store_description">Descripción (opcional)</Label>
+            <Label htmlFor="req_store_description">{t('requestAccess.description')}</Label>
             <Input
               id="req_store_description"
               value={form.store_description}
@@ -344,7 +347,7 @@ function RequestAccessSection({ onCreated }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="req_store_url">Web de la tienda (opcional)</Label>
+            <Label htmlFor="req_store_url">{t('requestAccess.storeUrl')}</Label>
             <Input
               id="req_store_url"
               type="url"
@@ -355,7 +358,7 @@ function RequestAccessSection({ onCreated }) {
           </div>
           <Button type="submit" disabled={saving}>
             {saving ? <Spinner className="size-4 mr-2" /> : null}
-            Enviar solicitud
+            {t('requestAccess.submit')}
           </Button>
         </form>
       </CardContent>
@@ -367,6 +370,7 @@ function RequestAccessSection({ onCreated }) {
 // Diálogo para buscar un ítem del catálogo
 // ----------------------------------------------------------------
 function CatalogItemPicker({ value, label, onChange }) {
+  const { t } = useTranslation('seller');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -408,29 +412,29 @@ function CatalogItemPicker({ value, label, onChange }) {
 
   return (
     <div className="space-y-2">
-      <Label>Ítem del catálogo *</Label>
+      <Label>{t('catalogPicker.label')}</Label>
       <div className="flex gap-2">
         <Input
           value={label || ''}
           readOnly
-          placeholder="Selecciona un ítem del catálogo…"
+          placeholder={t('catalogPicker.placeholder')}
           className="flex-1 bg-muted cursor-default"
           onClick={() => setOpen(true)}
         />
         <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-          Buscar
+          {t('catalogPicker.search')}
         </Button>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Buscar ítem del catálogo</DialogTitle>
+            <DialogTitle>{t('catalogPicker.dialogTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
               autoFocus
-              placeholder="Referencia, marca o modelo…"
+              placeholder={t('catalogPicker.queryPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -440,7 +444,7 @@ function CatalogItemPicker({ value, label, onChange }) {
               </div>
             )}
             {!searching && results.length === 0 && query.trim().length >= 2 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Sin resultados</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('catalogPicker.noResults')}</p>
             )}
             {!searching && results.length > 0 && (
               <ul className="max-h-64 overflow-y-auto divide-y divide-border border rounded-md">
@@ -466,7 +470,7 @@ function CatalogItemPicker({ value, label, onChange }) {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
+              {t('catalogPicker.cancel')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -479,6 +483,7 @@ function CatalogItemPicker({ value, label, onChange }) {
 // Diálogo: crear / editar listado
 // ----------------------------------------------------------------
 function ListingDialog({ open, onOpenChange, listing, onSaved }) {
+  const { t } = useTranslation('seller');
   const isEdit = Boolean(listing?.id);
   const [form, setForm] = useState(emptyListingForm);
   const [saving, setSaving] = useState(false);
@@ -509,15 +514,15 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!form.catalog_item_id) {
-      toast.error('Selecciona un ítem del catálogo');
+      toast.error(t('listingDialog.toastSelectCatalog'));
       return;
     }
     if (!form.title.trim()) {
-      toast.error('El título es obligatorio');
+      toast.error(t('listingDialog.toastTitleRequired'));
       return;
     }
     if (!form.url.trim()) {
-      toast.error('La URL es obligatoria');
+      toast.error(t('listingDialog.toastUrlRequired'));
       return;
     }
     setSaving(true);
@@ -541,9 +546,9 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
       }
       onSaved(data, isEdit);
       onOpenChange(false);
-      toast.success(isEdit ? 'Listado actualizado' : 'Listado creado');
+      toast.success(isEdit ? t('listingDialog.toastUpdated') : t('listingDialog.toastCreated'));
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al guardar');
+      toast.error(err.response?.data?.error || t('listingDialog.toastSaveError'));
     } finally {
       setSaving(false);
     }
@@ -553,7 +558,7 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Editar listado' : 'Añadir listado'}</DialogTitle>
+          <DialogTitle>{isEdit ? t('listingDialog.editTitle') : t('listingDialog.addTitle')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4 py-2">
           {!isEdit && (
@@ -567,7 +572,7 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
           )}
           {isEdit && listing?.catalog_item && (
             <div className="space-y-1">
-              <Label>Ítem del catálogo</Label>
+              <Label>{t('listingDialog.catalogItem')}</Label>
               <p className="text-sm rounded-md border bg-muted px-3 py-2">
                 <span className="font-mono text-xs text-muted-foreground mr-2">
                   {listing.catalog_item.reference}
@@ -582,21 +587,21 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="listing_title">Título *</Label>
+            <Label htmlFor="listing_title">{t('listingDialog.title')}</Label>
             <Input
               id="listing_title"
-              placeholder="Ej: Scalextric Ford GT Race 1:32"
+              placeholder={t('listingDialog.titlePlaceholder')}
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="listing_url">Enlace al producto *</Label>
+            <Label htmlFor="listing_url">{t('listingDialog.url')}</Label>
             <Input
               id="listing_url"
               type="url"
-              placeholder="https://tienda.com/producto"
+              placeholder={t('listingDialog.urlPlaceholder')}
               value={form.url}
               onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
               required
@@ -604,7 +609,7 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="listing_price">Precio (opcional)</Label>
+              <Label htmlFor="listing_price">{t('listingDialog.price')}</Label>
               <Input
                 id="listing_price"
                 type="number"
@@ -616,7 +621,7 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="listing_currency">Moneda</Label>
+              <Label htmlFor="listing_currency">{t('listingDialog.currency')}</Label>
               <Input
                 id="listing_currency"
                 value={form.currency}
@@ -628,47 +633,47 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="listing_notes">Notas (opcional)</Label>
+            <Label htmlFor="listing_notes">{t('listingDialog.notes')}</Label>
             <Input
               id="listing_notes"
-              placeholder="Ej: Envío gratuito, stock limitado…"
+              placeholder={t('listingDialog.notesPlaceholder')}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
             />
           </div>
           {/* Condición */}
           <div className="space-y-2">
-            <Label htmlFor="listing_condition">Condición (opcional)</Label>
+            <Label htmlFor="listing_condition">{t('listingDialog.condition')}</Label>
             <select
               id="listing_condition"
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
               value={form.condition}
               onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))}
             >
-              <option value="">Sin especificar</option>
-              <option value="new">Nuevo</option>
-              <option value="used">Usado</option>
-              <option value="preorder">Preventa</option>
+              <option value="">{t('listingDialog.conditionUnset')}</option>
+              <option value="new">{t('listingDialog.conditionNew')}</option>
+              <option value="used">{t('listingDialog.conditionUsed')}</option>
+              <option value="preorder">{t('listingDialog.conditionPreorder')}</option>
             </select>
           </div>
 
           {/* UTM campaign personalizada */}
           <div className="space-y-2">
-            <Label htmlFor="listing_utm">Campaña UTM personalizada (opcional)</Label>
+            <Label htmlFor="listing_utm">{t('listingDialog.utmCampaign')}</Label>
             <Input
               id="listing_utm"
-              placeholder="ej: verano-2026"
+              placeholder={t('listingDialog.utmPlaceholder')}
               value={form.custom_utm_campaign}
               onChange={(e) => setForm((f) => ({ ...f, custom_utm_campaign: e.target.value }))}
             />
             <p className="text-xs text-muted-foreground">
-              Si lo dejas vacío se usará <code className="font-mono">listing_&lt;id&gt;</code> como campaña.
+              {t('listingDialog.utmHint')}
             </p>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border px-3 py-2">
             <Label htmlFor="listing_active" className="cursor-pointer">
-              Listado activo (visible en el catálogo)
+              {t('listingDialog.activeLabel')}
             </Label>
             <Switch
               id="listing_active"
@@ -678,11 +683,11 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
+              {t('listingDialog.cancel')}
             </Button>
             <Button type="submit" disabled={saving}>
               {saving ? <Spinner className="size-4 mr-2" /> : null}
-              {isEdit ? 'Guardar cambios' : 'Crear listado'}
+              {isEdit ? t('listingDialog.saveChanges') : t('listingDialog.create')}
             </Button>
           </DialogFooter>
         </form>
@@ -695,10 +700,11 @@ function ListingDialog({ open, onOpenChange, listing, onSaved }) {
 // Tabla de listados
 // ----------------------------------------------------------------
 function ListingsTable({ listings, onEdit, onDelete }) {
+  const { t } = useTranslation('seller');
   if (listings.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-6 text-center">
-        Aún no tienes listados. Haz clic en «Añadir listado» para empezar.
+        {t('table.empty')}
       </p>
     );
   }
@@ -708,14 +714,14 @@ function ListingsTable({ listings, onEdit, onDelete }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Ítem del catálogo</TableHead>
-            <TableHead>Título</TableHead>
-            <TableHead className="text-right">Precio</TableHead>
+            <TableHead>{t('table.catalogItem')}</TableHead>
+            <TableHead>{t('table.title')}</TableHead>
+            <TableHead className="text-right">{t('table.price')}</TableHead>
             <TableHead className="text-center">
-              <MousePointerClick className="size-4 inline-block" aria-label="Clics" />
+              <MousePointerClick className="size-4 inline-block" aria-label={t('table.clicksAria')} />
             </TableHead>
-            <TableHead className="text-center">Activo</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-center">{t('table.active')}</TableHead>
+            <TableHead className="text-right">{t('table.actions')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -759,9 +765,9 @@ function ListingsTable({ listings, onEdit, onDelete }) {
               </TableCell>
               <TableCell className="text-center">
                 {l.active ? (
-                  <Badge variant="default" className="text-xs">Sí</Badge>
+                  <Badge variant="default" className="text-xs">{t('table.yes')}</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-xs text-muted-foreground">No</Badge>
+                  <Badge variant="outline" className="text-xs text-muted-foreground">{t('table.no')}</Badge>
                 )}
               </TableCell>
               <TableCell className="text-right">
@@ -771,7 +777,7 @@ function ListingsTable({ listings, onEdit, onDelete }) {
                     variant="ghost"
                     className="size-7"
                     onClick={() => onEdit(l)}
-                    aria-label="Editar"
+                    aria-label={t('table.editAria')}
                   >
                     <Pencil className="size-3.5" />
                   </Button>
@@ -780,7 +786,7 @@ function ListingsTable({ listings, onEdit, onDelete }) {
                     variant="ghost"
                     className="size-7 text-destructive hover:text-destructive"
                     onClick={() => onDelete(l)}
-                    aria-label="Eliminar"
+                    aria-label={t('table.deleteAria')}
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
@@ -798,6 +804,7 @@ function ListingsTable({ listings, onEdit, onDelete }) {
 // Página principal
 // ----------------------------------------------------------------
 export default function SellerDashboard() {
+  const { t } = useTranslation('seller');
   const { user } = useAuth();
   const [profile, setProfile] = useState(undefined);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -876,9 +883,9 @@ export default function SellerDashboard() {
     try {
       await api.delete(`/store-listings/${deleteTarget.id}`);
       setListings((prev) => prev.filter((l) => l.id !== deleteTarget.id));
-      toast.success('Listado eliminado');
+      toast.success(t('deleteDialog.toastDeleted'));
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al eliminar');
+      toast.error(err.response?.data?.error || t('deleteDialog.toastError'));
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
@@ -889,11 +896,11 @@ export default function SellerDashboard() {
     return (
       <Alert>
         <AlertDescription>
-          Debes{' '}
+          {t('loginRequired.prefix')}{' '}
           <Link to="/login" className="text-primary underline">
-            iniciar sesión
+            {t('loginRequired.login')}
           </Link>{' '}
-          para acceder al panel de vendedor.
+          {t('loginRequired.suffix')}
         </AlertDescription>
       </Alert>
     );
@@ -913,16 +920,16 @@ export default function SellerDashboard() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Store className="size-6" />
-            Panel de vendedor
+            {t('page.title')}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gestiona los productos de tu tienda en el catálogo.
+            {t('page.subtitle')}
           </p>
         </div>
         {profile?.approved && (
           <Button onClick={openCreate}>
             <PlusCircle className="size-4 mr-2" />
-            Añadir listado
+            {t('page.addListing')}
           </Button>
         )}
       </div>
@@ -938,21 +945,23 @@ export default function SellerDashboard() {
           <AlertDescription>
             {profile.rejection_reason ? (
               <>
-                Tu solicitud de alta como vendedor ha sido <strong>rechazada</strong>.
+                {t('pending.rejectedLead')}
                 <br />
-                <span className="mt-1 block text-sm">Motivo: {profile.rejection_reason}</span>
+                <span className="mt-1 block text-sm">
+                  {t('pending.reasonLabel')} {profile.rejection_reason}
+                </span>
                 <span className="mt-2 block text-sm">
-                  Revisa las{' '}
+                  {t('pending.rejectedFooterBefore')}
                   <a href="/politicas/seller-terms" className="underline" target="_blank" rel="noopener noreferrer">
-                    condiciones para vendedores
-                  </a>{' '}
-                  y contacta con el equipo si crees que es un error.
+                    {t('pending.sellerTermsLink')}
+                  </a>
+                  {t('pending.rejectedFooterAfter')}
                 </span>
               </>
             ) : (
               <>
-                Tu solicitud de alta como vendedor está <strong>pendiente de aprobación</strong>.
-                Recibirás acceso completo una vez que el equipo la revise.
+                {t('pending.pendingLead')}{' '}
+                {t('pending.pendingDetail')}
               </>
             )}
           </AlertDescription>
@@ -968,7 +977,7 @@ export default function SellerDashboard() {
       {profile?.approved && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Mis listados</CardTitle>
+            <CardTitle className="text-base">{t('page.myListings')}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {listingsLoading ? (
@@ -995,18 +1004,18 @@ export default function SellerDashboard() {
         <Dialog open={Boolean(deleteTarget)} onOpenChange={() => setDeleteTarget(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Eliminar listado</DialogTitle>
+              <DialogTitle>{t('deleteDialog.title')}</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
-              ¿Seguro que quieres eliminar «{deleteTarget.title}»? Esta acción no se puede deshacer.
+              {t('deleteDialog.description', { title: deleteTarget.title })}
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-                Cancelar
+                {t('deleteDialog.cancel')}
               </Button>
               <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
                 {deleting ? <Spinner className="size-4 mr-2" /> : null}
-                Eliminar
+                {t('deleteDialog.delete')}
               </Button>
             </DialogFooter>
           </DialogContent>

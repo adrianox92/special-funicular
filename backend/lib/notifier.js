@@ -306,45 +306,53 @@ async function sendTestNotification(userId) {
  * @param {object} digest
  */
 async function sendWeeklyDigestNotification(userId, digest) {
+  const { getEmailCopy, interpolate } = require('./emailCopy');
   const meta = await fetchUserMetadata(userId);
+  const copy = getEmailCopy(meta.locale);
   const discordUrl = typeof meta.webhook_discord_url === 'string' ? meta.webhook_discord_url.trim() : '';
   const tgToken = getTelegramBotTokenFromEnv();
   const tgChat = meta.telegram_chat_id != null ? String(meta.telegram_chat_id).trim() : '';
 
   if (!discordUrl && (!tgToken || !tgChat)) {
-    const err = new Error(
-      'Configura al menos un webhook de Discord o tu Chat ID de Telegram para recibir el resumen.',
-    );
+    const err = new Error(copy.digest.noChannels);
     err.code = 'NO_CHANNELS';
     throw err;
   }
 
   const lines = [
-    '📊 **Resumen semanal — Scalextric Collection**',
-    `Sesiones (7 días): ${digest.sessionCount ?? 0}`,
+    copy.digest.title,
+    interpolate(copy.digest.sessions, { count: digest.sessionCount ?? 0 }),
   ];
   if (digest.guidedCount > 0) {
-    lines.push(`Entrenamientos guiados: ${digest.guidedCount}`);
+    lines.push(interpolate(copy.digest.guided, { count: digest.guidedCount }));
   }
   if (digest.newPbs?.length) {
-    lines.push('', '**Nuevos PB:**');
+    lines.push('', copy.digest.newPbs);
     digest.newPbs.forEach((pb) => {
-      lines.push(`• ${pb.vehicle} — ${pb.circuit} (carril ${pb.lane ?? '—'}): ${pb.time} (−${pb.improvement}s)`);
+      lines.push(
+        interpolate(copy.digest.pbLine, {
+          vehicle: pb.vehicle,
+          circuit: pb.circuit,
+          lane: pb.lane ?? '—',
+          time: pb.time,
+          improvement: pb.improvement,
+        }),
+      );
     });
   }
   if (digest.goals?.length) {
-    lines.push('', '**Metas de entrenamiento:**');
+    lines.push('', copy.digest.goals);
     digest.goals.forEach((g) => {
       const label =
         g.goal_type === 'lap_time'
-          ? `PB objetivo ${Number(g.target_value).toFixed(3)}s`
-          : `Consistencia ≤ ${Number(g.target_value).toFixed(1)}%`;
-      const status = g.achieved ? '✅ lograda' : `${g.progressPct ?? 0}%`;
+          ? interpolate(copy.digest.goalLap, { value: Number(g.target_value).toFixed(3) })
+          : interpolate(copy.digest.goalConsistency, { value: Number(g.target_value).toFixed(1) });
+      const status = g.achieved ? copy.digest.goalAchieved : `${g.progressPct ?? 0}%`;
       lines.push(`• ${g.vehicle?.manufacturer ?? ''} ${g.vehicle?.model ?? ''} — ${g.circuit ?? ''}: ${label} (${status})`);
     });
   }
   if (digest.maintenancePending > 0) {
-    lines.push('', `⚠️ Mantenimiento pendiente en ${digest.maintenancePending} registro(s) antiguo(s).`);
+    lines.push('', interpolate(copy.digest.maintenance, { count: digest.maintenancePending }));
   }
 
   const textPlain = lines.map((l) => l.replace(/\*\*/g, '')).join('\n').slice(0, 4096);

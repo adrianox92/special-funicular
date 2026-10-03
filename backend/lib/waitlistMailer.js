@@ -1,10 +1,12 @@
 'use strict';
 
+const { getEmailCopy, interpolate } = require('./emailCopy');
+
 /**
- * Envía email cuando un signup pasa de lista de espera a pendiente de aprobación (Resend API).
+ * Envía email cuando un depósito pasa de lista de espera a pendiente de aprobación (Resend API).
  * @returns {Promise<{ ok: boolean, skipped?: boolean }>}
  */
-async function sendWaitlistPromotionEmail({ to, name, competitionName, signupUrl }) {
+async function sendWaitlistPromotionEmail({ to, name, competitionName, signupUrl, locale }) {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.warn('[waitlist] RESEND_API_KEY no configurado; no se envía email de lista de espera');
@@ -16,15 +18,22 @@ async function sendWaitlistPromotionEmail({ to, name, competitionName, signupUrl
     process.env.CONTACT_FROM ||
     'Slot Database <onboarding@resend.dev>';
 
+  const copy = getEmailCopy(locale);
   const safeName = name ? String(name).slice(0, 120) : '';
-  const safeComp = competitionName ? String(competitionName).slice(0, 200) : 'la competición';
-  const subject = `Plaza disponible — ${safeComp}`;
+  const safeComp = competitionName
+    ? String(competitionName).slice(0, 200)
+    : copy.waitlist.fallbackCompetition;
+  const subject = interpolate(copy.waitlist.subject, { competition: safeComp });
+  const greeting = safeName
+    ? interpolate(copy.waitlist.greetingNamed, { name: safeName })
+    : copy.waitlist.greeting;
+  const body = interpolate(copy.waitlist.body, { competition: safeComp });
   const html = `
 <!DOCTYPE html>
 <html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#111;">
-  <p>Hola${safeName ? ` ${safeName}` : ''},</p>
-  <p>Se ha liberado una plaza en <strong>${safeComp}</strong>. Tu solicitud pasa a estar <strong>pendiente de aprobación</strong> por el organizador.</p>
-  <p><a href="${signupUrl}">Ver la página de la competición</a></p>
+  <p>${greeting}</p>
+  <p>${body}</p>
+  <p><a href="${signupUrl}">${copy.waitlist.cta}</a></p>
   <p style="color:#666;font-size:13px;">Slot Database</p>
 </body></html>`;
 
