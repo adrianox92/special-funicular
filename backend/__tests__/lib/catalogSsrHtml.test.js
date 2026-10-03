@@ -209,6 +209,24 @@ describe('catalog-ssr bot gate', () => {
     expect(res.headers['x-robots-tag']).toMatch(/noindex/);
   });
 
+  test('WhatsApp no es rechazado en la puerta (vista previa al compartir)', async () => {
+    const res = mockRes();
+    await catalogSsrHandler(
+      {
+        method: 'GET',
+        url: '/catalogo',
+        headers: {
+          host: '127.0.0.1:9',
+          'x-forwarded-proto': 'http',
+          'user-agent': 'WhatsApp/2.23.20.0',
+        },
+        query: {},
+      },
+      res,
+    );
+    expect(res.statusCode).not.toBe(403);
+  });
+
   test('Chrome no es rechazado en la puerta (sigue al SSR)', async () => {
     const res = mockRes();
     await catalogSsrHandler(

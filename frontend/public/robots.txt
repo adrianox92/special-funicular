@@ -115,4 +115,17 @@ Disallow: /de/katalog
 Disallow: /api/public/catalog
 Disallow: /sitemap-catalog-
 
+# Vista previa al compartir un enlace (OG). No indexan el catálogo.
+User-agent: facebookexternalhit
+User-agent: Facebot
+User-agent: WhatsApp
+User-agent: Twitterbot
+User-agent: Slackbot
+User-agent: LinkedInBot
+User-agent: Discordbot
+User-agent: TelegramBot
+Allow: /catalogo
+Allow: /en/catalog
+Allow: /de/katalog
+
 Sitemap: https://www.slotdatabase.es/sitemap.xml
