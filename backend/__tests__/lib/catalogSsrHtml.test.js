@@ -12,6 +12,7 @@ const {
   catalogSlugify,
 } = require('../../../frontend/api/_lib/catalogSeoHtml');
 const { sitemapBackendPath } = require('../../../frontend/api/_lib/backendUrls');
+const catalogSsrHandler = require('../../../frontend/api/catalog-ssr');
 
 describe('parsePublicCatalogPath', () => {
   test('ficha ES / EN / DE', () => {
@@ -168,6 +169,63 @@ describe('catalogSeoHtml', () => {
     expect(out).toContain(`rel="canonical" href="${canonical}"`);
     expect(out).toContain(`property="og:url" content="${canonical}"`);
     expect(canonical).toMatch(/^https:\/\/www\.slotdatabase\.es\//);
+  });
+});
+
+describe('catalog-ssr bot gate', () => {
+  function mockRes() {
+    return {
+      statusCode: 200,
+      headers: {},
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      setHeader(key, value) {
+        this.headers[String(key).toLowerCase()] = value;
+        return this;
+      },
+      send(body) {
+        this.body = body;
+        return this;
+      },
+    };
+  }
+
+  test('GPTBot recibe 403 y no el HTML del catálogo', async () => {
+    const res = mockRes();
+    await catalogSsrHandler(
+      {
+        method: 'GET',
+        url: '/catalogo',
+        headers: { 'user-agent': 'GPTBot' },
+        query: {},
+      },
+      res,
+    );
+    expect(res.statusCode).toBe(403);
+    expect(String(res.body)).toContain('Catálogo no disponible para clientes automatizados');
+    expect(res.headers['x-robots-tag']).toMatch(/noindex/);
+  });
+
+  test('Chrome no es rechazado en la puerta (sigue al SSR)', async () => {
+    const res = mockRes();
+    await catalogSsrHandler(
+      {
+        method: 'GET',
+        url: '/catalogo',
+        headers: {
+          host: '127.0.0.1:9',
+          'x-forwarded-proto': 'http',
+          'user-agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        },
+        query: {},
+      },
+      res,
+    );
+    expect(res.statusCode).not.toBe(403);
   });
 });
 
