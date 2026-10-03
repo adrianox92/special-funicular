@@ -2,6 +2,8 @@ const express = require('express');
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { normalizePilotSlug } = require('../lib/pilotProfileUtils');
 const { calculatePoints } = require('../lib/pointsCalculator');
+const { fetchVehicleImagesForVehicleIds } = require('../lib/fetchVehicleImagesForVehicleIds');
+const { pickPreferredVehicleImageUrl } = require('../lib/vehicleImagePick');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -150,17 +152,13 @@ router.get('/:slug', async (req, res) => {
     }
 
     const vehicleIds = (vehicles || []).map((v) => v.id);
-    const imagesMap = {};
+    const imagesByVehicle = new Map();
     if (vehicleIds.length > 0) {
-      const { data: images } = await supabase
-        .from('vehicle_images')
-        .select('vehicle_id, image_url')
-        .in('vehicle_id', vehicleIds);
-      (images || []).forEach((img) => {
-        if (!imagesMap[img.vehicle_id]) {
-          imagesMap[img.vehicle_id] = img.image_url;
-        }
-      });
+      const { data: images } = await fetchVehicleImagesForVehicleIds(supabase, vehicleIds);
+      for (const img of images || []) {
+        if (!imagesByVehicle.has(img.vehicle_id)) imagesByVehicle.set(img.vehicle_id, []);
+        imagesByVehicle.get(img.vehicle_id).push(img);
+      }
     }
 
     const vehiclesOut = (vehicles || []).map((v) => ({
@@ -168,7 +166,7 @@ router.get('/:slug', async (req, res) => {
       model: v.model,
       manufacturer: v.manufacturer,
       type: v.type,
-      image: imagesMap[v.id] || null,
+      image: pickPreferredVehicleImageUrl(imagesByVehicle.get(v.id) || []) || null,
     }));
 
     /** @type {Map<string, any>} */
