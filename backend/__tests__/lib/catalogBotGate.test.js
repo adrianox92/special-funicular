@@ -59,6 +59,27 @@ describe('classifyCatalogUserAgent', () => {
     expect(classifyCatalogUserAgent('PerplexityBot')).toBe('blocked-bot');
   });
 
+  test('vista previa al compartir (WhatsApp, Facebook, Slack, X…)', () => {
+    expect(
+      classifyCatalogUserAgent(
+        'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+      ),
+    ).toBe('link-preview');
+    expect(classifyCatalogUserAgent('Facebot/1.0')).toBe('link-preview');
+    expect(classifyCatalogUserAgent('WhatsApp/2.23.20.0')).toBe('link-preview');
+    expect(classifyCatalogUserAgent('Twitterbot/1.0')).toBe('link-preview');
+    expect(classifyCatalogUserAgent('Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)')).toBe(
+      'link-preview',
+    );
+    expect(classifyCatalogUserAgent('Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)')).toBe(
+      'link-preview',
+    );
+    expect(classifyCatalogUserAgent('TelegramBot (like TwitterBot)')).toBe('link-preview');
+    expect(classifyCatalogUserAgent('LinkedInBot/1.0')).toBe('link-preview');
+    expect(classifyCatalogUserAgent('FacebookBot')).toBe('blocked-bot');
+    expect(classifyCatalogUserAgent('meta-externalagent')).toBe('blocked-bot');
+  });
+
   test('herramientas de scraping', () => {
     expect(classifyCatalogUserAgent('curl/8.5.0')).toBe('blocked-bot');
     expect(classifyCatalogUserAgent('Wget/1.21')).toBe('blocked-bot');
@@ -86,6 +107,13 @@ describe('decideCatalogAccess', () => {
     for (const ua of ['GPTBot', 'bingbot', 'curl/8.0', 'ClaudeBot', '']) {
       const d = await decideCatalogAccess({ userAgent: ua, ip: '1.2.3.4', env });
       expect(d.allow).toBe(false);
+    }
+  });
+
+  test('WhatsApp / facebookexternalhit pasan sin verificar IP', async () => {
+    for (const ua of ['WhatsApp/2.23.20.0', 'facebookexternalhit/1.1', 'Twitterbot/1.0']) {
+      const d = await decideCatalogAccess({ userAgent: ua, ip: '1.2.3.4', env });
+      expect(d).toEqual({ allow: true, reason: 'link-preview', class: 'link-preview' });
     }
   });
 
@@ -240,6 +268,12 @@ describe('catalogBotGateMiddleware (HTTP)', () => {
       .set('User-Agent', 'curl/8.5.0')
       .expect(403);
     expect(curl.body.code).toBe('catalog_bot_denied');
+
+    const whatsapp = await request(app)
+      .get('/api/public/catalog/items')
+      .set('User-Agent', 'WhatsApp/2.23.20.0')
+      .expect(200);
+    expect(whatsapp.body).toEqual({ items: ['ref-1'] });
   });
 
   test('Googlebot verificado recibe el listado; Googlebot falso no', async () => {
@@ -291,6 +325,17 @@ describe('robots.txt del catálogo', () => {
     expect(google).toContain('Allow: /en/catalog');
     expect(google).toContain('Allow: /de/katalog');
     expect(google).toContain('Allow: /sitemap-catalog-');
+  });
+
+  test('abre el catálogo a crawlers de vista previa social', () => {
+    expect(robots).toContain('User-agent: facebookexternalhit');
+    expect(robots).toContain('User-agent: WhatsApp');
+    expect(robots).toContain('User-agent: Twitterbot');
+    expect(robots).toContain('User-agent: Slackbot');
+    const social = robots.split('User-agent: facebookexternalhit')[1];
+    expect(social).toContain('Allow: /catalogo');
+    expect(social).toContain('Allow: /en/catalog');
+    expect(social).toContain('Allow: /de/katalog');
   });
 });
 

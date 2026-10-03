@@ -1,9 +1,10 @@
 /**
  * Acceso al catálogo público de referencias.
  *
- * Objetivo: personas en el navegador y crawlers de indexación de Google
- * (Googlebot + imagen/vídeo/inspección) pueden ver el catálogo. El resto de
- * bots, scrapers y motores/IA no.
+ * Objetivo: personas en el navegador, crawlers de indexación de Google
+ * (Googlebot + imagen/vídeo/inspección) y bots de vista previa al compartir
+ * (WhatsApp, Facebook, Slack, X/Twitter, etc.) pueden ver el catálogo.
+ * El resto de bots, scrapers y motores/IA no.
  *
  * robots.txt es cortesía; este módulo es el bloqueo real en servidor.
  * Un cliente que finja un UA de Chrome sigue pudiendo pasar: sin WAF/JS
@@ -22,6 +23,24 @@ const GOOGLE_NON_SEARCH_UA =
 
 const GOOGLE_RDNS_HOST = /(^|\.)googlebot\.com$/i;
 const GOOGLE_RDNS_HOST_ALT = /(^|\.)google\.com$/i;
+
+/**
+ * Unfurl / Open Graph al pegar un enlace. No indexan el catálogo.
+ * FacebookBot y meta-externalagent son crawlers de Meta (IA/producto), no preview.
+ */
+const LINK_PREVIEW_UA_PATTERNS = [
+  /facebookexternalhit/i,
+  /(?:^|[^\w])Facebot(?:[^\w]|$)/i,
+  /WhatsApp/i,
+  /Twitterbot/i,
+  /Slackbot/i,
+  /Discordbot/i,
+  /TelegramBot/i,
+  /LinkedInBot/i,
+  /SkypeUriPreview/i,
+  /Pinterest/i,
+  /Redditbot/i,
+];
 
 const BLOCKED_UA_PATTERNS = [
   // Motores de búsqueda que no son Google
@@ -65,14 +84,6 @@ const BLOCKED_UA_PATTERNS = [
   /ImagesiftBot/i,
   /meta-externalagent/i,
   /FacebookBot/i,
-  /facebookexternalhit/i,
-  /facebot/i,
-  /Twitterbot/i,
-  /LinkedInBot/i,
-  /Slackbot/i,
-  /Discordbot/i,
-  /TelegramBot/i,
-  /WhatsApp/i,
   // Herramientas HTTP / headless
   /^(curl|Wget|wget)(?:\/|\s|$)/i,
   /libcurl/i,
@@ -162,6 +173,9 @@ function classifyCatalogUserAgent(userAgent) {
   }
   if (GOOGLE_NON_SEARCH_UA.test(ua)) return 'blocked-bot';
   if (GOOGLE_INDEX_UA.test(ua)) return 'google-index';
+  for (const re of LINK_PREVIEW_UA_PATTERNS) {
+    if (re.test(ua)) return 'link-preview';
+  }
   for (const re of BLOCKED_UA_PATTERNS) {
     if (re.test(ua)) return 'blocked-bot';
   }
@@ -303,8 +317,8 @@ async function decideCatalogAccess(input = {}, deps = {}) {
     return { allow: false, reason: `google-unverified:${result.reason}`, class: cls };
   }
 
-  if (cls === 'browser') {
-    return { allow: true, reason: 'browser', class: cls };
+  if (cls === 'browser' || cls === 'link-preview') {
+    return { allow: true, reason: cls, class: cls };
   }
 
   return { allow: false, reason: cls === 'blocked-bot' ? 'blocked-bot' : 'unknown-client', class: cls };
