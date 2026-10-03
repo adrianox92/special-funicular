@@ -70,7 +70,7 @@ const Profile = () => {
 
   const apiDescriptionParts = useMemo(
     () => t('api.description', { header: '__HDR__' }).split('__HDR__'),
-    [t, i18n.language],
+    [t],
   );
 
   const licenseAdminDescriptionParts = useMemo(() => {
@@ -85,7 +85,7 @@ const Profile = () => {
     const [beforeFirst, betweenAndAfter] = prefix.split(LICENSE_ADMIN_SERVER_ENV);
     const [between, afterSecond] = (betweenAndAfter || '').split(LICENSE_ADMIN_CLIENT_ENV);
     return { beforeFirst, between, afterSecond, linkText, suffix };
-  }, [t, i18n.language]);
+  }, [t]);
 
   const fetchKeyList = useCallback(async () => {
     try {
@@ -116,7 +116,7 @@ const Profile = () => {
     fetchApiKey();
   }, [fetchApiKey]);
 
-  const fetchPilotProfile = async () => {
+  const fetchPilotProfile = useCallback(async () => {
     setPilotLoading(true);
     setPilotError(null);
     try {
@@ -131,11 +131,11 @@ const Profile = () => {
     } finally {
       setPilotLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     fetchPilotProfile();
-  }, []);
+  }, [fetchPilotProfile]);
 
   const savePilotProfile = async () => {
     setPilotSaving(true);
@@ -174,7 +174,7 @@ const Profile = () => {
     }
   };
 
-  const fetchLicenseInfo = async () => {
+  const fetchLicenseInfo = useCallback(async () => {
     setLicenseLoading(true);
     setLicenseError(null);
     try {
@@ -186,11 +186,11 @@ const Profile = () => {
     } finally {
       setLicenseLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     if (user?.id) fetchLicenseInfo();
-  }, [user?.id]);
+  }, [user?.id, fetchLicenseInfo]);
 
   const handleAdminTogglePaid = async (checked) => {
     if (!user?.id) return;
