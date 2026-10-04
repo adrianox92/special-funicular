@@ -184,8 +184,10 @@ function PublicCatalogList() {
   useEffect(() => {
     const mfgBrand = brands.find((b) => b.slug === pathFilters.manufacturerSlug);
     const mfgName  = mfgBrand?.name ?? pathFilters.manufacturerSlug ?? null;
-    const vtLabel  = pathFilters.vehicleTypeSlug ? (VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug) : null;
-    const trLabel  = pathFilters.tractionSlug    ? (TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug]        ?? pathFilters.tractionSlug)    : null;
+    const vtStored = pathFilters.vehicleTypeSlug ? (VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug) : null;
+    const trStored = pathFilters.tractionSlug    ? (TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug]        ?? pathFilters.tractionSlug)    : null;
+    const vtLabel  = vtStored ? t(`values.vehicleTypes.${vtStored}`, { defaultValue: vtStored }) : null;
+    const trLabel  = trStored ? t(`values.traction.${trStored}`, { defaultValue: trStored }) : null;
 
     applyPublicCatalogListSeo({
       manufacturerName: mfgName,
@@ -197,7 +199,7 @@ function PublicCatalogList() {
       canonicalPath:    localizePath(locale, buildCatalogPath(pathFilters)),
     });
     return clearCatalogItemPageSeo;
-  }, [pathFilters, brands, total, locale]);
+  }, [pathFilters, brands, total, locale, t]);
 
   // ---- Helpers para cambiar filtros del PATH ----
   const setPathFilter = useCallback((key, value) => {
@@ -264,32 +266,36 @@ function PublicCatalogList() {
   const vehicleTypeOptions = useMemo(() => {
     const fromFacets = (facets.vehicle_types || []).map((v) => {
       const n = typeof v === 'string' ? v : v.name;
-      return { slug: vehicleTypeToSlug(n), label: VEHICLE_TYPE_SLUG_TO_LABEL[vehicleTypeToSlug(n)] ?? n };
+      const stored = VEHICLE_TYPE_SLUG_TO_LABEL[vehicleTypeToSlug(n)] ?? n;
+      return { slug: vehicleTypeToSlug(n), label: t(`values.vehicleTypes.${stored}`, { defaultValue: stored }) };
     });
     // Incluir el activo aunque no esté en facetas
     if (pathFilters.vehicleTypeSlug && !fromFacets.find((o) => o.slug === pathFilters.vehicleTypeSlug)) {
-      fromFacets.push({ slug: pathFilters.vehicleTypeSlug, label: VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug });
+      const stored = VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug;
+      fromFacets.push({ slug: pathFilters.vehicleTypeSlug, label: t(`values.vehicleTypes.${stored}`, { defaultValue: stored }) });
     }
     return fromFacets;
-  }, [facets.vehicle_types, pathFilters.vehicleTypeSlug]);
+  }, [facets.vehicle_types, pathFilters.vehicleTypeSlug, t]);
 
   const tractionOptions = useMemo(() => {
     const fromFacets = (facets.tractions || []).map((t) => {
       const n = typeof t === 'string' ? t : t.name;
-      return { slug: tractionToSlug(n), label: TRACTION_SLUG_TO_LABEL[tractionToSlug(n)] ?? n };
+      const stored = TRACTION_SLUG_TO_LABEL[tractionToSlug(n)] ?? n;
+      return { slug: tractionToSlug(n), label: t(`values.traction.${stored}`, { defaultValue: stored }) };
     });
     if (pathFilters.tractionSlug && !fromFacets.find((o) => o.slug === pathFilters.tractionSlug)) {
-      fromFacets.push({ slug: pathFilters.tractionSlug, label: TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug] ?? pathFilters.tractionSlug });
+      const stored = TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug] ?? pathFilters.tractionSlug;
+      fromFacets.push({ slug: pathFilters.tractionSlug, label: t(`values.traction.${stored}`, { defaultValue: stored }) });
     }
     return fromFacets;
-  }, [facets.tractions, pathFilters.tractionSlug]);
+  }, [facets.tractions, pathFilters.tractionSlug, t]);
 
   const motorPositionOptions = useMemo(() => {
     return (facets.motor_positions || []).map((row) => {
       const value = typeof row === 'string' ? row : row.name;
-      return { value, label: labelMotorPosition(value) };
+      return { value, label: labelMotorPosition(value, t) };
     });
-  }, [facets.motor_positions]);
+  }, [facets.motor_positions, t]);
 
   const hasActiveFilters = Boolean(
     pathFilters.manufacturerSlug || pathFilters.vehicleTypeSlug ||
@@ -613,7 +619,7 @@ function PublicCatalogList() {
                             </span>
                           )}
                           {row.vehicle_type && (
-                            <span className="rounded-md bg-secondary px-2 py-0.5">{row.vehicle_type}</span>
+                            <span className="rounded-md bg-secondary px-2 py-0.5">{t(`values.vehicleTypes.${row.vehicle_type}`, { defaultValue: row.vehicle_type })}</span>
                           )}
                           {row.commercial_release_year != null && (
                             <span className="rounded-md bg-secondary px-2 py-0.5">{row.commercial_release_year}</span>

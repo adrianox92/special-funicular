@@ -113,7 +113,8 @@
     "send": "Send",
     "sending": "Sending…",
     "addToGarage": "Add to my garage",
-    "addToGarageHint": "Opens the add-vehicle form with this reference filled in."
+    "addToGarageHint": "Opens the add-vehicle form with this reference filled in.",
+    "legacyValue": "{{value}} (previous value)"
   },
   "guest": {
     "addTitle": "Add this reference to your garage",
@@ -173,6 +174,35 @@
       "inline": "inline",
       "angular": "anglewinder",
       "transverse": "sidewinder"
+    }
+  },
+  "values": {
+    "vehicleTypes": {
+      "Rally": "Rally",
+      "GT": "GT",
+      "LMP": "LMP",
+      "Hypercar": "Hypercar",
+      "Grupo 5": "Group 5",
+      "Road Car": "Road car",
+      "Turismo": "Touring",
+      "Clásico": "Classic",
+      "DTM": "DTM",
+      "F1": "F1",
+      "Camiones": "Trucks",
+      "Raid": "Raid"
+    },
+    "traction": {
+      "4x4": "4x4",
+      "Trasera": "Rear",
+      "Delantera": "Front"
+    },
+    "motorPosition": {
+      "inline": "Inline",
+      "angular": "Anglewinder",
+      "transverse": "Sidewinder",
+      "En línea": "Inline",
+      "Angular": "Anglewinder",
+      "Transversal": "Sidewinder"
     }
   }
 }

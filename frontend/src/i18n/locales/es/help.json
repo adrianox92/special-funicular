@@ -1,0 +1,39 @@
+{
+  "page": {
+    "title": "Onboarding y ayuda",
+    "lead": "Guía para empezar con Slot Database y referencia de cada sección: qué hace, en qué orden conviene configurarla y buenas prácticas. También puedes usar el buscador de abajo con preguntas en lenguaje natural.",
+    "tocTitle": "Índice",
+    "tocDesc": "Saltar a una sección o abrirla en la app.",
+    "tocAria": "Índice de ayuda",
+    "recommended": "Recomendado",
+    "steps": "Pasos",
+    "tips": "Qué tener en cuenta",
+    "qa": "Comportamiento esperado (QA)",
+    "gotchas": "Errores frecuentes",
+    "footer": "¿Algo no cuadra con lo que ves en pantalla? Comprueba que estás en la última versión de la app y vuelve a cargar la página."
+  },
+  "assistant": {
+    "title": "Pregunta a la guía",
+    "lead": "Escribe en lenguaje natural (por ejemplo: «¿cómo doy de alta un coche?»). La respuesta se basa en el contenido de esta guía.",
+    "label": "Tu pregunta",
+    "placeholder": "Ej.: ¿Cómo registro una sesión de tiempos?",
+    "submit": "Buscar respuesta",
+    "searching": "Buscando respuesta…",
+    "minLength": "Escribe al menos 3 caracteres.",
+    "unavailableHint": "El asistente no está disponible en este momento. Consulta el índice y las secciones de esta página.",
+    "unavailableNow": "El asistente no está disponible ahora mismo. Puedes usar el índice y las secciones de esta página.",
+    "genericError": "No se ha podido obtener una respuesta. Inténtalo de nuevo más tarde.",
+    "requestFailed": "No se pudo obtener respuesta.",
+    "answerPlaceholder": "La respuesta aparecerá aquí.",
+    "guideSections": "Secciones de la guía:"
+  },
+  "plain": {
+    "guideTitle": "Slot Database — Guía y onboarding",
+    "firstSteps": "Primeros pasos",
+    "steps": "Pasos:",
+    "tips": "Consejos:",
+    "qa": "Comportamiento esperado (QA):",
+    "faq": "Preguntas frecuentes",
+    "related": "Temas relacionados: {{topics}}."
+  }
+}

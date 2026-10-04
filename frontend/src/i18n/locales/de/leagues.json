@@ -218,5 +218,28 @@
     "empty": "In dieser Liga sind keine Teilnehmer eingetragen.",
     "emptyHint": "Die Wertung kann auch aus Lauf-Ergebnissen kommen. Ein Liga-Teilnehmer kann DNS, DSQ oder Angepasst erhalten.",
     "emptyImportHint": "Wenn deine Läufe schon Fahrer haben, nutze „Aus Wettbewerben importieren“."
+  },
+  "publicSignup": {
+    "notFound": "Liga nicht gefunden",
+    "signupError": "Anmeldung fehlgeschlagen",
+    "backHome": "Zurück zur Startseite",
+    "slots": "{{count}}/{{max}} Plätze",
+    "participants_one": "{{count}} Teilnehmer",
+    "participants_other": "{{count}} Teilnehmer",
+    "waitlistCount": "Warteliste: {{count}}",
+    "closed": "Diese Liga ist geschlossen und nimmt keine neuen Anmeldungen an.",
+    "name": "Fahrername *",
+    "email": "E-Mail",
+    "vehicle": "Fahrzeug",
+    "vehiclePlaceholder": "z. B. Porsche 911",
+    "joinWaitlist": "Auf die Warteliste",
+    "joinLeague": "Zur Liga anmelden",
+    "confirmed": "Anmeldung bestätigt!",
+    "waitlisted": "Du stehst auf der Warteliste",
+    "waitlistedBody": "Du stehst auf der Warteliste von {{name}} auf Platz {{position}}.",
+    "confirmedBody": "Du bist bei {{name}} angemeldet. Zu den einzelnen Läufen kannst du dich anmelden, sobald sie öffnen.",
+    "viewSeason": "Meine Saison ansehen",
+    "viewStandings": "Wertung ansehen",
+    "close": "Schließen"
   }
 }

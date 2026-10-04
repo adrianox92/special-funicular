@@ -2,10 +2,21 @@
   "hero": {
     "title": "Take your slot collection management to the next level",
     "subtitle": "Technical sheets, millisecond timing, competitions and cloud sync for Scalextric, Ninco and Avant Slot.",
+    "tagline": "Your slot database: cars, spare parts, setups and more",
+    "lead": "Manage slot cars with full sheets, parts and consumables inventory, time every lap, compare setups and run competitions with public entry and live ranking — all in one place.",
     "ctaLogin": "Log in",
     "ctaRegister": "Create free account",
-    "ctaCatalog": "Browse catalog"
+    "ctaRegisterShort": "Sign up",
+    "ctaCatalog": "Browse catalog",
+    "ctaHaveAccount": "Already have an account? Sign in"
   },
+  "nav": {
+    "catalog": "Catalog",
+    "slotRaceManager": "Slot Race Manager",
+    "login": "Log in",
+    "register": "Sign up"
+  },
+  "themeToggle": "Toggle theme",
   "highlights": {
     "pwa": "Installable PWA",
     "pdf": "Exportable PDF",
@@ -16,6 +27,99 @@
     "timings": { "title": "Timings", "blurb": "Millisecond laps and per-session analysis." },
     "competitions": { "title": "Competitions", "blurb": "Sign-ups, rules and live ranking." },
     "inventory": { "title": "Inventory", "blurb": "Parts stock, alerts and car fitment." }
+  },
+  "stats": {
+    "aria": "Platform pillars",
+    "complete": {
+      "title": "Full management",
+      "text": "Multi-view photos, technical specs and modifications with cost."
+    },
+    "precision": {
+      "title": "Millisecond precision",
+      "text": "Lap timing, consistency and progress charts."
+    },
+    "competitions": {
+      "title": "Pro competitions",
+      "text": "Live ranking and TV-style presentation for your event."
+    },
+    "inventory": {
+      "title": "Parts inventory",
+      "text": "Stock, categories, restocking and links to car fitment."
+    }
+  },
+  "features": {
+    "collection": {
+      "title": "Collection management",
+      "description": "A professional catalog for slot cars (Scalextric, Ninco, Avant Slot, Scaleauto and more): images, purchase data, setup and documentation ready to share.",
+      "bullets": [
+        "Photos from 6 views (front, sides, rear, top, chassis, 3/4)",
+        "Technical specs with components (motor, pinion, crown, guide, axles…)",
+        "Modification log with cost and history",
+        "Export a complete technical sheet to PDF",
+        "Advanced filters, grid/table view and CSV export",
+        "Digital, Museum and Workshop badges"
+      ]
+    },
+    "inventory": {
+      "title": "Parts inventory",
+      "description": "Parts and consumables with the same care as your collection: stock, prices and traceability down to the car you fit them on.",
+      "bullets": [
+        "Categories, units, purchase price, dates and notes per item",
+        "Minimum stock, alerts and restocking when it is time to reorder",
+        "Filters by category, search and low-stock parts",
+        "Fit parts to cars from inventory (stock is deducted automatically)",
+        "Movement history and links to car modifications",
+        "Type-specific fields (material, gearing, and more)"
+      ]
+    },
+    "timing": {
+      "title": "Timing and performance",
+      "description": "See how each car and each setup change performs with granular data and clear comparisons.",
+      "bullets": [
+        "Lap times with millisecond precision",
+        "Session analysis: progress, histogram and delta vs best lap",
+        "Side-by-side comparison of two sessions",
+        "Setup analysis: compare setups across sessions",
+        "Performance comparison by lane",
+        "Charts for lap-time and speed progress"
+      ]
+    },
+    "competitions": {
+      "title": "Competition system",
+      "description": "Run events with the same rigour you apply in the garage: categories, rules and traceable results.",
+      "bullets": [
+        "Competitions with circuits and categories",
+        "Public entries via a shareable link",
+        "Custom scoring rules and templates",
+        "Round times with penalties",
+        "Live ranking and presentation mode (Live TV)",
+        "CSV and PDF results export"
+      ]
+    },
+    "analytics": {
+      "title": "Dashboard and analytics",
+      "description": "A panel that summarises investment, fleet mix and performance so you can decide with data.",
+      "bullets": [
+        "Collection metrics: cars, spend and trends",
+        "Charts by brand, type, shop and modifications",
+        "Investment over time",
+        "Top cars by cost and most-used components"
+      ]
+    }
+  },
+  "extras": {
+    "heading": "And more…",
+    "lead": "Details that make the tool better to use every day.",
+    "pwa": { "title": "PWA", "text": "Installable on phone and desktop." },
+    "api": { "title": "API & sync", "text": "API keys and endpoints for external apps." },
+    "theme": { "title": "Light / dark theme", "text": "Comfortable in any environment." },
+    "responsive": { "title": "Responsive", "text": "Phone, tablet and desktop." },
+    "circuits": { "title": "Circuits", "text": "Several lanes and a length per lane." }
+  },
+  "cta": {
+    "title": "Start managing your collection today",
+    "lead": "Create your account in seconds and keep a record of every car, every lap and every event.",
+    "register": "Create free account"
   },
   "seo": {
     "title": "Slot Database | Take your slot collection to the next level",

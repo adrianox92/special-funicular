@@ -51,8 +51,18 @@ function plural(seo, base, count, vars = {}) {
   return interpolate(tpl, { count, ...vars });
 }
 
-function labelMotorForMeta(seo, value) {
+function labelCatalogValue(pack, group, value) {
   if (value == null || value === '') return '';
+  const key = String(value);
+  const map = pack.values && pack.values[group];
+  if (map && map[key]) return map[key];
+  return key;
+}
+
+function labelMotorForMeta(seo, pack, value) {
+  if (value == null || value === '') return '';
+  const fromValues = labelCatalogValue(pack, 'motorPosition', value);
+  if (fromValues && fromValues !== String(value)) return fromValues;
   const labels = seo.motorLabels || {};
   return labels[value] || String(value);
 }
@@ -95,16 +105,18 @@ function buildCatalogItemPageTitle(item, locale = 'es') {
   return truncateTitle(raw, 72);
 }
 
-function catalogMetaExtras(item, seo, { includeRating = true } = {}) {
+function catalogMetaExtras(item, seo, pack, { includeRating = true } = {}) {
   const extras = [];
-  if (item.vehicle_type) extras.push(`${item.vehicle_type}`);
+  if (item.vehicle_type) extras.push(labelCatalogValue(pack, 'vehicleTypes', item.vehicle_type));
   if (item.commercial_release_year != null && item.commercial_release_year !== '') {
     extras.push(interpolate(seo.year, { year: item.commercial_release_year }));
   }
-  if (item.traction) extras.push(interpolate(seo.traction, { traction: item.traction }));
+  if (item.traction) {
+    extras.push(interpolate(seo.traction, { traction: labelCatalogValue(pack, 'traction', item.traction) }));
+  }
   if (item.discontinued) extras.push(seo.discontinued);
   if (item.upcoming_release) extras.push(seo.upcoming);
-  const motor = labelMotorForMeta(seo, item.motor_position);
+  const motor = labelMotorForMeta(seo, pack, item.motor_position);
   if (motor) extras.push(interpolate(seo.motor, { position: String(motor).toLowerCase() }));
   if (includeRating) {
     const rc = Number(item.rating_count);
@@ -125,7 +137,7 @@ function buildCatalogItemMetaDescription(item, locale = 'es') {
     ? interpolate(seo.leadWithHeadline, { headline, brand: BRAND })
     : interpolate(seo.leadWithoutHeadline, { brand: BRAND });
   const parts = [lead];
-  const extras = catalogMetaExtras(item, seo, { includeRating: true });
+  const extras = catalogMetaExtras(item, seo, packFor(locale), { includeRating: true });
   if (extras.length) parts.push(extras.join(' · ') + '.');
   parts.push(interpolate(seo.footer, { brand: BRAND }));
   return truncate(parts.join(' '), 160);
@@ -153,15 +165,18 @@ function buildCatalogItemLeadParagraph(item, locale = 'es') {
       ? interpolate(seo.paragraphWithHeadline, { headline, brand: BRAND })
       : interpolate(seo.paragraphWithoutHeadline, { brand: BRAND }),
   ];
+  const pack = packFor(locale);
   const extras = [];
-  if (item.vehicle_type) extras.push(String(item.vehicle_type));
+  if (item.vehicle_type) extras.push(labelCatalogValue(pack, 'vehicleTypes', item.vehicle_type));
   if (item.commercial_release_year != null && item.commercial_release_year !== '') {
     extras.push(interpolate(seo.paragraphYear, { year: item.commercial_release_year }));
   }
-  if (item.traction) extras.push(interpolate(seo.traction, { traction: item.traction }));
+  if (item.traction) {
+    extras.push(interpolate(seo.traction, { traction: labelCatalogValue(pack, 'traction', item.traction) }));
+  }
   if (item.discontinued) extras.push(seo.discontinued);
   if (item.upcoming_release) extras.push(seo.upcoming);
-  const motor = labelMotorForMeta(seo, item.motor_position);
+  const motor = labelMotorForMeta(seo, pack, item.motor_position);
   if (motor) extras.push(interpolate(seo.motor, { position: String(motor).toLowerCase() }));
   const rc = Number(item.rating_count);
   if (Number.isFinite(rc) && rc > 0 && item.rating_avg != null) {
@@ -183,7 +198,7 @@ function buildCatalogItemKeywords(item, locale = 'es') {
   if (item.reference) bits.push(String(item.reference));
   if (item.manufacturer) bits.push(String(item.manufacturer));
   if (item.model_name) bits.push(String(item.model_name));
-  if (item.vehicle_type) bits.push(String(item.vehicle_type));
+  if (item.vehicle_type) bits.push(labelCatalogValue(packFor(locale), 'vehicleTypes', item.vehicle_type));
   if (item.reference && item.manufacturer) {
     bits.push(`${item.reference} ${item.manufacturer}`);
   }
@@ -292,7 +307,7 @@ function buildItemJsonLd({
     product.brand = { '@type': 'Brand', name: String(item.manufacturer) };
   }
   if (item.vehicle_type) {
-    product.category = String(item.vehicle_type);
+    product.category = labelCatalogValue(packFor(locale), 'vehicleTypes', item.vehicle_type);
   }
   if (imageUrl) {
     product.image = [imageUrl];
