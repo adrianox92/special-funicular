@@ -9,7 +9,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { CATALOG_TECH_SPEC_NUM_FIELDS, CATALOG_TECH_SPEC_TEXT_FIELDS } from '../data/catalogTechSpecs';
+import {
+  CATALOG_TECH_SPEC_LEAD_TEXT_KEYS,
+  CATALOG_TECH_SPEC_NUM_FIELDS,
+  CATALOG_TECH_SPEC_TEXT_FIELDS,
+} from '../data/catalogTechSpecs';
 
 export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'catalog-tech' }) {
   const { t } = useTranslation('catalog');
@@ -20,7 +24,7 @@ export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'cata
     <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2">
       <p className="text-sm text-muted-foreground sm:col-span-2">{t('techSpecs.formHelp')}</p>
       {CATALOG_TECH_SPEC_TEXT_FIELDS.filter((f) =>
-        ['spec_scale', 'spec_body', 'spec_motor'].includes(f.key),
+        CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key),
       ).map((f) => (
         <div key={f.key} className="space-y-2">
           <Label htmlFor={`${idPrefix}-${f.key}`}>{t(`techSpecs.fields.${f.i18n}`)}</Label>
@@ -63,7 +67,7 @@ export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'cata
         </Select>
       </div>
       {CATALOG_TECH_SPEC_TEXT_FIELDS.filter(
-        (f) => !['spec_scale', 'spec_body', 'spec_motor'].includes(f.key),
+        (f) => !CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key),
       ).map((f) => (
         <div key={f.key} className="space-y-2">
           <Label htmlFor={`${idPrefix}-${f.key}`}>{t(`techSpecs.fields.${f.i18n}`)}</Label>

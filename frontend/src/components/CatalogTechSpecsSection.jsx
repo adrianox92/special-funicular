@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { labelMotorPosition } from '../data/motorPosition';
 import {
+  CATALOG_TECH_SPEC_LEAD_TEXT_KEYS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
   formatTechSpecNumber,
@@ -31,8 +32,10 @@ export default function CatalogTechSpecsSection({ item }) {
     const out = [];
     const label = (i18nKey) => t(`techSpecs.fields.${i18nKey}`);
 
-    pushRow(out, 'spec_scale', label('scale'), item.spec_scale);
-    pushRow(out, 'spec_body', label('body'), item.spec_body);
+    for (const f of CATALOG_TECH_SPEC_TEXT_FIELDS) {
+      if (!CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key) || f.key === 'spec_motor') continue;
+      pushRow(out, f.key, label(f.i18n), item[f.key]);
+    }
     for (const f of CATALOG_TECH_SPEC_NUM_FIELDS) {
       pushRow(out, f.key, label(f.i18n), formatTechSpecNumber(item[f.key]));
     }
@@ -54,7 +57,7 @@ export default function CatalogTechSpecsSection({ item }) {
       );
     }
     for (const f of CATALOG_TECH_SPEC_TEXT_FIELDS) {
-      if (f.key === 'spec_scale' || f.key === 'spec_body' || f.key === 'spec_motor') continue;
+      if (CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key)) continue;
       pushRow(out, f.key, label(f.i18n), item[f.key]);
     }
     return out;
