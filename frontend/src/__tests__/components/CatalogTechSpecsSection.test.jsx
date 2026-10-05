@@ -16,10 +16,8 @@ jest.mock('react-i18next', () => ({
         'techSpecs.fields.lengthMm': 'Longitud (mm)',
         'techSpecs.fields.heightMm': 'Altura (mm)',
         'techSpecs.fields.wheelbaseMm': 'Distancia entre ejes (mm)',
-        'techSpecs.fields.frontTrackMm': 'Vía delantera (mm)',
-        'techSpecs.fields.rearTrackMm': 'Vía trasera (mm)',
-        'techSpecs.fields.frontAxleLengthMm': 'Longitud de eje delantero (mm)',
-        'techSpecs.fields.rearAxleLengthMm': 'Longitud de eje trasero (mm)',
+        'techSpecs.fields.frontAxleLengthMm': 'Eje delantero (mm)',
+        'techSpecs.fields.rearAxleLengthMm': 'Eje trasero (mm)',
         'techSpecs.fields.weightG': 'Peso (g)',
         'techSpecs.fields.magnet': 'Imán',
         'techSpecs.fields.motor': 'Motor',
@@ -91,14 +89,14 @@ describe('CatalogTechSpecsSection', () => {
     expect(screen.getByText('145')).toBeInTheDocument();
     expect(screen.getByText('Distancia entre ejes (mm)')).toBeInTheDocument();
     expect(screen.getByText('88')).toBeInTheDocument();
-    expect(screen.getByText('Longitud de eje delantero (mm)')).toBeInTheDocument();
+    expect(screen.getByText('Eje delantero (mm)')).toBeInTheDocument();
     expect(screen.getByText('52')).toBeInTheDocument();
     expect(screen.getByText('No')).toBeInTheDocument();
     expect(screen.getByText('Trasera')).toBeInTheDocument();
     expect(screen.getByText('En línea')).toBeInTheDocument();
     expect(screen.getByText('Luces delanteras')).toBeInTheDocument();
     expect(screen.queryByText('Luces traseras')).not.toBeInTheDocument();
-    expect(screen.queryByText('Longitud de eje trasero (mm)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eje trasero (mm)')).not.toBeInTheDocument();
     expect(screen.getByText('Llanta delantera')).toBeInTheDocument();
     expect(screen.getByText('Llanta trasera')).toBeInTheDocument();
     expect(screen.getByText('Diámetro llanta delantera (mm)')).toBeInTheDocument();
@@ -143,21 +141,35 @@ describe('CatalogTechSpecsSection', () => {
     expect(rims).toHaveTextContent('16.5');
     expect(screen.getByTestId('tech-spec-pair-wheels')).toHaveTextContent('Ruedas delanteras');
     expect(screen.getByTestId('tech-spec-pair-wheels')).toHaveTextContent('Ruedas traseras');
-    expect(screen.getByTestId('tech-spec-pair-track')).toHaveTextContent('Vía delantera (mm)');
-    expect(screen.getByTestId('tech-spec-pair-track')).toHaveTextContent('Vía trasera (mm)');
-    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent(
-      'Longitud de eje delantero (mm)',
-    );
-    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent(
-      'Longitud de eje trasero (mm)',
-    );
+    expect(screen.queryByTestId('tech-spec-pair-track')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vía delantera (mm)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vía trasera (mm)')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('Eje delantero (mm)');
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('Eje trasero (mm)');
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('51');
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('53');
     expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces delanteras');
     expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces traseras');
-    expect(screen.getAllByText('Vía delantera (mm)')).toHaveLength(1);
-    expect(screen.getAllByText('Vía trasera (mm)')).toHaveLength(1);
-    expect(screen.getAllByText('Longitud de eje delantero (mm)')).toHaveLength(1);
+    expect(screen.getAllByText('Eje delantero (mm)')).toHaveLength(1);
     expect(screen.queryByText(/ancho de eje/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/batalla/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/vía /i)).not.toBeInTheDocument();
+  });
+
+  test('si solo hay vía legado, la muestra como eje delantero/trasero', () => {
+    render(
+      <CatalogTechSpecsSection
+        item={{
+          spec_front_track_mm: 50,
+          spec_rear_track_mm: 52,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('Eje delantero (mm)');
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('50');
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('Eje trasero (mm)');
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent('52');
+    expect(screen.queryByText('Vía delantera (mm)')).not.toBeInTheDocument();
   });
 
   test('modo embedded no usa el card de ficha', () => {

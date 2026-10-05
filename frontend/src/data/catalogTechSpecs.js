@@ -41,10 +41,13 @@ export const CATALOG_TECH_SPEC_SYSTEM_VALUES = ['analog', 'digital'];
 /** Clave canónica `aluminum` (EN Aluminium / ES Aluminio / DE Aluminium). */
 export const CATALOG_TECH_SPEC_RIM_VALUES = ['plastic', 'aluminum', 'magnesium'];
 
-/** Vía (track): distancia entre ruedas del mismo eje. No confundir con longitud de eje. */
+/**
+ * Vía (track), legado. Se conserva en BD/API pero no se muestra ni se envía
+ * en el formulario. La UI unifica en spec_*_axle_length_mm.
+ */
 export const CATALOG_TECH_SPEC_TRACK_PAIR = ['spec_front_track_mm', 'spec_rear_track_mm'];
 
-/** Longitud de cada eje (varilla), no el ancho/vía. */
+/** Eje delantero / trasero (mm): fuente de verdad de las dos medidas de eje. */
 export const CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR = [
   'spec_front_axle_length_mm',
   'spec_rear_axle_length_mm',
@@ -52,13 +55,17 @@ export const CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR = [
 
 /** Pares delantero/trasero que deben compartir fila en ficha y admin. */
 export const CATALOG_TECH_SPEC_SIBLING_PAIRS = [
-  CATALOG_TECH_SPEC_TRACK_PAIR,
   CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR,
   ['spec_front_wheels', 'spec_rear_wheels'],
   ['spec_front_rim', 'spec_rear_rim'],
   ['spec_front_rim_diameter_mm', 'spec_rear_rim_diameter_mm'],
   ['spec_front_lights', 'spec_rear_lights'],
 ];
+
+const AXLE_LENGTH_FROM_TRACK = {
+  spec_front_axle_length_mm: 'spec_front_track_mm',
+  spec_rear_axle_length_mm: 'spec_rear_track_mm',
+};
 
 /** Id de control de formulario: usa la clave i18n, no el nombre de columna SQL. */
 export function techSpecControlId(idPrefix, field) {
@@ -125,6 +132,7 @@ export function techSpecFormFromRow(row = {}) {
     const legacy = formatStoredNumber(row.spec_rear_axle_width_mm);
     if (legacy) out.spec_rear_axle_length_mm = legacy;
   }
+  applyTrackFallbackToAxleLength(out);
   out.spec_system = CATALOG_TECH_SPEC_SYSTEM_VALUES.includes(row.spec_system) ? row.spec_system : '';
   for (const f of CATALOG_TECH_SPEC_RIM_FIELDS) {
     out[f.key] = CATALOG_TECH_SPEC_RIM_VALUES.includes(row[f.key]) ? row[f.key] : '';
@@ -138,7 +146,9 @@ export function techSpecFormFromRow(row = {}) {
 }
 
 export function appendTechSpecsToFormData(fd, form) {
+  const skip = new Set(CATALOG_TECH_SPEC_TRACK_PAIR);
   for (const key of CATALOG_TECH_SPEC_KEYS) {
+    if (skip.has(key)) continue;
     const v = form?.[key];
     if (typeof v === 'boolean') fd.append(key, v ? 'true' : 'false');
     else fd.append(key, v ?? '');
@@ -152,6 +162,28 @@ function isFilledText(v) {
 function isFilledNumber(v) {
   if (v == null || v === '') return false;
   return Number.isFinite(Number(v));
+}
+
+/**
+ * Preferencia: axle_length; si está vacío, vía (track) legado.
+ * @param {'front'|'rear'} side
+ */
+export function resolveTechSpecAxleLengthMm(row, side) {
+  if (!row || (side !== 'front' && side !== 'rear')) return null;
+  const lengthKey = side === 'front' ? 'spec_front_axle_length_mm' : 'spec_rear_axle_length_mm';
+  const trackKey = AXLE_LENGTH_FROM_TRACK[lengthKey];
+  if (isFilledNumber(row[lengthKey])) return row[lengthKey];
+  if (isFilledNumber(row[trackKey])) return row[trackKey];
+  return null;
+}
+
+function applyTrackFallbackToAxleLength(out) {
+  for (const [axleKey, trackKey] of Object.entries(AXLE_LENGTH_FROM_TRACK)) {
+    if (isFilledNumber(out[axleKey])) continue;
+    const fromTrack = formatStoredNumber(out[trackKey]);
+    if (fromTrack) out[axleKey] = fromTrack;
+  }
+  return out;
 }
 
 /** True si hay al menos un campo nuevo relleno (imán false cuenta; luces solo si true). */
@@ -225,9 +257,11 @@ export function mergeEmptyTechSpecsFromCatalog(currentForm, catalogRow) {
   const current = { ...emptyTechSpecForm(), ...(currentForm || {}) };
   const out = { ...current };
   for (const key of CATALOG_TECH_SPEC_KEYS) {
+    if (CATALOG_TECH_SPEC_TRACK_PAIR.includes(key)) continue;
     if (isEmptyFormSpecValue(key, out[key]) && !isEmptyFormSpecValue(key, incoming[key])) {
       out[key] = incoming[key];
     }
   }
+  applyTrackFallbackToAxleLength(out);
   return out;
 }

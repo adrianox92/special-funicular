@@ -4,10 +4,12 @@ import {
   CATALOG_TECH_SPEC_NUM_FIELDS,
   CATALOG_TECH_SPEC_SIBLING_PAIRS,
   CATALOG_TECH_SPEC_TRACK_PAIR,
+  appendTechSpecsToFormData,
   emptyTechSpecForm,
   hasCatalogTechSpecs,
   labelCatalogTechSpecRim,
   mergeEmptyTechSpecsFromCatalog,
+  resolveTechSpecAxleLengthMm,
   techSpecControlId,
   techSpecFormFromRow,
   validateTechSpecForm,
@@ -47,20 +49,20 @@ describe('catalogTechSpecs helpers', () => {
     expect(labelCatalogTechSpecRim('', t)).toBeNull();
   });
 
-  test('pares delantero/trasero cubren vías, ejes, ruedas, llantas, diámetros y luces', () => {
+  test('pares delantero/trasero cubren ejes, ruedas, llantas, diámetros y luces (sin vía)', () => {
     expect(CATALOG_TECH_SPEC_TRACK_PAIR).toEqual(['spec_front_track_mm', 'spec_rear_track_mm']);
     expect(CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR).toEqual([
       'spec_front_axle_length_mm',
       'spec_rear_axle_length_mm',
     ]);
     expect(CATALOG_TECH_SPEC_SIBLING_PAIRS).toEqual([
-      CATALOG_TECH_SPEC_TRACK_PAIR,
       CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR,
       ['spec_front_wheels', 'spec_rear_wheels'],
       ['spec_front_rim', 'spec_rear_rim'],
       ['spec_front_rim_diameter_mm', 'spec_rear_rim_diameter_mm'],
       ['spec_front_lights', 'spec_rear_lights'],
     ]);
+    expect(CATALOG_TECH_SPEC_SIBLING_PAIRS).not.toContainEqual(CATALOG_TECH_SPEC_TRACK_PAIR);
   });
 
   test('claves de specs son únicas y no incluyen axle_width', () => {
@@ -88,6 +90,34 @@ describe('catalogTechSpecs helpers', () => {
       spec_front_axle_width_mm: 52,
     });
     expect(preferLength.spec_front_axle_length_mm).toBe('60');
+  });
+
+  test('techSpecFormFromRow usa vía legado si axle_length está vacío', () => {
+    const form = techSpecFormFromRow({
+      spec_front_track_mm: 50,
+      spec_rear_track_mm: 52,
+    });
+    expect(form.spec_front_axle_length_mm).toBe('50');
+    expect(form.spec_rear_axle_length_mm).toBe('52');
+    const preferLength = techSpecFormFromRow({
+      spec_front_axle_length_mm: 60,
+      spec_front_track_mm: 50,
+    });
+    expect(preferLength.spec_front_axle_length_mm).toBe('60');
+    expect(resolveTechSpecAxleLengthMm({ spec_front_track_mm: 50 }, 'front')).toBe(50);
+    expect(resolveTechSpecAxleLengthMm({ spec_front_axle_length_mm: 60, spec_front_track_mm: 50 }, 'front')).toBe(60);
+  });
+
+  test('appendTechSpecsToFormData no envía columnas de vía', () => {
+    const fd = new FormData();
+    appendTechSpecsToFormData(fd, {
+      ...emptyTechSpecForm(),
+      spec_front_axle_length_mm: '52',
+      spec_front_track_mm: '50',
+    });
+    expect(fd.get('spec_front_axle_length_mm')).toBe('52');
+    expect(fd.get('spec_front_track_mm')).toBeNull();
+    expect(fd.get('spec_rear_track_mm')).toBeNull();
   });
 
   test('validateTechSpecForm acepta vacío y rechaza negativos', () => {
@@ -124,6 +154,21 @@ describe('catalogTechSpecs helpers', () => {
     expect(merged.spec_front_lights).toBe(true);
     expect(merged.spec_front_rim).toBe('aluminum');
     expect(merged.spec_front_rim_diameter_mm).toBe('15.8');
+  });
+
+  test('mergeEmptyTechSpecsFromCatalog rellena eje vacío desde vía de catálogo', () => {
+    const current = emptyTechSpecForm();
+    const merged = mergeEmptyTechSpecsFromCatalog(current, {
+      spec_front_track_mm: 50,
+      spec_rear_track_mm: 52,
+    });
+    expect(merged.spec_front_axle_length_mm).toBe('50');
+    expect(merged.spec_rear_axle_length_mm).toBe('52');
+    const kept = mergeEmptyTechSpecsFromCatalog(
+      { ...emptyTechSpecForm(), spec_front_axle_length_mm: '61' },
+      { spec_front_track_mm: 50, spec_front_axle_length_mm: 60 },
+    );
+    expect(kept.spec_front_axle_length_mm).toBe('61');
   });
 
   test('el formulario de vehículo omite motor, piñón y ruedas (componentes montados)', () => {
