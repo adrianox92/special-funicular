@@ -88,3 +88,20 @@ export function vehicleTypeSlugToLabel(slug) {
 export function tractionSlugToLabel(slug) {
   return TRACTION_SLUG_TO_LABEL[slug] ?? slug ?? '';
 }
+
+/**
+ * Opciones del filtro público de tracción.
+ * `t` es el traductor i18n: no sombrearlo con el item del `.map`.
+ */
+export function buildTractionFilterOptions(tractions, activeSlug, t) {
+  const fromFacets = (tractions || []).map((row) => {
+    const n = typeof row === 'string' ? row : row.name;
+    const stored = TRACTION_SLUG_TO_LABEL[tractionToSlug(n)] ?? n;
+    return { slug: tractionToSlug(n), label: t(`values.traction.${stored}`, { defaultValue: stored }) };
+  });
+  if (activeSlug && !fromFacets.find((o) => o.slug === activeSlug)) {
+    const stored = TRACTION_SLUG_TO_LABEL[activeSlug] ?? activeSlug;
+    fromFacets.push({ slug: activeSlug, label: t(`values.traction.${stored}`, { defaultValue: stored }) });
+  }
+  return fromFacets;
+}
