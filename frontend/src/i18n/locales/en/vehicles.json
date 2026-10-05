@@ -115,6 +115,7 @@
     "and": " and ",
     "tabs": {
       "general": "General Information",
+      "carSpecs": "Technical information",
       "technical": "Technical Specifications",
       "modifications": "Modifications",
       "timings": "Timing Table",
@@ -139,6 +140,7 @@
     "cards": {
       "identification": "Identification",
       "technicalData": "Technical data",
+      "carSpecs": "Technical information",
       "competition": "Competition and limited edition",
       "purchase": "Purchase and prices",
       "condition": "Vehicle condition",
@@ -352,6 +354,7 @@
     "catalogSearching": "Searching…",
     "catalogNoResults": "No results",
     "catalogSelectedHint": "Catalog item selected. You can adjust the fields below before saving.",
+    "techSpecsTitle": "Technical information",
     "requiredFieldsError": "Please fill in the following required fields: {{fields}}",
     "invalidPriceError": "Invalid price value. Leave the field empty or enter a number.",
     "createError": "Failed to create vehicle",

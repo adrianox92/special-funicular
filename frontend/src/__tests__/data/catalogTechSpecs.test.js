@@ -3,6 +3,7 @@ import {
   emptyTechSpecForm,
   hasCatalogTechSpecs,
   labelCatalogTechSpecRim,
+  mergeEmptyTechSpecsFromCatalog,
   techSpecFormFromRow,
   validateTechSpecForm,
 } from '../../data/catalogTechSpecs';
@@ -56,5 +57,25 @@ describe('catalogTechSpecs helpers', () => {
     expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_rear_axle_width_mm: '-1' })).toBe(
       'rearAxleWidthMm',
     );
+  });
+
+  test('mergeEmptyTechSpecsFromCatalog solo rellena huecos', () => {
+    const current = {
+      ...emptyTechSpecForm(),
+      spec_scale: '1:24',
+      spec_magnet: 'false',
+    };
+    const merged = mergeEmptyTechSpecsFromCatalog(current, {
+      spec_scale: '1:32',
+      spec_body: 'Plastic',
+      spec_magnet: true,
+      spec_front_lights: true,
+      spec_front_rim: 'aluminum',
+    });
+    expect(merged.spec_scale).toBe('1:24');
+    expect(merged.spec_magnet).toBe('false');
+    expect(merged.spec_body).toBe('Plastic');
+    expect(merged.spec_front_lights).toBe(true);
+    expect(merged.spec_front_rim).toBe('aluminum');
   });
 });

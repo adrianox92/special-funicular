@@ -18,6 +18,7 @@ import VehicleMaintenanceTab from './edit-vehicle/VehicleMaintenanceTab';
 import VehicleQrDialog from './edit-vehicle/VehicleQrDialog';
 import VehicleSpecReturnDialog from './edit-vehicle/VehicleSpecReturnDialog';
 import VehicleSpecsTab from './edit-vehicle/VehicleSpecsTab';
+import VehicleCarSpecsTab from './edit-vehicle/VehicleCarSpecsTab';
 import VehicleTimingsTab from './edit-vehicle/VehicleTimingsTab';
 import InventoryPickerDialog from './edit-vehicle/InventoryPickerDialog';
 
@@ -51,14 +52,15 @@ function EditVehicleShell() {
     if (q.get('tab') === 'palmares' || location.hash === '#palmares') {
       setActiveTab('palmares');
     }
-    if (q.get('tab') === 'timings' || location.hash === '#timings') {
-      setActiveTab('timings');
+    if (q.get('tab') === 'car-specs' || location.hash === '#car-specs') {
+      setActiveTab('car-specs');
     }
   }, [location.search, location.hash]);
 
   const vehicleTabOptions = useMemo(
     () => [
       { value: 'general', label: t('edit.tabs.general') },
+      { value: 'car-specs', label: t('edit.tabs.carSpecs') },
       { value: 'technical', label: t('edit.tabs.technical') },
       { value: 'modifications', label: t('edit.tabs.modifications') },
       { value: 'timings', label: t('edit.tabs.timings') },
@@ -108,6 +110,10 @@ function EditVehicleShell() {
 
           <TabsContent value="general">
             <VehicleGeneralTab />
+          </TabsContent>
+
+          <TabsContent value="car-specs">
+            <VehicleCarSpecsTab />
           </TabsContent>
 
           <TabsContent value="technical">

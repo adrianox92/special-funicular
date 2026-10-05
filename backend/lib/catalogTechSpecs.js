@@ -217,6 +217,54 @@ function parseCatalogTechSpecsFromBody(body, existing) {
   return { ok: true, specs };
 }
 
+function isEmptyTechSpecValue(value, field) {
+  if (value == null || value === '') return true;
+  if ((field === 'spec_front_lights' || field === 'spec_rear_lights') && value === false) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Copia specs del catálogo solo en campos vacíos del vehículo.
+ * No pisa valores ya rellenados (incl. imán false y 0). Copy-on-create / copy-on-link.
+ * Luces false se trata como vacío (el formulario envía false si el checkbox no está marcado).
+ *
+ * @param {Record<string, unknown>} specs
+ * @param {Record<string, unknown>|null|undefined} catalogRow
+ * @returns {Record<string, unknown>}
+ */
+function fillEmptyTechSpecsFromCatalog(specs, catalogRow) {
+  const out = specs && typeof specs === 'object' ? { ...specs } : {};
+  if (!catalogRow || typeof catalogRow !== 'object') return out;
+  for (const field of CATALOG_TECH_SPEC_COLUMNS) {
+    if (!isEmptyTechSpecValue(out[field], field)) continue;
+    const fromCatalog = catalogRow[field];
+    if (isEmptyTechSpecValue(fromCatalog, field)) continue;
+    out[field] = fromCatalog;
+  }
+  return out;
+}
+
+/**
+ * Parsea el body y, si hay ficha de catálogo y fillFromCatalog, rellena huecos.
+ *
+ * @param {Record<string, unknown>} body
+ * @param {Record<string, unknown>|null} existing
+ * @param {Record<string, unknown>|null} catalogRow
+ * @param {{ fillFromCatalog?: boolean }} [opts]
+ * @returns {{ ok: true, specs: Record<string, unknown> } | { ok: false, error: string }}
+ */
+function parseVehicleTechSpecsFromBody(body, existing, catalogRow, opts = {}) {
+  const parsed = parseCatalogTechSpecsFromBody(body, existing);
+  if (!parsed.ok) return parsed;
+  const specs =
+    opts.fillFromCatalog && catalogRow
+      ? fillEmptyTechSpecsFromCatalog(parsed.specs, catalogRow)
+      : parsed.specs;
+  return { ok: true, specs };
+}
+
 module.exports = {
   CATALOG_TECH_SPEC_COLUMNS,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
@@ -227,6 +275,9 @@ module.exports = {
   CATALOG_TECH_SPEC_RIM_VALUES,
   CATALOG_TECH_SPEC_SELECT,
   parseCatalogTechSpecsFromBody,
+  parseVehicleTechSpecsFromBody,
+  fillEmptyTechSpecsFromCatalog,
+  isEmptyTechSpecValue,
   parseOptionalNonNegativeNumber,
   parseOptionalNullableBool,
   parseOptionalRim,

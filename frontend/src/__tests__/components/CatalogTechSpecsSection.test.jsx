@@ -140,4 +140,13 @@ describe('CatalogTechSpecsSection', () => {
     expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces delanteras');
     expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces traseras');
   });
+
+  test('modo embedded no usa el card de ficha', () => {
+    const { container } = render(
+      <CatalogTechSpecsSection embedded item={{ spec_scale: '1:32' }} />,
+    );
+    expect(container.querySelector('.rounded-xl')).toBeNull();
+    expect(screen.getByText('Información técnica')).toBeInTheDocument();
+    expect(screen.getByText('1:32')).toBeInTheDocument();
+  });
 });
