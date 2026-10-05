@@ -31,9 +31,9 @@ import {
   VEHICLE_TYPE_SLUG_TO_LABEL,
   TRACTION_SLUG_TO_LABEL,
   vehicleTypeToSlug,
-  tractionToSlug,
   vehicleTypeSlugToLabel,
   tractionSlugToLabel,
+  buildTractionFilterOptions,
 } from '../utils/catalogFilterSlugs';
 import { labelMotorPosition } from '../data/motorPosition';
 import { Package, Search, Star, X } from 'lucide-react';
@@ -277,18 +277,10 @@ function PublicCatalogList() {
     return fromFacets;
   }, [facets.vehicle_types, pathFilters.vehicleTypeSlug, t]);
 
-  const tractionOptions = useMemo(() => {
-    const fromFacets = (facets.tractions || []).map((t) => {
-      const n = typeof t === 'string' ? t : t.name;
-      const stored = TRACTION_SLUG_TO_LABEL[tractionToSlug(n)] ?? n;
-      return { slug: tractionToSlug(n), label: t(`values.traction.${stored}`, { defaultValue: stored }) };
-    });
-    if (pathFilters.tractionSlug && !fromFacets.find((o) => o.slug === pathFilters.tractionSlug)) {
-      const stored = TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug] ?? pathFilters.tractionSlug;
-      fromFacets.push({ slug: pathFilters.tractionSlug, label: t(`values.traction.${stored}`, { defaultValue: stored }) });
-    }
-    return fromFacets;
-  }, [facets.tractions, pathFilters.tractionSlug, t]);
+  const tractionOptions = useMemo(
+    () => buildTractionFilterOptions(facets.tractions, pathFilters.tractionSlug, t),
+    [facets.tractions, pathFilters.tractionSlug, t],
+  );
 
   const motorPositionOptions = useMemo(() => {
     return (facets.motor_positions || []).map((row) => {
