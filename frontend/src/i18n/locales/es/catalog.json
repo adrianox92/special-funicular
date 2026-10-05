@@ -148,6 +148,8 @@
       "rearWheels": "Ruedas traseras",
       "frontRim": "Llanta delantera",
       "rearRim": "Llanta trasera",
+      "frontRimDiameterMm": "Diámetro llanta delantera (mm)",
+      "rearRimDiameterMm": "Diámetro llanta trasera (mm)",
       "frontLights": "Luces delanteras",
       "rearLights": "Luces traseras"
     },

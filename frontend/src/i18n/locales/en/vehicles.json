@@ -115,7 +115,6 @@
     "and": " and ",
     "tabs": {
       "general": "General Information",
-      "carSpecs": "Technical information",
       "technical": "Technical Specifications",
       "modifications": "Modifications",
       "timings": "Timing Table",
@@ -140,7 +139,7 @@
     "cards": {
       "identification": "Identification",
       "technicalData": "Technical data",
-      "carSpecs": "Technical information",
+      "datasheet": "Car datasheet",
       "competition": "Competition and limited edition",
       "purchase": "Purchase and prices",
       "condition": "Vehicle condition",
@@ -175,6 +174,7 @@
       "addModification": "Add Modification",
       "editSpec": "Edit Technical Specification",
       "addSpec": "Add Technical Specification",
+      "datasheetHelp": "Datasheet measurements for this car. Motor, pinion and wheels are managed below as mounted components (not duplicated here). Rim material and diameter stay on the datasheet; specific rims (brand, stock) are added as components.",
       "fromInventory": "From inventory",
       "usingInventory": "Using inventory item «{{name}}». Type, name, reference, link and price come from the item. {{count}} {{unit}} will be deducted from stock on save (max. {{max}}).",
       "usingInventoryNoDeduct": "Using inventory item «{{name}}». Type, name, reference, link and price come from the item. {{count}} {{unit}} will be deducted from stock on save (max. {{max}}).",
@@ -354,7 +354,7 @@
     "catalogSearching": "Searching…",
     "catalogNoResults": "No results",
     "catalogSelectedHint": "Catalog item selected. You can adjust the fields below before saving.",
-    "techSpecsTitle": "Technical information",
+    "techSpecsTitle": "Technical Specifications",
     "requiredFieldsError": "Please fill in the following required fields: {{fields}}",
     "invalidPriceError": "Invalid price value. Leave the field empty or enter a number.",
     "createError": "Failed to create vehicle",

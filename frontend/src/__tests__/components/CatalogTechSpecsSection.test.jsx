@@ -30,6 +30,8 @@ jest.mock('react-i18next', () => ({
         'techSpecs.fields.rearWheels': 'Ruedas traseras',
         'techSpecs.fields.frontRim': 'Llanta delantera',
         'techSpecs.fields.rearRim': 'Llanta trasera',
+        'techSpecs.fields.frontRimDiameterMm': 'Diámetro llanta delantera (mm)',
+        'techSpecs.fields.rearRimDiameterMm': 'Diámetro llanta trasera (mm)',
         'techSpecs.fields.frontLights': 'Luces delanteras',
         'techSpecs.fields.rearLights': 'Luces traseras',
         'techSpecs.systemValues.analog': 'Analógico',
@@ -73,6 +75,7 @@ describe('CatalogTechSpecsSection', () => {
           spec_rear_lights: false,
           spec_front_rim: 'plastic',
           spec_rear_rim: 'aluminum',
+          spec_front_rim_diameter_mm: 15.8,
         }}
       />,
     );
@@ -95,6 +98,8 @@ describe('CatalogTechSpecsSection', () => {
     expect(screen.queryByText('Ancho de ejes trasero (mm)')).not.toBeInTheDocument();
     expect(screen.getByText('Llanta delantera')).toBeInTheDocument();
     expect(screen.getByText('Llanta trasera')).toBeInTheDocument();
+    expect(screen.getByText('Diámetro llanta delantera (mm)')).toBeInTheDocument();
+    expect(screen.getByText('15.8')).toBeInTheDocument();
     expect(screen.getByText('Plástico')).toBeInTheDocument();
     expect(screen.getByText('Aluminio')).toBeInTheDocument();
     expect(screen.queryByText('plastic')).not.toBeInTheDocument();
@@ -116,6 +121,8 @@ describe('CatalogTechSpecsSection', () => {
           spec_rear_wheels: 'Ø16.5',
           spec_front_rim: 'plastic',
           spec_rear_rim: 'magnesium',
+          spec_front_rim_diameter_mm: 15.8,
+          spec_rear_rim_diameter_mm: 16.5,
           spec_front_lights: true,
           spec_rear_lights: true,
         }}
@@ -127,6 +134,10 @@ describe('CatalogTechSpecsSection', () => {
     expect(rims).toHaveTextContent('Llanta trasera');
     expect(rims).toHaveTextContent('Plástico');
     expect(rims).toHaveTextContent('Magnesio');
+    expect(rims).toHaveTextContent('Diámetro llanta delantera (mm)');
+    expect(rims).toHaveTextContent('Diámetro llanta trasera (mm)');
+    expect(rims).toHaveTextContent('15.8');
+    expect(rims).toHaveTextContent('16.5');
     expect(screen.getByTestId('tech-spec-pair-wheels')).toHaveTextContent('Ruedas delanteras');
     expect(screen.getByTestId('tech-spec-pair-wheels')).toHaveTextContent('Ruedas traseras');
     expect(screen.getByTestId('tech-spec-pair-track')).toHaveTextContent('Vía delantera (mm)');

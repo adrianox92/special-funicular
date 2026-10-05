@@ -310,7 +310,9 @@ describe('admin catalog item image', () => {
       .field('spec_magnet', 'false')
       .field('spec_motor', 'S-Can 18,000rpm')
       .field('spec_front_rim', 'plastic')
-      .field('spec_rear_rim', 'aluminium');
+      .field('spec_rear_rim', 'aluminium')
+      .field('spec_front_rim_diameter_mm', '15,8')
+      .field('spec_rear_rim_diameter_mm', '16.5');
 
     expect(response.status).toBe(200);
     expect(itemsBuilder.updatePayload).toEqual(
@@ -327,6 +329,8 @@ describe('admin catalog item image', () => {
         spec_motor: 'S-Can 18,000rpm',
         spec_front_rim: 'plastic',
         spec_rear_rim: 'aluminum',
+        spec_front_rim_diameter_mm: 15.8,
+        spec_rear_rim_diameter_mm: 16.5,
       }),
     );
   });

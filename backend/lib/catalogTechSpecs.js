@@ -19,6 +19,8 @@ const CATALOG_TECH_SPEC_NUM_FIELDS = [
   'spec_rear_track_mm',
   'spec_front_axle_width_mm',
   'spec_rear_axle_width_mm',
+  'spec_front_rim_diameter_mm',
+  'spec_rear_rim_diameter_mm',
   'spec_weight_g',
 ];
 

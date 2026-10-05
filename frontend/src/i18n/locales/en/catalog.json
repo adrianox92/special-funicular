@@ -148,6 +148,8 @@
       "rearWheels": "Rear wheels",
       "frontRim": "Front rim",
       "rearRim": "Rear rim",
+      "frontRimDiameterMm": "Front rim diameter (mm)",
+      "rearRimDiameterMm": "Rear rim diameter (mm)",
       "frontLights": "Front lights",
       "rearLights": "Rear lights"
     },

@@ -21,6 +21,8 @@ export const CATALOG_TECH_SPEC_NUM_FIELDS = [
   { key: 'spec_rear_track_mm', i18n: 'rearTrackMm' },
   { key: 'spec_front_axle_width_mm', i18n: 'frontAxleWidthMm' },
   { key: 'spec_rear_axle_width_mm', i18n: 'rearAxleWidthMm' },
+  { key: 'spec_front_rim_diameter_mm', i18n: 'frontRimDiameterMm' },
+  { key: 'spec_rear_rim_diameter_mm', i18n: 'rearRimDiameterMm' },
   { key: 'spec_weight_g', i18n: 'weightG' },
 ];
 
@@ -45,7 +47,20 @@ export const CATALOG_TECH_SPEC_SIBLING_PAIRS = [
   ['spec_front_axle_width_mm', 'spec_rear_axle_width_mm'],
   ['spec_front_wheels', 'spec_rear_wheels'],
   ['spec_front_rim', 'spec_rear_rim'],
+  ['spec_front_rim_diameter_mm', 'spec_rear_rim_diameter_mm'],
   ['spec_front_lights', 'spec_rear_lights'],
+];
+
+/**
+ * En el formulario de vehículo, motor / piñón / ruedas se gestionan como
+ * componentes montados (pestaña Especificaciones técnicas). Siguen en spec_*
+ * (prefill, GET, ficha pública) pero no se editan dos veces.
+ */
+export const VEHICLE_FORM_OMIT_TECH_SPEC_KEYS = [
+  'spec_motor',
+  'spec_pinion_gear',
+  'spec_front_wheels',
+  'spec_rear_wheels',
 ];
 
 export const CATALOG_TECH_SPEC_KEYS = [
