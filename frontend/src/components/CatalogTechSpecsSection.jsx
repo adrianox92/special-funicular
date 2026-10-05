@@ -54,6 +54,8 @@ const SPEC_ICONS = {
   spec_rear_wheels: CircleDot,
   spec_front_rim: Disc,
   spec_rear_rim: Disc,
+  spec_front_rim_diameter_mm: Disc,
+  spec_rear_rim_diameter_mm: Disc,
   spec_front_lights: Lightbulb,
   spec_rear_lights: Lightbulb,
 };
@@ -158,7 +160,17 @@ export default function CatalogTechSpecsSection({ item, embedded = false }) {
     }
     pushSingle(out, textRow('spec_pinion_gear'));
     pushPair(out, 'wheels', textRow('spec_front_wheels'), textRow('spec_rear_wheels'));
-    pushPair(out, 'rims', rimRow('spec_front_rim'), rimRow('spec_rear_rim'));
+    {
+      const rimItems = [
+        rimRow('spec_front_rim'),
+        numRow('spec_front_rim_diameter_mm'),
+        rimRow('spec_rear_rim'),
+        numRow('spec_rear_rim_diameter_mm'),
+      ].filter(Boolean);
+      if (rimItems.length) {
+        out.push({ type: 'pair', key: 'rims', items: rimItems });
+      }
+    }
     pushPair(out, 'lights', lightRow('spec_front_lights'), lightRow('spec_rear_lights'));
     return out;
   }, [item, t]);

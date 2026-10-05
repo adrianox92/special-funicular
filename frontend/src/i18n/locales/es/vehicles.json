@@ -115,7 +115,6 @@
     "and": " y ",
     "tabs": {
       "general": "Información General",
-      "carSpecs": "Información técnica",
       "technical": "Especificaciones Técnicas",
       "modifications": "Modificaciones",
       "timings": "Tabla de Tiempos",
@@ -140,7 +139,7 @@
     "cards": {
       "identification": "Identificación",
       "technicalData": "Datos técnicos",
-      "carSpecs": "Información técnica",
+      "datasheet": "Ficha del ejemplar",
       "competition": "Competición y edición limitada",
       "purchase": "Compra y precios",
       "condition": "Estado del ejemplar",
@@ -175,6 +174,7 @@
       "addModification": "Añadir Modificación",
       "editSpec": "Editar Especificación Técnica",
       "addSpec": "Añadir Especificación Técnica",
+      "datasheetHelp": "Medidas y datos de ficha de este ejemplar. Motor, piñón y ruedas se gestionan más abajo como componentes montados (sin duplicar esos campos aquí). El material y el diámetro de llanta sí van en la ficha; las llantas concretas (marca, stock) se añaden como componentes.",
       "fromInventory": "Desde inventario",
       "usingInventory": "Usando ítem de inventario «{{name}}». El tipo, nombre, referencia, enlace y precio los toma del ítem. Al guardar se descontarán {{count}} {{unit}} del stock (máx. {{max}}).",
       "usingInventoryNoDeduct": "Usando ítem de inventario «{{name}}». El tipo, nombre, referencia, enlace y precio los toma del ítem. Al guardar se descontarán {{count}} {{unit}} del stock (máx. {{max}}).",
@@ -354,7 +354,7 @@
     "catalogSearching": "Buscando…",
     "catalogNoResults": "Sin resultados",
     "catalogSelectedHint": "Ítem de catálogo seleccionado. Puedes ajustar los campos abajo antes de guardar.",
-    "techSpecsTitle": "Información técnica",
+    "techSpecsTitle": "Especificaciones Técnicas",
     "requiredFieldsError": "Por favor, rellena los siguientes campos obligatorios: {{fields}}",
     "invalidPriceError": "El valor del precio no es válido. Deja el campo vacío o introduce un número.",
     "createError": "Error al crear el vehículo",

@@ -19,6 +19,8 @@ describe('catalogTechSpecs', () => {
     expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_rear_lights');
     expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_front_rim');
     expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_rear_rim');
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_front_rim_diameter_mm');
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_rear_rim_diameter_mm');
     expect(CATALOG_TECH_SPEC_SELECT).not.toContain('spec_lights');
     expect(CATALOG_TECH_SPEC_SELECT).not.toContain('spec_front_tyres');
     expect(CATALOG_TECH_SPEC_SELECT).not.toContain('spec_rear_tyres');
@@ -38,6 +40,8 @@ describe('catalogTechSpecs', () => {
     expect(parsed.specs.spec_rear_lights).toBeNull();
     expect(parsed.specs.spec_front_rim).toBeNull();
     expect(parsed.specs.spec_rear_rim).toBeNull();
+    expect(parsed.specs.spec_front_rim_diameter_mm).toBeNull();
+    expect(parsed.specs.spec_rear_rim_diameter_mm).toBeNull();
   });
 
   test('update sin campos conserva los existentes', () => {
@@ -51,6 +55,8 @@ describe('catalogTechSpecs', () => {
         spec_front_lights: true,
         spec_front_rim: 'plastic',
         spec_rear_rim: 'aluminum',
+        spec_front_rim_diameter_mm: 15.8,
+        spec_rear_rim_diameter_mm: 16.5,
       },
     );
     expect(parsed.ok).toBe(true);
@@ -61,6 +67,8 @@ describe('catalogTechSpecs', () => {
     expect(parsed.specs.spec_front_lights).toBe(true);
     expect(parsed.specs.spec_front_rim).toBe('plastic');
     expect(parsed.specs.spec_rear_rim).toBe('aluminum');
+    expect(parsed.specs.spec_front_rim_diameter_mm).toBe(15.8);
+    expect(parsed.specs.spec_rear_rim_diameter_mm).toBe(16.5);
   });
 
   test('campo vacío borra el valor', () => {
@@ -73,6 +81,8 @@ describe('catalogTechSpecs', () => {
         spec_front_lights: '',
         spec_front_rim: '',
         spec_rear_rim: '  ',
+        spec_front_rim_diameter_mm: '',
+        spec_rear_rim_diameter_mm: '  ',
       },
       {
         spec_scale: '1:32',
@@ -82,6 +92,8 @@ describe('catalogTechSpecs', () => {
         spec_front_lights: true,
         spec_front_rim: 'plastic',
         spec_rear_rim: 'magnesium',
+        spec_front_rim_diameter_mm: 15.8,
+        spec_rear_rim_diameter_mm: 16.5,
       },
     );
     expect(parsed.ok).toBe(true);
@@ -92,6 +104,8 @@ describe('catalogTechSpecs', () => {
     expect(parsed.specs.spec_front_lights).toBeNull();
     expect(parsed.specs.spec_front_rim).toBeNull();
     expect(parsed.specs.spec_rear_rim).toBeNull();
+    expect(parsed.specs.spec_front_rim_diameter_mm).toBeNull();
+    expect(parsed.specs.spec_rear_rim_diameter_mm).toBeNull();
   });
 
   test('parsea números, imán, sistema, luces y llantas', () => {
@@ -110,6 +124,8 @@ describe('catalogTechSpecs', () => {
       spec_rear_lights: 'false',
       spec_front_rim: 'Plástico',
       spec_rear_rim: 'aluminium',
+      spec_front_rim_diameter_mm: '15,8',
+      spec_rear_rim_diameter_mm: '16.5',
     });
     expect(parsed.ok).toBe(true);
     expect(parsed.specs.spec_scale).toBe('1:32');
@@ -124,6 +140,8 @@ describe('catalogTechSpecs', () => {
     expect(parsed.specs.spec_rear_lights).toBe(false);
     expect(parsed.specs.spec_front_rim).toBe('plastic');
     expect(parsed.specs.spec_rear_rim).toBe('aluminum');
+    expect(parsed.specs.spec_front_rim_diameter_mm).toBe(15.8);
+    expect(parsed.specs.spec_rear_rim_diameter_mm).toBe(16.5);
   });
 
   test('acepta analógico con acento como analog', () => {
@@ -178,6 +196,7 @@ describe('catalogTechSpecs', () => {
         spec_body: null,
         spec_front_lights: false,
         spec_rear_rim: null,
+        spec_front_rim_diameter_mm: 15.8,
       },
       {
         spec_scale: '1:32',
@@ -185,6 +204,8 @@ describe('catalogTechSpecs', () => {
         spec_body: 'Plastic',
         spec_front_lights: true,
         spec_rear_rim: 'magnesium',
+        spec_front_rim_diameter_mm: 16.9,
+        spec_rear_rim_diameter_mm: 17.2,
       },
     );
     expect(filled.spec_scale).toBe('1:24');
@@ -192,6 +213,8 @@ describe('catalogTechSpecs', () => {
     expect(filled.spec_body).toBe('Plastic');
     expect(filled.spec_front_lights).toBe(true);
     expect(filled.spec_rear_rim).toBe('magnesium');
+    expect(filled.spec_front_rim_diameter_mm).toBe(15.8);
+    expect(filled.spec_rear_rim_diameter_mm).toBe(17.2);
   });
 
   test('parseVehicleTechSpecsFromBody rellena huecos solo si fillFromCatalog', () => {
@@ -199,6 +222,7 @@ describe('catalogTechSpecs', () => {
       spec_scale: '1:32',
       spec_system: 'digital',
       spec_front_rim: 'plastic',
+      spec_front_rim_diameter_mm: 15.8,
     };
     const withoutFill = parseVehicleTechSpecsFromBody({ spec_body: 'ABS' }, null, catalogRow, {
       fillFromCatalog: false,
@@ -206,6 +230,7 @@ describe('catalogTechSpecs', () => {
     expect(withoutFill.ok).toBe(true);
     expect(withoutFill.specs.spec_scale).toBeNull();
     expect(withoutFill.specs.spec_body).toBe('ABS');
+    expect(withoutFill.specs.spec_front_rim_diameter_mm).toBeNull();
 
     const withFill = parseVehicleTechSpecsFromBody({ spec_body: 'ABS' }, null, catalogRow, {
       fillFromCatalog: true,
@@ -215,5 +240,6 @@ describe('catalogTechSpecs', () => {
     expect(withFill.specs.spec_scale).toBe('1:32');
     expect(withFill.specs.spec_system).toBe('digital');
     expect(withFill.specs.spec_front_rim).toBe('plastic');
+    expect(withFill.specs.spec_front_rim_diameter_mm).toBe(15.8);
   });
 });

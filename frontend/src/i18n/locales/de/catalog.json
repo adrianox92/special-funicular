@@ -148,6 +148,8 @@
       "rearWheels": "Hinterräder",
       "frontRim": "Felge vorn",
       "rearRim": "Felge hinten",
+      "frontRimDiameterMm": "Felgendurchmesser vorn (mm)",
+      "rearRimDiameterMm": "Felgendurchmesser hinten (mm)",
       "frontLights": "Frontbeleuchtung",
       "rearLights": "Heckbeleuchtung"
     },

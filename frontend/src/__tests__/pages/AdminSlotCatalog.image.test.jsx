@@ -240,6 +240,7 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
               spec_magnet: true,
               spec_length_mm: 145,
               spec_front_axle_width_mm: 52,
+              spec_front_rim_diameter_mm: 15.8,
             }],
             totalPages: 1,
             page: 1,
@@ -267,6 +268,7 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
       'techSpecs.systemValues.analog',
     );
     expect(screen.getByLabelText('techSpecs.fields.frontAxleWidthMm')).toHaveValue(52);
+    expect(screen.getByLabelText('techSpecs.fields.frontRimDiameterMm')).toHaveValue(15.8);
     expect(screen.getByLabelText('techSpecs.fields.frontLights')).toBeChecked();
     expect(screen.getByLabelText('techSpecs.fields.rearLights')).not.toBeChecked();
     await userEvent.clear(scaleInput);
@@ -285,5 +287,6 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
     expect(fd.get('spec_magnet')).toBe('true');
     expect(fd.get('spec_length_mm')).toBe('145');
     expect(fd.get('spec_front_axle_width_mm')).toBe('52');
+    expect(fd.get('spec_front_rim_diameter_mm')).toBe('15.8');
   });
 });
