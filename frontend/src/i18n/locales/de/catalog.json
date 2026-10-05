@@ -116,6 +116,37 @@
     "addToGarageHint": "Öffnet das Formular für ein neues Fahrzeug mit dieser Referenz.",
     "legacyValue": "{{value}} (bisheriger Wert)"
   },
+  "techSpecs": {
+    "title": "Technische Informationen",
+    "tab": "Technische Daten",
+    "tabGeneral": "Allgemein",
+    "tabNavAria": "Formularabschnitt",
+    "formHelp": "Maße in Millimetern und Gewicht in Gramm. Leer lassen, wenn unbekannt. Antrieb und Motorhalterung werden im Reiter Allgemein bearbeitet.",
+    "yes": "Ja",
+    "no": "Nein",
+    "unspecified": "— Nicht angegeben —",
+    "invalidNumber": "{{field}} muss eine Zahl größer oder gleich 0 sein.",
+    "fields": {
+      "scale": "Maßstab",
+      "body": "Karosserie",
+      "lengthMm": "Länge (mm)",
+      "heightMm": "Höhe (mm)",
+      "wheelbaseMm": "Radstand (mm)",
+      "frontTrackMm": "Spurweite vorn (mm)",
+      "rearTrackMm": "Spurweite hinten (mm)",
+      "weightG": "Gewicht (g)",
+      "magnet": "Magnet",
+      "motor": "Motor",
+      "motorMount": "Motorhalterung",
+      "drivetrain": "Antrieb",
+      "pinionGear": "Ritzel / Zahnrad",
+      "frontWheels": "Vorderräder",
+      "rearWheels": "Hinterräder",
+      "frontTyres": "Vorderreifen",
+      "rearTyres": "Hinterreifen",
+      "lights": "Beleuchtung"
+    }
+  },
   "guest": {
     "addTitle": "Diese Referenz zu deiner Garage hinzufügen",
     "addBody": "Kostenlos. Später kannst du Zeiten erfassen und deine Sammlung verwalten.",

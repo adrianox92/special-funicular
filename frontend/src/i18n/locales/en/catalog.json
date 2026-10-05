@@ -116,6 +116,37 @@
     "addToGarageHint": "Opens the add-vehicle form with this reference filled in.",
     "legacyValue": "{{value}} (previous value)"
   },
+  "techSpecs": {
+    "title": "Technical information",
+    "tab": "Technical specs",
+    "tabGeneral": "General",
+    "tabNavAria": "Form section",
+    "formHelp": "Dimensions in millimetres and weight in grams. Leave blank if unknown. Drivetrain and motor mount are edited on the General tab.",
+    "yes": "Yes",
+    "no": "No",
+    "unspecified": "— Unspecified —",
+    "invalidNumber": "{{field}} must be a number greater than or equal to 0.",
+    "fields": {
+      "scale": "Scale",
+      "body": "Body",
+      "lengthMm": "Length (mm)",
+      "heightMm": "Height (mm)",
+      "wheelbaseMm": "Wheelbase (mm)",
+      "frontTrackMm": "Front track (mm)",
+      "rearTrackMm": "Rear track (mm)",
+      "weightG": "Weight (g)",
+      "magnet": "Magnet",
+      "motor": "Motor",
+      "motorMount": "Motor mount",
+      "drivetrain": "Drivetrain",
+      "pinionGear": "Pinion / gear",
+      "frontWheels": "Front wheels",
+      "rearWheels": "Rear wheels",
+      "frontTyres": "Front tyres",
+      "rearTyres": "Rear tyres",
+      "lights": "Lights"
+    }
+  },
   "guest": {
     "addTitle": "Add this reference to your garage",
     "addBody": "It's free. You can later log times and manage your collection.",

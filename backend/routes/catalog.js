@@ -23,6 +23,7 @@ const {
   aggregateCompletenessByManufacturerId,
   applyCatalogItemsMissingFilter,
 } = require('../lib/catalogCompleteness');
+const { parseCatalogTechSpecsFromBody } = require('../lib/catalogTechSpecs');
 
 const router = express.Router();
 
@@ -938,6 +939,8 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
     if (!raceResultsParsed.ok) return res.status(400).json({ error: raceResultsParsed.error });
     const racePhotosParsed = parseOptionalAbsoluteHttpUrl(req.body.real_race_photos_url);
     if (!racePhotosParsed.ok) return res.status(400).json({ error: racePhotosParsed.error });
+    const techSpecsParsed = parseCatalogTechSpecsFromBody(req.body, null);
+    if (!techSpecsParsed.ok) return res.status(400).json({ error: techSpecsParsed.error });
 
     if (!reference || !manufacturer_id || !model_name) {
       return res.status(400).json({
@@ -973,6 +976,7 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
           limited_edition_total,
           real_race_results_url: raceResultsParsed.value,
           real_race_photos_url: racePhotosParsed.value,
+          ...techSpecsParsed.specs,
           image_url,
           updated_at: new Date().toISOString(),
         },
@@ -1056,6 +1060,8 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
       if (!p.ok) return res.status(400).json({ error: p.error });
       real_race_photos_url = p.value;
     }
+    const techSpecsParsed = parseCatalogTechSpecsFromBody(req.body, existing);
+    if (!techSpecsParsed.ok) return res.status(400).json({ error: techSpecsParsed.error });
 
     let image_url = existing.image_url;
     const clearImage = parseBodyBool(req.body.clear_image);
@@ -1099,6 +1105,7 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
         limited_edition_total,
         real_race_results_url,
         real_race_photos_url,
+        ...techSpecsParsed.specs,
         image_url,
         updated_at: new Date().toISOString(),
       })

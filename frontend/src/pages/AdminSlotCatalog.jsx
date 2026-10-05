@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Link, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
@@ -64,6 +65,13 @@ import { Switch } from '../components/ui/switch';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogTechSpecsFields from '../components/CatalogTechSpecsFields';
+import {
+  appendTechSpecsToFormData,
+  emptyTechSpecForm,
+  techSpecFormFromRow,
+  validateTechSpecForm,
+} from '../data/catalogTechSpecs';
 
 const emptyItem = {
   reference: '',
@@ -80,6 +88,7 @@ const emptyItem = {
   real_race_photos_url: '',
   discontinued: false,
   upcoming_release: false,
+  ...emptyTechSpecForm(),
 };
 
 /** Parámetro `missing` en GET /catalog/items (huecos alineados con el dashboard). */
@@ -238,6 +247,7 @@ function formatCatalogDiffValue(field, value) {
 
 function AdminSlotCatalog() {
   const { user } = useAuth();
+  const { t } = useTranslation('catalog');
   const isAdmin = isLicenseAdminUser(user);
 
   const [tab, setTab] = useState('dashboard');
@@ -269,6 +279,7 @@ function AdminSlotCatalog() {
   const [newImageObjectUrl, setNewImageObjectUrl] = useState(null);
   const [formSaving, setFormSaving] = useState(false);
   const [imageDeleting, setImageDeleting] = useState(false);
+  const [formTab, setFormTab] = useState('general');
 
   useEffect(() => {
     if (!imageFile) {
@@ -690,6 +701,7 @@ function AdminSlotCatalog() {
     setExistingImageUrl(null);
     setClearImage(false);
     setNewImageObjectUrl(null);
+    setFormTab('general');
     setEditOpen(true);
   };
 
@@ -717,12 +729,14 @@ function AdminSlotCatalog() {
       real_race_photos_url: row.real_race_photos_url != null ? String(row.real_race_photos_url) : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
+      ...techSpecFormFromRow(row),
     });
     setImageFile(null);
     const url = row.image_url != null && String(row.image_url).trim() ? String(row.image_url) : null;
     setExistingImageUrl(url);
     setClearImage(false);
     setNewImageObjectUrl(null);
+    setFormTab('general');
     setEditOpen(true);
   };
 
@@ -750,17 +764,25 @@ function AdminSlotCatalog() {
       real_race_photos_url: row.real_race_photos_url != null ? String(row.real_race_photos_url) : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
+      ...techSpecFormFromRow(row),
     });
     setImageFile(null);
     setExistingImageUrl(null);
     setClearImage(false);
     setNewImageObjectUrl(null);
+    setFormTab('general');
     setEditOpen(true);
   };
 
   const saveItem = async () => {
     if (!form.manufacturer_id?.trim()) {
       alert('Selecciona una marca registrada');
+      return;
+    }
+    const invalidSpec = validateTechSpecForm(form);
+    if (invalidSpec) {
+      setFormTab('tech');
+      alert(t('techSpecs.invalidNumber', { field: t(`techSpecs.fields.${invalidSpec}`) }));
       return;
     }
     setFormSaving(true);
@@ -785,6 +807,7 @@ function AdminSlotCatalog() {
       fd.append('upcoming_release', form.upcoming_release ? 'true' : 'false');
       fd.append('real_race_results_url', form.real_race_results_url?.trim() ?? '');
       fd.append('real_race_photos_url', form.real_race_photos_url?.trim() ?? '');
+      appendTechSpecsToFormData(fd, form);
       if (imageFile) fd.append('image', imageFile);
       if (editMode === 'edit' && clearImage && !imageFile) fd.append('clear_image', 'true');
 
@@ -2019,6 +2042,20 @@ function AdminSlotCatalog() {
                   : 'Editar ítem'}
             </DialogTitle>
           </DialogHeader>
+          <Tabs value={formTab} onValueChange={setFormTab}>
+            <ResponsiveTabsNav
+              value={formTab}
+              onValueChange={setFormTab}
+              options={[
+                { value: 'general', label: t('techSpecs.tabGeneral') },
+                { value: 'tech', label: t('techSpecs.tab') },
+              ]}
+              listClassName="sm:grid-cols-2"
+              listAriaLabel={t('techSpecs.tabNavAria')}
+              selectId="catalog-item-form-tab"
+              mobileLabel={t('techSpecs.tabNavAria')}
+            />
+            <TabsContent value="general" className="mt-2 focus-visible:outline-none">
           <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Referencia</Label>
@@ -2216,6 +2253,11 @@ function AdminSlotCatalog() {
               )}
             </div>
           </div>
+            </TabsContent>
+            <TabsContent value="tech" className="mt-2 focus-visible:outline-none">
+              <CatalogTechSpecsFields form={form} setForm={setForm} />
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
             <Button onClick={saveItem} disabled={formSaving}>
