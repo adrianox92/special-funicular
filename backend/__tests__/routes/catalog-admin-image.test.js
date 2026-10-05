@@ -248,4 +248,70 @@ describe('admin catalog item image', () => {
     expect(response.status).toBe(403);
     expect(removeCatalogObjectByPublicUrl).not.toHaveBeenCalled();
   });
+
+  test('PUT /items/:id sin specs conserva las existentes', async () => {
+    const existing = { ...EXISTING, spec_scale: '1:32', spec_magnet: true, spec_length_mm: 145 };
+    itemsBuilder = createItemsBuilder(existing);
+    ratingsBuilder = createRatingsBuilder(existing);
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemsBuilder;
+      if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      return createItemsBuilder(null);
+    });
+
+    const response = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name);
+
+    expect(response.status).toBe(200);
+    expect(itemsBuilder.updatePayload).toEqual(
+      expect.objectContaining({
+        spec_scale: '1:32',
+        spec_magnet: true,
+        spec_length_mm: 145,
+      }),
+    );
+  });
+
+  test('PUT /items/:id guarda specs técnicas y valida números', async () => {
+    ratingsBuilder = createRatingsBuilder({ ...EXISTING, spec_scale: '1:32' });
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemsBuilder;
+      if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      return createItemsBuilder(null);
+    });
+
+    const bad = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name)
+      .field('spec_weight_g', '-3');
+    expect(bad.status).toBe(400);
+
+    const response = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name)
+      .field('spec_scale', '1:32')
+      .field('spec_length_mm', '145,5')
+      .field('spec_magnet', 'false')
+      .field('spec_motor', 'S-Can 18,000rpm');
+
+    expect(response.status).toBe(200);
+    expect(itemsBuilder.updatePayload).toEqual(
+      expect.objectContaining({
+        spec_scale: '1:32',
+        spec_length_mm: 145.5,
+        spec_magnet: false,
+        spec_motor: 'S-Can 18,000rpm',
+      }),
+    );
+  });
 });

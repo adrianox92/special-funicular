@@ -116,6 +116,37 @@
     "addToGarageHint": "Se abrirá el alta de vehículo con esta referencia ya rellenada.",
     "legacyValue": "{{value}} (valor anterior)"
   },
+  "techSpecs": {
+    "title": "Información técnica",
+    "tab": "Información técnica",
+    "tabGeneral": "General",
+    "tabNavAria": "Sección del formulario",
+    "formHelp": "Medidas en milímetros y peso en gramos. Deja vacío lo que no conozcas. La tracción y el soporte del motor se editan en la pestaña General.",
+    "yes": "Sí",
+    "no": "No",
+    "unspecified": "— Sin especificar —",
+    "invalidNumber": "{{field}} debe ser un número mayor o igual que 0.",
+    "fields": {
+      "scale": "Escala",
+      "body": "Carrocería",
+      "lengthMm": "Longitud (mm)",
+      "heightMm": "Altura (mm)",
+      "wheelbaseMm": "Batalla (mm)",
+      "frontTrackMm": "Vía delantera (mm)",
+      "rearTrackMm": "Vía trasera (mm)",
+      "weightG": "Peso (g)",
+      "magnet": "Imán",
+      "motor": "Motor",
+      "motorMount": "Soporte del motor",
+      "drivetrain": "Transmisión",
+      "pinionGear": "Piñón / corona",
+      "frontWheels": "Ruedas delanteras",
+      "rearWheels": "Ruedas traseras",
+      "frontTyres": "Neumáticos delanteros",
+      "rearTyres": "Neumáticos traseros",
+      "lights": "Luces"
+    }
+  },
   "guest": {
     "addTitle": "Añade esta referencia a tu garaje",
     "addBody": "Es gratis. Después podrás cronometrar y gestionar tu colección.",

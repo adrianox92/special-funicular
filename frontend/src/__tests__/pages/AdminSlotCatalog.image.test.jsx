@@ -212,4 +212,56 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
     const [, fd] = api.put.mock.calls[0];
     expect(fd.get('commercial_release_year')).toBe('');
   });
+
+  it('pestaña de specs técnicas carga valores y los envía al guardar', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/catalog/stats') {
+        return Promise.resolve({
+          data: {
+            totalItems: 1,
+            weightedCompletenessPercent: 80,
+            fullyCompletePercent: 0,
+            fullyCompleteCount: 0,
+            weights: { image_url: 0.3, model_name: 0.14 },
+            missing: {},
+          },
+        });
+      }
+      if (url === '/catalog/items') {
+        return Promise.resolve({
+          data: {
+            items: [{ ...ITEM, spec_scale: '1:32', spec_magnet: true, spec_length_mm: 145 }],
+            totalPages: 1,
+            page: 1,
+          },
+        });
+      }
+      if (url === '/catalog/change-requests' || url === '/catalog/insert-requests') {
+        return Promise.resolve({ data: { requests: [] } });
+      }
+      if (url === '/catalog/brands') {
+        return Promise.resolve({ data: { brands: [] } });
+      }
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    });
+
+    await openItemsAndEdit();
+
+    const techTabs = screen.getAllByRole('tab', { name: 'techSpecs.tab' });
+    await userEvent.click(techTabs[0]);
+
+    const scaleInput = await screen.findByLabelText('techSpecs.fields.scale');
+    expect(scaleInput).toHaveValue('1:32');
+    await userEvent.clear(scaleInput);
+    await userEvent.type(scaleInput, '1:24');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalled();
+    });
+    const [, fd] = api.put.mock.calls[0];
+    expect(fd.get('spec_scale')).toBe('1:24');
+    expect(fd.get('spec_magnet')).toBe('true');
+    expect(fd.get('spec_length_mm')).toBe('145');
+  });
 });

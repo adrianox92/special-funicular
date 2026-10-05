@@ -40,6 +40,7 @@ import { toast } from 'sonner';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
 import CatalogTractionSelect from '../components/CatalogTractionSelect';
 import CatalogPrevNext from '../components/CatalogPrevNext';
+import CatalogTechSpecsSection from '../components/CatalogTechSpecsSection';
 import { useLocale } from '../hooks/useLocale';
 import { localizePath } from '../i18n/localeUtils';
 import { buildLoginPath, withIntent } from '../utils/authReturnUrl';
@@ -517,6 +518,8 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             </CardContent>
           </Card>
         </div>
+
+        <CatalogTechSpecsSection item={item} />
 
         {(publicRaceResultsUrl || publicRacePhotosUrl) && (
           <Card>

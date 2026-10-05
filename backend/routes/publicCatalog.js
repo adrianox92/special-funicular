@@ -9,8 +9,14 @@ const { fetchCatalogNeighbors } = require('../lib/catalogNeighbors');
 const router = express.Router();
 const supabase = getAnonClient();
 
-const PUBLIC_SELECT =
+const { CATALOG_TECH_SPEC_SELECT } = require('../lib/catalogTechSpecs');
+
+const PUBLIC_LIST_SELECT =
   'id, reference, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count';
+
+const PUBLIC_SELECT = PUBLIC_LIST_SELECT;
+
+const PUBLIC_DETAIL_SELECT = `${PUBLIC_LIST_SELECT}, ${CATALOG_TECH_SPEC_SELECT}`;
 
 function escapeIlikePattern(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
@@ -268,7 +274,7 @@ router.get('/items/:id', async (req, res) => {
     }
     const { data, error } = await supabase
       .from('slot_catalog_items_with_ratings')
-      .select(`${PUBLIC_SELECT}, created_at`)
+      .select(`${PUBLIC_DETAIL_SELECT}, created_at`)
       .eq('id', id)
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
