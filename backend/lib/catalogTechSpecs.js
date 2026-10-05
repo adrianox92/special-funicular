@@ -5,14 +5,12 @@ const CATALOG_TECH_SPEC_TEXT_FIELDS = [
   'spec_scale',
   'spec_body',
   'spec_color',
-  'spec_system',
   'spec_motor',
   'spec_pinion_gear',
   'spec_front_wheels',
   'spec_rear_wheels',
   'spec_front_tyres',
   'spec_rear_tyres',
-  'spec_lights',
 ];
 
 const CATALOG_TECH_SPEC_NUM_FIELDS = [
@@ -26,10 +24,19 @@ const CATALOG_TECH_SPEC_NUM_FIELDS = [
   'spec_weight_g',
 ];
 
+const CATALOG_TECH_SPEC_BOOL_FIELDS = [
+  'spec_magnet',
+  'spec_front_lights',
+  'spec_rear_lights',
+];
+
+const CATALOG_TECH_SPEC_SYSTEM_VALUES = ['analog', 'digital'];
+
 const CATALOG_TECH_SPEC_COLUMNS = [
   ...CATALOG_TECH_SPEC_TEXT_FIELDS,
   ...CATALOG_TECH_SPEC_NUM_FIELDS,
-  'spec_magnet',
+  ...CATALOG_TECH_SPEC_BOOL_FIELDS,
+  'spec_system',
 ];
 
 const CATALOG_TECH_SPEC_SELECT = CATALOG_TECH_SPEC_COLUMNS.join(', ');
@@ -38,17 +45,23 @@ const TEXT_MAX = {
   spec_scale: 32,
   spec_body: 80,
   spec_color: 80,
-  spec_system: 80,
   spec_motor: 120,
   spec_pinion_gear: 40,
   spec_front_wheels: 120,
   spec_rear_wheels: 120,
   spec_front_tyres: 120,
   spec_rear_tyres: 120,
-  spec_lights: 80,
 };
 
 const NUM_MAX = 100000;
+
+const SYSTEM_ALIASES = {
+  analog: 'analog',
+  analogue: 'analog',
+  analogico: 'analog',
+  analogisch: 'analog',
+  digital: 'digital',
+};
 
 function normOptionalStr(v) {
   if (v == null) return null;
@@ -77,13 +90,27 @@ function parseOptionalNonNegativeNumber(raw, field) {
   return { ok: true, value: n };
 }
 
-function parseOptionalNullableBool(raw) {
+function parseOptionalNullableBool(raw, field = 'spec_magnet') {
   if (raw == null || raw === '') return { ok: true, value: null };
   if (typeof raw === 'boolean') return { ok: true, value: raw };
   const s = String(raw).trim().toLowerCase();
   if (['true', '1', 'yes', 'sí', 'si', 'ja', 'on'].includes(s)) return { ok: true, value: true };
   if (['false', '0', 'no', 'nein', 'n', 'off'].includes(s)) return { ok: true, value: false };
-  return { ok: false, error: 'spec_magnet: valor no válido (sí/no o vacío)' };
+  return { ok: false, error: `${field}: valor no válido (sí/no o vacío)` };
+}
+
+function parseOptionalSystem(raw) {
+  const value = normOptionalStr(raw);
+  if (value == null) return { ok: true, value: null };
+  const key = value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  const mapped = SYSTEM_ALIASES[key];
+  if (mapped) return { ok: true, value: mapped };
+  return { ok: false, error: 'spec_system: debe ser analog, digital o vacío' };
+}
+
+function copyExistingOrNull(prev, field) {
+  if (!prev) return null;
+  return prev[field] === undefined ? null : prev[field];
 }
 
 /**
@@ -106,7 +133,7 @@ function parseCatalogTechSpecsFromBody(body, existing) {
       if (!parsed.ok) return parsed;
       specs[field] = parsed.value;
     } else {
-      specs[field] = prev ? (prev[field] ?? null) : null;
+      specs[field] = copyExistingOrNull(prev, field);
     }
   }
 
@@ -116,17 +143,31 @@ function parseCatalogTechSpecsFromBody(body, existing) {
       if (!parsed.ok) return parsed;
       specs[field] = parsed.value;
     } else {
-      specs[field] = prev ? (prev[field] ?? null) : null;
+      specs[field] = copyExistingOrNull(prev, field);
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(src, 'spec_magnet')) {
-    const parsed = parseOptionalNullableBool(src.spec_magnet);
+  for (const field of CATALOG_TECH_SPEC_BOOL_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(src, field)) {
+      const parsed = parseOptionalNullableBool(src[field], field);
+      if (!parsed.ok) return parsed;
+      specs[field] = parsed.value;
+    } else if (prev) {
+      const v = prev[field];
+      specs[field] = v === true || v === false ? v : null;
+    } else {
+      specs[field] = null;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(src, 'spec_system')) {
+    const parsed = parseOptionalSystem(src.spec_system);
     if (!parsed.ok) return parsed;
-    specs.spec_magnet = parsed.value;
+    specs.spec_system = parsed.value;
   } else {
-    specs.spec_magnet = prev
-      ? (prev.spec_magnet === true || prev.spec_magnet === false ? prev.spec_magnet : null)
+    const existingSystem = prev ? prev.spec_system : null;
+    specs.spec_system = CATALOG_TECH_SPEC_SYSTEM_VALUES.includes(existingSystem)
+      ? existingSystem
       : null;
   }
 
@@ -137,9 +178,12 @@ module.exports = {
   CATALOG_TECH_SPEC_COLUMNS,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
+  CATALOG_TECH_SPEC_BOOL_FIELDS,
+  CATALOG_TECH_SPEC_SYSTEM_VALUES,
   CATALOG_TECH_SPEC_SELECT,
   parseCatalogTechSpecsFromBody,
   parseOptionalNonNegativeNumber,
   parseOptionalNullableBool,
+  parseOptionalSystem,
   parseOptionalTechText,
 };

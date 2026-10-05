@@ -11,7 +11,9 @@ import {
 } from './ui/select';
 import {
   CATALOG_TECH_SPEC_LEAD_TEXT_KEYS,
+  CATALOG_TECH_SPEC_LIGHT_FIELDS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
+  CATALOG_TECH_SPEC_SYSTEM_VALUES,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
 } from '../data/catalogTechSpecs';
 
@@ -36,6 +38,25 @@ export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'cata
           />
         </div>
       ))}
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-spec_system`}>{t('techSpecs.fields.system')}</Label>
+        <Select
+          value={form.spec_system || '__none__'}
+          onValueChange={(v) => setField('spec_system', v === '__none__' ? '' : v)}
+        >
+          <SelectTrigger id={`${idPrefix}-spec_system`}>
+            <SelectValue placeholder={t('techSpecs.unspecified')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">{t('techSpecs.unspecified')}</SelectItem>
+            {CATALOG_TECH_SPEC_SYSTEM_VALUES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {t(`techSpecs.systemValues.${value}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {CATALOG_TECH_SPEC_NUM_FIELDS.map((f) => (
         <div key={f.key} className="space-y-2">
           <Label htmlFor={`${idPrefix}-${f.key}`}>{t(`techSpecs.fields.${f.i18n}`)}</Label>
@@ -78,6 +99,22 @@ export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'cata
             onChange={(e) => setField(f.key, e.target.value)}
           />
         </div>
+      ))}
+      {CATALOG_TECH_SPEC_LIGHT_FIELDS.map((f) => (
+        <label
+          key={f.key}
+          htmlFor={`${idPrefix}-${f.key}`}
+          className="flex items-center gap-2 rounded-lg border p-3 text-sm font-medium leading-none"
+        >
+          <input
+            id={`${idPrefix}-${f.key}`}
+            type="checkbox"
+            className="size-4 shrink-0 rounded border-input accent-primary"
+            checked={form[f.key] === true}
+            onChange={(e) => setField(f.key, e.target.checked)}
+          />
+          {t(`techSpecs.fields.${f.i18n}`)}
+        </label>
       ))}
     </div>
   );

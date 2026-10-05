@@ -8,11 +8,14 @@ const {
 } = require('../../lib/catalogTechSpecs');
 
 describe('catalogTechSpecs', () => {
-  test('select de detalle incluye color, sistema y anchos de eje', () => {
+  test('select de detalle incluye sistema, luces y anchos de eje', () => {
     expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_color');
     expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_system');
     expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_front_axle_width_mm');
     expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_rear_axle_width_mm');
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_front_lights');
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_rear_lights');
+    expect(CATALOG_TECH_SPEC_SELECT).not.toContain('spec_lights');
   });
 
   test('create sin campos deja todo a null', () => {
@@ -25,53 +28,86 @@ describe('catalogTechSpecs', () => {
     expect(parsed.specs.spec_front_axle_width_mm).toBeNull();
     expect(parsed.specs.spec_rear_axle_width_mm).toBeNull();
     expect(parsed.specs.spec_magnet).toBeNull();
+    expect(parsed.specs.spec_front_lights).toBeNull();
+    expect(parsed.specs.spec_rear_lights).toBeNull();
   });
 
   test('update sin campos conserva los existentes', () => {
     const parsed = parseCatalogTechSpecsFromBody(
       { reference: 'AV1' },
-      { spec_scale: '1:32', spec_magnet: true, spec_length_mm: 145 },
+      {
+        spec_scale: '1:32',
+        spec_magnet: true,
+        spec_length_mm: 145,
+        spec_system: 'analog',
+        spec_front_lights: true,
+      },
     );
     expect(parsed.ok).toBe(true);
     expect(parsed.specs.spec_scale).toBe('1:32');
     expect(parsed.specs.spec_magnet).toBe(true);
     expect(parsed.specs.spec_length_mm).toBe(145);
+    expect(parsed.specs.spec_system).toBe('analog');
+    expect(parsed.specs.spec_front_lights).toBe(true);
   });
 
   test('campo vacío borra el valor', () => {
     const parsed = parseCatalogTechSpecsFromBody(
-      { spec_scale: '  ', spec_magnet: '', spec_length_mm: '' },
-      { spec_scale: '1:32', spec_magnet: true, spec_length_mm: 145 },
+      { spec_scale: '  ', spec_magnet: '', spec_length_mm: '', spec_system: '', spec_front_lights: '' },
+      {
+        spec_scale: '1:32',
+        spec_magnet: true,
+        spec_length_mm: 145,
+        spec_system: 'digital',
+        spec_front_lights: true,
+      },
     );
     expect(parsed.ok).toBe(true);
     expect(parsed.specs.spec_scale).toBeNull();
     expect(parsed.specs.spec_magnet).toBeNull();
     expect(parsed.specs.spec_length_mm).toBeNull();
+    expect(parsed.specs.spec_system).toBeNull();
+    expect(parsed.specs.spec_front_lights).toBeNull();
   });
 
-  test('parsea números, imán y texto', () => {
+  test('parsea números, imán, sistema y luces', () => {
     const parsed = parseCatalogTechSpecsFromBody({
       spec_scale: '1:32',
       spec_body: 'Plastic',
       spec_color: 'Black',
-      spec_system: 'Digital Plug Ready',
+      spec_system: 'Analog',
       spec_length_mm: '145,5',
       spec_front_axle_width_mm: '52',
       spec_rear_axle_width_mm: '53,5',
       spec_magnet: 'no',
       spec_motor: 'S-Can 18,000rpm',
       spec_pinion_gear: '9/27',
-      spec_lights: 'Front & Rear',
+      spec_front_lights: 'true',
+      spec_rear_lights: 'false',
     });
     expect(parsed.ok).toBe(true);
     expect(parsed.specs.spec_scale).toBe('1:32');
     expect(parsed.specs.spec_color).toBe('Black');
-    expect(parsed.specs.spec_system).toBe('Digital Plug Ready');
+    expect(parsed.specs.spec_system).toBe('analog');
     expect(parsed.specs.spec_length_mm).toBe(145.5);
     expect(parsed.specs.spec_front_axle_width_mm).toBe(52);
     expect(parsed.specs.spec_rear_axle_width_mm).toBe(53.5);
     expect(parsed.specs.spec_magnet).toBe(false);
     expect(parsed.specs.spec_motor).toBe('S-Can 18,000rpm');
+    expect(parsed.specs.spec_front_lights).toBe(true);
+    expect(parsed.specs.spec_rear_lights).toBe(false);
+  });
+
+  test('acepta analógico con acento como analog', () => {
+    const parsed = parseCatalogTechSpecsFromBody({ spec_system: 'Analógico' });
+    expect(parsed.ok).toBe(true);
+    expect(parsed.specs.spec_system).toBe('analog');
+  });
+
+  test('rechaza sistema inválido', () => {
+    const parsed = parseCatalogTechSpecsFromBody({ spec_system: 'Digital Plug Ready' });
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toMatch(/spec_system/);
   });
 
   test('rechaza número negativo', () => {
