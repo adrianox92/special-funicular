@@ -93,7 +93,7 @@ function pushPair(blocks, pairKey, left, right) {
   blocks.push({ type: 'pair', key: pairKey, items });
 }
 
-export default function CatalogTechSpecsSection({ item }) {
+export default function CatalogTechSpecsSection({ item, embedded = false }) {
   const { t } = useTranslation('catalog');
 
   const blocks = useMemo(() => {
@@ -165,33 +165,46 @@ export default function CatalogTechSpecsSection({ item }) {
 
   if (!blocks.length) return null;
 
+  const list = (
+    <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-8">
+      {blocks.map((block) => {
+        if (block.type === 'pair') {
+          return (
+            <div
+              key={block.key}
+              data-testid={`tech-spec-pair-${block.key}`}
+              className="grid grid-cols-1 md:col-span-2 md:grid-cols-2 md:gap-x-8"
+            >
+              {block.items.map((row) => (
+                <DetailRow key={row.key} icon={SPEC_ICONS[row.key]} label={row.label} value={row.value} />
+              ))}
+            </div>
+          );
+        }
+        return (
+          <DetailRow key={block.key} icon={SPEC_ICONS[block.key]} label={block.label} value={block.value} />
+        );
+      })}
+    </dl>
+  );
+
+  if (embedded) {
+    return (
+      <div className="pt-2">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t('techSpecs.title')}
+        </p>
+        {list}
+      </div>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <h2 className="text-xl font-semibold leading-none tracking-tight">{t('techSpecs.title')}</h2>
       </CardHeader>
-      <CardContent>
-        <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-8">
-          {blocks.map((block) => {
-            if (block.type === 'pair') {
-              return (
-                <div
-                  key={block.key}
-                  data-testid={`tech-spec-pair-${block.key}`}
-                  className="grid grid-cols-1 md:col-span-2 md:grid-cols-2 md:gap-x-8"
-                >
-                  {block.items.map((row) => (
-                    <DetailRow key={row.key} icon={SPEC_ICONS[row.key]} label={row.label} value={row.value} />
-                  ))}
-                </div>
-              );
-            }
-            return (
-              <DetailRow key={block.key} icon={SPEC_ICONS[block.key]} label={block.label} value={block.value} />
-            );
-          })}
-        </dl>
-      </CardContent>
+      <CardContent>{list}</CardContent>
     </Card>
   );
 }

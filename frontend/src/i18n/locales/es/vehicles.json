@@ -115,6 +115,7 @@
     "and": " y ",
     "tabs": {
       "general": "Información General",
+      "carSpecs": "Información técnica",
       "technical": "Especificaciones Técnicas",
       "modifications": "Modificaciones",
       "timings": "Tabla de Tiempos",
@@ -139,6 +140,7 @@
     "cards": {
       "identification": "Identificación",
       "technicalData": "Datos técnicos",
+      "carSpecs": "Información técnica",
       "competition": "Competición y edición limitada",
       "purchase": "Compra y precios",
       "condition": "Estado del ejemplar",
@@ -352,6 +354,7 @@
     "catalogSearching": "Buscando…",
     "catalogNoResults": "Sin resultados",
     "catalogSelectedHint": "Ítem de catálogo seleccionado. Puedes ajustar los campos abajo antes de guardar.",
+    "techSpecsTitle": "Información técnica",
     "requiredFieldsError": "Por favor, rellena los siguientes campos obligatorios: {{fields}}",
     "invalidPriceError": "El valor del precio no es válido. Deja el campo vacío o introduce un número.",
     "createError": "Error al crear el vehículo",

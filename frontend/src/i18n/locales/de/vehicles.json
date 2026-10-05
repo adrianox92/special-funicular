@@ -115,6 +115,7 @@
     "and": " und ",
     "tabs": {
       "general": "Allgemeine Informationen",
+      "carSpecs": "Technische Informationen",
       "technical": "Technische Spezifikationen",
       "modifications": "Modifikationen",
       "timings": "Zeittabelle",
@@ -139,6 +140,7 @@
     "cards": {
       "identification": "Identifikation",
       "technicalData": "Technische Daten",
+      "carSpecs": "Technische Informationen",
       "competition": "Wettbewerb und limitierte Auflage",
       "purchase": "Kauf und Preise",
       "condition": "Zustand des Exemplars",
@@ -352,6 +354,7 @@
     "catalogSearching": "Suche…",
     "catalogNoResults": "Keine Ergebnisse",
     "catalogSelectedHint": "Katalogeintrag ausgewählt. Du kannst die Felder unten vor dem Speichern anpassen.",
+    "techSpecsTitle": "Technische Informationen",
     "requiredFieldsError": "Bitte fülle folgende Pflichtfelder aus: {{fields}}",
     "invalidPriceError": "Ungültiger Preis. Feld leer lassen oder Zahl eingeben.",
     "createError": "Fahrzeug konnte nicht erstellt werden",

@@ -170,3 +170,26 @@ export function validateTechSpecForm(form) {
   }
   return null;
 }
+
+function isEmptyFormSpecValue(key, value) {
+  if (key === 'spec_front_lights' || key === 'spec_rear_lights') return value !== true;
+  if (value == null) return true;
+  if (typeof value === 'boolean') return false;
+  return String(value).trim() === '';
+}
+
+/**
+ * Copia specs del catálogo solo en campos vacíos del formulario de vehículo.
+ * No pisa ediciones del usuario (imán false cuenta como relleno).
+ */
+export function mergeEmptyTechSpecsFromCatalog(currentForm, catalogRow) {
+  const incoming = techSpecFormFromRow(catalogRow);
+  const current = { ...emptyTechSpecForm(), ...(currentForm || {}) };
+  const out = { ...current };
+  for (const key of CATALOG_TECH_SPEC_KEYS) {
+    if (isEmptyFormSpecValue(key, out[key]) && !isEmptyFormSpecValue(key, incoming[key])) {
+      out[key] = incoming[key];
+    }
+  }
+  return out;
+}

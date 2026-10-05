@@ -3,6 +3,8 @@
 const {
   CATALOG_TECH_SPEC_SELECT,
   parseCatalogTechSpecsFromBody,
+  parseVehicleTechSpecsFromBody,
+  fillEmptyTechSpecsFromCatalog,
   parseOptionalNonNegativeNumber,
   parseOptionalNullableBool,
 } = require('../../lib/catalogTechSpecs');
@@ -166,5 +168,52 @@ describe('catalogTechSpecs', () => {
     const parsed = parseCatalogTechSpecsFromBody({ spec_scale: 'x'.repeat(40) });
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toMatch(/spec_scale/);
+  });
+
+  test('fillEmptyTechSpecsFromCatalog no pisa campos rellenos', () => {
+    const filled = fillEmptyTechSpecsFromCatalog(
+      {
+        spec_scale: '1:24',
+        spec_magnet: false,
+        spec_body: null,
+        spec_front_lights: false,
+        spec_rear_rim: null,
+      },
+      {
+        spec_scale: '1:32',
+        spec_magnet: true,
+        spec_body: 'Plastic',
+        spec_front_lights: true,
+        spec_rear_rim: 'magnesium',
+      },
+    );
+    expect(filled.spec_scale).toBe('1:24');
+    expect(filled.spec_magnet).toBe(false);
+    expect(filled.spec_body).toBe('Plastic');
+    expect(filled.spec_front_lights).toBe(true);
+    expect(filled.spec_rear_rim).toBe('magnesium');
+  });
+
+  test('parseVehicleTechSpecsFromBody rellena huecos solo si fillFromCatalog', () => {
+    const catalogRow = {
+      spec_scale: '1:32',
+      spec_system: 'digital',
+      spec_front_rim: 'plastic',
+    };
+    const withoutFill = parseVehicleTechSpecsFromBody({ spec_body: 'ABS' }, null, catalogRow, {
+      fillFromCatalog: false,
+    });
+    expect(withoutFill.ok).toBe(true);
+    expect(withoutFill.specs.spec_scale).toBeNull();
+    expect(withoutFill.specs.spec_body).toBe('ABS');
+
+    const withFill = parseVehicleTechSpecsFromBody({ spec_body: 'ABS' }, null, catalogRow, {
+      fillFromCatalog: true,
+    });
+    expect(withFill.ok).toBe(true);
+    expect(withFill.specs.spec_body).toBe('ABS');
+    expect(withFill.specs.spec_scale).toBe('1:32');
+    expect(withFill.specs.spec_system).toBe('digital');
+    expect(withFill.specs.spec_front_rim).toBe('plastic');
   });
 });

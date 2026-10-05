@@ -21,6 +21,15 @@ import {
   SelectValue,
 } from './ui/select';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogTechSpecsFields from './CatalogTechSpecsFields';
+import {
+  appendTechSpecsToFormData,
+  CATALOG_TECH_SPEC_KEYS,
+  emptyTechSpecForm,
+  mergeEmptyTechSpecsFromCatalog,
+  techSpecFormFromRow,
+  validateTechSpecForm,
+} from '../data/catalogTechSpecs';
 
 const IMAGE_FIELD_NAMES = ['front', 'left', 'right', 'rear', 'top', 'chassis', 'three_quarters'];
 
@@ -29,6 +38,7 @@ const REQUIRED_FIELD_KEYS = ['model', 'manufacturer', 'type'];
 const AddVehicle = () => {
   const { t } = useTranslation('vehicles');
   const { t: tc } = useTranslation('common');
+  const { t: tCatalog } = useTranslation('catalog');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
@@ -61,6 +71,7 @@ const AddVehicle = () => {
     dorsal: '',
     limited_edition: false,
     limited_edition_unit_number: '',
+    ...emptyTechSpecForm(),
   });
   const [images, setImages] = useState({});
   const [previews, setPreviews] = useState({});
@@ -109,6 +120,7 @@ const AddVehicle = () => {
       dorsal: item.dorsal != null && String(item.dorsal).trim() !== '' ? String(item.dorsal).trim() : '',
       limited_edition: Boolean(item.limited_edition),
       limited_edition_unit_number: '',
+      ...mergeEmptyTechSpecsFromCatalog(prev, item),
     }));
     if (error) setError(null);
   };
@@ -196,10 +208,18 @@ const AddVehicle = () => {
       return;
     }
 
+    const invalidSpec = validateTechSpecForm(vehicle);
+    if (invalidSpec) {
+      setError(tCatalog('techSpecs.invalidNumber', { field: tCatalog(`techSpecs.fields.${invalidSpec}`) }));
+      return;
+    }
+
     setSaving(true);
     try {
       const formData = new FormData();
+      const specKeySet = new Set(CATALOG_TECH_SPEC_KEYS);
       Object.entries(vehicle).forEach(([key, value]) => {
+        if (specKeySet.has(key)) return;
         if (key === 'dorsal' || key === 'limited_edition' || key === 'limited_edition_unit_number') return;
         if (value === undefined || value === null) return;
         if (typeof value === 'object') return;
@@ -213,6 +233,7 @@ const AddVehicle = () => {
           ? String(vehicle.limited_edition_unit_number)
           : '',
       );
+      appendTechSpecsToFormData(formData, techSpecFormFromRow(vehicle));
       if (catalogItemId) formData.append('catalog_item_id', catalogItemId);
       IMAGE_FIELD_NAMES.forEach((name) => {
         if (images[name]) formData.append('images', images[name], name);
@@ -467,6 +488,24 @@ const AddVehicle = () => {
           </CardContent>
         </Card>
       </div>
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>{t('addPage.techSpecsTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CatalogTechSpecsFields
+            form={techSpecFormFromRow(vehicle)}
+            setForm={(updater) => {
+              setVehicle((prev) => {
+                const current = techSpecFormFromRow(prev);
+                const next = typeof updater === 'function' ? updater(current) : updater;
+                return { ...prev, ...next };
+              });
+            }}
+            idPrefix="vehicle-add-tech"
+          />
+        </CardContent>
+      </Card>
     </>
   );
 

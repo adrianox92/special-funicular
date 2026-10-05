@@ -21,6 +21,7 @@ import {
 import placeholderImage from '../assets/images/placeholder.png';
 import DuplicateVehicleDialog from './DuplicateVehicleDialog';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogTechSpecsSection from './CatalogTechSpecsSection';
 
 const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
   const { t } = useTranslation('vehicles');
@@ -180,6 +181,7 @@ const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
             </div>
           )}
         </div>
+        <CatalogTechSpecsSection item={vehicle} embedded />
       </CardContent>
     </Card>
     </>
