@@ -236,6 +236,21 @@ describe('catalogTechSpecs', () => {
     expect(filled.spec_rear_rim_diameter_mm).toBe(17.2);
   });
 
+  test('fillEmptyTechSpecsFromCatalog copia vía de catálogo a eje si axle_length está vacío', () => {
+    const fromTrack = fillEmptyTechSpecsFromCatalog(
+      { spec_front_axle_length_mm: null, spec_rear_axle_length_mm: null },
+      { spec_front_track_mm: 50, spec_rear_track_mm: 52 },
+    );
+    expect(fromTrack.spec_front_axle_length_mm).toBe(50);
+    expect(fromTrack.spec_rear_axle_length_mm).toBe(52);
+
+    const keepAxle = fillEmptyTechSpecsFromCatalog(
+      { spec_front_axle_length_mm: 61 },
+      { spec_front_axle_length_mm: 60, spec_front_track_mm: 50 },
+    );
+    expect(keepAxle.spec_front_axle_length_mm).toBe(61);
+  });
+
   test('parseVehicleTechSpecsFromBody rellena huecos solo si fillFromCatalog', () => {
     const catalogRow = {
       spec_scale: '1:32',

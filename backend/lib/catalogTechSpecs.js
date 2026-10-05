@@ -249,6 +249,23 @@ function isEmptyTechSpecValue(value, field) {
   return false;
 }
 
+const TRACK_TO_AXLE_LENGTH = [
+  ['spec_front_track_mm', 'spec_front_axle_length_mm'],
+  ['spec_rear_track_mm', 'spec_rear_axle_length_mm'],
+];
+
+/** Si axle_length está vacío, usa vía (track) legado. No pisa un axle ya relleno. */
+function applyTrackFallbackToAxleLength(row) {
+  if (!row || typeof row !== 'object') return row;
+  const out = { ...row };
+  for (const [trackKey, axleKey] of TRACK_TO_AXLE_LENGTH) {
+    if (!isEmptyTechSpecValue(out[axleKey], axleKey)) continue;
+    if (isEmptyTechSpecValue(out[trackKey], trackKey)) continue;
+    out[axleKey] = out[trackKey];
+  }
+  return out;
+}
+
 /**
  * Copia specs del catálogo solo en campos vacíos del vehículo.
  * No pisa valores ya rellenados (incl. imán false y 0). Copy-on-create / copy-on-link.
@@ -261,13 +278,14 @@ function isEmptyTechSpecValue(value, field) {
 function fillEmptyTechSpecsFromCatalog(specs, catalogRow) {
   const out = specs && typeof specs === 'object' ? { ...specs } : {};
   if (!catalogRow || typeof catalogRow !== 'object') return out;
+  const catalog = applyTrackFallbackToAxleLength(catalogRow);
   for (const field of CATALOG_TECH_SPEC_COLUMNS) {
     if (!isEmptyTechSpecValue(out[field], field)) continue;
-    const fromCatalog = catalogRow[field];
+    const fromCatalog = catalog[field];
     if (isEmptyTechSpecValue(fromCatalog, field)) continue;
     out[field] = fromCatalog;
   }
-  return out;
+  return applyTrackFallbackToAxleLength(out);
 }
 
 /**

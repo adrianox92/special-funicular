@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowLeftRight,
   Box,
   Car,
   CircleDot,
@@ -27,11 +26,11 @@ import {
   CATALOG_TECH_SPEC_NUM_FIELDS,
   CATALOG_TECH_SPEC_RIM_FIELDS,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
-  CATALOG_TECH_SPEC_TRACK_PAIR,
   formatTechSpecNumber,
   hasCatalogTechSpecs,
   labelCatalogTechSpecRim,
   labelCatalogTechSpecSystem,
+  resolveTechSpecAxleLengthMm,
 } from '../data/catalogTechSpecs';
 
 const SPEC_ICONS = {
@@ -42,8 +41,6 @@ const SPEC_ICONS = {
   spec_length_mm: Maximize2,
   spec_height_mm: UnfoldVertical,
   spec_wheelbase_mm: MoveHorizontal,
-  spec_front_track_mm: ArrowLeftRight,
-  spec_rear_track_mm: ArrowLeftRight,
   spec_front_axle_length_mm: MoveHorizontal,
   spec_rear_axle_length_mm: MoveHorizontal,
   spec_weight_g: Scale,
@@ -130,13 +127,12 @@ export default function CatalogTechSpecsSection({ item, embedded = false }) {
     pushSingle(out, numRow('spec_length_mm'));
     pushSingle(out, numRow('spec_height_mm'));
     pushSingle(out, numRow('spec_wheelbase_mm'));
-    pushPair(out, 'track', numRow(CATALOG_TECH_SPEC_TRACK_PAIR[0]), numRow(CATALOG_TECH_SPEC_TRACK_PAIR[1]));
-    pushPair(
-      out,
-      'axleLength',
-      numRow(CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR[0]),
-      numRow(CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR[1]),
-    );
+    const axleRow = (side) => {
+      const key = side === 'front' ? CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR[0] : CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR[1];
+      const f = NUM_BY_KEY[key];
+      return makeRow(key, label(f.i18n), formatTechSpecNumber(resolveTechSpecAxleLengthMm(item, side)));
+    };
+    pushPair(out, 'axleLength', axleRow('front'), axleRow('rear'));
     pushSingle(out, numRow('spec_weight_g'));
     if (item.spec_magnet === true) {
       pushSingle(out, makeRow('spec_magnet', label('magnet'), t('techSpecs.yes')));

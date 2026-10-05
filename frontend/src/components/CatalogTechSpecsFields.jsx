@@ -18,7 +18,6 @@ import {
   CATALOG_TECH_SPEC_RIM_VALUES,
   CATALOG_TECH_SPEC_SYSTEM_VALUES,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
-  CATALOG_TECH_SPEC_TRACK_PAIR,
   techSpecControlId,
 } from '../data/catalogTechSpecs';
 
@@ -163,18 +162,6 @@ export default function CatalogTechSpecsFields({
           t={t}
         />
       ))}
-      <FieldPair>
-        {CATALOG_TECH_SPEC_TRACK_PAIR.map((key) => (
-          <NumSpecField
-            key={key}
-            field={NUM_BY_KEY[key]}
-            form={form}
-            setField={setField}
-            idPrefix={idPrefix}
-            t={t}
-          />
-        ))}
-      </FieldPair>
       <FieldPair>
         {CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR.map((key) => (
           <NumSpecField

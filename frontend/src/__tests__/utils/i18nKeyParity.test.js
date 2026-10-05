@@ -51,16 +51,23 @@ describe('i18n key parity es/en/de', () => {
   test('slotRaceManager', () => expectSameKeys(esSrm, enSrm, deSrm));
   test('catalog', () => expectSameKeys(esCatalog, enCatalog, deCatalog));
 
-  test('catalog tech spec labels: wheelbase y vía vs longitud de eje', () => {
+  test('catalog tech spec labels: distancia entre ejes y eje delantero/trasero', () => {
     expect(esCatalog.techSpecs.fields.wheelbaseMm).toBe('Distancia entre ejes (mm)');
     expect(enCatalog.techSpecs.fields.wheelbaseMm).toBe('Wheelbase (mm)');
     expect(deCatalog.techSpecs.fields.wheelbaseMm).toBe('Radstand (mm)');
-    expect(esCatalog.techSpecs.fields.frontTrackMm).toBe('Vía delantera (mm)');
-    expect(esCatalog.techSpecs.fields.rearTrackMm).toBe('Vía trasera (mm)');
-    expect(esCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Longitud de eje delantero (mm)');
-    expect(esCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Longitud de eje trasero (mm)');
-    expect(enCatalog.techSpecs.fields.frontAxleLengthMm.toLowerCase()).toContain('axle length');
-    expect(deCatalog.techSpecs.fields.frontAxleLengthMm.toLowerCase()).toContain('achslänge');
+    expect(esCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Eje delantero (mm)');
+    expect(esCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Eje trasero (mm)');
+    expect(enCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Front axle (mm)');
+    expect(enCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Rear axle (mm)');
+    expect(deCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Vorderachse (mm)');
+    expect(deCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Hinterachse (mm)');
+    const axleLabels = [
+      esCatalog.techSpecs.fields.frontAxleLengthMm,
+      esCatalog.techSpecs.fields.rearAxleLengthMm,
+      enCatalog.techSpecs.fields.frontAxleLengthMm,
+      deCatalog.techSpecs.fields.frontAxleLengthMm,
+    ].join(' ');
+    expect(axleLabels.toLowerCase()).not.toMatch(/vía|via |track|achslänge|axle length|longitud de eje/);
     const fieldsJson = JSON.stringify({
       es: esCatalog.techSpecs.fields,
       en: enCatalog.techSpecs.fields,
