@@ -21,11 +21,13 @@ import {
 import { Card, CardContent, CardHeader } from './ui/card';
 import { labelMotorPosition } from '../data/motorPosition';
 import {
+  CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR,
   CATALOG_TECH_SPEC_LEAD_TEXT_KEYS,
   CATALOG_TECH_SPEC_LIGHT_FIELDS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
   CATALOG_TECH_SPEC_RIM_FIELDS,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
+  CATALOG_TECH_SPEC_TRACK_PAIR,
   formatTechSpecNumber,
   hasCatalogTechSpecs,
   labelCatalogTechSpecRim,
@@ -128,12 +130,12 @@ export default function CatalogTechSpecsSection({ item, embedded = false }) {
     pushSingle(out, numRow('spec_length_mm'));
     pushSingle(out, numRow('spec_height_mm'));
     pushSingle(out, numRow('spec_wheelbase_mm'));
-    pushPair(out, 'track', numRow('spec_front_track_mm'), numRow('spec_rear_track_mm'));
+    pushPair(out, 'track', numRow(CATALOG_TECH_SPEC_TRACK_PAIR[0]), numRow(CATALOG_TECH_SPEC_TRACK_PAIR[1]));
     pushPair(
       out,
       'axleLength',
-      numRow('spec_front_axle_length_mm'),
-      numRow('spec_rear_axle_length_mm'),
+      numRow(CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR[0]),
+      numRow(CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR[1]),
     );
     pushSingle(out, numRow('spec_weight_g'));
     if (item.spec_magnet === true) {
