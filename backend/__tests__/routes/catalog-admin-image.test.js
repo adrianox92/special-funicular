@@ -305,8 +305,8 @@ describe('admin catalog item image', () => {
       .field('spec_front_lights', 'true')
       .field('spec_rear_lights', 'false')
       .field('spec_length_mm', '145,5')
-      .field('spec_front_axle_width_mm', '52')
-      .field('spec_rear_axle_width_mm', '53,5')
+      .field('spec_front_axle_length_mm', '52')
+      .field('spec_rear_axle_length_mm', '53,5')
       .field('spec_magnet', 'false')
       .field('spec_motor', 'S-Can 18,000rpm')
       .field('spec_front_rim', 'plastic')
@@ -323,8 +323,8 @@ describe('admin catalog item image', () => {
         spec_front_lights: true,
         spec_rear_lights: false,
         spec_length_mm: 145.5,
-        spec_front_axle_width_mm: 52,
-        spec_rear_axle_width_mm: 53.5,
+        spec_front_axle_length_mm: 52,
+        spec_rear_axle_length_mm: 53.5,
         spec_magnet: false,
         spec_motor: 'S-Can 18,000rpm',
         spec_front_rim: 'plastic',

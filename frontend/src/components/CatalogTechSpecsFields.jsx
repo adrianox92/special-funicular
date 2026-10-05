@@ -166,7 +166,7 @@ export default function CatalogTechSpecsFields({
         ))}
       </FieldPair>
       <FieldPair>
-        {['spec_front_axle_width_mm', 'spec_rear_axle_width_mm'].map((key) => (
+        {['spec_front_axle_length_mm', 'spec_rear_axle_length_mm'].map((key) => (
           <NumSpecField
             key={key}
             field={NUM_BY_KEY[key]}

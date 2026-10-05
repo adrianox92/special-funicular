@@ -18,8 +18,8 @@ jest.mock('react-i18next', () => ({
         'techSpecs.fields.wheelbaseMm': 'Batalla (mm)',
         'techSpecs.fields.frontTrackMm': 'Vía delantera (mm)',
         'techSpecs.fields.rearTrackMm': 'Vía trasera (mm)',
-        'techSpecs.fields.frontAxleWidthMm': 'Ancho de ejes delantero (mm)',
-        'techSpecs.fields.rearAxleWidthMm': 'Ancho de ejes trasero (mm)',
+        'techSpecs.fields.frontAxleLengthMm': 'Longitud de ejes delantero (mm)',
+        'techSpecs.fields.rearAxleLengthMm': 'Longitud de ejes trasero (mm)',
         'techSpecs.fields.weightG': 'Peso (g)',
         'techSpecs.fields.magnet': 'Imán',
         'techSpecs.fields.motor': 'Motor',
@@ -65,8 +65,8 @@ describe('CatalogTechSpecsSection', () => {
           spec_color: 'Black',
           spec_system: 'digital',
           spec_length_mm: '145.00',
-          spec_front_axle_width_mm: 52,
-          spec_rear_axle_width_mm: '',
+          spec_front_axle_length_mm: 52,
+          spec_rear_axle_length_mm: '',
           spec_magnet: false,
           spec_motor: 'S-Can 18,000rpm',
           traction: 'Trasera',
@@ -88,14 +88,14 @@ describe('CatalogTechSpecsSection', () => {
     expect(screen.getByText('Digital')).toBeInTheDocument();
     expect(screen.queryByText('Digital Plug Ready')).not.toBeInTheDocument();
     expect(screen.getByText('145')).toBeInTheDocument();
-    expect(screen.getByText('Ancho de ejes delantero (mm)')).toBeInTheDocument();
+    expect(screen.getByText('Longitud de ejes delantero (mm)')).toBeInTheDocument();
     expect(screen.getByText('52')).toBeInTheDocument();
     expect(screen.getByText('No')).toBeInTheDocument();
     expect(screen.getByText('Trasera')).toBeInTheDocument();
     expect(screen.getByText('En línea')).toBeInTheDocument();
     expect(screen.getByText('Luces delanteras')).toBeInTheDocument();
     expect(screen.queryByText('Luces traseras')).not.toBeInTheDocument();
-    expect(screen.queryByText('Ancho de ejes trasero (mm)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Longitud de ejes trasero (mm)')).not.toBeInTheDocument();
     expect(screen.getByText('Llanta delantera')).toBeInTheDocument();
     expect(screen.getByText('Llanta trasera')).toBeInTheDocument();
     expect(screen.getByText('Diámetro llanta delantera (mm)')).toBeInTheDocument();
@@ -115,8 +115,8 @@ describe('CatalogTechSpecsSection', () => {
         item={{
           spec_front_track_mm: 50,
           spec_rear_track_mm: 52,
-          spec_front_axle_width_mm: 51,
-          spec_rear_axle_width_mm: 53,
+          spec_front_axle_length_mm: 51,
+          spec_rear_axle_length_mm: 53,
           spec_front_wheels: 'Ø15.8',
           spec_rear_wheels: 'Ø16.5',
           spec_front_rim: 'plastic',
@@ -142,11 +142,11 @@ describe('CatalogTechSpecsSection', () => {
     expect(screen.getByTestId('tech-spec-pair-wheels')).toHaveTextContent('Ruedas traseras');
     expect(screen.getByTestId('tech-spec-pair-track')).toHaveTextContent('Vía delantera (mm)');
     expect(screen.getByTestId('tech-spec-pair-track')).toHaveTextContent('Vía trasera (mm)');
-    expect(screen.getByTestId('tech-spec-pair-axleWidth')).toHaveTextContent(
-      'Ancho de ejes delantero (mm)',
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent(
+      'Longitud de ejes delantero (mm)',
     );
-    expect(screen.getByTestId('tech-spec-pair-axleWidth')).toHaveTextContent(
-      'Ancho de ejes trasero (mm)',
+    expect(screen.getByTestId('tech-spec-pair-axleLength')).toHaveTextContent(
+      'Longitud de ejes trasero (mm)',
     );
     expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces delanteras');
     expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces traseras');
