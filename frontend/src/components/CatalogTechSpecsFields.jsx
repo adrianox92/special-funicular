@@ -13,9 +13,91 @@ import {
   CATALOG_TECH_SPEC_LEAD_TEXT_KEYS,
   CATALOG_TECH_SPEC_LIGHT_FIELDS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
+  CATALOG_TECH_SPEC_RIM_FIELDS,
+  CATALOG_TECH_SPEC_RIM_VALUES,
   CATALOG_TECH_SPEC_SYSTEM_VALUES,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
 } from '../data/catalogTechSpecs';
+
+const NUM_BY_KEY = Object.fromEntries(CATALOG_TECH_SPEC_NUM_FIELDS.map((f) => [f.key, f]));
+const TEXT_BY_KEY = Object.fromEntries(CATALOG_TECH_SPEC_TEXT_FIELDS.map((f) => [f.key, f]));
+
+function FieldPair({ children }) {
+  return <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">{children}</div>;
+}
+
+function TextSpecField({ field, form, setField, idPrefix, t }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={`${idPrefix}-${field.key}`}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
+      <Input
+        id={`${idPrefix}-${field.key}`}
+        value={form[field.key] ?? ''}
+        maxLength={field.maxLength}
+        onChange={(e) => setField(field.key, e.target.value)}
+      />
+    </div>
+  );
+}
+
+function NumSpecField({ field, form, setField, idPrefix, t }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={`${idPrefix}-${field.key}`}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
+      <Input
+        id={`${idPrefix}-${field.key}`}
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step="any"
+        value={form[field.key] ?? ''}
+        onChange={(e) => setField(field.key, e.target.value)}
+      />
+    </div>
+  );
+}
+
+function LightSpecField({ field, form, setField, idPrefix, t }) {
+  return (
+    <label
+      htmlFor={`${idPrefix}-${field.key}`}
+      className="flex items-center gap-2 rounded-lg border p-3 text-sm font-medium leading-none"
+    >
+      <input
+        id={`${idPrefix}-${field.key}`}
+        type="checkbox"
+        className="size-4 shrink-0 rounded border-input accent-primary"
+        checked={form[field.key] === true}
+        onChange={(e) => setField(field.key, e.target.checked)}
+      />
+      {t(`techSpecs.fields.${field.i18n}`)}
+    </label>
+  );
+}
+
+function RimSpecField({ field, form, setField, idPrefix, t }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={`${idPrefix}-${field.key}`}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
+      <Select
+        value={form[field.key] || '__none__'}
+        onValueChange={(v) => setField(field.key, v === '__none__' ? '' : v)}
+      >
+        <SelectTrigger id={`${idPrefix}-${field.key}`}>
+          <SelectValue placeholder={t('techSpecs.unspecified')} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">{t('techSpecs.unspecified')}</SelectItem>
+          {CATALOG_TECH_SPEC_RIM_VALUES.map((value) => (
+            <SelectItem key={value} value={value}>
+              {t(`techSpecs.rimValues.${value}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'catalog-tech' }) {
   const { t } = useTranslation('catalog');
@@ -28,15 +110,7 @@ export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'cata
       {CATALOG_TECH_SPEC_TEXT_FIELDS.filter((f) =>
         CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key),
       ).map((f) => (
-        <div key={f.key} className="space-y-2">
-          <Label htmlFor={`${idPrefix}-${f.key}`}>{t(`techSpecs.fields.${f.i18n}`)}</Label>
-          <Input
-            id={`${idPrefix}-${f.key}`}
-            value={form[f.key] ?? ''}
-            maxLength={f.maxLength}
-            onChange={(e) => setField(f.key, e.target.value)}
-          />
-        </div>
+        <TextSpecField key={f.key} field={f} form={form} setField={setField} idPrefix={idPrefix} t={t} />
       ))}
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-spec_system`}>{t('techSpecs.fields.system')}</Label>
@@ -57,20 +131,47 @@ export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'cata
           </SelectContent>
         </Select>
       </div>
-      {CATALOG_TECH_SPEC_NUM_FIELDS.map((f) => (
-        <div key={f.key} className="space-y-2">
-          <Label htmlFor={`${idPrefix}-${f.key}`}>{t(`techSpecs.fields.${f.i18n}`)}</Label>
-          <Input
-            id={`${idPrefix}-${f.key}`}
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="any"
-            value={form[f.key] ?? ''}
-            onChange={(e) => setField(f.key, e.target.value)}
-          />
-        </div>
+      {['spec_length_mm', 'spec_height_mm', 'spec_wheelbase_mm'].map((key) => (
+        <NumSpecField
+          key={key}
+          field={NUM_BY_KEY[key]}
+          form={form}
+          setField={setField}
+          idPrefix={idPrefix}
+          t={t}
+        />
       ))}
+      <FieldPair>
+        {['spec_front_track_mm', 'spec_rear_track_mm'].map((key) => (
+          <NumSpecField
+            key={key}
+            field={NUM_BY_KEY[key]}
+            form={form}
+            setField={setField}
+            idPrefix={idPrefix}
+            t={t}
+          />
+        ))}
+      </FieldPair>
+      <FieldPair>
+        {['spec_front_axle_width_mm', 'spec_rear_axle_width_mm'].map((key) => (
+          <NumSpecField
+            key={key}
+            field={NUM_BY_KEY[key]}
+            form={form}
+            setField={setField}
+            idPrefix={idPrefix}
+            t={t}
+          />
+        ))}
+      </FieldPair>
+      <NumSpecField
+        field={NUM_BY_KEY.spec_weight_g}
+        form={form}
+        setField={setField}
+        idPrefix={idPrefix}
+        t={t}
+      />
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-spec_magnet`}>{t('techSpecs.fields.magnet')}</Label>
         <Select
@@ -87,35 +188,38 @@ export default function CatalogTechSpecsFields({ form, setForm, idPrefix = 'cata
           </SelectContent>
         </Select>
       </div>
-      {CATALOG_TECH_SPEC_TEXT_FIELDS.filter(
-        (f) => !CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key),
-      ).map((f) => (
-        <div key={f.key} className="space-y-2">
-          <Label htmlFor={`${idPrefix}-${f.key}`}>{t(`techSpecs.fields.${f.i18n}`)}</Label>
-          <Input
-            id={`${idPrefix}-${f.key}`}
-            value={form[f.key] ?? ''}
-            maxLength={f.maxLength}
-            onChange={(e) => setField(f.key, e.target.value)}
-          />
-        </div>
+      {['spec_motor', 'spec_pinion_gear'].map((key) => (
+        <TextSpecField
+          key={key}
+          field={TEXT_BY_KEY[key]}
+          form={form}
+          setField={setField}
+          idPrefix={idPrefix}
+          t={t}
+        />
       ))}
-      {CATALOG_TECH_SPEC_LIGHT_FIELDS.map((f) => (
-        <label
-          key={f.key}
-          htmlFor={`${idPrefix}-${f.key}`}
-          className="flex items-center gap-2 rounded-lg border p-3 text-sm font-medium leading-none"
-        >
-          <input
-            id={`${idPrefix}-${f.key}`}
-            type="checkbox"
-            className="size-4 shrink-0 rounded border-input accent-primary"
-            checked={form[f.key] === true}
-            onChange={(e) => setField(f.key, e.target.checked)}
+      <FieldPair>
+        {['spec_front_wheels', 'spec_rear_wheels'].map((key) => (
+          <TextSpecField
+            key={key}
+            field={TEXT_BY_KEY[key]}
+            form={form}
+            setField={setField}
+            idPrefix={idPrefix}
+            t={t}
           />
-          {t(`techSpecs.fields.${f.i18n}`)}
-        </label>
-      ))}
+        ))}
+      </FieldPair>
+      <FieldPair>
+        {CATALOG_TECH_SPEC_RIM_FIELDS.map((f) => (
+          <RimSpecField key={f.key} field={f} form={form} setField={setField} idPrefix={idPrefix} t={t} />
+        ))}
+      </FieldPair>
+      <FieldPair>
+        {CATALOG_TECH_SPEC_LIGHT_FIELDS.map((f) => (
+          <LightSpecField key={f.key} field={f} form={form} setField={setField} idPrefix={idPrefix} t={t} />
+        ))}
+      </FieldPair>
     </div>
   );
 }

@@ -146,14 +146,19 @@
       "pinionGear": "Pinion / gear",
       "frontWheels": "Front wheels",
       "rearWheels": "Rear wheels",
-      "frontTyres": "Front tyres",
-      "rearTyres": "Rear tyres",
+      "frontRim": "Front rim",
+      "rearRim": "Rear rim",
       "frontLights": "Front lights",
       "rearLights": "Rear lights"
     },
     "systemValues": {
       "analog": "Analog",
       "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Plastic",
+      "aluminum": "Aluminium",
+      "magnesium": "Magnesium"
     }
   },
   "guest": {

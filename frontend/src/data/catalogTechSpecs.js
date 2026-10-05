@@ -8,8 +8,6 @@ export const CATALOG_TECH_SPEC_TEXT_FIELDS = [
   { key: 'spec_pinion_gear', i18n: 'pinionGear', maxLength: 40 },
   { key: 'spec_front_wheels', i18n: 'frontWheels', maxLength: 120 },
   { key: 'spec_rear_wheels', i18n: 'rearWheels', maxLength: 120 },
-  { key: 'spec_front_tyres', i18n: 'frontTyres', maxLength: 120 },
-  { key: 'spec_rear_tyres', i18n: 'rearTyres', maxLength: 120 },
 ];
 
 /** Texto mostrado antes de medidas / imán (ficha pública y formulario admin). */
@@ -31,13 +29,31 @@ export const CATALOG_TECH_SPEC_LIGHT_FIELDS = [
   { key: 'spec_rear_lights', i18n: 'rearLights' },
 ];
 
+export const CATALOG_TECH_SPEC_RIM_FIELDS = [
+  { key: 'spec_front_rim', i18n: 'frontRim' },
+  { key: 'spec_rear_rim', i18n: 'rearRim' },
+];
+
 export const CATALOG_TECH_SPEC_SYSTEM_VALUES = ['analog', 'digital'];
+
+/** Clave canónica `aluminum` (EN Aluminium / ES Aluminio / DE Aluminium). */
+export const CATALOG_TECH_SPEC_RIM_VALUES = ['plastic', 'aluminum', 'magnesium'];
+
+/** Pares delantero/trasero que deben compartir fila en ficha y admin. */
+export const CATALOG_TECH_SPEC_SIBLING_PAIRS = [
+  ['spec_front_track_mm', 'spec_rear_track_mm'],
+  ['spec_front_axle_width_mm', 'spec_rear_axle_width_mm'],
+  ['spec_front_wheels', 'spec_rear_wheels'],
+  ['spec_front_rim', 'spec_rear_rim'],
+  ['spec_front_lights', 'spec_rear_lights'],
+];
 
 export const CATALOG_TECH_SPEC_KEYS = [
   ...CATALOG_TECH_SPEC_TEXT_FIELDS.map((f) => f.key),
   ...CATALOG_TECH_SPEC_NUM_FIELDS.map((f) => f.key),
   'spec_system',
   'spec_magnet',
+  ...CATALOG_TECH_SPEC_RIM_FIELDS.map((f) => f.key),
   ...CATALOG_TECH_SPEC_LIGHT_FIELDS.map((f) => f.key),
 ];
 
@@ -45,6 +61,8 @@ export function emptyTechSpecForm() {
   const out = {
     spec_magnet: '',
     spec_system: '',
+    spec_front_rim: '',
+    spec_rear_rim: '',
     spec_front_lights: false,
     spec_rear_lights: false,
   };
@@ -70,6 +88,9 @@ export function techSpecFormFromRow(row = {}) {
     out[f.key] = formatStoredNumber(row[f.key]);
   }
   out.spec_system = CATALOG_TECH_SPEC_SYSTEM_VALUES.includes(row.spec_system) ? row.spec_system : '';
+  for (const f of CATALOG_TECH_SPEC_RIM_FIELDS) {
+    out[f.key] = CATALOG_TECH_SPEC_RIM_VALUES.includes(row[f.key]) ? row[f.key] : '';
+  }
   if (row.spec_magnet === true) out.spec_magnet = 'true';
   else if (row.spec_magnet === false) out.spec_magnet = 'false';
   else out.spec_magnet = '';
@@ -101,6 +122,9 @@ export function hasCatalogTechSpecs(item) {
   if (item.spec_magnet === true || item.spec_magnet === false) return true;
   if (item.spec_front_lights === true || item.spec_rear_lights === true) return true;
   if (isFilledText(item.spec_system)) return true;
+  for (const f of CATALOG_TECH_SPEC_RIM_FIELDS) {
+    if (isFilledText(item[f.key])) return true;
+  }
   for (const f of CATALOG_TECH_SPEC_TEXT_FIELDS) {
     if (isFilledText(item[f.key])) return true;
   }
@@ -124,6 +148,15 @@ export function labelCatalogTechSpecSystem(value, t) {
     return t(`techSpecs.systemValues.${key}`);
   }
   return t(`techSpecs.systemValues.${key}`, { defaultValue: String(value) });
+}
+
+export function labelCatalogTechSpecRim(value, t) {
+  if (value == null || String(value).trim() === '') return null;
+  const key = String(value).trim().toLowerCase();
+  if (CATALOG_TECH_SPEC_RIM_VALUES.includes(key)) {
+    return t(`techSpecs.rimValues.${key}`);
+  }
+  return t(`techSpecs.rimValues.${key}`, { defaultValue: String(value) });
 }
 
 export function validateTechSpecForm(form) {

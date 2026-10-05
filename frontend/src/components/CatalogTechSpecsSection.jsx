@@ -24,9 +24,11 @@ import {
   CATALOG_TECH_SPEC_LEAD_TEXT_KEYS,
   CATALOG_TECH_SPEC_LIGHT_FIELDS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
+  CATALOG_TECH_SPEC_RIM_FIELDS,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
   formatTechSpecNumber,
   hasCatalogTechSpecs,
+  labelCatalogTechSpecRim,
   labelCatalogTechSpecSystem,
 } from '../data/catalogTechSpecs';
 
@@ -50,11 +52,16 @@ const SPEC_ICONS = {
   spec_pinion_gear: Cog,
   spec_front_wheels: CircleDot,
   spec_rear_wheels: CircleDot,
-  spec_front_tyres: Disc,
-  spec_rear_tyres: Disc,
+  spec_front_rim: Disc,
+  spec_rear_rim: Disc,
   spec_front_lights: Lightbulb,
   spec_rear_lights: Lightbulb,
 };
+
+const NUM_BY_KEY = Object.fromEntries(CATALOG_TECH_SPEC_NUM_FIELDS.map((f) => [f.key, f]));
+const TEXT_BY_KEY = Object.fromEntries(CATALOG_TECH_SPEC_TEXT_FIELDS.map((f) => [f.key, f]));
+const LIGHT_BY_KEY = Object.fromEntries(CATALOG_TECH_SPEC_LIGHT_FIELDS.map((f) => [f.key, f]));
+const RIM_BY_KEY = Object.fromEntries(CATALOG_TECH_SPEC_RIM_FIELDS.map((f) => [f.key, f]));
 
 function DetailRow({ icon: Icon, label, value }) {
   return (
@@ -70,57 +77,93 @@ function DetailRow({ icon: Icon, label, value }) {
   );
 }
 
-function pushRow(rows, key, label, value) {
-  if (value == null || String(value).trim() === '' || value === '—') return;
-  rows.push({ key, label, value });
+function makeRow(key, label, value) {
+  if (value == null || String(value).trim() === '' || value === '—') return null;
+  return { key, label, value };
+}
+
+function pushSingle(blocks, row) {
+  if (!row) return;
+  blocks.push({ type: 'single', ...row });
+}
+
+function pushPair(blocks, pairKey, left, right) {
+  const items = [left, right].filter(Boolean);
+  if (!items.length) return;
+  blocks.push({ type: 'pair', key: pairKey, items });
 }
 
 export default function CatalogTechSpecsSection({ item }) {
   const { t } = useTranslation('catalog');
 
-  const rows = useMemo(() => {
+  const blocks = useMemo(() => {
     if (!hasCatalogTechSpecs(item)) return [];
     const out = [];
     const label = (i18nKey) => t(`techSpecs.fields.${i18nKey}`);
+    const numRow = (key) => {
+      const f = NUM_BY_KEY[key];
+      return makeRow(key, label(f.i18n), formatTechSpecNumber(item[key]));
+    };
+    const textRow = (key) => {
+      const f = TEXT_BY_KEY[key];
+      return makeRow(key, label(f.i18n), item[key]);
+    };
+    const lightRow = (key) => {
+      if (item[key] !== true) return null;
+      const f = LIGHT_BY_KEY[key];
+      return makeRow(key, label(f.i18n), t('techSpecs.yes'));
+    };
+    const rimRow = (key) => {
+      const f = RIM_BY_KEY[key];
+      return makeRow(key, label(f.i18n), labelCatalogTechSpecRim(item[key], t));
+    };
 
     for (const f of CATALOG_TECH_SPEC_TEXT_FIELDS) {
-      if (!CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key) || f.key === 'spec_motor') continue;
-      pushRow(out, f.key, label(f.i18n), item[f.key]);
+      if (!CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key)) continue;
+      pushSingle(out, textRow(f.key));
     }
-    pushRow(out, 'spec_system', label('system'), labelCatalogTechSpecSystem(item.spec_system, t));
-    for (const f of CATALOG_TECH_SPEC_NUM_FIELDS) {
-      pushRow(out, f.key, label(f.i18n), formatTechSpecNumber(item[f.key]));
-    }
+    pushSingle(out, makeRow('spec_system', label('system'), labelCatalogTechSpecSystem(item.spec_system, t)));
+    pushSingle(out, numRow('spec_length_mm'));
+    pushSingle(out, numRow('spec_height_mm'));
+    pushSingle(out, numRow('spec_wheelbase_mm'));
+    pushPair(out, 'track', numRow('spec_front_track_mm'), numRow('spec_rear_track_mm'));
+    pushPair(
+      out,
+      'axleWidth',
+      numRow('spec_front_axle_width_mm'),
+      numRow('spec_rear_axle_width_mm'),
+    );
+    pushSingle(out, numRow('spec_weight_g'));
     if (item.spec_magnet === true) {
-      pushRow(out, 'spec_magnet', label('magnet'), t('techSpecs.yes'));
+      pushSingle(out, makeRow('spec_magnet', label('magnet'), t('techSpecs.yes')));
     } else if (item.spec_magnet === false) {
-      pushRow(out, 'spec_magnet', label('magnet'), t('techSpecs.no'));
+      pushSingle(out, makeRow('spec_magnet', label('magnet'), t('techSpecs.no')));
     }
-    pushRow(out, 'spec_motor', label('motor'), item.spec_motor);
+    pushSingle(out, textRow('spec_motor'));
     if (item.motor_position) {
-      pushRow(out, 'motor_position', label('motorMount'), labelMotorPosition(item.motor_position, t));
-    }
-    if (item.traction) {
-      pushRow(
+      pushSingle(
         out,
-        'traction',
-        label('drivetrain'),
-        t(`values.traction.${item.traction}`, { defaultValue: item.traction }),
+        makeRow('motor_position', label('motorMount'), labelMotorPosition(item.motor_position, t)),
       );
     }
-    for (const f of CATALOG_TECH_SPEC_TEXT_FIELDS) {
-      if (CATALOG_TECH_SPEC_LEAD_TEXT_KEYS.includes(f.key) || f.key === 'spec_motor') continue;
-      pushRow(out, f.key, label(f.i18n), item[f.key]);
+    if (item.traction) {
+      pushSingle(
+        out,
+        makeRow(
+          'traction',
+          label('drivetrain'),
+          t(`values.traction.${item.traction}`, { defaultValue: item.traction }),
+        ),
+      );
     }
-    for (const f of CATALOG_TECH_SPEC_LIGHT_FIELDS) {
-      if (item[f.key] === true) {
-        pushRow(out, f.key, label(f.i18n), t('techSpecs.yes'));
-      }
-    }
+    pushSingle(out, textRow('spec_pinion_gear'));
+    pushPair(out, 'wheels', textRow('spec_front_wheels'), textRow('spec_rear_wheels'));
+    pushPair(out, 'rims', rimRow('spec_front_rim'), rimRow('spec_rear_rim'));
+    pushPair(out, 'lights', lightRow('spec_front_lights'), lightRow('spec_rear_lights'));
     return out;
   }, [item, t]);
 
-  if (!rows.length) return null;
+  if (!blocks.length) return null;
 
   return (
     <Card>
@@ -129,9 +172,24 @@ export default function CatalogTechSpecsSection({ item }) {
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-8">
-          {rows.map((row) => (
-            <DetailRow key={row.key} icon={SPEC_ICONS[row.key]} label={row.label} value={row.value} />
-          ))}
+          {blocks.map((block) => {
+            if (block.type === 'pair') {
+              return (
+                <div
+                  key={block.key}
+                  data-testid={`tech-spec-pair-${block.key}`}
+                  className="grid grid-cols-1 md:col-span-2 md:grid-cols-2 md:gap-x-8"
+                >
+                  {block.items.map((row) => (
+                    <DetailRow key={row.key} icon={SPEC_ICONS[row.key]} label={row.label} value={row.value} />
+                  ))}
+                </div>
+              );
+            }
+            return (
+              <DetailRow key={block.key} icon={SPEC_ICONS[block.key]} label={block.label} value={block.value} />
+            );
+          })}
         </dl>
       </CardContent>
     </Card>

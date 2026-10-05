@@ -28,12 +28,15 @@ jest.mock('react-i18next', () => ({
         'techSpecs.fields.pinionGear': 'Piñón / corona',
         'techSpecs.fields.frontWheels': 'Ruedas delanteras',
         'techSpecs.fields.rearWheels': 'Ruedas traseras',
-        'techSpecs.fields.frontTyres': 'Neumáticos delanteros',
-        'techSpecs.fields.rearTyres': 'Neumáticos traseros',
+        'techSpecs.fields.frontRim': 'Llanta delantera',
+        'techSpecs.fields.rearRim': 'Llanta trasera',
         'techSpecs.fields.frontLights': 'Luces delanteras',
         'techSpecs.fields.rearLights': 'Luces traseras',
         'techSpecs.systemValues.analog': 'Analógico',
         'techSpecs.systemValues.digital': 'Digital',
+        'techSpecs.rimValues.plastic': 'Plástico',
+        'techSpecs.rimValues.aluminum': 'Aluminio',
+        'techSpecs.rimValues.magnesium': 'Magnesio',
         'values.motorPosition.inline': 'En línea',
         'values.traction.Trasera': 'Trasera',
       };
@@ -68,6 +71,8 @@ describe('CatalogTechSpecsSection', () => {
           motor_position: 'inline',
           spec_front_lights: true,
           spec_rear_lights: false,
+          spec_front_rim: 'plastic',
+          spec_rear_rim: 'aluminum',
         }}
       />,
     );
@@ -88,8 +93,51 @@ describe('CatalogTechSpecsSection', () => {
     expect(screen.getByText('Luces delanteras')).toBeInTheDocument();
     expect(screen.queryByText('Luces traseras')).not.toBeInTheDocument();
     expect(screen.queryByText('Ancho de ejes trasero (mm)')).not.toBeInTheDocument();
+    expect(screen.getByText('Llanta delantera')).toBeInTheDocument();
+    expect(screen.getByText('Llanta trasera')).toBeInTheDocument();
+    expect(screen.getByText('Plástico')).toBeInTheDocument();
+    expect(screen.getByText('Aluminio')).toBeInTheDocument();
+    expect(screen.queryByText('plastic')).not.toBeInTheDocument();
+    expect(screen.queryByText('Neumáticos delanteros')).not.toBeInTheDocument();
     const grid = container.querySelector('dl');
     expect(grid).toHaveClass('md:grid-cols-2');
     expect(container.querySelectorAll('svg').length).toBeGreaterThan(0);
+  });
+
+  test('empareja delantera y trasera en la misma fila', () => {
+    render(
+      <CatalogTechSpecsSection
+        item={{
+          spec_front_track_mm: 50,
+          spec_rear_track_mm: 52,
+          spec_front_axle_width_mm: 51,
+          spec_rear_axle_width_mm: 53,
+          spec_front_wheels: 'Ø15.8',
+          spec_rear_wheels: 'Ø16.5',
+          spec_front_rim: 'plastic',
+          spec_rear_rim: 'magnesium',
+          spec_front_lights: true,
+          spec_rear_lights: true,
+        }}
+      />,
+    );
+    const rims = screen.getByTestId('tech-spec-pair-rims');
+    expect(rims).toHaveClass('md:col-span-2');
+    expect(rims).toHaveTextContent('Llanta delantera');
+    expect(rims).toHaveTextContent('Llanta trasera');
+    expect(rims).toHaveTextContent('Plástico');
+    expect(rims).toHaveTextContent('Magnesio');
+    expect(screen.getByTestId('tech-spec-pair-wheels')).toHaveTextContent('Ruedas delanteras');
+    expect(screen.getByTestId('tech-spec-pair-wheels')).toHaveTextContent('Ruedas traseras');
+    expect(screen.getByTestId('tech-spec-pair-track')).toHaveTextContent('Vía delantera (mm)');
+    expect(screen.getByTestId('tech-spec-pair-track')).toHaveTextContent('Vía trasera (mm)');
+    expect(screen.getByTestId('tech-spec-pair-axleWidth')).toHaveTextContent(
+      'Ancho de ejes delantero (mm)',
+    );
+    expect(screen.getByTestId('tech-spec-pair-axleWidth')).toHaveTextContent(
+      'Ancho de ejes trasero (mm)',
+    );
+    expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces delanteras');
+    expect(screen.getByTestId('tech-spec-pair-lights')).toHaveTextContent('Luces traseras');
   });
 });
