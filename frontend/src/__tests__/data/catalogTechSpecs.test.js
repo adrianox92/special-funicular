@@ -15,7 +15,7 @@ describe('catalogTechSpecs helpers', () => {
     expect(hasCatalogTechSpecs({ spec_scale: '1:32' })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_color: 'Black' })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_system: 'analog' })).toBe(true);
-    expect(hasCatalogTechSpecs({ spec_front_axle_width_mm: 52 })).toBe(true);
+    expect(hasCatalogTechSpecs({ spec_front_axle_length_mm: 52 })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_magnet: false })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_front_lights: true })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_rear_lights: false })).toBe(false);
@@ -45,7 +45,7 @@ describe('catalogTechSpecs helpers', () => {
   test('pares delantero/trasero cubren vías, ejes, ruedas, llantas, diámetros y luces', () => {
     expect(CATALOG_TECH_SPEC_SIBLING_PAIRS).toEqual([
       ['spec_front_track_mm', 'spec_rear_track_mm'],
-      ['spec_front_axle_width_mm', 'spec_rear_axle_width_mm'],
+      ['spec_front_axle_length_mm', 'spec_rear_axle_length_mm'],
       ['spec_front_wheels', 'spec_rear_wheels'],
       ['spec_front_rim', 'spec_rear_rim'],
       ['spec_front_rim_diameter_mm', 'spec_rear_rim_diameter_mm'],
@@ -56,11 +56,11 @@ describe('catalogTechSpecs helpers', () => {
   test('validateTechSpecForm acepta vacío y rechaza negativos', () => {
     expect(validateTechSpecForm(emptyTechSpecForm())).toBeNull();
     expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_weight_g: '12.5' })).toBeNull();
-    expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_front_axle_width_mm: '52' })).toBeNull();
+    expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_front_axle_length_mm: '52' })).toBeNull();
     expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_front_rim_diameter_mm: '15.8' })).toBeNull();
     expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_length_mm: '-1' })).toBe('lengthMm');
-    expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_rear_axle_width_mm: '-1' })).toBe(
-      'rearAxleWidthMm',
+    expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_rear_axle_length_mm: '-1' })).toBe(
+      'rearAxleLengthMm',
     );
     expect(validateTechSpecForm({ ...emptyTechSpecForm(), spec_rear_rim_diameter_mm: '-1' })).toBe(
       'rearRimDiameterMm',

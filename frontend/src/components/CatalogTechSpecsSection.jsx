@@ -42,8 +42,8 @@ const SPEC_ICONS = {
   spec_wheelbase_mm: MoveHorizontal,
   spec_front_track_mm: ArrowLeftRight,
   spec_rear_track_mm: ArrowLeftRight,
-  spec_front_axle_width_mm: MoveHorizontal,
-  spec_rear_axle_width_mm: MoveHorizontal,
+  spec_front_axle_length_mm: MoveHorizontal,
+  spec_rear_axle_length_mm: MoveHorizontal,
   spec_weight_g: Scale,
   spec_magnet: Magnet,
   spec_motor: Gauge,
@@ -131,9 +131,9 @@ export default function CatalogTechSpecsSection({ item, embedded = false }) {
     pushPair(out, 'track', numRow('spec_front_track_mm'), numRow('spec_rear_track_mm'));
     pushPair(
       out,
-      'axleWidth',
-      numRow('spec_front_axle_width_mm'),
-      numRow('spec_rear_axle_width_mm'),
+      'axleLength',
+      numRow('spec_front_axle_length_mm'),
+      numRow('spec_rear_axle_length_mm'),
     );
     pushSingle(out, numRow('spec_weight_g'));
     if (item.spec_magnet === true) {

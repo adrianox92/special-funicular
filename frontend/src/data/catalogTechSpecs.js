@@ -19,8 +19,8 @@ export const CATALOG_TECH_SPEC_NUM_FIELDS = [
   { key: 'spec_wheelbase_mm', i18n: 'wheelbaseMm' },
   { key: 'spec_front_track_mm', i18n: 'frontTrackMm' },
   { key: 'spec_rear_track_mm', i18n: 'rearTrackMm' },
-  { key: 'spec_front_axle_width_mm', i18n: 'frontAxleWidthMm' },
-  { key: 'spec_rear_axle_width_mm', i18n: 'rearAxleWidthMm' },
+  { key: 'spec_front_axle_length_mm', i18n: 'frontAxleLengthMm' },
+  { key: 'spec_rear_axle_length_mm', i18n: 'rearAxleLengthMm' },
   { key: 'spec_front_rim_diameter_mm', i18n: 'frontRimDiameterMm' },
   { key: 'spec_rear_rim_diameter_mm', i18n: 'rearRimDiameterMm' },
   { key: 'spec_weight_g', i18n: 'weightG' },
@@ -44,7 +44,7 @@ export const CATALOG_TECH_SPEC_RIM_VALUES = ['plastic', 'aluminum', 'magnesium']
 /** Pares delantero/trasero que deben compartir fila en ficha y admin. */
 export const CATALOG_TECH_SPEC_SIBLING_PAIRS = [
   ['spec_front_track_mm', 'spec_rear_track_mm'],
-  ['spec_front_axle_width_mm', 'spec_rear_axle_width_mm'],
+  ['spec_front_axle_length_mm', 'spec_rear_axle_length_mm'],
   ['spec_front_wheels', 'spec_rear_wheels'],
   ['spec_front_rim', 'spec_rear_rim'],
   ['spec_front_rim_diameter_mm', 'spec_rear_rim_diameter_mm'],
