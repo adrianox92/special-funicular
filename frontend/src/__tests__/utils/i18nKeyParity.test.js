@@ -50,6 +50,25 @@ describe('i18n key parity es/en/de', () => {
   test('legal', () => expectSameKeys(esLegal, enLegal, deLegal));
   test('slotRaceManager', () => expectSameKeys(esSrm, enSrm, deSrm));
   test('catalog', () => expectSameKeys(esCatalog, enCatalog, deCatalog));
+
+  test('catalog tech spec labels: wheelbase y vía vs longitud de eje', () => {
+    expect(esCatalog.techSpecs.fields.wheelbaseMm).toBe('Distancia entre ejes (mm)');
+    expect(enCatalog.techSpecs.fields.wheelbaseMm).toBe('Wheelbase (mm)');
+    expect(deCatalog.techSpecs.fields.wheelbaseMm).toBe('Radstand (mm)');
+    expect(esCatalog.techSpecs.fields.frontTrackMm).toBe('Vía delantera (mm)');
+    expect(esCatalog.techSpecs.fields.rearTrackMm).toBe('Vía trasera (mm)');
+    expect(esCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Longitud de eje delantero (mm)');
+    expect(esCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Longitud de eje trasero (mm)');
+    expect(enCatalog.techSpecs.fields.frontAxleLengthMm.toLowerCase()).toContain('axle length');
+    expect(deCatalog.techSpecs.fields.frontAxleLengthMm.toLowerCase()).toContain('achslänge');
+    const fieldsJson = JSON.stringify({
+      es: esCatalog.techSpecs.fields,
+      en: enCatalog.techSpecs.fields,
+      de: deCatalog.techSpecs.fields,
+    });
+    expect(fieldsJson).not.toMatch(/batalla/i);
+    expect(fieldsJson).not.toMatch(/axleWidth|axle_width|Ancho de eje/i);
+  });
   test('inventory', () => expectSameKeys(esInventory, enInventory, deInventory));
   test('seller', () => expectSameKeys(esSeller, enSeller, deSeller));
   test('help', () => expectSameKeys(esHelp, enHelp, deHelp));

@@ -145,6 +145,24 @@ describe('catalogTechSpecs', () => {
     expect(parsed.specs.spec_rear_rim_diameter_mm).toBe(16.5);
   });
 
+  test('alias axle_width legado a axle_length sin duplicar columnas', () => {
+    const fromLegacy = parseCatalogTechSpecsFromBody({
+      spec_front_axle_width_mm: '52',
+      spec_rear_axle_width_mm: '53,5',
+    });
+    expect(fromLegacy.ok).toBe(true);
+    expect(fromLegacy.specs.spec_front_axle_length_mm).toBe(52);
+    expect(fromLegacy.specs.spec_rear_axle_length_mm).toBe(53.5);
+    expect(fromLegacy.specs).not.toHaveProperty('spec_front_axle_width_mm');
+
+    const preferLength = parseCatalogTechSpecsFromBody({
+      spec_front_axle_length_mm: '60',
+      spec_front_axle_width_mm: '52',
+    });
+    expect(preferLength.ok).toBe(true);
+    expect(preferLength.specs.spec_front_axle_length_mm).toBe(60);
+  });
+
   test('acepta analógico con acento como analog', () => {
     const parsed = parseCatalogTechSpecsFromBody({ spec_system: 'Analógico' });
     expect(parsed.ok).toBe(true);

@@ -41,15 +41,29 @@ export const CATALOG_TECH_SPEC_SYSTEM_VALUES = ['analog', 'digital'];
 /** Clave canónica `aluminum` (EN Aluminium / ES Aluminio / DE Aluminium). */
 export const CATALOG_TECH_SPEC_RIM_VALUES = ['plastic', 'aluminum', 'magnesium'];
 
+/** Vía (track): distancia entre ruedas del mismo eje. No confundir con longitud de eje. */
+export const CATALOG_TECH_SPEC_TRACK_PAIR = ['spec_front_track_mm', 'spec_rear_track_mm'];
+
+/** Longitud de cada eje (varilla), no el ancho/vía. */
+export const CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR = [
+  'spec_front_axle_length_mm',
+  'spec_rear_axle_length_mm',
+];
+
 /** Pares delantero/trasero que deben compartir fila en ficha y admin. */
 export const CATALOG_TECH_SPEC_SIBLING_PAIRS = [
-  ['spec_front_track_mm', 'spec_rear_track_mm'],
-  ['spec_front_axle_length_mm', 'spec_rear_axle_length_mm'],
+  CATALOG_TECH_SPEC_TRACK_PAIR,
+  CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR,
   ['spec_front_wheels', 'spec_rear_wheels'],
   ['spec_front_rim', 'spec_rear_rim'],
   ['spec_front_rim_diameter_mm', 'spec_rear_rim_diameter_mm'],
   ['spec_front_lights', 'spec_rear_lights'],
 ];
+
+/** Id de control de formulario: usa la clave i18n, no el nombre de columna SQL. */
+export function techSpecControlId(idPrefix, field) {
+  return `${idPrefix}-${field.i18n}`;
+}
 
 /**
  * En el formulario de vehículo, motor / piñón / ruedas se gestionan como
@@ -101,6 +115,15 @@ export function techSpecFormFromRow(row = {}) {
   }
   for (const f of CATALOG_TECH_SPEC_NUM_FIELDS) {
     out[f.key] = formatStoredNumber(row[f.key]);
+  }
+  // Compat: respuestas antiguas podían traer spec_*_axle_width_mm (renombrado a length).
+  if (!isFilledNumber(out.spec_front_axle_length_mm)) {
+    const legacy = formatStoredNumber(row.spec_front_axle_width_mm);
+    if (legacy) out.spec_front_axle_length_mm = legacy;
+  }
+  if (!isFilledNumber(out.spec_rear_axle_length_mm)) {
+    const legacy = formatStoredNumber(row.spec_rear_axle_width_mm);
+    if (legacy) out.spec_rear_axle_length_mm = legacy;
   }
   out.spec_system = CATALOG_TECH_SPEC_SYSTEM_VALUES.includes(row.spec_system) ? row.spec_system : '';
   for (const f of CATALOG_TECH_SPEC_RIM_FIELDS) {

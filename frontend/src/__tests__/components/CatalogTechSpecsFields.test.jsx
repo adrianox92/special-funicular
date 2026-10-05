@@ -40,4 +40,24 @@ describe('CatalogTechSpecsFields', () => {
     expect(screen.getByLabelText('techSpecs.fields.frontRim')).toBeInTheDocument();
     expect(screen.getByLabelText('techSpecs.fields.frontRimDiameterMm')).toBeInTheDocument();
   });
+
+  test('vía y longitud de ejes aparecen una sola vez, sin ids axle_width', () => {
+    const { container } = render(<Harness />);
+    expect(screen.getAllByLabelText('techSpecs.fields.frontTrackMm')).toHaveLength(1);
+    expect(screen.getAllByLabelText('techSpecs.fields.rearTrackMm')).toHaveLength(1);
+    expect(screen.getAllByLabelText('techSpecs.fields.frontAxleLengthMm')).toHaveLength(1);
+    expect(screen.getAllByLabelText('techSpecs.fields.rearAxleLengthMm')).toHaveLength(1);
+    expect(screen.getAllByLabelText('techSpecs.fields.wheelbaseMm')).toHaveLength(1);
+    expect(screen.queryByLabelText(/axleWidth|AxleWidth/)).not.toBeInTheDocument();
+    expect(container.querySelector('[id*="axle_width"]')).toBeNull();
+    expect(container.querySelector('[name*="axle_width"]')).toBeNull();
+    expect(container.querySelector('#test-tech-frontTrackMm')).toHaveAttribute(
+      'name',
+      'spec_front_track_mm',
+    );
+    expect(container.querySelector('#test-tech-frontAxleLengthMm')).toHaveAttribute(
+      'name',
+      'spec_front_axle_length_mm',
+    );
+  });
 });

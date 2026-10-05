@@ -148,6 +148,28 @@ function copyExistingOrNull(prev, field) {
 }
 
 /**
+ * Clientes antiguos podían enviar spec_*_axle_width_mm (renombrado a length).
+ * No se persisten ambas: se copia al campo length solo si este no viene en el body.
+ */
+function applyLegacyAxleWidthAliases(src) {
+  if (!src || typeof src !== 'object') return src;
+  const out = { ...src };
+  if (
+    !Object.prototype.hasOwnProperty.call(out, 'spec_front_axle_length_mm') &&
+    Object.prototype.hasOwnProperty.call(out, 'spec_front_axle_width_mm')
+  ) {
+    out.spec_front_axle_length_mm = out.spec_front_axle_width_mm;
+  }
+  if (
+    !Object.prototype.hasOwnProperty.call(out, 'spec_rear_axle_length_mm') &&
+    Object.prototype.hasOwnProperty.call(out, 'spec_rear_axle_width_mm')
+  ) {
+    out.spec_rear_axle_length_mm = out.spec_rear_axle_width_mm;
+  }
+  return out;
+}
+
+/**
  * Parsea specs técnicas desde body (JSON o multipart).
  * Campo ausente: en create → null; en update → valor existente.
  * Campo presente vacío: null (permite borrar).
@@ -157,7 +179,7 @@ function copyExistingOrNull(prev, field) {
  * @returns {{ ok: true, specs: Record<string, unknown> } | { ok: false, error: string }}
  */
 function parseCatalogTechSpecsFromBody(body, existing) {
-  const src = body && typeof body === 'object' ? body : {};
+  const src = applyLegacyAxleWidthAliases(body && typeof body === 'object' ? body : {});
   const prev = existing && typeof existing === 'object' ? existing : null;
   const specs = {};
 

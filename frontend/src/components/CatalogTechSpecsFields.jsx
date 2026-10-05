@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from './ui/select';
 import {
+  CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR,
   CATALOG_TECH_SPEC_LEAD_TEXT_KEYS,
   CATALOG_TECH_SPEC_LIGHT_FIELDS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
@@ -17,6 +18,8 @@ import {
   CATALOG_TECH_SPEC_RIM_VALUES,
   CATALOG_TECH_SPEC_SYSTEM_VALUES,
   CATALOG_TECH_SPEC_TEXT_FIELDS,
+  CATALOG_TECH_SPEC_TRACK_PAIR,
+  techSpecControlId,
 } from '../data/catalogTechSpecs';
 
 const NUM_BY_KEY = Object.fromEntries(CATALOG_TECH_SPEC_NUM_FIELDS.map((f) => [f.key, f]));
@@ -27,11 +30,13 @@ function FieldPair({ children }) {
 }
 
 function TextSpecField({ field, form, setField, idPrefix, t }) {
+  const id = techSpecControlId(idPrefix, field);
   return (
     <div className="space-y-2">
-      <Label htmlFor={`${idPrefix}-${field.key}`}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
+      <Label htmlFor={id}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
       <Input
-        id={`${idPrefix}-${field.key}`}
+        id={id}
+        name={field.key}
         value={form[field.key] ?? ''}
         maxLength={field.maxLength}
         onChange={(e) => setField(field.key, e.target.value)}
@@ -41,11 +46,13 @@ function TextSpecField({ field, form, setField, idPrefix, t }) {
 }
 
 function NumSpecField({ field, form, setField, idPrefix, t }) {
+  const id = techSpecControlId(idPrefix, field);
   return (
     <div className="space-y-2">
-      <Label htmlFor={`${idPrefix}-${field.key}`}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
+      <Label htmlFor={id}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
       <Input
-        id={`${idPrefix}-${field.key}`}
+        id={id}
+        name={field.key}
         type="number"
         inputMode="decimal"
         min={0}
@@ -58,13 +65,15 @@ function NumSpecField({ field, form, setField, idPrefix, t }) {
 }
 
 function LightSpecField({ field, form, setField, idPrefix, t }) {
+  const id = techSpecControlId(idPrefix, field);
   return (
     <label
-      htmlFor={`${idPrefix}-${field.key}`}
+      htmlFor={id}
       className="flex items-center gap-2 rounded-lg border p-3 text-sm font-medium leading-none"
     >
       <input
-        id={`${idPrefix}-${field.key}`}
+        id={id}
+        name={field.key}
         type="checkbox"
         className="size-4 shrink-0 rounded border-input accent-primary"
         checked={form[field.key] === true}
@@ -76,14 +85,15 @@ function LightSpecField({ field, form, setField, idPrefix, t }) {
 }
 
 function RimSpecField({ field, form, setField, idPrefix, t }) {
+  const id = techSpecControlId(idPrefix, field);
   return (
     <div className="space-y-2">
-      <Label htmlFor={`${idPrefix}-${field.key}`}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
+      <Label htmlFor={id}>{t(`techSpecs.fields.${field.i18n}`)}</Label>
       <Select
         value={form[field.key] || '__none__'}
         onValueChange={(v) => setField(field.key, v === '__none__' ? '' : v)}
       >
-        <SelectTrigger id={`${idPrefix}-${field.key}`}>
+        <SelectTrigger id={id}>
           <SelectValue placeholder={t('techSpecs.unspecified')} />
         </SelectTrigger>
         <SelectContent>
@@ -125,12 +135,12 @@ export default function CatalogTechSpecsFields({
         <TextSpecField key={f.key} field={f} form={form} setField={setField} idPrefix={idPrefix} t={t} />
       ))}
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-spec_system`}>{t('techSpecs.fields.system')}</Label>
+        <Label htmlFor={`${idPrefix}-system`}>{t('techSpecs.fields.system')}</Label>
         <Select
           value={form.spec_system || '__none__'}
           onValueChange={(v) => setField('spec_system', v === '__none__' ? '' : v)}
         >
-          <SelectTrigger id={`${idPrefix}-spec_system`}>
+          <SelectTrigger id={`${idPrefix}-system`}>
             <SelectValue placeholder={t('techSpecs.unspecified')} />
           </SelectTrigger>
           <SelectContent>
@@ -154,7 +164,7 @@ export default function CatalogTechSpecsFields({
         />
       ))}
       <FieldPair>
-        {['spec_front_track_mm', 'spec_rear_track_mm'].map((key) => (
+        {CATALOG_TECH_SPEC_TRACK_PAIR.map((key) => (
           <NumSpecField
             key={key}
             field={NUM_BY_KEY[key]}
@@ -166,7 +176,7 @@ export default function CatalogTechSpecsFields({
         ))}
       </FieldPair>
       <FieldPair>
-        {['spec_front_axle_length_mm', 'spec_rear_axle_length_mm'].map((key) => (
+        {CATALOG_TECH_SPEC_AXLE_LENGTH_PAIR.map((key) => (
           <NumSpecField
             key={key}
             field={NUM_BY_KEY[key]}
@@ -185,12 +195,12 @@ export default function CatalogTechSpecsFields({
         t={t}
       />
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-spec_magnet`}>{t('techSpecs.fields.magnet')}</Label>
+        <Label htmlFor={`${idPrefix}-magnet`}>{t('techSpecs.fields.magnet')}</Label>
         <Select
           value={form.spec_magnet || '__none__'}
           onValueChange={(v) => setField('spec_magnet', v === '__none__' ? '' : v)}
         >
-          <SelectTrigger id={`${idPrefix}-spec_magnet`}>
+          <SelectTrigger id={`${idPrefix}-magnet`}>
             <SelectValue placeholder={t('techSpecs.unspecified')} />
           </SelectTrigger>
           <SelectContent>
