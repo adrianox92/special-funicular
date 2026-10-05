@@ -300,7 +300,11 @@ describe('admin catalog item image', () => {
       .field('manufacturer_id', MFG_ID)
       .field('model_name', EXISTING.model_name)
       .field('spec_scale', '1:32')
+      .field('spec_color', 'Black')
+      .field('spec_system', 'Analog')
       .field('spec_length_mm', '145,5')
+      .field('spec_front_axle_width_mm', '52')
+      .field('spec_rear_axle_width_mm', '53,5')
       .field('spec_magnet', 'false')
       .field('spec_motor', 'S-Can 18,000rpm');
 
@@ -308,7 +312,11 @@ describe('admin catalog item image', () => {
     expect(itemsBuilder.updatePayload).toEqual(
       expect.objectContaining({
         spec_scale: '1:32',
+        spec_color: 'Black',
+        spec_system: 'Analog',
         spec_length_mm: 145.5,
+        spec_front_axle_width_mm: 52,
+        spec_rear_axle_width_mm: 53.5,
         spec_magnet: false,
         spec_motor: 'S-Can 18,000rpm',
       }),

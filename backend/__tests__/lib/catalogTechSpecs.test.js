@@ -1,17 +1,29 @@
 'use strict';
 
 const {
+  CATALOG_TECH_SPEC_SELECT,
   parseCatalogTechSpecsFromBody,
   parseOptionalNonNegativeNumber,
   parseOptionalNullableBool,
 } = require('../../lib/catalogTechSpecs');
 
 describe('catalogTechSpecs', () => {
+  test('select de detalle incluye color, sistema y anchos de eje', () => {
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_color');
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_system');
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_front_axle_width_mm');
+    expect(CATALOG_TECH_SPEC_SELECT).toContain('spec_rear_axle_width_mm');
+  });
+
   test('create sin campos deja todo a null', () => {
     const parsed = parseCatalogTechSpecsFromBody({}, null);
     expect(parsed.ok).toBe(true);
     expect(parsed.specs.spec_scale).toBeNull();
+    expect(parsed.specs.spec_color).toBeNull();
+    expect(parsed.specs.spec_system).toBeNull();
     expect(parsed.specs.spec_length_mm).toBeNull();
+    expect(parsed.specs.spec_front_axle_width_mm).toBeNull();
+    expect(parsed.specs.spec_rear_axle_width_mm).toBeNull();
     expect(parsed.specs.spec_magnet).toBeNull();
   });
 
@@ -41,7 +53,11 @@ describe('catalogTechSpecs', () => {
     const parsed = parseCatalogTechSpecsFromBody({
       spec_scale: '1:32',
       spec_body: 'Plastic',
+      spec_color: 'Black',
+      spec_system: 'Digital Plug Ready',
       spec_length_mm: '145,5',
+      spec_front_axle_width_mm: '52',
+      spec_rear_axle_width_mm: '53,5',
       spec_magnet: 'no',
       spec_motor: 'S-Can 18,000rpm',
       spec_pinion_gear: '9/27',
@@ -49,7 +65,11 @@ describe('catalogTechSpecs', () => {
     });
     expect(parsed.ok).toBe(true);
     expect(parsed.specs.spec_scale).toBe('1:32');
+    expect(parsed.specs.spec_color).toBe('Black');
+    expect(parsed.specs.spec_system).toBe('Digital Plug Ready');
     expect(parsed.specs.spec_length_mm).toBe(145.5);
+    expect(parsed.specs.spec_front_axle_width_mm).toBe(52);
+    expect(parsed.specs.spec_rear_axle_width_mm).toBe(53.5);
     expect(parsed.specs.spec_magnet).toBe(false);
     expect(parsed.specs.spec_motor).toBe('S-Can 18,000rpm');
   });

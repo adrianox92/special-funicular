@@ -4,6 +4,8 @@
 const CATALOG_TECH_SPEC_TEXT_FIELDS = [
   'spec_scale',
   'spec_body',
+  'spec_color',
+  'spec_system',
   'spec_motor',
   'spec_pinion_gear',
   'spec_front_wheels',
@@ -19,6 +21,8 @@ const CATALOG_TECH_SPEC_NUM_FIELDS = [
   'spec_wheelbase_mm',
   'spec_front_track_mm',
   'spec_rear_track_mm',
+  'spec_front_axle_width_mm',
+  'spec_rear_axle_width_mm',
   'spec_weight_g',
 ];
 
@@ -33,6 +37,8 @@ const CATALOG_TECH_SPEC_SELECT = CATALOG_TECH_SPEC_COLUMNS.join(', ');
 const TEXT_MAX = {
   spec_scale: 32,
   spec_body: 80,
+  spec_color: 80,
+  spec_system: 80,
   spec_motor: 120,
   spec_pinion_gear: 40,
   spec_front_wheels: 120,
