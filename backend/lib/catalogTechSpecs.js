@@ -9,8 +9,6 @@ const CATALOG_TECH_SPEC_TEXT_FIELDS = [
   'spec_pinion_gear',
   'spec_front_wheels',
   'spec_rear_wheels',
-  'spec_front_tyres',
-  'spec_rear_tyres',
 ];
 
 const CATALOG_TECH_SPEC_NUM_FIELDS = [
@@ -30,13 +28,18 @@ const CATALOG_TECH_SPEC_BOOL_FIELDS = [
   'spec_rear_lights',
 ];
 
+const CATALOG_TECH_SPEC_RIM_FIELDS = ['spec_front_rim', 'spec_rear_rim'];
+
 const CATALOG_TECH_SPEC_SYSTEM_VALUES = ['analog', 'digital'];
+
+const CATALOG_TECH_SPEC_RIM_VALUES = ['plastic', 'aluminum', 'magnesium'];
 
 const CATALOG_TECH_SPEC_COLUMNS = [
   ...CATALOG_TECH_SPEC_TEXT_FIELDS,
   ...CATALOG_TECH_SPEC_NUM_FIELDS,
   ...CATALOG_TECH_SPEC_BOOL_FIELDS,
   'spec_system',
+  ...CATALOG_TECH_SPEC_RIM_FIELDS,
 ];
 
 const CATALOG_TECH_SPEC_SELECT = CATALOG_TECH_SPEC_COLUMNS.join(', ');
@@ -49,8 +52,6 @@ const TEXT_MAX = {
   spec_pinion_gear: 40,
   spec_front_wheels: 120,
   spec_rear_wheels: 120,
-  spec_front_tyres: 120,
-  spec_rear_tyres: 120,
 };
 
 const NUM_MAX = 100000;
@@ -63,10 +64,31 @@ const SYSTEM_ALIASES = {
   digital: 'digital',
 };
 
+const RIM_ALIASES = {
+  plastic: 'plastic',
+  plastico: 'plastic',
+  plastik: 'plastic',
+  kunststoff: 'plastic',
+  pl: 'plastic',
+  aluminum: 'aluminum',
+  aluminium: 'aluminum',
+  aluminio: 'aluminum',
+  alu: 'aluminum',
+  al: 'aluminum',
+  magnesium: 'magnesium',
+  magnesio: 'magnesium',
+  mag: 'magnesium',
+  ma: 'magnesium',
+};
+
 function normOptionalStr(v) {
   if (v == null) return null;
   const s = String(v).trim();
   return s === '' ? null : s;
+}
+
+function foldKey(value) {
+  return value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
 }
 
 function parseOptionalTechText(raw, field) {
@@ -102,10 +124,20 @@ function parseOptionalNullableBool(raw, field = 'spec_magnet') {
 function parseOptionalSystem(raw) {
   const value = normOptionalStr(raw);
   if (value == null) return { ok: true, value: null };
-  const key = value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
-  const mapped = SYSTEM_ALIASES[key];
+  const mapped = SYSTEM_ALIASES[foldKey(value)];
   if (mapped) return { ok: true, value: mapped };
   return { ok: false, error: 'spec_system: debe ser analog, digital o vacío' };
+}
+
+function parseOptionalRim(raw, field) {
+  const value = normOptionalStr(raw);
+  if (value == null) return { ok: true, value: null };
+  const mapped = RIM_ALIASES[foldKey(value)];
+  if (mapped) return { ok: true, value: mapped };
+  return {
+    ok: false,
+    error: `${field}: debe ser plastic, aluminum, magnesium o vacío`,
+  };
 }
 
 function copyExistingOrNull(prev, field) {
@@ -171,6 +203,17 @@ function parseCatalogTechSpecsFromBody(body, existing) {
       : null;
   }
 
+  for (const field of CATALOG_TECH_SPEC_RIM_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(src, field)) {
+      const parsed = parseOptionalRim(src[field], field);
+      if (!parsed.ok) return parsed;
+      specs[field] = parsed.value;
+    } else {
+      const existingRim = prev ? prev[field] : null;
+      specs[field] = CATALOG_TECH_SPEC_RIM_VALUES.includes(existingRim) ? existingRim : null;
+    }
+  }
+
   return { ok: true, specs };
 }
 
@@ -179,11 +222,14 @@ module.exports = {
   CATALOG_TECH_SPEC_TEXT_FIELDS,
   CATALOG_TECH_SPEC_NUM_FIELDS,
   CATALOG_TECH_SPEC_BOOL_FIELDS,
+  CATALOG_TECH_SPEC_RIM_FIELDS,
   CATALOG_TECH_SPEC_SYSTEM_VALUES,
+  CATALOG_TECH_SPEC_RIM_VALUES,
   CATALOG_TECH_SPEC_SELECT,
   parseCatalogTechSpecsFromBody,
   parseOptionalNonNegativeNumber,
   parseOptionalNullableBool,
+  parseOptionalRim,
   parseOptionalSystem,
   parseOptionalTechText,
 };

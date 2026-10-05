@@ -308,7 +308,9 @@ describe('admin catalog item image', () => {
       .field('spec_front_axle_width_mm', '52')
       .field('spec_rear_axle_width_mm', '53,5')
       .field('spec_magnet', 'false')
-      .field('spec_motor', 'S-Can 18,000rpm');
+      .field('spec_motor', 'S-Can 18,000rpm')
+      .field('spec_front_rim', 'plastic')
+      .field('spec_rear_rim', 'aluminium');
 
     expect(response.status).toBe(200);
     expect(itemsBuilder.updatePayload).toEqual(
@@ -323,6 +325,8 @@ describe('admin catalog item image', () => {
         spec_rear_axle_width_mm: 53.5,
         spec_magnet: false,
         spec_motor: 'S-Can 18,000rpm',
+        spec_front_rim: 'plastic',
+        spec_rear_rim: 'aluminum',
       }),
     );
   });

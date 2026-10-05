@@ -1,4 +1,11 @@
-import { emptyTechSpecForm, hasCatalogTechSpecs, validateTechSpecForm } from '../../data/catalogTechSpecs';
+import {
+  CATALOG_TECH_SPEC_SIBLING_PAIRS,
+  emptyTechSpecForm,
+  hasCatalogTechSpecs,
+  labelCatalogTechSpecRim,
+  techSpecFormFromRow,
+  validateTechSpecForm,
+} from '../../data/catalogTechSpecs';
 
 describe('catalogTechSpecs helpers', () => {
   test('hasCatalogTechSpecs ignora tracción y motor_position', () => {
@@ -10,6 +17,35 @@ describe('catalogTechSpecs helpers', () => {
     expect(hasCatalogTechSpecs({ spec_magnet: false })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_front_lights: true })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_rear_lights: false })).toBe(false);
+    expect(hasCatalogTechSpecs({ spec_front_rim: 'plastic' })).toBe(true);
+    expect(hasCatalogTechSpecs({ spec_rear_rim: 'aluminum' })).toBe(true);
+  });
+
+  test('techSpecFormFromRow solo acepta claves de llanta conocidas', () => {
+    const form = techSpecFormFromRow({ spec_front_rim: 'plastic', spec_rear_rim: 'carbon' });
+    expect(form.spec_front_rim).toBe('plastic');
+    expect(form.spec_rear_rim).toBe('');
+  });
+
+  test('labelCatalogTechSpecRim traduce claves', () => {
+    const t = (key) =>
+      ({
+        'techSpecs.rimValues.plastic': 'Plástico',
+        'techSpecs.rimValues.aluminum': 'Aluminio',
+        'techSpecs.rimValues.magnesium': 'Magnesio',
+      })[key];
+    expect(labelCatalogTechSpecRim('aluminum', t)).toBe('Aluminio');
+    expect(labelCatalogTechSpecRim('', t)).toBeNull();
+  });
+
+  test('pares delantero/trasero cubren vías, ejes, ruedas, llantas y luces', () => {
+    expect(CATALOG_TECH_SPEC_SIBLING_PAIRS).toEqual([
+      ['spec_front_track_mm', 'spec_rear_track_mm'],
+      ['spec_front_axle_width_mm', 'spec_rear_axle_width_mm'],
+      ['spec_front_wheels', 'spec_rear_wheels'],
+      ['spec_front_rim', 'spec_rear_rim'],
+      ['spec_front_lights', 'spec_rear_lights'],
+    ]);
   });
 
   test('validateTechSpecForm acepta vacío y rechaza negativos', () => {

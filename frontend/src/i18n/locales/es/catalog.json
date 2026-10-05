@@ -146,14 +146,19 @@
       "pinionGear": "Piñón / corona",
       "frontWheels": "Ruedas delanteras",
       "rearWheels": "Ruedas traseras",
-      "frontTyres": "Neumáticos delanteros",
-      "rearTyres": "Neumáticos traseros",
+      "frontRim": "Llanta delantera",
+      "rearRim": "Llanta trasera",
       "frontLights": "Luces delanteras",
       "rearLights": "Luces traseras"
     },
     "systemValues": {
       "analog": "Analógico",
       "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Plástico",
+      "aluminum": "Aluminio",
+      "magnesium": "Magnesio"
     }
   },
   "guest": {

@@ -146,14 +146,19 @@
       "pinionGear": "Ritzel / Zahnrad",
       "frontWheels": "Vorderräder",
       "rearWheels": "Hinterräder",
-      "frontTyres": "Vorderreifen",
-      "rearTyres": "Hinterreifen",
+      "frontRim": "Felge vorn",
+      "rearRim": "Felge hinten",
       "frontLights": "Frontbeleuchtung",
       "rearLights": "Heckbeleuchtung"
     },
     "systemValues": {
       "analog": "Analog",
       "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Kunststoff",
+      "aluminum": "Aluminium",
+      "magnesium": "Magnesium"
     }
   },
   "guest": {
