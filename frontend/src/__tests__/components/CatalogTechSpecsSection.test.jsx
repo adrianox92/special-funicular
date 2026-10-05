@@ -30,7 +30,10 @@ jest.mock('react-i18next', () => ({
         'techSpecs.fields.rearWheels': 'Ruedas traseras',
         'techSpecs.fields.frontTyres': 'Neumáticos delanteros',
         'techSpecs.fields.rearTyres': 'Neumáticos traseros',
-        'techSpecs.fields.lights': 'Luces',
+        'techSpecs.fields.frontLights': 'Luces delanteras',
+        'techSpecs.fields.rearLights': 'Luces traseras',
+        'techSpecs.systemValues.analog': 'Analógico',
+        'techSpecs.systemValues.digital': 'Digital',
         'values.motorPosition.inline': 'En línea',
         'values.traction.Trasera': 'Trasera',
       };
@@ -49,13 +52,13 @@ describe('CatalogTechSpecsSection', () => {
   });
 
   test('muestra filas rellenas y oculta vacías', () => {
-    render(
+    const { container } = render(
       <CatalogTechSpecsSection
         item={{
           spec_scale: '1:32',
           spec_body: 'Plastic',
           spec_color: 'Black',
-          spec_system: 'Digital Plug Ready',
+          spec_system: 'digital',
           spec_length_mm: '145.00',
           spec_front_axle_width_mm: 52,
           spec_rear_axle_width_mm: '',
@@ -63,7 +66,8 @@ describe('CatalogTechSpecsSection', () => {
           spec_motor: 'S-Can 18,000rpm',
           traction: 'Trasera',
           motor_position: 'inline',
-          spec_lights: '',
+          spec_front_lights: true,
+          spec_rear_lights: false,
         }}
       />,
     );
@@ -73,14 +77,19 @@ describe('CatalogTechSpecsSection', () => {
     expect(screen.getByText('Color')).toBeInTheDocument();
     expect(screen.getByText('Black')).toBeInTheDocument();
     expect(screen.getByText('Sistema')).toBeInTheDocument();
-    expect(screen.getByText('Digital Plug Ready')).toBeInTheDocument();
+    expect(screen.getByText('Digital')).toBeInTheDocument();
+    expect(screen.queryByText('Digital Plug Ready')).not.toBeInTheDocument();
     expect(screen.getByText('145')).toBeInTheDocument();
     expect(screen.getByText('Ancho de ejes delantero (mm)')).toBeInTheDocument();
     expect(screen.getByText('52')).toBeInTheDocument();
     expect(screen.getByText('No')).toBeInTheDocument();
     expect(screen.getByText('Trasera')).toBeInTheDocument();
     expect(screen.getByText('En línea')).toBeInTheDocument();
-    expect(screen.queryByText('Luces')).not.toBeInTheDocument();
+    expect(screen.getByText('Luces delanteras')).toBeInTheDocument();
+    expect(screen.queryByText('Luces traseras')).not.toBeInTheDocument();
     expect(screen.queryByText('Ancho de ejes trasero (mm)')).not.toBeInTheDocument();
+    const grid = container.querySelector('dl');
+    expect(grid).toHaveClass('md:grid-cols-2');
+    expect(container.querySelectorAll('svg').length).toBeGreaterThan(0);
   });
 });

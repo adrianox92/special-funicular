@@ -5,9 +5,11 @@ describe('catalogTechSpecs helpers', () => {
     expect(hasCatalogTechSpecs({ traction: 'Trasera', motor_position: 'inline' })).toBe(false);
     expect(hasCatalogTechSpecs({ spec_scale: '1:32' })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_color: 'Black' })).toBe(true);
-    expect(hasCatalogTechSpecs({ spec_system: 'Analog' })).toBe(true);
+    expect(hasCatalogTechSpecs({ spec_system: 'analog' })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_front_axle_width_mm: 52 })).toBe(true);
     expect(hasCatalogTechSpecs({ spec_magnet: false })).toBe(true);
+    expect(hasCatalogTechSpecs({ spec_front_lights: true })).toBe(true);
+    expect(hasCatalogTechSpecs({ spec_rear_lights: false })).toBe(false);
   });
 
   test('validateTechSpecForm acepta vacío y rechaza negativos', () => {

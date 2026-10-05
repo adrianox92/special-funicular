@@ -148,7 +148,12 @@
       "rearWheels": "Ruedas traseras",
       "frontTyres": "Neumáticos delanteros",
       "rearTyres": "Neumáticos traseros",
-      "lights": "Luces"
+      "frontLights": "Luces delanteras",
+      "rearLights": "Luces traseras"
+    },
+    "systemValues": {
+      "analog": "Analógico",
+      "digital": "Digital"
     }
   },
   "guest": {

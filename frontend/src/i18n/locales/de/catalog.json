@@ -148,7 +148,12 @@
       "rearWheels": "Hinterräder",
       "frontTyres": "Vorderreifen",
       "rearTyres": "Hinterreifen",
-      "lights": "Beleuchtung"
+      "frontLights": "Frontbeleuchtung",
+      "rearLights": "Heckbeleuchtung"
+    },
+    "systemValues": {
+      "analog": "Analog",
+      "digital": "Digital"
     }
   },
   "guest": {

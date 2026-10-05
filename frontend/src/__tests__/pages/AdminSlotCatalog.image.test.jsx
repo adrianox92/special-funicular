@@ -234,7 +234,9 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
               ...ITEM,
               spec_scale: '1:32',
               spec_color: 'Black',
-              spec_system: 'Analog',
+              spec_system: 'analog',
+              spec_front_lights: true,
+              spec_rear_lights: false,
               spec_magnet: true,
               spec_length_mm: 145,
               spec_front_axle_width_mm: 52,
@@ -261,8 +263,12 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
     const scaleInput = await screen.findByLabelText('techSpecs.fields.scale');
     expect(scaleInput).toHaveValue('1:32');
     expect(screen.getByLabelText('techSpecs.fields.color')).toHaveValue('Black');
-    expect(screen.getByLabelText('techSpecs.fields.system')).toHaveValue('Analog');
+    expect(screen.getByLabelText('techSpecs.fields.system')).toHaveTextContent(
+      'techSpecs.systemValues.analog',
+    );
     expect(screen.getByLabelText('techSpecs.fields.frontAxleWidthMm')).toHaveValue(52);
+    expect(screen.getByLabelText('techSpecs.fields.frontLights')).toBeChecked();
+    expect(screen.getByLabelText('techSpecs.fields.rearLights')).not.toBeChecked();
     await userEvent.clear(scaleInput);
     await userEvent.type(scaleInput, '1:24');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
@@ -273,7 +279,9 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
     const [, fd] = api.put.mock.calls[0];
     expect(fd.get('spec_scale')).toBe('1:24');
     expect(fd.get('spec_color')).toBe('Black');
-    expect(fd.get('spec_system')).toBe('Analog');
+    expect(fd.get('spec_system')).toBe('analog');
+    expect(fd.get('spec_front_lights')).toBe('true');
+    expect(fd.get('spec_rear_lights')).toBe('false');
     expect(fd.get('spec_magnet')).toBe('true');
     expect(fd.get('spec_length_mm')).toBe('145');
     expect(fd.get('spec_front_axle_width_mm')).toBe('52');

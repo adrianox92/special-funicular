@@ -148,7 +148,12 @@
       "rearWheels": "Rear wheels",
       "frontTyres": "Front tyres",
       "rearTyres": "Rear tyres",
-      "lights": "Lights"
+      "frontLights": "Front lights",
+      "rearLights": "Rear lights"
+    },
+    "systemValues": {
+      "analog": "Analog",
+      "digital": "Digital"
     }
   },
   "guest": {

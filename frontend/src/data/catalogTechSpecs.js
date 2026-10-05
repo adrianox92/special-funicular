@@ -4,24 +4,16 @@ export const CATALOG_TECH_SPEC_TEXT_FIELDS = [
   { key: 'spec_scale', i18n: 'scale', maxLength: 32 },
   { key: 'spec_body', i18n: 'body', maxLength: 80 },
   { key: 'spec_color', i18n: 'color', maxLength: 80 },
-  { key: 'spec_system', i18n: 'system', maxLength: 80 },
   { key: 'spec_motor', i18n: 'motor', maxLength: 120 },
   { key: 'spec_pinion_gear', i18n: 'pinionGear', maxLength: 40 },
   { key: 'spec_front_wheels', i18n: 'frontWheels', maxLength: 120 },
   { key: 'spec_rear_wheels', i18n: 'rearWheels', maxLength: 120 },
   { key: 'spec_front_tyres', i18n: 'frontTyres', maxLength: 120 },
   { key: 'spec_rear_tyres', i18n: 'rearTyres', maxLength: 120 },
-  { key: 'spec_lights', i18n: 'lights', maxLength: 80 },
 ];
 
 /** Texto mostrado antes de medidas / imán (ficha pública y formulario admin). */
-export const CATALOG_TECH_SPEC_LEAD_TEXT_KEYS = [
-  'spec_scale',
-  'spec_body',
-  'spec_color',
-  'spec_system',
-  'spec_motor',
-];
+export const CATALOG_TECH_SPEC_LEAD_TEXT_KEYS = ['spec_scale', 'spec_body', 'spec_color'];
 
 export const CATALOG_TECH_SPEC_NUM_FIELDS = [
   { key: 'spec_length_mm', i18n: 'lengthMm' },
@@ -34,14 +26,28 @@ export const CATALOG_TECH_SPEC_NUM_FIELDS = [
   { key: 'spec_weight_g', i18n: 'weightG' },
 ];
 
+export const CATALOG_TECH_SPEC_LIGHT_FIELDS = [
+  { key: 'spec_front_lights', i18n: 'frontLights' },
+  { key: 'spec_rear_lights', i18n: 'rearLights' },
+];
+
+export const CATALOG_TECH_SPEC_SYSTEM_VALUES = ['analog', 'digital'];
+
 export const CATALOG_TECH_SPEC_KEYS = [
   ...CATALOG_TECH_SPEC_TEXT_FIELDS.map((f) => f.key),
   ...CATALOG_TECH_SPEC_NUM_FIELDS.map((f) => f.key),
+  'spec_system',
   'spec_magnet',
+  ...CATALOG_TECH_SPEC_LIGHT_FIELDS.map((f) => f.key),
 ];
 
 export function emptyTechSpecForm() {
-  const out = { spec_magnet: '' };
+  const out = {
+    spec_magnet: '',
+    spec_system: '',
+    spec_front_lights: false,
+    spec_rear_lights: false,
+  };
   for (const f of CATALOG_TECH_SPEC_TEXT_FIELDS) out[f.key] = '';
   for (const f of CATALOG_TECH_SPEC_NUM_FIELDS) out[f.key] = '';
   return out;
@@ -63,15 +69,20 @@ export function techSpecFormFromRow(row = {}) {
   for (const f of CATALOG_TECH_SPEC_NUM_FIELDS) {
     out[f.key] = formatStoredNumber(row[f.key]);
   }
+  out.spec_system = CATALOG_TECH_SPEC_SYSTEM_VALUES.includes(row.spec_system) ? row.spec_system : '';
   if (row.spec_magnet === true) out.spec_magnet = 'true';
   else if (row.spec_magnet === false) out.spec_magnet = 'false';
   else out.spec_magnet = '';
+  out.spec_front_lights = row.spec_front_lights === true;
+  out.spec_rear_lights = row.spec_rear_lights === true;
   return out;
 }
 
 export function appendTechSpecsToFormData(fd, form) {
   for (const key of CATALOG_TECH_SPEC_KEYS) {
-    fd.append(key, form?.[key] ?? '');
+    const v = form?.[key];
+    if (typeof v === 'boolean') fd.append(key, v ? 'true' : 'false');
+    else fd.append(key, v ?? '');
   }
 }
 
@@ -84,10 +95,12 @@ function isFilledNumber(v) {
   return Number.isFinite(Number(v));
 }
 
-/** True si hay al menos un campo nuevo relleno (imán false cuenta). */
+/** True si hay al menos un campo nuevo relleno (imán false cuenta; luces solo si true). */
 export function hasCatalogTechSpecs(item) {
   if (!item) return false;
   if (item.spec_magnet === true || item.spec_magnet === false) return true;
+  if (item.spec_front_lights === true || item.spec_rear_lights === true) return true;
+  if (isFilledText(item.spec_system)) return true;
   for (const f of CATALOG_TECH_SPEC_TEXT_FIELDS) {
     if (isFilledText(item[f.key])) return true;
   }
@@ -102,6 +115,15 @@ export function formatTechSpecNumber(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
   return Number.isInteger(n) ? String(n) : String(n);
+}
+
+export function labelCatalogTechSpecSystem(value, t) {
+  if (value == null || String(value).trim() === '') return null;
+  const key = String(value).trim().toLowerCase();
+  if (CATALOG_TECH_SPEC_SYSTEM_VALUES.includes(key)) {
+    return t(`techSpecs.systemValues.${key}`);
+  }
+  return t(`techSpecs.systemValues.${key}`, { defaultValue: String(value) });
 }
 
 export function validateTechSpecForm(form) {

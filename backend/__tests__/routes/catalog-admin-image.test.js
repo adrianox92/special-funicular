@@ -301,7 +301,9 @@ describe('admin catalog item image', () => {
       .field('model_name', EXISTING.model_name)
       .field('spec_scale', '1:32')
       .field('spec_color', 'Black')
-      .field('spec_system', 'Analog')
+      .field('spec_system', 'analog')
+      .field('spec_front_lights', 'true')
+      .field('spec_rear_lights', 'false')
       .field('spec_length_mm', '145,5')
       .field('spec_front_axle_width_mm', '52')
       .field('spec_rear_axle_width_mm', '53,5')
@@ -313,7 +315,9 @@ describe('admin catalog item image', () => {
       expect.objectContaining({
         spec_scale: '1:32',
         spec_color: 'Black',
-        spec_system: 'Analog',
+        spec_system: 'analog',
+        spec_front_lights: true,
+        spec_rear_lights: false,
         spec_length_mm: 145.5,
         spec_front_axle_width_mm: 52,
         spec_rear_axle_width_mm: 53.5,
