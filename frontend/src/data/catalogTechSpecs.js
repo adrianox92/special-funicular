@@ -3,6 +3,8 @@
 export const CATALOG_TECH_SPEC_TEXT_FIELDS = [
   { key: 'spec_scale', i18n: 'scale', maxLength: 32 },
   { key: 'spec_body', i18n: 'body', maxLength: 80 },
+  { key: 'spec_color', i18n: 'color', maxLength: 80 },
+  { key: 'spec_system', i18n: 'system', maxLength: 80 },
   { key: 'spec_motor', i18n: 'motor', maxLength: 120 },
   { key: 'spec_pinion_gear', i18n: 'pinionGear', maxLength: 40 },
   { key: 'spec_front_wheels', i18n: 'frontWheels', maxLength: 120 },
@@ -12,12 +14,23 @@ export const CATALOG_TECH_SPEC_TEXT_FIELDS = [
   { key: 'spec_lights', i18n: 'lights', maxLength: 80 },
 ];
 
+/** Texto mostrado antes de medidas / imán (ficha pública y formulario admin). */
+export const CATALOG_TECH_SPEC_LEAD_TEXT_KEYS = [
+  'spec_scale',
+  'spec_body',
+  'spec_color',
+  'spec_system',
+  'spec_motor',
+];
+
 export const CATALOG_TECH_SPEC_NUM_FIELDS = [
   { key: 'spec_length_mm', i18n: 'lengthMm' },
   { key: 'spec_height_mm', i18n: 'heightMm' },
   { key: 'spec_wheelbase_mm', i18n: 'wheelbaseMm' },
   { key: 'spec_front_track_mm', i18n: 'frontTrackMm' },
   { key: 'spec_rear_track_mm', i18n: 'rearTrackMm' },
+  { key: 'spec_front_axle_width_mm', i18n: 'frontAxleWidthMm' },
+  { key: 'spec_rear_axle_width_mm', i18n: 'rearAxleWidthMm' },
   { key: 'spec_weight_g', i18n: 'weightG' },
 ];
 
