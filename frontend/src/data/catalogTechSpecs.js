@@ -251,6 +251,9 @@ function isEmptyFormSpecValue(key, value) {
 /**
  * Copia specs del catálogo solo en campos vacíos del formulario de vehículo.
  * No pisa ediciones del usuario (imán false cuenta como relleno).
+ * Devuelve únicamente claves de ficha técnica: mezclar el resultado al final
+ * del estado no debe reescribir modelo, referencia, fabricante ni el resto
+ * de la ficha de identidad.
  */
 export function mergeEmptyTechSpecsFromCatalog(currentForm, catalogRow) {
   const incoming = techSpecFormFromRow(catalogRow);
@@ -263,5 +266,9 @@ export function mergeEmptyTechSpecsFromCatalog(currentForm, catalogRow) {
     }
   }
   applyTrackFallbackToAxleLength(out);
-  return out;
+  const specsOnly = {};
+  for (const key of CATALOG_TECH_SPEC_KEYS) {
+    specsOnly[key] = out[key];
+  }
+  return specsOnly;
 }

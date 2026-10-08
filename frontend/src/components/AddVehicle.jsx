@@ -107,6 +107,7 @@ const AddVehicle = () => {
     setCatalogThumb(item.image_url || null);
     setVehicle((prev) => ({
       ...prev,
+      ...mergeEmptyTechSpecsFromCatalog(prev, item),
       model: item.model_name || '',
       manufacturer: item.manufacturer || '',
       type: item.vehicle_type || '',
@@ -120,7 +121,6 @@ const AddVehicle = () => {
       dorsal: item.dorsal != null && String(item.dorsal).trim() !== '' ? String(item.dorsal).trim() : '',
       limited_edition: Boolean(item.limited_edition),
       limited_edition_unit_number: '',
-      ...mergeEmptyTechSpecsFromCatalog(prev, item),
     }));
     if (error) setError(null);
   };

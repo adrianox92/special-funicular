@@ -156,6 +156,64 @@ describe('catalogTechSpecs helpers', () => {
     expect(merged.spec_front_rim_diameter_mm).toBe('15.8');
   });
 
+  test('mergeEmptyTechSpecsFromCatalog no arrastra campos de identidad del formulario', () => {
+    const prev = {
+      ...emptyTechSpecForm(),
+      model: '',
+      reference: '',
+      manufacturer: '',
+      type: '',
+      traction: '',
+      motor_position: '',
+      commercial_release_year: '',
+      dorsal: '',
+      anotaciones: 'nota del usuario',
+    };
+    const item = {
+      model_name: 'Audi Quattro',
+      reference: 'C123',
+      manufacturer: 'Scalextric',
+      vehicle_type: 'rally',
+      traction: '4wd',
+      motor_position: 'front',
+      commercial_release_year: 2024,
+      dorsal: '17',
+      spec_body: 'Plastic',
+    };
+    const merged = mergeEmptyTechSpecsFromCatalog(prev, item);
+    expect(merged.model).toBeUndefined();
+    expect(merged.reference).toBeUndefined();
+    expect(merged.manufacturer).toBeUndefined();
+    expect(merged.anotaciones).toBeUndefined();
+    expect(merged.spec_body).toBe('Plastic');
+
+    // El prefill aplica identidad y luego mezcla las specs. Las specs no pueden
+    // volver a dejar vacíos modelo, referencia, fabricante, año, tipo, tracción,
+    // posición del motor ni dorsal.
+    const next = {
+      ...prev,
+      model: item.model_name,
+      manufacturer: item.manufacturer,
+      type: item.vehicle_type,
+      traction: item.traction,
+      motor_position: item.motor_position,
+      reference: item.reference,
+      commercial_release_year: String(item.commercial_release_year),
+      dorsal: item.dorsal,
+      ...merged,
+    };
+    expect(next.model).toBe('Audi Quattro');
+    expect(next.reference).toBe('C123');
+    expect(next.manufacturer).toBe('Scalextric');
+    expect(next.type).toBe('rally');
+    expect(next.traction).toBe('4wd');
+    expect(next.motor_position).toBe('front');
+    expect(next.commercial_release_year).toBe('2024');
+    expect(next.dorsal).toBe('17');
+    expect(next.anotaciones).toBe('nota del usuario');
+    expect(next.spec_body).toBe('Plastic');
+  });
+
   test('mergeEmptyTechSpecsFromCatalog rellena eje vacío desde vía de catálogo', () => {
     const current = emptyTechSpecForm();
     const merged = mergeEmptyTechSpecsFromCatalog(current, {
