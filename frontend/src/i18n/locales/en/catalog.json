@@ -15,7 +15,7 @@
   "list": {
     "heading": "Reference catalog",
     "lead": "Catalogued slot cars: reference, brand, type and commercial year.",
-    "searchPlaceholder": "Search by reference, model or brand…",
+    "searchPlaceholder": "Search by reference, alias, EAN, model or brand…",
     "clearSearch": "Clear search",
     "brand": "Brand",
     "allBrands": "All brands",
@@ -66,6 +66,10 @@
     "noImage": "No catalog image",
     "specsTitle": "Technical details",
     "fieldReference": "Reference",
+    "fieldEan": "EAN",
+    "aliasesTitle": "Alternative references",
+    "aliasMarket": "Market",
+    "aliasEan": "EAN",
     "fieldBrand": "Brand",
     "fieldName": "Name / model",
     "fieldType": "Type",
@@ -115,6 +119,28 @@
     "addToGarage": "Add to my garage",
     "addToGarageHint": "Opens the add-vehicle form with this reference filled in.",
     "legacyValue": "{{value}} (previous value)"
+  },
+  "aliases": {
+    "tab": "Alternative references",
+    "canonicalEan": "EAN (canonical reference)",
+    "canonicalEanHelp": "Barcode for the main reference. Each alias can have its own.",
+    "help": "Other references for the same model (market, short form, shop prefix or typo). Each one can have its own EAN.",
+    "empty": "No alternative references.",
+    "add": "Add alias",
+    "remove": "Remove",
+    "reference": "Alternative reference",
+    "type": "Type",
+    "market": "Market",
+    "brandLabel": "Brand in that market",
+    "ean": "EAN",
+    "source": "Source",
+    "sourceUrl": "Source URL",
+    "types": {
+      "market": "Market (S/X)",
+      "short": "Short form",
+      "shop_prefix": "Shop prefix",
+      "legacy_typo": "Typo / legacy"
+    }
   },
   "techSpecs": {
     "title": "Technical information",

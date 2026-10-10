@@ -484,6 +484,11 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             <CardContent>
               <dl className="space-y-0 divide-y divide-border">
                 <DetailRow label={t('detail.fieldReference')} value={item.reference} mono />
+                <DetailRow
+                  label={t('detail.fieldEan')}
+                  value={item.ean != null && String(item.ean).trim() !== '' ? String(item.ean).trim() : '—'}
+                  mono
+                />
                 <DetailRow label={t('detail.fieldBrand')} value={item.manufacturer} />
                 <DetailRow label={t('detail.fieldName')} value={item.model_name} />
                 <DetailRow label={t('detail.fieldType')} value={item.vehicle_type ? t(`values.vehicleTypes.${item.vehicle_type}`, { defaultValue: item.vehicle_type }) : '—'} />
@@ -518,6 +523,41 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             </CardContent>
           </Card>
         </div>
+
+        {Array.isArray(item.aliases) && item.aliases.length > 0 ? (
+          <Card>
+            <CardHeader className="pb-2">
+              <h2 className="text-xl font-semibold leading-none tracking-tight">{t('detail.aliasesTitle')}</h2>
+            </CardHeader>
+            <CardContent>
+              <ul className="divide-y divide-border">
+                {item.aliases.map((alias) => (
+                  <li key={alias.id || alias.alias_reference} className="py-3 first:pt-0">
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="font-mono text-sm font-medium">{alias.alias_reference}</span>
+                      {alias.market ? (
+                        <span className="text-xs text-muted-foreground">
+                          {t('detail.aliasMarket')}: {alias.market}
+                        </span>
+                      ) : null}
+                      {alias.ean ? (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {t('detail.aliasEan')}: {alias.ean}
+                        </span>
+                      ) : null}
+                      {alias.brand_label ? (
+                        <span className="text-xs text-muted-foreground">{alias.brand_label}</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t(`aliases.types.${alias.alias_type}`, { defaultValue: alias.alias_type })}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <CatalogTechSpecsSection item={item} />
 

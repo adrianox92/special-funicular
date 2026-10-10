@@ -15,7 +15,7 @@
   "list": {
     "heading": "Referenzkatalog",
     "lead": "Katalogisierte Slotcars: Referenz, Marke, Typ und Erscheinungsjahr.",
-    "searchPlaceholder": "Suche nach Referenz, Modell oder Marke…",
+    "searchPlaceholder": "Suche nach Referenz, Alias, EAN, Modell oder Marke…",
     "clearSearch": "Suche löschen",
     "brand": "Marke",
     "allBrands": "Alle Marken",
@@ -66,6 +66,10 @@
     "noImage": "Kein Katalogbild",
     "specsTitle": "Technische Daten",
     "fieldReference": "Referenz",
+    "fieldEan": "EAN",
+    "aliasesTitle": "Alternative Referenzen",
+    "aliasMarket": "Markt",
+    "aliasEan": "EAN",
     "fieldBrand": "Marke",
     "fieldName": "Name / Modell",
     "fieldType": "Typ",
@@ -115,6 +119,28 @@
     "addToGarage": "Zur Garage hinzufügen",
     "addToGarageHint": "Öffnet das Formular für ein neues Fahrzeug mit dieser Referenz.",
     "legacyValue": "{{value}} (bisheriger Wert)"
+  },
+  "aliases": {
+    "tab": "Alternative Referenzen",
+    "canonicalEan": "EAN (kanonische Referenz)",
+    "canonicalEanHelp": "Strichcode der Haupt-Referenz. Jeder Alias kann einen eigenen haben.",
+    "help": "Weitere Referenzen desselben Modells (Markt, Kurzform, Shop-Präfix oder Tippfehler). Jede kann eine eigene EAN haben.",
+    "empty": "Keine alternativen Referenzen.",
+    "add": "Alias hinzufügen",
+    "remove": "Entfernen",
+    "reference": "Alternative Referenz",
+    "type": "Typ",
+    "market": "Markt",
+    "brandLabel": "Marke in diesem Markt",
+    "ean": "EAN",
+    "source": "Quelle",
+    "sourceUrl": "Quellen-URL",
+    "types": {
+      "market": "Markt (S/X)",
+      "short": "Kurzform",
+      "shop_prefix": "Shop-Präfix",
+      "legacy_typo": "Tippfehler / Alt"
+    }
   },
   "techSpecs": {
     "title": "Technische Informationen",
