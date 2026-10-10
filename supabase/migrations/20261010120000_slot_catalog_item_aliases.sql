@@ -452,8 +452,8 @@ AS $$
     SELECT
       x.ref_norm,
       count(*)::int AS catalog_item_count,
-      min(x.id) AS catalog_item_id_min,
-      min(x.manufacturer_id) AS catalog_manufacturer_id_min,
+      (array_agg(x.id ORDER BY x.id::text))[1] AS catalog_item_id_min,
+      (array_agg(x.manufacturer_id ORDER BY x.id::text))[1] AS catalog_manufacturer_id_min,
       min(x.reference_sample)::text AS catalog_reference_sample,
       min(x.manufacturer_name)::text AS catalog_manufacturer_name_sample
     FROM (
