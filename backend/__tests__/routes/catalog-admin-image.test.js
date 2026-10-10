@@ -82,6 +82,25 @@ function createRatingsBuilder(row) {
   };
 }
 
+function createAliasesBuilder(rows = []) {
+  const builder = {
+    select: jest.fn(() => builder),
+    eq: jest.fn(() => builder),
+    in: jest.fn(() => builder),
+    or: jest.fn(() => builder),
+    order: jest.fn(() => builder),
+    limit: jest.fn(() => builder),
+    delete: jest.fn(() => builder),
+    insert: jest.fn(() => builder),
+    update: jest.fn(() => builder),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    then(onFulfilled, onRejected) {
+      return Promise.resolve({ data: rows, error: null }).then(onFulfilled, onRejected);
+    },
+  };
+  return builder;
+}
+
 describe('admin catalog item image', () => {
   const previousAdmins = process.env.LICENSE_ADMIN_EMAILS;
   let itemsBuilder;
@@ -99,6 +118,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
     removeCatalogObjectByPublicUrl.mockResolvedValue({ error: null });
@@ -136,6 +156,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -161,6 +182,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -184,6 +206,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -223,6 +246,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -256,6 +280,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -281,6 +306,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 

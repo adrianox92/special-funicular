@@ -10,9 +10,14 @@ const router = express.Router();
 const supabase = getAnonClient();
 
 const { CATALOG_TECH_SPEC_SELECT } = require('../lib/catalogTechSpecs');
+const {
+  attachAliasesToCatalogItems,
+  findCatalogItemIdsByAliasOrEan,
+  catalogSearchOrClause,
+} = require('../lib/catalogAliases');
 
 const PUBLIC_LIST_SELECT =
-  'id, reference, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count';
+  'id, reference, ean, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count';
 
 const PUBLIC_SELECT = PUBLIC_LIST_SELECT;
 
@@ -119,7 +124,7 @@ router.get('/brands', async (req, res) => {
  *   year               — año exacto (legacy)
  *
  * Filtros extra (query string):
- *   q                  — búsqueda libre (reference, model_name, manufacturer)
+ *   q                  — búsqueda libre (reference, alias, ean, model_name, manufacturer)
  *   motor_position     — posición de motor exacta
  *   discontinued       — "true" | "false"
  *   upcoming_release   — "true" | "false"
@@ -152,6 +157,10 @@ router.get('/items', async (req, res) => {
     const yearTo   = req.query.year_to   != null && req.query.year_to   !== ''
       ? parseInt(String(req.query.year_to),   10) : null;
     const sort = String(req.query.sort ?? 'manufacturer').trim();
+
+    const aliasIds = q
+      ? await findCatalogItemIdsByAliasOrEan(supabase, q, { limit: 80 })
+      : [];
 
     let resolvedManufacturerId = null;
 
@@ -197,10 +206,7 @@ router.get('/items', async (req, res) => {
       }
 
       if (q) {
-        const escaped = escapeIlikePattern(q);
-        q_builder = q_builder.or(
-          `reference.ilike.%${escaped}%,model_name.ilike.%${escaped}%,manufacturer.ilike.%${escaped}%`,
-        );
+        q_builder = q_builder.or(catalogSearchOrClause(q, aliasIds));
       }
 
       if (motorPosition) {
@@ -299,7 +305,8 @@ router.get('/items/:id', async (req, res) => {
       console.warn('[publicCatalog] neighbors', neighborErr.message);
     }
 
-    res.json({ ...data, registered_user_count, neighbors });
+    const withAliases = await attachAliasesToCatalogItems(supabase, data);
+    res.json({ ...withAliases, registered_user_count, neighbors });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

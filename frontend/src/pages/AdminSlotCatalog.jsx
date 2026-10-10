@@ -66,15 +66,19 @@ import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
 import CatalogTechSpecsFields from '../components/CatalogTechSpecsFields';
+import CatalogAliasesFields from '../components/CatalogAliasesFields';
 import {
   appendTechSpecsToFormData,
   emptyTechSpecForm,
   techSpecFormFromRow,
   validateTechSpecForm,
 } from '../data/catalogTechSpecs';
+import { aliasesFormFromItem, aliasesPayloadFromForm } from '../data/catalogAliases';
 
 const emptyItem = {
   reference: '',
+  ean: '',
+  aliases: [],
   manufacturer_id: '',
   model_name: '',
   vehicle_type: '',
@@ -710,6 +714,8 @@ function AdminSlotCatalog() {
     setEditingId(row.id);
     setForm({
       reference: row.reference ?? '',
+      ean: row.ean ?? '',
+      aliases: aliasesFormFromItem(row),
       manufacturer_id: row.manufacturer_id ?? '',
       model_name: row.model_name ?? '',
       vehicle_type: row.vehicle_type ?? '',
@@ -745,6 +751,8 @@ function AdminSlotCatalog() {
     setEditingId(null);
     setForm({
       reference: '',
+      ean: '',
+      aliases: [],
       manufacturer_id: row.manufacturer_id ?? '',
       model_name: row.model_name ?? '',
       vehicle_type: row.vehicle_type ?? '',
@@ -789,6 +797,8 @@ function AdminSlotCatalog() {
     try {
       const fd = new FormData();
       fd.append('reference', form.reference);
+      fd.append('ean', form.ean ?? '');
+      fd.append('aliases', JSON.stringify(aliasesPayloadFromForm(form.aliases)));
       fd.append('manufacturer_id', form.manufacturer_id);
       fd.append('model_name', form.model_name);
       if (form.vehicle_type) fd.append('vehicle_type', form.vehicle_type);
@@ -2048,9 +2058,10 @@ function AdminSlotCatalog() {
               onValueChange={setFormTab}
               options={[
                 { value: 'general', label: t('techSpecs.tabGeneral') },
+                { value: 'aliases', label: t('aliases.tab') },
                 { value: 'tech', label: t('techSpecs.tab') },
               ]}
-              listClassName="sm:grid-cols-2"
+              listClassName="sm:grid-cols-3"
               listAriaLabel={t('techSpecs.tabNavAria')}
               selectId="catalog-item-form-tab"
               mobileLabel={t('techSpecs.tabNavAria')}
@@ -2060,6 +2071,18 @@ function AdminSlotCatalog() {
             <div className="space-y-2">
               <Label>Referencia</Label>
               <Input name="reference" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="catalog-item-ean">{t('aliases.canonicalEan')}</Label>
+              <Input
+                id="catalog-item-ean"
+                name="ean"
+                className="font-mono"
+                inputMode="numeric"
+                value={form.ean}
+                onChange={(e) => setForm((f) => ({ ...f, ean: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">{t('aliases.canonicalEanHelp')}</p>
             </div>
             <CatalogBrandSelect
               label="Marca"
@@ -2253,6 +2276,18 @@ function AdminSlotCatalog() {
               )}
             </div>
           </div>
+            </TabsContent>
+            <TabsContent value="aliases" className="mt-2 focus-visible:outline-none">
+              <CatalogAliasesFields
+                aliases={form.aliases}
+                setAliases={(next) => {
+                  if (typeof next === 'function') {
+                    setForm((f) => ({ ...f, aliases: next(f.aliases || []) }));
+                  } else {
+                    setForm((f) => ({ ...f, aliases: next }));
+                  }
+                }}
+              />
             </TabsContent>
             <TabsContent value="tech" className="mt-2 focus-visible:outline-none">
               <CatalogTechSpecsFields form={form} setForm={setForm} />
