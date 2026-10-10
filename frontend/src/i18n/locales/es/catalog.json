@@ -15,7 +15,7 @@
   "list": {
     "heading": "Catálogo de referencias",
     "lead": "Modelos de slot catalogados: referencia, marca, tipo y año de comercialización.",
-    "searchPlaceholder": "Buscar por referencia, modelo o marca…",
+    "searchPlaceholder": "Buscar por referencia, alias, EAN, modelo o marca…",
     "clearSearch": "Limpiar búsqueda",
     "brand": "Marca",
     "allBrands": "Todas las marcas",
@@ -66,6 +66,10 @@
     "noImage": "Sin imagen en catálogo",
     "specsTitle": "Detalles técnicos",
     "fieldReference": "Referencia",
+    "fieldEan": "EAN",
+    "aliasesTitle": "Referencias alternativas",
+    "aliasMarket": "Mercado",
+    "aliasEan": "EAN",
     "fieldBrand": "Marca",
     "fieldName": "Nombre / modelo",
     "fieldType": "Tipo",
@@ -115,6 +119,28 @@
     "addToGarage": "Añadir a mi garaje",
     "addToGarageHint": "Se abrirá el alta de vehículo con esta referencia ya rellenada.",
     "legacyValue": "{{value}} (valor anterior)"
+  },
+  "aliases": {
+    "tab": "Referencias alternativas",
+    "canonicalEan": "EAN (referencia canónica)",
+    "canonicalEanHelp": "Código de barras de la referencia principal. Cada alias puede tener el suyo.",
+    "help": "Otras referencias del mismo modelo (mercado, forma corta, prefijo de tienda o typo). Cada una puede tener su EAN.",
+    "empty": "Sin referencias alternativas.",
+    "add": "Añadir alias",
+    "remove": "Quitar",
+    "reference": "Referencia alternativa",
+    "type": "Tipo",
+    "market": "Mercado",
+    "brandLabel": "Marca en ese mercado",
+    "ean": "EAN",
+    "source": "Fuente",
+    "sourceUrl": "URL de la fuente",
+    "types": {
+      "market": "Mercado (S/X)",
+      "short": "Forma corta",
+      "shop_prefix": "Prefijo de tienda",
+      "legacy_typo": "Typo / legado"
+    }
   },
   "techSpecs": {
     "title": "Información técnica",

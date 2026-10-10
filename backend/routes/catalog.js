@@ -24,6 +24,19 @@ const {
   applyCatalogItemsMissingFilter,
 } = require('../lib/catalogCompleteness');
 const { parseCatalogTechSpecsFromBody } = require('../lib/catalogTechSpecs');
+const {
+  parseEanFromBody,
+  parseAliasesFromBody,
+  parseImportAliases,
+  attachAliasesToCatalogItems,
+  findCatalogItemIdsByAliasOrEan,
+  catalogReferenceOrClause,
+  replaceCatalogItemAliases,
+  upsertCatalogItemAliases,
+  mapAliasWriteError,
+  findCatalogItemIdByReferenceOrAlias,
+  normalizeEan,
+} = require('../lib/catalogAliases');
 
 const router = express.Router();
 
@@ -685,19 +698,33 @@ router.get('/search', async (req, res) => {
     }
     const pattern = `%${escapeIlikePattern(q)}%`;
     const sel =
-      'id, reference, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url';
-    const [r1, r2, r3, r4] = await Promise.all([
+      'id, reference, ean, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url';
+    const aliasIds = await findCatalogItemIdsByAliasOrEan(req.supabase, q, { limit: 20 });
+    const [r1, r2, r3, r4, r5, r6] = await Promise.all([
       req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('reference', pattern).limit(20),
       req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('manufacturer', pattern).limit(20),
       req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('model_name', pattern).limit(20),
       req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('vehicle_type', pattern).limit(20),
+      req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('ean', pattern).limit(20),
+      aliasIds.length
+        ? req.supabase.from('slot_catalog_items_with_ratings').select(sel).in('id', aliasIds).limit(20)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (r1.error) return res.status(500).json({ error: r1.error.message });
     if (r2.error) return res.status(500).json({ error: r2.error.message });
     if (r3.error) return res.status(500).json({ error: r3.error.message });
     if (r4.error) return res.status(500).json({ error: r4.error.message });
+    if (r5.error) return res.status(500).json({ error: r5.error.message });
+    if (r6.error) return res.status(500).json({ error: r6.error.message });
     const byId = new Map();
-    for (const row of [...(r1.data || []), ...(r2.data || []), ...(r3.data || []), ...(r4.data || [])]) {
+    for (const row of [
+      ...(r1.data || []),
+      ...(r2.data || []),
+      ...(r3.data || []),
+      ...(r4.data || []),
+      ...(r5.data || []),
+      ...(r6.data || []),
+    ]) {
       byId.set(row.id, row);
     }
     const items = Array.from(byId.values()).slice(0, 20);
@@ -860,14 +887,19 @@ router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
     const mfgFilter = String(req.query.manufacturer ?? '').trim();
     /** Hueco de datos: campo concreto o `weighted` (falta algún campo ponderado). */
     const missing = String(req.query.missing ?? '').trim().toLowerCase();
+    const aliasIds = refFilter
+      ? await findCatalogItemIdsByAliasOrEan(req.supabase, refFilter, {
+          limit: 80,
+          manufacturerId: manufacturerId && isUuid(manufacturerId) ? manufacturerId : undefined,
+        })
+      : [];
 
     const buildCatalogItemsQuery = (opts = {}) => {
       const selectOpts =
         opts.head === true ? { count: 'exact', head: true } : { count: 'exact' };
       let q = req.supabase.from('slot_catalog_items_with_ratings').select('*', selectOpts);
       if (refFilter) {
-        const p = `%${escapeIlikePattern(refFilter)}%`;
-        q = q.ilike('reference', p);
+        q = q.or(catalogReferenceOrClause(refFilter, aliasIds));
       }
       if (manufacturerId && isUuid(manufacturerId)) {
         q = q.eq('manufacturer_id', manufacturerId);
@@ -886,8 +918,9 @@ router.get('/items', adminGuard, adminCatalogServiceDb, async (req, res) => {
       page,
       limit,
     });
+    const items = await attachAliasesToCatalogItems(req.supabase, data || []);
     res.json({
-      items: data,
+      items,
       total: count,
       page,
       limit,
@@ -907,7 +940,7 @@ router.get('/items/:id', adminGuard, adminCatalogServiceDb, async (req, res) => 
     const { data, error } = await req.supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Ítem no encontrado' });
-    res.json(data);
+    res.json(await attachAliasesToCatalogItems(req.supabase, data));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -942,6 +975,16 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
     if (!racePhotosParsed.ok) return res.status(400).json({ error: racePhotosParsed.error });
     const techSpecsParsed = parseCatalogTechSpecsFromBody(req.body, null);
     if (!techSpecsParsed.ok) return res.status(400).json({ error: techSpecsParsed.error });
+    const eanParsed = parseEanFromBody(req.body.ean);
+    if (eanParsed.ok === false) return res.status(400).json({ error: eanParsed.error });
+    const aliasesParsed = parseAliasesFromBody(req.body);
+    if (!aliasesParsed.ok) return res.status(400).json({ error: aliasesParsed.error });
+    if (
+      aliasesParsed.provided &&
+      aliasesParsed.aliases.some((a) => a.alias_reference === reference)
+    ) {
+      return res.status(400).json({ error: 'Un alias no puede coincidir con la referencia canónica' });
+    }
 
     if (!reference || !manufacturer_id || !model_name) {
       return res.status(400).json({
@@ -978,6 +1021,7 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
           real_race_results_url: raceResultsParsed.value,
           real_race_photos_url: racePhotosParsed.value,
           ...techSpecsParsed.specs,
+          ean: eanParsed.provided ? eanParsed.value : null,
           image_url,
           updated_at: new Date().toISOString(),
         },
@@ -991,12 +1035,17 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
       }
       return res.status(500).json({ error: error.message });
     }
+    if (aliasesParsed.provided) {
+      const aliasWrite = await replaceCatalogItemAliases(req.supabase, insRow.id, aliasesParsed.aliases);
+      const mapped = mapAliasWriteError(aliasWrite.error);
+      if (mapped) return res.status(mapped.status).json({ error: mapped.error });
+    }
     const { data: full } = await req.supabase
       .from('slot_catalog_items_with_ratings')
       .select('*')
       .eq('id', insRow.id)
       .maybeSingle();
-    res.status(201).json(full || insRow);
+    res.status(201).json(await attachAliasesToCatalogItems(req.supabase, full || insRow));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1063,6 +1112,20 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
     }
     const techSpecsParsed = parseCatalogTechSpecsFromBody(req.body, existing);
     if (!techSpecsParsed.ok) return res.status(400).json({ error: techSpecsParsed.error });
+    let ean = existing.ean ?? null;
+    if (req.body.ean !== undefined) {
+      const eanParsed = parseEanFromBody(req.body.ean);
+      if (eanParsed.ok === false) return res.status(400).json({ error: eanParsed.error });
+      ean = eanParsed.value;
+    }
+    const aliasesParsed = parseAliasesFromBody(req.body);
+    if (!aliasesParsed.ok) return res.status(400).json({ error: aliasesParsed.error });
+    if (
+      aliasesParsed.provided &&
+      aliasesParsed.aliases.some((a) => a.alias_reference === reference)
+    ) {
+      return res.status(400).json({ error: 'Un alias no puede coincidir con la referencia canónica' });
+    }
 
     let image_url = existing.image_url;
     const clearImage = parseBodyBool(req.body.clear_image);
@@ -1107,6 +1170,7 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
         real_race_results_url,
         real_race_photos_url,
         ...techSpecsParsed.specs,
+        ean,
         image_url,
         updated_at: new Date().toISOString(),
       })
@@ -1118,8 +1182,13 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
       }
       return res.status(500).json({ error: error.message });
     }
+    if (aliasesParsed.provided) {
+      const aliasWrite = await replaceCatalogItemAliases(req.supabase, id, aliasesParsed.aliases);
+      const mapped = mapAliasWriteError(aliasWrite.error);
+      if (mapped) return res.status(mapped.status).json({ error: mapped.error });
+    }
     const { data: full } = await req.supabase.from('slot_catalog_items_with_ratings').select('*').eq('id', id).maybeSingle();
-    res.json(full);
+    res.json(await attachAliasesToCatalogItems(req.supabase, full));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1156,7 +1225,7 @@ router.delete('/items/:id/image', adminGuard, adminCatalogServiceDb, async (req,
       .select('*')
       .eq('id', id)
       .maybeSingle();
-    res.json(full || { ok: true, image_url: null });
+    res.json((full && (await attachAliasesToCatalogItems(req.supabase, full))) || { ok: true, image_url: null });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1741,6 +1810,20 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
       'tirada_total',
     ]);
     let limited_edition_total = limited_edition ? parseCatalogLimitedEditionTotal(ltRaw) : null;
+    const eanCellRaw = r.ean ?? r.EAN ?? r.barcode ?? r.Barcode ?? r.ean13;
+    const hasEanCell = eanCellRaw != null && String(eanCellRaw).trim() !== '';
+    const eanNorm = hasEanCell ? normalizeEan(eanCellRaw) : null;
+    if (eanNorm && typeof eanNorm === 'object' && eanNorm.invalid) {
+      errors.push({ row: rowNum, message: eanNorm.message });
+      if (onProgress) onProgress(i + 1, total);
+      continue;
+    }
+    const aliasesParsed = parseImportAliases(r);
+    if (!aliasesParsed.ok) {
+      errors.push({ row: rowNum, message: aliasesParsed.error });
+      if (onProgress) onProgress(i + 1, total);
+      continue;
+    }
 
     if (!ref || !manufacturerRaw || !model_name) {
       errors.push({ row: rowNum, message: 'Faltan reference, manufacturer o model_name' });
@@ -1757,12 +1840,8 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
       continue;
     }
 
-    const { data: existing } = await sb
-      .from('slot_catalog_items')
-      .select('id')
-      .eq('reference', ref)
-      .eq('manufacturer_id', manufacturer_id)
-      .maybeSingle();
+    const existingId = await findCatalogItemIdByReferenceOrAlias(sb, ref, manufacturer_id);
+    const existing = existingId ? { id: existingId } : null;
 
     if (existing) {
       if (duplicateMode === 'skip') {
@@ -1789,11 +1868,22 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
           dorsal,
           limited_edition,
           limited_edition_total,
+          ...(hasEanCell ? { ean: eanNorm || null } : {}),
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
       if (upErr) errors.push({ row: rowNum, message: upErr.message });
-      else updated.push(ref);
+      else {
+        if (aliasesParsed.aliases.length) {
+          const aliasWrite = await upsertCatalogItemAliases(sb, existing.id, aliasesParsed.aliases);
+          if (aliasWrite.error) {
+            errors.push({ row: rowNum, message: aliasWrite.error.message });
+            if (onProgress) onProgress(i + 1, total);
+            continue;
+          }
+        }
+        updated.push(ref);
+      }
       if (onProgress) onProgress(i + 1, total);
       continue;
     }
@@ -1814,6 +1904,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
           dorsal,
           limited_edition,
           limited_edition_total,
+          ...(hasEanCell ? { ean: eanNorm || null } : {}),
           updated_at: new Date().toISOString(),
         },
       ])
@@ -1823,6 +1914,14 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
     if (insErr) {
       errors.push({ row: rowNum, message: insErr.message });
     } else {
+      if (aliasesParsed.aliases.length) {
+        const aliasWrite = await upsertCatalogItemAliases(sb, ins.id, aliasesParsed.aliases);
+        if (aliasWrite.error) {
+          errors.push({ row: rowNum, message: aliasWrite.error.message });
+          if (onProgress) onProgress(i + 1, total);
+          continue;
+        }
+      }
       inserted.push(ref);
     }
     if (onProgress) onProgress(i + 1, total);

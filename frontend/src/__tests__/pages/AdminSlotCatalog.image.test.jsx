@@ -278,4 +278,31 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
     expect(fd.get('spec_length_mm')).toBe('145');
     expect(fd.get('spec_front_axle_width_mm')).toBe('52');
   });
+
+  it('envía EAN canónico y aliases al guardar', async () => {
+    await openItemsAndEdit();
+
+    await userEvent.type(screen.getByLabelText('aliases.canonicalEan'), '8436572913332');
+    const aliasTabs = screen.getAllByRole('tab', { name: 'aliases.tab' });
+    await userEvent.click(aliasTabs[0]);
+    await userEvent.click(screen.getByRole('button', { name: 'aliases.add' }));
+    await userEvent.type(screen.getByLabelText('aliases.reference'), 'A10068X300');
+    await userEvent.type(screen.getByLabelText('aliases.ean'), '8436572913349');
+    await userEvent.type(screen.getByLabelText('aliases.market'), 'INT');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalled();
+    });
+    const [, fd] = api.put.mock.calls[0];
+    expect(fd.get('ean')).toBe('8436572913332');
+    expect(JSON.parse(fd.get('aliases'))).toEqual([
+      expect.objectContaining({
+        alias_reference: 'A10068X300',
+        alias_type: 'market',
+        ean: '8436572913349',
+        market: 'INT',
+      }),
+    ]);
+  });
 });
