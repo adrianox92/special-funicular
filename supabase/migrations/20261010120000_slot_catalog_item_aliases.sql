@@ -180,18 +180,14 @@ CREATE POLICY slot_catalog_item_aliases_select
   TO anon, authenticated
   USING (true);
 
--- Escritura alineada con GRANT de slot_catalog_items (authenticated).
--- service_role bypasea RLS (API admin / import).
+-- Escritura solo via service_role (API admin / import), igual que el acceso
+-- efectivo a slot_catalog_items desde la API. RLS bloquea writes de JWT;
+-- service_role bypasea RLS.
 DROP POLICY IF EXISTS slot_catalog_item_aliases_write ON public.slot_catalog_item_aliases;
-CREATE POLICY slot_catalog_item_aliases_write
-  ON public.slot_catalog_item_aliases
-  FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
 
 GRANT SELECT ON public.slot_catalog_item_aliases TO anon, authenticated, service_role;
-GRANT INSERT, UPDATE, DELETE ON public.slot_catalog_item_aliases TO authenticated, service_role;
+REVOKE INSERT, UPDATE, DELETE ON public.slot_catalog_item_aliases FROM authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.slot_catalog_item_aliases TO service_role;
 
 DROP VIEW IF EXISTS public.slot_catalog_items_with_ratings CASCADE;
 
@@ -225,17 +221,20 @@ SELECT
   i.spec_wheelbase_mm,
   i.spec_front_track_mm,
   i.spec_rear_track_mm,
-  i.spec_front_axle_width_mm,
-  i.spec_rear_axle_width_mm,
+  i.spec_front_axle_length_mm,
+  i.spec_rear_axle_length_mm,
   i.spec_weight_g,
   i.spec_magnet,
   i.spec_motor,
   i.spec_pinion_gear,
   i.spec_front_wheels,
   i.spec_rear_wheels,
-  i.spec_front_tyres,
-  i.spec_rear_tyres,
-  i.spec_lights,
+  i.spec_front_rim,
+  i.spec_rear_rim,
+  i.spec_front_rim_diameter_mm,
+  i.spec_rear_rim_diameter_mm,
+  i.spec_front_lights,
+  i.spec_rear_lights,
   i.image_url,
   i.created_at,
   i.updated_at,
@@ -453,8 +452,8 @@ AS $$
     SELECT
       x.ref_norm,
       count(*)::int AS catalog_item_count,
-      min(x.id) AS catalog_item_id_min,
-      min(x.manufacturer_id) AS catalog_manufacturer_id_min,
+      (array_agg(x.id ORDER BY x.id::text))[1] AS catalog_item_id_min,
+      (array_agg(x.manufacturer_id ORDER BY x.id::text))[1] AS catalog_manufacturer_id_min,
       min(x.reference_sample)::text AS catalog_reference_sample,
       min(x.manufacturer_name)::text AS catalog_manufacturer_name_sample
     FROM (
