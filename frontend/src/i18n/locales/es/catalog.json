@@ -159,11 +159,11 @@
       "system": "Sistema",
       "lengthMm": "Longitud (mm)",
       "heightMm": "Altura (mm)",
-      "wheelbaseMm": "Batalla (mm)",
+      "wheelbaseMm": "Distancia entre ejes (mm)",
       "frontTrackMm": "Vía delantera (mm)",
       "rearTrackMm": "Vía trasera (mm)",
-      "frontAxleWidthMm": "Ancho de ejes delantero (mm)",
-      "rearAxleWidthMm": "Ancho de ejes trasero (mm)",
+      "frontAxleLengthMm": "Eje delantero (mm)",
+      "rearAxleLengthMm": "Eje trasero (mm)",
       "weightG": "Peso (g)",
       "magnet": "Imán",
       "motor": "Motor",
@@ -172,9 +172,21 @@
       "pinionGear": "Piñón / corona",
       "frontWheels": "Ruedas delanteras",
       "rearWheels": "Ruedas traseras",
-      "frontTyres": "Neumáticos delanteros",
-      "rearTyres": "Neumáticos traseros",
-      "lights": "Luces"
+      "frontRim": "Llanta delantera",
+      "rearRim": "Llanta trasera",
+      "frontRimDiameterMm": "Diámetro llanta delantera (mm)",
+      "rearRimDiameterMm": "Diámetro llanta trasera (mm)",
+      "frontLights": "Luces delanteras",
+      "rearLights": "Luces traseras"
+    },
+    "systemValues": {
+      "analog": "Analógico",
+      "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Plástico",
+      "aluminum": "Aluminio",
+      "magnesium": "Magnesio"
     }
   },
   "guest": {

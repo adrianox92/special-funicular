@@ -139,6 +139,7 @@
     "cards": {
       "identification": "Identifikation",
       "technicalData": "Technische Daten",
+      "datasheet": "Fahrzeugdatenblatt",
       "competition": "Wettbewerb und limitierte Auflage",
       "purchase": "Kauf und Preise",
       "condition": "Zustand des Exemplars",
@@ -173,6 +174,7 @@
       "addModification": "Modifikation hinzufügen",
       "editSpec": "Technische Spezifikation bearbeiten",
       "addSpec": "Technische Spezifikation hinzufügen",
+      "datasheetHelp": "Datenblattmaße dieses Fahrzeugs. Motor, Ritzel und Räder werden unten als montierte Komponenten verwaltet (hier nicht doppelt). Felgenmaterial und -durchmesser bleiben im Datenblatt; konkrete Felgen (Marke, Bestand) werden als Komponenten hinzugefügt.",
       "fromInventory": "Aus Inventar",
       "usingInventory": "Inventareintrag «{{name}}» wird verwendet. Typ, Name, Referenz, Link und Preis stammen vom Eintrag. Beim Speichern werden {{count}} {{unit}} vom Bestand abgezogen (max. {{max}}).",
       "usingInventoryNoDeduct": "Inventareintrag «{{name}}» wird verwendet. Typ, Name, Referenz, Link und Preis stammen vom Eintrag. Beim Speichern werden {{count}} {{unit}} vom Bestand abgezogen (max. {{max}}).",
@@ -352,6 +354,7 @@
     "catalogSearching": "Suche…",
     "catalogNoResults": "Keine Ergebnisse",
     "catalogSelectedHint": "Katalogeintrag ausgewählt. Du kannst die Felder unten vor dem Speichern anpassen.",
+    "techSpecsTitle": "Technische Spezifikationen",
     "requiredFieldsError": "Bitte fülle folgende Pflichtfelder aus: {{fields}}",
     "invalidPriceError": "Ungültiger Preis. Feld leer lassen oder Zahl eingeben.",
     "createError": "Fahrzeug konnte nicht erstellt werden",

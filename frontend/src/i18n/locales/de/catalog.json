@@ -162,8 +162,8 @@
       "wheelbaseMm": "Radstand (mm)",
       "frontTrackMm": "Spurweite vorn (mm)",
       "rearTrackMm": "Spurweite hinten (mm)",
-      "frontAxleWidthMm": "Achsbreite vorn (mm)",
-      "rearAxleWidthMm": "Achsbreite hinten (mm)",
+      "frontAxleLengthMm": "Vorderachse (mm)",
+      "rearAxleLengthMm": "Hinterachse (mm)",
       "weightG": "Gewicht (g)",
       "magnet": "Magnet",
       "motor": "Motor",
@@ -172,9 +172,21 @@
       "pinionGear": "Ritzel / Zahnrad",
       "frontWheels": "Vorderräder",
       "rearWheels": "Hinterräder",
-      "frontTyres": "Vorderreifen",
-      "rearTyres": "Hinterreifen",
-      "lights": "Beleuchtung"
+      "frontRim": "Felge vorn",
+      "rearRim": "Felge hinten",
+      "frontRimDiameterMm": "Felgendurchmesser vorn (mm)",
+      "rearRimDiameterMm": "Felgendurchmesser hinten (mm)",
+      "frontLights": "Frontbeleuchtung",
+      "rearLights": "Heckbeleuchtung"
+    },
+    "systemValues": {
+      "analog": "Analog",
+      "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Kunststoff",
+      "aluminum": "Aluminium",
+      "magnesium": "Magnesium"
     }
   },
   "guest": {

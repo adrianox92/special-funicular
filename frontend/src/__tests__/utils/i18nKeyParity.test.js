@@ -50,6 +50,32 @@ describe('i18n key parity es/en/de', () => {
   test('legal', () => expectSameKeys(esLegal, enLegal, deLegal));
   test('slotRaceManager', () => expectSameKeys(esSrm, enSrm, deSrm));
   test('catalog', () => expectSameKeys(esCatalog, enCatalog, deCatalog));
+
+  test('catalog tech spec labels: distancia entre ejes y eje delantero/trasero', () => {
+    expect(esCatalog.techSpecs.fields.wheelbaseMm).toBe('Distancia entre ejes (mm)');
+    expect(enCatalog.techSpecs.fields.wheelbaseMm).toBe('Wheelbase (mm)');
+    expect(deCatalog.techSpecs.fields.wheelbaseMm).toBe('Radstand (mm)');
+    expect(esCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Eje delantero (mm)');
+    expect(esCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Eje trasero (mm)');
+    expect(enCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Front axle (mm)');
+    expect(enCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Rear axle (mm)');
+    expect(deCatalog.techSpecs.fields.frontAxleLengthMm).toBe('Vorderachse (mm)');
+    expect(deCatalog.techSpecs.fields.rearAxleLengthMm).toBe('Hinterachse (mm)');
+    const axleLabels = [
+      esCatalog.techSpecs.fields.frontAxleLengthMm,
+      esCatalog.techSpecs.fields.rearAxleLengthMm,
+      enCatalog.techSpecs.fields.frontAxleLengthMm,
+      deCatalog.techSpecs.fields.frontAxleLengthMm,
+    ].join(' ');
+    expect(axleLabels.toLowerCase()).not.toMatch(/vía|via |track|achslänge|axle length|longitud de eje/);
+    const fieldsJson = JSON.stringify({
+      es: esCatalog.techSpecs.fields,
+      en: enCatalog.techSpecs.fields,
+      de: deCatalog.techSpecs.fields,
+    });
+    expect(fieldsJson).not.toMatch(/batalla/i);
+    expect(fieldsJson).not.toMatch(/axleWidth|axle_width|Ancho de eje/i);
+  });
   test('inventory', () => expectSameKeys(esInventory, enInventory, deInventory));
   test('seller', () => expectSameKeys(esSeller, enSeller, deSeller));
   test('help', () => expectSameKeys(esHelp, enHelp, deHelp));

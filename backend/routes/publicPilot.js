@@ -4,6 +4,7 @@ const { normalizePilotSlug } = require('../lib/pilotProfileUtils');
 const { calculatePoints } = require('../lib/pointsCalculator');
 const { fetchVehicleImagesForVehicleIds } = require('../lib/fetchVehicleImagesForVehicleIds');
 const { resolvePublicVehicleCardImage } = require('../lib/publicVehicleCardImage');
+const { CATALOG_TECH_SPEC_SELECT } = require('../lib/catalogTechSpecs');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -143,7 +144,7 @@ router.get('/:slug', async (req, res) => {
 
     const { data: vehicles, error: vErr } = await supabase
       .from('vehicles')
-      .select('id, model, manufacturer, type, catalog_item_id')
+      .select(`id, model, manufacturer, type, catalog_item_id, ${CATALOG_TECH_SPEC_SELECT}`)
       .eq('user_id', userId)
       .order('model', { ascending: true });
 
@@ -178,16 +179,16 @@ router.get('/:slug', async (req, res) => {
       }
     }
 
-    const vehiclesOut = (vehicles || []).map((v) => ({
-      id: v.id,
-      model: v.model,
-      manufacturer: v.manufacturer,
-      type: v.type,
-      image: resolvePublicVehicleCardImage({
-        vehicleImages: imagesByVehicle.get(v.id) || [],
-        catalogImageUrl: catalogImageById.get(v.catalog_item_id) || null,
-      }),
-    }));
+    const vehiclesOut = (vehicles || []).map((v) => {
+      const { catalog_item_id: _omitCatalogId, ...publicVehicle } = v;
+      return {
+        ...publicVehicle,
+        image: resolvePublicVehicleCardImage({
+          vehicleImages: imagesByVehicle.get(v.id) || [],
+          catalogImageUrl: catalogImageById.get(v.catalog_item_id) || null,
+        }),
+      };
+    });
 
     /** @type {Map<string, any>} */
     const bestByCircuit = new Map();

@@ -35,6 +35,10 @@ const { applyVehicleListFilters } = require('../lib/vehicleListFilters');
 const { fetchDistinctVehicleManufacturers } = require('../lib/vehicleManufacturers');
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
+const {
+  CATALOG_TECH_SPEC_SELECT,
+  parseVehicleTechSpecsFromBody,
+} = require('../lib/catalogTechSpecs');
 const { resolveBaselineTimings, sortTimingsByBestLap } = require('../lib/syncTimingsQuery');
 const { bestLapSecondsFromTimingRow } = require('../lib/personalBest');
 const { formatSecondsToLapTime } = require('../lib/timingUtils');
@@ -166,6 +170,15 @@ async function insertVehicleFromImportValues(supabaseClient, userId, v) {
 
   const { dorsal, limited_edition, limited_edition_unit_number } = mergeVehicleCatalogDefaults(v, catalogRow);
 
+  const techSpecsParsed = parseVehicleTechSpecsFromBody(v, null, catalogRow, {
+    fillFromCatalog: Boolean(catalogRow),
+  });
+  if (!techSpecsParsed.ok) {
+    const err = new Error(techSpecsParsed.error);
+    err.statusCode = 400;
+    throw err;
+  }
+
   const { data, error } = await supabaseClient
     .from('vehicles')
     .insert([
@@ -191,6 +204,7 @@ async function insertVehicleFromImportValues(supabaseClient, userId, v) {
         scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
         commercial_release_year: yearOk ? commercial_release_year_val : null,
         catalog_item_id: catalog_item_id_val,
+        ...techSpecsParsed.specs,
         user_id: userId,
       },
     ])
@@ -255,6 +269,25 @@ async function updateVehicleFromImportValues(supabaseClient, userId, vehicleId, 
 
   const { dorsal, limited_edition, limited_edition_unit_number } = mergeVehicleCatalogDefaults(v, catalogRow);
 
+  const { data: existingForSpecs } = await supabaseClient
+    .from('vehicles')
+    .select(`id, catalog_item_id, ${CATALOG_TECH_SPEC_SELECT}`)
+    .eq('id', vehicleId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const isNewCatalogLink = Boolean(
+    catalog_item_id_val && catalog_item_id_val !== existingForSpecs?.catalog_item_id,
+  );
+  const techSpecsParsed = parseVehicleTechSpecsFromBody(v, existingForSpecs, catalogRow, {
+    fillFromCatalog: isNewCatalogLink,
+  });
+  if (!techSpecsParsed.ok) {
+    const err = new Error(techSpecsParsed.error);
+    err.statusCode = 400;
+    throw err;
+  }
+
   const { data, error } = await supabaseClient
     .from('vehicles')
     .update({
@@ -279,6 +312,7 @@ async function updateVehicleFromImportValues(supabaseClient, userId, vehicleId, 
       scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
       commercial_release_year: yearOk ? commercial_release_year_val : null,
       catalog_item_id: catalog_item_id_val,
+      ...techSpecsParsed.specs,
       updated_at: new Date().toISOString(),
     })
     .eq('id', vehicleId)
@@ -1265,7 +1299,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
     // Verificar que el vehículo pertenece al usuario
     const { data: existingVehicle, error: checkError } = await req.supabase
       .from('vehicles')
-      .select('id, modified, reference, manufacturer, catalog_item_id')
+      .select(`id, modified, reference, manufacturer, catalog_item_id, ${CATALOG_TECH_SPEC_SELECT}`)
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
@@ -1316,7 +1350,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
         const catalog_item_id_explicit = String(rawCat).trim();
         const { data: catOk, error: catErr } = await req.supabase
           .from('slot_catalog_items_with_ratings')
-          .select('id')
+          .select('*')
           .eq('id', catalog_item_id_explicit)
           .maybeSingle();
         if (catErr) return res.status(500).json({ error: catErr.message });
@@ -1329,6 +1363,34 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
       const resolved = await resolveCatalogItemIdFromGarageRef(req.supabase, mergedMfg, mergedRef);
       if (resolved) updateData.catalog_item_id = resolved;
     }
+
+    const nextCatalogId =
+      Object.prototype.hasOwnProperty.call(updateData, 'catalog_item_id')
+        ? updateData.catalog_item_id
+        : existingVehicle.catalog_item_id;
+    const isNewCatalogLink = Boolean(nextCatalogId && nextCatalogId !== existingVehicle.catalog_item_id);
+
+    let catalogRowForSpecs = null;
+    if (isNewCatalogLink) {
+      const { data: cr, error: crErr } = await req.supabase
+        .from('slot_catalog_items_with_ratings')
+        .select('*')
+        .eq('id', nextCatalogId)
+        .maybeSingle();
+      if (crErr) return res.status(500).json({ error: crErr.message });
+      catalogRowForSpecs = cr;
+    }
+
+    const techSpecsParsed = parseVehicleTechSpecsFromBody(
+      req.body,
+      existingVehicle,
+      catalogRowForSpecs,
+      { fillFromCatalog: isNewCatalogLink },
+    );
+    if (!techSpecsParsed.ok) {
+      return res.status(400).json({ error: techSpecsParsed.error });
+    }
+    Object.assign(updateData, techSpecsParsed.specs);
 
     // Actualizar datos del vehículo
     const { data, error } = await req.supabase
@@ -1436,6 +1498,13 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
       catalogRow,
     );
 
+    const techSpecsParsed = parseVehicleTechSpecsFromBody(req.body, null, catalogRow, {
+      fillFromCatalog: Boolean(catalogRow),
+    });
+    if (!techSpecsParsed.ok) {
+      return res.status(400).json({ error: techSpecsParsed.error });
+    }
+
     // Añadir user_id al crear el vehículo
     const { data, error } = await req.supabase
       .from('vehicles')
@@ -1462,6 +1531,7 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
           scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
           commercial_release_year: commercial_release_year_val,
           catalog_item_id: catalog_item_id_val,
+          ...techSpecsParsed.specs,
           user_id: req.user.id,
         },
       ])

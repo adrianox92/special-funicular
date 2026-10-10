@@ -30,6 +30,7 @@ import { publicVehicleImageSrc } from '../utils/publicVehicleImageSrc';
 import { BRAND } from '../utils/documentTitle';
 import { useLocale } from '../hooks/useLocale';
 import { localizePath } from '../i18n/localeUtils';
+import CatalogTechSpecsSection from '../components/CatalogTechSpecsSection';
 
 const ALL_TYPES = '__all__';
 const BRANDS_PREVIEW = 6;
@@ -130,6 +131,7 @@ function PublicVehicleCard({ vehicle, highlight, t }) {
             </span>
           </p>
         ) : null}
+        <CatalogTechSpecsSection item={vehicle} embedded />
       </div>
     </article>
   );

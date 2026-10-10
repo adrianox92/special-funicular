@@ -23,7 +23,7 @@ const {
   aggregateCompletenessByManufacturerId,
   applyCatalogItemsMissingFilter,
 } = require('../lib/catalogCompleteness');
-const { parseCatalogTechSpecsFromBody } = require('../lib/catalogTechSpecs');
+const { parseCatalogTechSpecsFromBody, CATALOG_TECH_SPEC_SELECT } = require('../lib/catalogTechSpecs');
 const {
   parseEanFromBody,
   parseAliasesFromBody,
@@ -698,7 +698,7 @@ router.get('/search', async (req, res) => {
     }
     const pattern = `%${escapeIlikePattern(q)}%`;
     const sel =
-      'id, reference, ean, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url';
+      `id, reference, ean, manufacturer_id, manufacturer, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, ${CATALOG_TECH_SPEC_SELECT}`;
     const aliasIds = await findCatalogItemIdsByAliasOrEan(req.supabase, q, { limit: 20 });
     const [r1, r2, r3, r4, r5, r6] = await Promise.all([
       req.supabase.from('slot_catalog_items_with_ratings').select(sel).ilike('reference', pattern).limit(20),

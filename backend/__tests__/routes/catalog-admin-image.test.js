@@ -327,24 +327,36 @@ describe('admin catalog item image', () => {
       .field('model_name', EXISTING.model_name)
       .field('spec_scale', '1:32')
       .field('spec_color', 'Black')
-      .field('spec_system', 'Analog')
+      .field('spec_system', 'analog')
+      .field('spec_front_lights', 'true')
+      .field('spec_rear_lights', 'false')
       .field('spec_length_mm', '145,5')
-      .field('spec_front_axle_width_mm', '52')
-      .field('spec_rear_axle_width_mm', '53,5')
+      .field('spec_front_axle_length_mm', '52')
+      .field('spec_rear_axle_length_mm', '53,5')
       .field('spec_magnet', 'false')
-      .field('spec_motor', 'S-Can 18,000rpm');
+      .field('spec_motor', 'S-Can 18,000rpm')
+      .field('spec_front_rim', 'plastic')
+      .field('spec_rear_rim', 'aluminium')
+      .field('spec_front_rim_diameter_mm', '15,8')
+      .field('spec_rear_rim_diameter_mm', '16.5');
 
     expect(response.status).toBe(200);
     expect(itemsBuilder.updatePayload).toEqual(
       expect.objectContaining({
         spec_scale: '1:32',
         spec_color: 'Black',
-        spec_system: 'Analog',
+        spec_system: 'analog',
+        spec_front_lights: true,
+        spec_rear_lights: false,
         spec_length_mm: 145.5,
-        spec_front_axle_width_mm: 52,
-        spec_rear_axle_width_mm: 53.5,
+        spec_front_axle_length_mm: 52,
+        spec_rear_axle_length_mm: 53.5,
         spec_magnet: false,
         spec_motor: 'S-Can 18,000rpm',
+        spec_front_rim: 'plastic',
+        spec_rear_rim: 'aluminum',
+        spec_front_rim_diameter_mm: 15.8,
+        spec_rear_rim_diameter_mm: 16.5,
       }),
     );
   });
