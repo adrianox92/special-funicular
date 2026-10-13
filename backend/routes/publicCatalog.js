@@ -2,7 +2,7 @@
  * Catálogo slot — solo lectura, sin autenticación.
  */
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
 const { fetchCatalogNeighbors } = require('../lib/catalogNeighbors');
 
@@ -287,7 +287,8 @@ router.get('/items/:id', async (req, res) => {
     if (!data) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     let registered_user_count = 0;
-    const { data: countVal, error: countErr } = await supabase.rpc(
+    const countClient = getServiceClient() || supabase;
+    const { data: countVal, error: countErr } = await countClient.rpc(
       'slot_catalog_item_registered_user_count',
       { p_catalog_item_id: id },
     );

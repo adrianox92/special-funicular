@@ -65,6 +65,7 @@ import { Switch } from '../components/ui/switch';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogListingImage from '../components/CatalogListingImage';
 import CatalogTechSpecsFields from '../components/CatalogTechSpecsFields';
 import CatalogAliasesFields from '../components/CatalogAliasesFields';
 import {
@@ -1201,10 +1202,11 @@ function AdminSlotCatalog() {
                       <TableRow key={row.id}>
                         <TableCell>
                           {row.image_url ? (
-                            <img
-                              src={row.image_url}
+                            <CatalogListingImage
+                              imageUrl={row.image_url}
                               alt=""
                               className="h-12 w-auto max-w-[5rem] rounded border object-contain bg-muted/30"
+                              sizes="80px"
                             />
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>

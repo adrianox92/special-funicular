@@ -41,6 +41,7 @@ import { localizePath } from '../i18n/localeUtils';
 import { useLocale } from '../hooks/useLocale';
 import { useTranslation } from 'react-i18next';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogListingImage from '../components/CatalogListingImage';
 
 const EMPTY   = '__all__';
 const PAGE_SIZE = 24;
@@ -566,11 +567,11 @@ function PublicCatalogList() {
                     <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
                       <div className="aspect-[4/3] bg-muted relative overflow-hidden">
                         {row.image_url ? (
-                          <img
-                            src={cachedStorageImageUrl(row.image_url)}
+                          <CatalogListingImage
+                            imageUrl={row.image_url}
                             alt=""
                             className="absolute inset-0 size-full object-cover"
-                            loading="lazy"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
                           />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">

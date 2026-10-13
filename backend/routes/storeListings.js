@@ -33,6 +33,7 @@ const {
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const { processVehicleImageBuffer } = require('../lib/processVehicleImageBuffer');
+const { STORAGE_UPLOAD_CACHE } = require('../lib/storageCacheControl');
 const { buildTrackedUrl } = require('../lib/affiliateUrl');
 
 /** Anon, sin sesión: lecturas/escrituras que RLS permite al rol anon (p. ej. listados públicos, INSERT de clics). */
@@ -97,6 +98,7 @@ async function uploadStoreLogoBuffer(buffer, mimetype, storageClient) {
     .upload(filePath, processed.buffer, {
       contentType: processed.contentType,
       upsert: false,
+      ...STORAGE_UPLOAD_CACHE,
     });
   if (storageError) throw new Error(storageError.message);
   const { data: publicUrlData } = client.storage
