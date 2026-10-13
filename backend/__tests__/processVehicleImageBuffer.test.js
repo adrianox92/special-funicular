@@ -5,6 +5,7 @@ const {
   getOutputFormat,
   getWebpQuality,
   DEFAULT_MAX_EDGE,
+  DEFAULT_THUMB_EDGE,
   DEFAULT_WEBP_QUALITY,
 } = require('../lib/processVehicleImageBuffer');
 
@@ -107,6 +108,25 @@ describe('processVehicleImageBuffer', () => {
     const meta = await sharp(buffer).metadata();
     expect(meta.width).toBe(640);
     expect(meta.height).toBe(480);
+  });
+
+  it('respeta maxEdgePx para miniaturas de listado', async () => {
+    expect(DEFAULT_THUMB_EDGE).toBe(400);
+    const png = await sharp({
+      create: {
+        width: 1400,
+        height: 700,
+        channels: 3,
+        background: { r: 10, g: 20, b: 30 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const { buffer } = await processVehicleImageBuffer(png, 'image/png', { maxEdgePx: DEFAULT_THUMB_EDGE });
+    const meta = await sharp(buffer).metadata();
+    expect(meta.width).toBe(400);
+    expect(meta.height).toBe(200);
   });
 
   it('rechaza buffer vacío', async () => {
