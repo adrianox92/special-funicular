@@ -2,11 +2,11 @@
  * Ficha técnica PDF pública por UUID (p. ej. QR impreso sin sesión).
  */
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const { buildVehicleSpecsPdfBuffer, safeFilenamePart } = require('../lib/vehicleSpecsPdfBuilder');
 
 const router = express.Router();
-const supabase = getAnonClient();
+const supabase = getServiceOrAnonClient();
 
 function isUuid(id) {
   return (

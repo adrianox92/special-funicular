@@ -50,7 +50,7 @@ router.get('/:slug/compare/:otherSlug', async (req, res) => {
     }
 
     const bestByUserCircuit = async (userId) => {
-      const { data: vehicles } = await supabase
+      const { data: vehicles } = await supabaseAdmin
         .from('vehicles')
         .select('id')
         .eq('user_id', userId);
@@ -142,7 +142,7 @@ router.get('/:slug', async (req, res) => {
 
     const userId = profile.user_id;
 
-    const { data: vehicles, error: vErr } = await supabase
+    const { data: vehicles, error: vErr } = await supabaseAdmin
       .from('vehicles')
       .select(`id, model, manufacturer, type, catalog_item_id, ${CATALOG_TECH_SPEC_SELECT}`)
       .eq('user_id', userId)

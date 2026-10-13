@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { modificationLineTotal, vehicleModificationCost, vehiclePurchaseCost } = require('../lib/componentPricing');
 const { resolveStaleDaysThreshold } = require('../lib/userPreferences');
@@ -10,7 +10,7 @@ const { logDbError } = require('../lib/logDbError');
 const { fetchVehicleTimingsForVehicleIds } = require('../lib/fetchVehicleTimingsForVehicleIds');
 const { countTimingActivity, countHobbyProgress } = require('../lib/timingActivityCounts');
 
-const supabase = getAnonClient();
+const supabase = getServiceOrAnonClient();
 
 /** TTL en memoria para deduplicar resúmenes de competición entre /metrics y /action-items. */
 const COMPETITION_SUMMARY_TTL_MS = 30_000;
@@ -331,9 +331,9 @@ const calculateTrends = async (userId, options = {}) => {
       .lt('timing_date', oneMonthAgo.toISOString().split('T')[0])
       .order('best_lap_time', { ascending: true })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (historicalError && historicalError.code !== 'PGRST116') throw historicalError;
+    if (historicalError) throw historicalError;
 
     const historicalBest = historicalBestTime ? timeToSeconds(historicalBestTime.best_lap_time) : null;
 
@@ -536,11 +536,9 @@ router.get('/metrics', async (req, res) => {
       .gt('best_lap_time', 0)
       .order('best_lap_time', { ascending: true })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    
-
-    if (bestTimeError && bestTimeError.code !== 'PGRST116') {
+    if (bestTimeError) {
       throw bestTimeError;
     }
 
