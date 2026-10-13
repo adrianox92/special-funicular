@@ -12,6 +12,7 @@
 const sharp = require('sharp');
 
 const DEFAULT_MAX_EDGE = 1400;
+const DEFAULT_THUMB_EDGE = 400;
 const DEFAULT_WEBP_QUALITY = 70;
 const DEFAULT_JPEG_QUALITY = 85;
 
@@ -44,16 +45,21 @@ function getJpegQuality() {
 /**
  * @param {Buffer} buffer
  * @param {string} [mimetype] hint only
+ * @param {{ maxEdgePx?: number }} [options]
  * @returns {Promise<{ buffer: Buffer, contentType: string, ext: string }>}
  */
-async function processVehicleImageBuffer(buffer, mimetype) {
+async function processVehicleImageBuffer(buffer, mimetype, options = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     const err = new Error('Imagen vacía o no válida');
     err.code = 'INVALID_IMAGE';
     throw err;
   }
 
-  const maxEdge = getMaxEdgePx();
+  const overrideEdge = Number(options.maxEdgePx);
+  const maxEdge =
+    Number.isFinite(overrideEdge) && overrideEdge > 0
+      ? Math.min(overrideEdge, 8192)
+      : getMaxEdgePx();
   const format = getOutputFormat();
 
   try {
@@ -91,5 +97,6 @@ module.exports = {
   getOutputFormat,
   getWebpQuality,
   DEFAULT_MAX_EDGE,
+  DEFAULT_THUMB_EDGE,
   DEFAULT_WEBP_QUALITY,
 };

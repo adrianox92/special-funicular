@@ -34,6 +34,7 @@ function createQueryBuilder(resolveValue = { data: [], error: null }) {
     order: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     single: jest.fn().mockResolvedValue(resolveValue),
+    maybeSingle: jest.fn().mockResolvedValue(resolveValue),
     then(onFulfilled, onRejected) {
       return Promise.resolve(resolveValue).then(onFulfilled, onRejected);
     },
@@ -119,11 +120,11 @@ describe('Dashboard Routes', () => {
           vehicleTimingsCall += 1;
           const b = createQueryBuilder();
           if (vehicleTimingsCall === 1) {
-            b.single.mockResolvedValue({ data: mockTimings[0], error: null });
+            b.maybeSingle.mockResolvedValue({ data: mockTimings[0], error: null });
           } else if (vehicleTimingsCall === 2) {
             b.gte.mockImplementation(() => Promise.resolve({ data: [], error: null }));
           } else if (vehicleTimingsCall === 3) {
-            b.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+            b.maybeSingle.mockResolvedValue({ data: null, error: null });
           }
           return b;
         }
@@ -205,7 +206,7 @@ describe('Dashboard Routes', () => {
         }
         if (table === 'vehicle_timings') {
           const b = createQueryBuilder();
-          b.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+          b.maybeSingle.mockResolvedValue({ data: null, error: null });
           b.gte.mockImplementation(() => Promise.resolve({ data: [], error: null }));
           return b;
         }
@@ -260,7 +261,7 @@ describe('Dashboard Routes', () => {
         }
         if (table === 'vehicle_timings') {
           const b = createQueryBuilder();
-          b.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+          b.maybeSingle.mockResolvedValue({ data: null, error: null });
           b.gte.mockImplementation(() => Promise.resolve({ data: [], error: null }));
           return b;
         }
