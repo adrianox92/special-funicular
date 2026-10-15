@@ -150,6 +150,157 @@ function normalizeIp(ip) {
   return s;
 }
 
+/** Lista coma-separada; se lee en cada request (cambiar IPs = env + redeploy, sin código). */
+function parseBlockedIpList(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function ipv4ToInt(ip) {
+  const parts = String(ip || '').split('.');
+  if (parts.length !== 4) return null;
+  let n = 0;
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return null;
+    const x = Number(part);
+    if (!Number.isInteger(x) || x < 0 || x > 255) return null;
+    n = (n << 8) + x;
+  }
+  return n >>> 0;
+}
+
+function ipv4InCidr(ip, cidr) {
+  const slash = cidr.lastIndexOf('/');
+  if (slash < 0) return false;
+  const bits = Number(cidr.slice(slash + 1));
+  if (!Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+  const ipInt = ipv4ToInt(ip);
+  const baseInt = ipv4ToInt(cidr.slice(0, slash));
+  if (ipInt == null || baseInt == null) return false;
+  if (bits === 0) return true;
+  const mask = bits === 32 ? 0xffffffff : (0xffffffff << (32 - bits)) >>> 0;
+  return (ipInt & mask) === (baseInt & mask);
+}
+
+function expandIpv6(ip) {
+  const s = String(ip || '').toLowerCase();
+  if (!s.includes(':') || s.includes('.')) return null;
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(':') : [];
+  const right = halves.length === 2 ? (halves[1] ? halves[1].split(':') : []) : [];
+  if (halves.length === 1) {
+    if (left.length !== 8) return null;
+    return left.map((p) => String(p).padStart(4, '0'));
+  }
+  const missing = 8 - left.length - right.length;
+  if (missing < 0) return null;
+  return [...left, ...Array(missing).fill('0000'), ...right].map((p) => String(p).padStart(4, '0'));
+}
+
+function ipv6ToBigInt(ip) {
+  const parts = expandIpv6(ip);
+  if (!parts || parts.length !== 8) return null;
+  let n = 0n;
+  for (const p of parts) {
+    if (!/^[0-9a-f]{4}$/.test(p)) return null;
+    n = (n << 16n) + BigInt(parseInt(p, 16));
+  }
+  return n;
+}
+
+function ipv6InCidr(ip, cidr) {
+  const slash = cidr.lastIndexOf('/');
+  if (slash < 0) return false;
+  const bits = Number(cidr.slice(slash + 1));
+  if (!Number.isInteger(bits) || bits < 0 || bits > 128) return false;
+  const ipN = ipv6ToBigInt(ip);
+  const baseN = ipv6ToBigInt(cidr.slice(0, slash));
+  if (ipN == null || baseN == null) return false;
+  if (bits === 0) return true;
+  const shift = 128n - BigInt(bits);
+  return ipN >> shift === baseN >> shift;
+}
+
+function ipMatchesBlockedEntry(ip, entry) {
+  const addr = normalizeIp(ip);
+  const rule = normalizeIp(entry);
+  if (!addr || !rule) return false;
+  if (rule.includes('/')) {
+    return addr.includes(':') ? ipv6InCidr(addr, rule) : ipv4InCidr(addr, rule);
+  }
+  if (addr.includes(':') || rule.includes(':')) {
+    const a = ipv6ToBigInt(addr);
+    const b = ipv6ToBigInt(rule);
+    if (a != null && b != null) return a === b;
+  }
+  return addr === rule;
+}
+
+function clientIpsToCheck(req) {
+  const ips = [];
+  const seen = new Set();
+  function add(raw) {
+    const ip = normalizeIp(raw);
+    if (!ip || seen.has(ip)) return;
+    seen.add(ip);
+    ips.push(ip);
+  }
+  add(getClientIp(req));
+  add(req && req.ip);
+  const vercel = header(req, 'x-vercel-forwarded-for');
+  if (vercel) add(vercel.split(',')[0]);
+  return ips;
+}
+
+/**
+ * BLOCKED_IPS: coma-separado, IPs sueltas o CIDR. Vacío = nadie bloqueado.
+ * @param {object} req
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+function isBlockedClientIp(req, env = process.env) {
+  const list = parseBlockedIpList((env || process.env).BLOCKED_IPS);
+  if (!list.length) return false;
+  return clientIpsToCheck(req).some((ip) => list.some((entry) => ipMatchesBlockedEntry(ip, entry)));
+}
+
+function ipBlockedPayload() {
+  return { error: 'Forbidden', code: 'ip_blocked' };
+}
+
+function sendIpBlocked(res, { html = false } = {}) {
+  if (typeof res.setHeader === 'function') {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.setHeader('Cache-Control', 'private, no-store');
+  } else if (typeof res.set === 'function') {
+    res.set('X-Robots-Tag', 'noindex, nofollow');
+    res.set('Cache-Control', 'private, no-store');
+  }
+  if (typeof res.status === 'function') res.status(403);
+  else res.statusCode = 403;
+
+  if (html) {
+    if (typeof res.setHeader === 'function') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+    res.send(
+      '<!doctype html><html lang="es"><head><meta charset="utf-8"/><title>Forbidden</title></head><body><p>Forbidden</p></body></html>',
+    );
+    return;
+  }
+
+  if (typeof res.json === 'function') {
+    res.json(ipBlockedPayload());
+    return;
+  }
+  if (typeof res.setHeader === 'function') {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  }
+  res.send(JSON.stringify(ipBlockedPayload()));
+}
+
 function isGateDisabled(env = process.env) {
   const raw = String(env.CATALOG_BOT_GATE || '').trim().toLowerCase();
   return raw === 'off' || raw === '0' || raw === 'false';
@@ -376,6 +527,10 @@ function sendCatalogDenied(res, { html = false } = {}) {
  * @returns {Promise<boolean>} true si la petición puede continuar
  */
 async function gateCatalogRequest(req, res, opts = {}) {
+  if (isBlockedClientIp(req, opts.env || process.env)) {
+    sendIpBlocked(res, { html: Boolean(opts.html) });
+    return false;
+  }
   if (req && String(req.method || '').toUpperCase() === 'OPTIONS') return true;
   const decision = await decideCatalogAccess(
     {
@@ -415,4 +570,9 @@ module.exports = {
   getClientIp,
   deniedPayload,
   isGoogleRdnsHostname,
+  parseBlockedIpList,
+  isBlockedClientIp,
+  ipMatchesBlockedEntry,
+  sendIpBlocked,
+  ipBlockedPayload,
 };

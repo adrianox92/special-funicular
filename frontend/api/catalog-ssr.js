@@ -27,7 +27,10 @@ const {
   injectIntoSpaHtml,
   fallbackDocument,
 } = require('./_lib/catalogSeoHtml');
-const { cachedStorageImageUrl } = require('../src/utils/cachedStorageImageUrl');
+const {
+  cachedStorageImageUrl,
+  rewritePublicCatalogMediaUrls,
+} = require('../src/utils/cachedStorageImageUrl');
 const { catalogInternalHeaders, gateCatalogRequest } = require('./_lib/catalogBotGate');
 
 const LIST_PAGE_SIZE = 24;
@@ -234,9 +237,10 @@ async function renderItem(req, res, parsed, spaHtml) {
     jsonLd,
   });
   const rootHtml = renderItemBody({ item, locale, origin, slug, neighbors });
+  const itemForBootstrap = rewritePublicCatalogMediaUrls(item, { origin });
   const bootstrapScript = `<script>window.__PUBLIC_CATALOG_BOOTSTRAP__=${JSON.stringify({
     kind: 'item',
-    item,
+    item: itemForBootstrap,
   }).replace(/</g, '\\u003c')};</script>`;
 
   const html = wrapHtml(spaHtml, {
@@ -349,7 +353,7 @@ async function renderList(req, res, parsed, spaHtml) {
   });
   const bootstrapScript = `<script>window.__PUBLIC_CATALOG_BOOTSTRAP__=${JSON.stringify({
     kind: 'list',
-    items,
+    items: rewritePublicCatalogMediaUrls(items, { origin }),
     total,
     totalPages,
     page,

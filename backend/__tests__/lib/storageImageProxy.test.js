@@ -1,4 +1,9 @@
 const handler = require('../../../frontend/api/img');
+const {
+  allowImgRateLimit,
+  allowImgHotlink,
+  resetImgAccessControlForTests,
+} = require('../../../frontend/api/_lib/imgAccessControl');
 
 function mockRes() {
   const res = {
@@ -33,6 +38,8 @@ describe('api/img proxy', () => {
       ...env,
       REACT_APP_SUPABASE_URL: 'https://abcdxyz.supabase.co',
     };
+    delete process.env.BLOCKED_IPS;
+    resetImgAccessControlForTests();
   });
 
   afterEach(() => {
@@ -71,7 +78,9 @@ describe('api/img proxy', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['Content-Type']).toBe('image/webp');
     expect(res.headers['Cache-Control']).toContain('immutable');
+    expect(res.headers['Cache-Control']).toContain('s-maxage=31536000');
     expect(res.headers['CDN-Cache-Control']).toContain('max-age=31536000');
+    expect(res.headers['CDN-Cache-Control']).toContain('s-maxage=31536000');
     expect(res.headers['Vercel-CDN-Cache-Control']).toContain('immutable');
     expect(Buffer.isBuffer(res.body)).toBe(true);
     expect(res.body.toString()).toBe('webp-bytes');
@@ -88,6 +97,119 @@ describe('api/img proxy', () => {
       resBad,
     );
     expect(resBad.statusCode).toBe(400);
+    expect(global.fetch).toBe(originalFetch);
+  });
+
+  test('403 ante hotlink cruzado; referer vacío y Googlebot pasan', async () => {
+    const blocked = mockRes();
+    await handler(
+      {
+        method: 'GET',
+        query: { p: 'catalog-images/catalog/a.webp' },
+        headers: {
+          referer: 'https://evil.example/gallery',
+          'sec-fetch-site': 'cross-site',
+          'user-agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        },
+      },
+      blocked,
+    );
+    expect(blocked.statusCode).toBe(403);
+    expect(global.fetch).toBe(originalFetch);
+
+    const emptyRef = allowImgHotlink({
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      },
+    });
+    expect(emptyRef).toEqual({ ok: true });
+
+    const google = allowImgHotlink({
+      headers: {
+        'user-agent': 'Googlebot-Image/1.0',
+        referer: 'https://www.google.com/',
+        'sec-fetch-site': 'cross-site',
+      },
+    });
+    expect(google).toEqual({ ok: true });
+  });
+
+  test('rate limit por IP con ráfaga; Googlebot no consume cupo', () => {
+    const env = {
+      IMG_RATE_LIMIT_BURST_WINDOW_MS: '1000',
+      IMG_RATE_LIMIT_BURST_MAX: '3',
+      IMG_RATE_LIMIT_WINDOW_MS: '60000',
+      IMG_RATE_LIMIT_MAX: '10',
+    };
+    const req = {
+      headers: {
+        'x-forwarded-for': '203.0.113.50',
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      },
+    };
+    expect(allowImgRateLimit(req, env).ok).toBe(true);
+    expect(allowImgRateLimit(req, env).ok).toBe(true);
+    expect(allowImgRateLimit(req, env).ok).toBe(true);
+    const limited = allowImgRateLimit(req, env);
+    expect(limited.ok).toBe(false);
+    expect(limited.status).toBe(429);
+    expect(limited.retryAfterSec).toBeGreaterThanOrEqual(1);
+
+    const bot = {
+      headers: { 'x-forwarded-for': '203.0.113.50', 'user-agent': 'Googlebot/2.1' },
+    };
+    expect(allowImgRateLimit(bot, env).ok).toBe(true);
+  });
+
+  test('BLOCKED_IPS responde 403 en /api/img sin ir a Storage', async () => {
+    process.env.BLOCKED_IPS = '90.94.193.52';
+    const res = mockRes();
+    await handler(
+      {
+        method: 'GET',
+        query: { p: 'catalog-images/catalog/a.webp' },
+        headers: { 'x-forwarded-for': '90.94.193.52' },
+      },
+      res,
+    );
+    expect(res.statusCode).toBe(403);
+    expect(String(res.body)).toMatch(/Forbidden/i);
+    expect(global.fetch).toBe(originalFetch);
+
+    process.env.BLOCKED_IPS = '10.0.0.1';
+    const allowed = mockRes();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get(name) {
+          return name === 'content-type' ? 'image/webp' : null;
+        },
+      },
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+    await handler(
+      {
+        method: 'GET',
+        query: { p: 'catalog-images/catalog/a.webp' },
+        headers: { 'x-forwarded-for': '90.94.193.52' },
+      },
+      allowed,
+    );
+    expect(allowed.statusCode).toBe(200);
+  });
+
+  test('rechaza path traversal y buckets ajenos sin fetch', async () => {
+    const resTrav = mockRes();
+    await handler({ method: 'GET', query: { p: 'catalog-images/../secret/x.webp' } }, resTrav);
+    expect(resTrav.statusCode).toBe(400);
+
+    const resBucket = mockRes();
+    await handler({ method: 'GET', query: { p: 'secret-bucket/x.webp' } }, resBucket);
+    expect(resBucket.statusCode).toBe(400);
     expect(global.fetch).toBe(originalFetch);
   });
 });

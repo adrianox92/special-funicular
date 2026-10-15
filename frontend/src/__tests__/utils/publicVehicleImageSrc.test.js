@@ -17,4 +17,15 @@ describe('publicVehicleImageSrc', () => {
     expect(publicVehicleImageSrc(null)).toBe('');
     expect(publicVehicleImageSrc('')).toBe('');
   });
+
+  test('acepta URLs ya proxificadas a /api/img (relativa y absoluta)', () => {
+    expect(publicVehicleImageSrc('/api/img/catalog-images/catalog/911.webp')).toBe(
+      '/api/img/catalog-images/catalog/911.webp',
+    );
+    expect(
+      publicVehicleImageSrc(
+        'https://www.slotdatabase.es/api/img/catalog-images/catalog/911.webp',
+      ),
+    ).toBe('https://www.slotdatabase.es/api/img/catalog-images/catalog/911.webp');
+  });
 });
