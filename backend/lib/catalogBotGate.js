@@ -132,14 +132,23 @@ function header(req, name) {
   return raw == null ? '' : String(raw);
 }
 
-function getClientIp(req) {
-  const forwarded = header(req, 'x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0].trim();
-    if (first) return normalizeIp(first);
+/**
+ * IP del cliente de confianza. Nunca se lee el X-Forwarded-For que manda el cliente:
+ * - Vercel (env VERCEL): x-vercel-forwarded-for / x-real-ip los fija el edge de Vercel,
+ *   que además sobrescribe X-Forwarded-For (no lo concatena), así que no son falsificables.
+ * - Express detrás de Render: req.ip con `trust proxy` = 1 (entrada que añade el proxy
+ *   de Render, la de más a la derecha). Las entradas previas de XFF las pone el cliente.
+ */
+function getClientIp(req, env = process.env) {
+  if (!req) return '';
+  if (env && env.VERCEL) {
+    const vercel = header(req, 'x-vercel-forwarded-for');
+    if (vercel) return normalizeIp(vercel.split(',')[0]);
+    const realIp = header(req, 'x-real-ip');
+    if (realIp) return normalizeIp(realIp);
+    const forwarded = header(req, 'x-forwarded-for');
+    if (forwarded) return normalizeIp(forwarded.split(',')[0]);
   }
-  const realIp = header(req, 'x-real-ip');
-  if (realIp) return normalizeIp(realIp);
   return normalizeIp(req.ip || req.socket?.remoteAddress || '');
 }
 
@@ -239,20 +248,9 @@ function ipMatchesBlockedEntry(ip, entry) {
   return addr === rule;
 }
 
-function clientIpsToCheck(req) {
-  const ips = [];
-  const seen = new Set();
-  function add(raw) {
-    const ip = normalizeIp(raw);
-    if (!ip || seen.has(ip)) return;
-    seen.add(ip);
-    ips.push(ip);
-  }
-  add(getClientIp(req));
-  add(req && req.ip);
-  const vercel = header(req, 'x-vercel-forwarded-for');
-  if (vercel) add(vercel.split(',')[0]);
-  return ips;
+function clientIpsToCheck(req, env = process.env) {
+  const ip = getClientIp(req, env);
+  return ip ? [ip] : [];
 }
 
 /**
@@ -263,7 +261,7 @@ function clientIpsToCheck(req) {
 function isBlockedClientIp(req, env = process.env) {
   const list = parseBlockedIpList((env || process.env).BLOCKED_IPS);
   if (!list.length) return false;
-  return clientIpsToCheck(req).some((ip) => list.some((entry) => ipMatchesBlockedEntry(ip, entry)));
+  return clientIpsToCheck(req, env || process.env).some((ip) => list.some((entry) => ipMatchesBlockedEntry(ip, entry)));
 }
 
 function ipBlockedPayload() {

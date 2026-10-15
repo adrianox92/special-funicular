@@ -1,3 +1,5 @@
+// Estas pruebas simulan la función de Vercel (process.env.VERCEL).
+process.env.VERCEL = process.env.VERCEL || '1';
 const handler = require('../../../frontend/api/img');
 const {
   allowImgRateLimit,
