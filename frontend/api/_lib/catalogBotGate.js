@@ -136,8 +136,10 @@ function header(req, name) {
  * IP del cliente de confianza. Nunca se lee el X-Forwarded-For que manda el cliente:
  * - Vercel (env VERCEL): x-vercel-forwarded-for / x-real-ip los fija el edge de Vercel,
  *   que además sobrescribe X-Forwarded-For (no lo concatena), así que no son falsificables.
- * - Express detrás de Render: req.ip con `trust proxy` = 1 (entrada que añade el proxy
- *   de Render, la de más a la derecha). Las entradas previas de XFF las pone el cliente.
+ * - Render (env RENDER): Cloudflare va delante y fija CF-Connecting-IP (rechaza el que mande
+ *   el cliente). Render CONCATENA a X-Forwarded-For, así que su primer valor lo elige el cliente
+ *   y `trust proxy = 1` solo da un salto interno (Cloudflare/LB): no sirven.
+ * - Resto (tests/local): req.ip / socket.
  */
 function getClientIp(req, env = process.env) {
   if (!req) return '';
@@ -148,6 +150,10 @@ function getClientIp(req, env = process.env) {
     if (realIp) return normalizeIp(realIp);
     const forwarded = header(req, 'x-forwarded-for');
     if (forwarded) return normalizeIp(forwarded.split(',')[0]);
+  }
+  if (env && env.RENDER) {
+    const cf = header(req, 'cf-connecting-ip');
+    if (cf) return normalizeIp(cf);
   }
   return normalizeIp(req.ip || req.socket?.remoteAddress || '');
 }
