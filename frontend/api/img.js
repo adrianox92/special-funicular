@@ -1,16 +1,17 @@
 /**
  * Proxy same-origin de imágenes públicas de Supabase Storage.
- * Cachea en el edge (Vercel CDN) con max-age largo e immutable.
+ * Cachea en el edge (Vercel CDN) con s-maxage largo e immutable.
  * Solo permite hosts de nuestro proyecto y buckets catalog-images / vehicle-images.
  */
 const {
   resolveStorageImageRequest,
   pathSegmentsFromReq,
 } = require('../src/utils/cachedStorageImageUrl');
+const { allowImgRateLimit, allowImgHotlink } = require('./_lib/imgAccessControl');
 
 const FETCH_MS = 8000;
 const MAX_BYTES = 5 * 1024 * 1024;
-const LONG_CACHE = 'public, max-age=31536000, immutable';
+const LONG_CACHE = 'public, max-age=31536000, s-maxage=31536000, immutable';
 
 function sendText(res, status, message, cache) {
   res.status(status);
@@ -34,6 +35,19 @@ function isImageContentType(ct) {
 module.exports = async function handler(req, res) {
   if (req.method && req.method !== 'GET' && req.method !== 'HEAD') {
     res.status(405).setHeader('Allow', 'GET, HEAD').send('Method Not Allowed');
+    return;
+  }
+
+  const limited = allowImgRateLimit(req);
+  if (!limited.ok) {
+    res.setHeader('Retry-After', String(limited.retryAfterSec || 1));
+    sendText(res, 429, 'Too many requests');
+    return;
+  }
+
+  const hotlink = allowImgHotlink(req);
+  if (!hotlink.ok) {
+    sendText(res, hotlink.status, hotlink.message);
     return;
   }
 

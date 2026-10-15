@@ -31,4 +31,17 @@ describe('catalogImageVariants', () => {
     expect(catalogThumbUrl('')).toBe('');
     expect(catalogThumbUrl(null)).toBe('');
   });
+
+  test('funciona sobre URLs ya reescritas a /api/img (absoluta y relativa)', () => {
+    expect(
+      catalogThumbUrl(
+        'https://www.slotdatabase.es/api/img/catalog-images/catalog/1710000000-ab12cd.webp',
+      ),
+    ).toBe(
+      'https://www.slotdatabase.es/api/img/catalog-images/catalog/1710000000-ab12cd-thumb.webp',
+    );
+    expect(catalogThumbUrl('/api/img/catalog-images/catalog/1710000000-ab12cd.webp')).toBe(
+      '/api/img/catalog-images/catalog/1710000000-ab12cd-thumb.webp',
+    );
+  });
 });

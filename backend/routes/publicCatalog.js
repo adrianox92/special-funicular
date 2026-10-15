@@ -15,6 +15,10 @@ const {
   findCatalogItemIdsByAliasOrEan,
   catalogSearchOrClause,
 } = require('../lib/catalogAliases');
+const { rewritePublicCatalogResponse } = require('../lib/publicCatalogImageUrls');
+
+/** Techo del listado público: la UI usa 24; 48 cubre grids densos sin dump masivo. */
+const PUBLIC_ITEMS_MAX_LIMIT = 48;
 
 const PUBLIC_LIST_SELECT =
   'id, reference, ean, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count';
@@ -106,7 +110,7 @@ router.get('/brands', async (req, res) => {
       .select('id, name, logo_url, slug')
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ brands: data ?? [] });
+    res.json(rewritePublicCatalogResponse({ brands: data ?? [] }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -136,7 +140,10 @@ router.get('/brands', async (req, res) => {
 router.get('/items', async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(String(req.query.page  || '1'),  10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24));
+    const limit = Math.min(
+      PUBLIC_ITEMS_MAX_LIMIT,
+      Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24),
+    );
 
     // --- Filtros básicos (SEO path) ---
     const manufacturerSlug = String(req.query.manufacturer_slug ?? '').trim();
@@ -257,13 +264,15 @@ router.get('/items', async (req, res) => {
       limit,
     });
 
-    res.json({
-      items: data,
-      total: count,
-      page,
-      limit,
-      totalPages,
-    });
+    res.json(
+      rewritePublicCatalogResponse({
+        items: data,
+        total: count,
+        page,
+        limit,
+        totalPages,
+      }),
+    );
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -307,10 +316,11 @@ router.get('/items/:id', async (req, res) => {
     }
 
     const withAliases = await attachAliasesToCatalogItems(supabase, data);
-    res.json({ ...withAliases, registered_user_count, neighbors });
+    res.json(rewritePublicCatalogResponse({ ...withAliases, registered_user_count, neighbors }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 module.exports = router;
+module.exports.PUBLIC_ITEMS_MAX_LIMIT = PUBLIC_ITEMS_MAX_LIMIT;

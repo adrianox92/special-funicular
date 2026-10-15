@@ -18,13 +18,22 @@ const publicSignupLimiter = rateLimit({
 /**
  * Catálogo público (GET facets/items/detail): lecturas frecuentes; no comparte cupo con signup/pilot.
  * Ventana de 1 min para que el store se limpie rápido y no acumule IPs de bots.
+ * 120/min cubre navegación + Googlebot; el SSR interno no consume cupo si hay secreto.
  */
+function isCatalogInternalRequest(req) {
+  const secret = process.env.CATALOG_INTERNAL_SECRET;
+  if (!secret || !String(secret).trim()) return false;
+  const token = req.get ? req.get('x-catalog-internal') : req.headers && req.headers['x-catalog-internal'];
+  return Boolean(token && String(token) === String(secret).trim());
+}
+
 const publicCatalogReadLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 200,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
+  skip: isCatalogInternalRequest,
   message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
 });
 
@@ -166,4 +175,5 @@ module.exports = {
   createSyncApiKeyLimiter,
   getSyncRateLimitMax,
   syncRateLimitKey,
+  isCatalogInternalRequest,
 };

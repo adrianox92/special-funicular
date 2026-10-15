@@ -69,6 +69,22 @@ Objetivo: **Production Branch = `master`**. Pushes a `staging` = Preview, no Pro
 
 Variables típicas de prod (nombres, no valores): `REACT_APP_API_URL`, `REACT_APP_SITE_URL`, opcionalmente `SITEMAP_BACKEND_URL`, `NODE_OPTIONS`. En Preview, `REACT_APP_API_URL` suele seguir apuntando a la API de prod en el modelo barato.
 
+### Proxy de imágenes (`/api/img`) y egress de Storage
+
+El JSON público (`/api/public/catalog/*`) y el bootstrap SSR (`window.__PUBLIC_CATALOG_BOOTSTRAP__`) reescriben `image_url`, `manufacturer_logo_url` y `logo_url` a `https://www.slotdatabase.es/api/img/<bucket>/<path>`. El origen se configura con `PUBLIC_IMAGE_ORIGIN` (Render) o, si falta, `PUBLIC_SITE_ORIGIN`; el frontend SSR usa `REACT_APP_SITE_URL`. La BD y `/api/sync/*` no se tocan (partners siguen viendo URLs de Storage).
+
+`/api/img` (función de Vercel) solo sirve `catalog-images` y `vehicle-images`, sin path traversal, con `Cache-Control` / `CDN-Cache-Control` `public, max-age=31536000, s-maxage=31536000, immutable`. Las repeticiones deberían pegar en el CDN de Vercel, no en Supabase.
+
+**Rate limit y hotlink**
+
+- Vercel Firewall `rate_limit` por IP es el control preferido a escala (cuenta también los hits de CDN). **No se puede declarar en el repo**: `vercel.json` `routes.mitigate` solo admite `deny`/`challenge`. Hay que crear la regla en el dashboard o con `vercel firewall rules add` (path `/api/img`, ventana 60s, techo generoso p.ej. 300, keys `ip`) y publicarla a mano. Tradeoff: no viaja en el PR; hay que repetirlo si se clona el proyecto.
+- El limiter in-process de `frontend/api/_lib/imgAccessControl.js` (ráfaga 120/10s + 300/min, desactivable con `IMG_RATE_LIMIT=off`) solo ve **cache-misses por isolate**. No sustituye al WAF; sí frena un dump contra el origen de Storage. Googlebot y bots de vista previa no consumen cupo.
+- Hotlink opcional (`IMG_HOTLINK_CHECK=off` para desactivar): 403 si `Sec-Fetch-Site: cross-site` (o referer ajeno) y el referer no es slotdatabase / preview `*.vercel.app` / buscadores. Referer vacío y crawlers de búsqueda se permiten. No se envía `Vary: Referer` para no fragmentar la caché (un hotlink de una URL ya cacheada puede servirse del CDN; el ahorro de egress de Supabase se mantiene).
+
+**Qué no cubre este cambio:** quien ya tenga la URL cruda de Storage (`…/storage/v1/object/public/…`) sigue pegando a Supabase hasta privatizar el bucket o ponerle un CDN propio (Cloudflare / dominio). Siguiente paso: bucket no público + mismo proxy, o Custom Domain de Storage.
+
+Rollback: revertir el PR (el JSON vuelve a exponer Storage; el proxy `/api/img` puede quedarse). Desactivar límites: `IMG_RATE_LIMIT=off`, `IMG_HOTLINK_CHECK=off`. El techo de página del catálogo público pasa de 100 a 48 y el rate limit de lectura de 200/min a 120/min (el SSR interno no cuenta si hay `CATALOG_INTERNAL_SECRET`).
+
 ### Render (backend / API)
 
 Servicio de producción: **`special-funicular-3q60`** (host `special-funicular-3q60.onrender.com`, o el web service que esté sirviendo la API actual).

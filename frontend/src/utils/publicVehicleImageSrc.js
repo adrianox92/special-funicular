@@ -8,10 +8,22 @@ import {
 const ALLOWED_BUCKET_SET = new Set(ALLOWED_BUCKETS || ['catalog-images', 'vehicle-images']);
 const IMG_PROXY_PREFIX = PROXY_PREFIX || '/api/img/';
 
+function proxyPathFromMaybeAbsolute(raw) {
+  const s = String(raw || '');
+  if (s.startsWith(IMG_PROXY_PREFIX)) return s;
+  try {
+    const url = new URL(s);
+    if (url.pathname.startsWith(IMG_PROXY_PREFIX)) return url.pathname;
+  } catch {
+    /* not an absolute URL */
+  }
+  return '';
+}
+
 function isProxiedAllowedBucket(path) {
-  const s = String(path || '');
-  if (!s.startsWith(IMG_PROXY_PREFIX)) return false;
-  const rest = s.slice(IMG_PROXY_PREFIX.length);
+  const proxied = proxyPathFromMaybeAbsolute(path);
+  if (!proxied.startsWith(IMG_PROXY_PREFIX)) return false;
+  const rest = proxied.slice(IMG_PROXY_PREFIX.length);
   const slash = rest.indexOf('/');
   if (slash <= 0) return false;
   return ALLOWED_BUCKET_SET.has(rest.slice(0, slash));

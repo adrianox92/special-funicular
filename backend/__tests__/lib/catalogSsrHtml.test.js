@@ -13,6 +13,7 @@ const {
 } = require('../../../frontend/api/_lib/catalogSeoHtml');
 const { sitemapBackendPath } = require('../../../frontend/api/_lib/backendUrls');
 const catalogSsrHandler = require('../../../frontend/api/catalog-ssr');
+const { rewritePublicCatalogMediaUrls } = require('../../../frontend/src/utils/cachedStorageImageUrl');
 
 describe('parsePublicCatalogPath', () => {
   test('ficha ES / EN / DE', () => {
@@ -244,6 +245,36 @@ describe('catalog-ssr bot gate', () => {
       res,
     );
     expect(res.statusCode).not.toBe(403);
+  });
+});
+
+describe('catalog-ssr bootstrap no filtra URLs de Storage', () => {
+  test('ficha y listado reescriben image_url / logos con origin', () => {
+    const origin = 'https://www.slotdatabase.es';
+    const storage =
+      'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/catalog/1710000000-ab12cd.webp';
+    const logo =
+      'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/brands/scx.webp';
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const itemBoot = JSON.stringify({
+      kind: 'item',
+      item: rewritePublicCatalogMediaUrls(
+        { id, image_url: storage, manufacturer_logo_url: logo },
+        { origin },
+      ),
+    });
+    expect(itemBoot).toContain(`${origin}/api/img/catalog-images/catalog/1710000000-ab12cd.webp`);
+    expect(itemBoot).not.toContain('abcdxyz.supabase.co');
+
+    const listBoot = JSON.stringify({
+      kind: 'list',
+      items: rewritePublicCatalogMediaUrls(
+        [{ id, image_url: storage, manufacturer_logo_url: logo }],
+        { origin },
+      ),
+    });
+    expect(listBoot).toContain('/api/img/catalog-images/brands/scx.webp');
+    expect(listBoot).not.toContain('storage/v1/object/public');
   });
 });
 
