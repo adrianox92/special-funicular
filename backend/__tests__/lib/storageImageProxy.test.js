@@ -38,6 +38,7 @@ describe('api/img proxy', () => {
       ...env,
       REACT_APP_SUPABASE_URL: 'https://abcdxyz.supabase.co',
     };
+    delete process.env.BLOCKED_IPS;
     resetImgAccessControlForTests();
   });
 
@@ -161,6 +162,44 @@ describe('api/img proxy', () => {
       headers: { 'x-forwarded-for': '203.0.113.50', 'user-agent': 'Googlebot/2.1' },
     };
     expect(allowImgRateLimit(bot, env).ok).toBe(true);
+  });
+
+  test('BLOCKED_IPS responde 403 en /api/img sin ir a Storage', async () => {
+    process.env.BLOCKED_IPS = '90.94.193.52';
+    const res = mockRes();
+    await handler(
+      {
+        method: 'GET',
+        query: { p: 'catalog-images/catalog/a.webp' },
+        headers: { 'x-forwarded-for': '90.94.193.52' },
+      },
+      res,
+    );
+    expect(res.statusCode).toBe(403);
+    expect(String(res.body)).toMatch(/Forbidden/i);
+    expect(global.fetch).toBe(originalFetch);
+
+    process.env.BLOCKED_IPS = '10.0.0.1';
+    const allowed = mockRes();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get(name) {
+          return name === 'content-type' ? 'image/webp' : null;
+        },
+      },
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+    await handler(
+      {
+        method: 'GET',
+        query: { p: 'catalog-images/catalog/a.webp' },
+        headers: { 'x-forwarded-for': '90.94.193.52' },
+      },
+      allowed,
+    );
+    expect(allowed.statusCode).toBe(200);
   });
 
   test('rechaza path traversal y buckets ajenos sin fetch', async () => {

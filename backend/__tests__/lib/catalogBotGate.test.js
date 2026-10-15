@@ -13,6 +13,9 @@ const {
   catalogInternalHeaders,
   INTERNAL_SSR_UA,
   isGoogleRdnsHostname,
+  parseBlockedIpList,
+  isBlockedClientIp,
+  ipMatchesBlockedEntry,
 } = require('../../lib/catalogBotGate');
 
 const CHROME =
@@ -336,6 +339,55 @@ describe('robots.txt del catálogo', () => {
     expect(social).toContain('Allow: /catalogo');
     expect(social).toContain('Allow: /en/catalog');
     expect(social).toContain('Allow: /de/katalog');
+  });
+});
+
+describe('BLOCKED_IPS', () => {
+  test('parsea coma-separado y admite CIDR IPv4', () => {
+    expect(parseBlockedIpList(' 90.94.193.52, 10.0.0.0/8 ')).toEqual([
+      '90.94.193.52',
+      '10.0.0.0/8',
+    ]);
+    expect(parseBlockedIpList('')).toEqual([]);
+    expect(ipMatchesBlockedEntry('90.94.193.52', '90.94.193.52')).toBe(true);
+    expect(ipMatchesBlockedEntry('90.94.193.52', '90.94.193.0/24')).toBe(true);
+    expect(ipMatchesBlockedEntry('90.94.194.1', '90.94.193.0/24')).toBe(false);
+    expect(ipMatchesBlockedEntry('::ffff:90.94.193.52', '90.94.193.52')).toBe(true);
+  });
+
+  test('bloquea la IP de env sin cachear el valor entre requests', () => {
+    const req = { headers: { 'x-forwarded-for': '90.94.193.52' }, method: 'GET' };
+    expect(isBlockedClientIp(req, {})).toBe(false);
+    expect(isBlockedClientIp(req, { BLOCKED_IPS: '90.94.193.52' })).toBe(true);
+    expect(isBlockedClientIp(req, { BLOCKED_IPS: '1.2.3.4, 90.94.193.0/24' })).toBe(true);
+    expect(isBlockedClientIp({ headers: { 'x-forwarded-for': '8.8.8.8' } }, { BLOCKED_IPS: '90.94.193.52' })).toBe(
+      false,
+    );
+  });
+
+  test('middleware responde 403 a la IP bloqueada aunque el UA sea Chrome', async () => {
+    const app = express();
+    app.use(
+      catalogBotGateMiddleware({
+        env: { BLOCKED_IPS: '90.94.193.52' },
+        deps: { verifyGoogleCrawlerIp: async () => ({ ok: true, reason: 'verified' }) },
+      }),
+    );
+    app.get('/api/public/catalog/items', (_req, res) => res.json({ items: ['ok'] }));
+
+    const blocked = await request(app)
+      .get('/api/public/catalog/items')
+      .set('User-Agent', CHROME)
+      .set('X-Forwarded-For', '90.94.193.52')
+      .expect(403);
+    expect(blocked.body.code).toBe('ip_blocked');
+    expect(blocked.headers['cache-control']).toMatch(/no-store/);
+
+    await request(app)
+      .get('/api/public/catalog/items')
+      .set('User-Agent', CHROME)
+      .set('X-Forwarded-For', '8.8.8.8')
+      .expect(200);
   });
 });
 

@@ -92,6 +92,8 @@ describe('partner sync compatibility', () => {
       expect(src).not.toContain('rewritePublicCatalogResponse');
       expect(src).not.toContain('publicCatalogImageUrls');
       expect(src).not.toContain('rewritePublicCatalogMediaUrls');
+      expect(src).not.toContain('isBlockedClientIp');
+      expect(src).not.toContain('BLOCKED_IPS');
     }
   });
 });

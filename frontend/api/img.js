@@ -8,6 +8,7 @@ const {
   pathSegmentsFromReq,
 } = require('../src/utils/cachedStorageImageUrl');
 const { allowImgRateLimit, allowImgHotlink } = require('./_lib/imgAccessControl');
+const { isBlockedClientIp } = require('./_lib/catalogBotGate');
 
 const FETCH_MS = 8000;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -35,6 +36,11 @@ function isImageContentType(ct) {
 module.exports = async function handler(req, res) {
   if (req.method && req.method !== 'GET' && req.method !== 'HEAD') {
     res.status(405).setHeader('Allow', 'GET, HEAD').send('Method Not Allowed');
+    return;
+  }
+
+  if (isBlockedClientIp(req)) {
+    sendText(res, 403, 'Forbidden');
     return;
   }
 

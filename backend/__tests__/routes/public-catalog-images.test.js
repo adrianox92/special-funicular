@@ -55,6 +55,7 @@ describe('GET /api/public/catalog image URLs', () => {
     jest.clearAllMocks();
     process.env.PUBLIC_IMAGE_ORIGIN = 'https://www.slotdatabase.es';
     process.env.CATALOG_BOT_GATE = 'off';
+    delete process.env.BLOCKED_IPS;
   });
 
   afterAll(() => {
