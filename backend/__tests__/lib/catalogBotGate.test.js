@@ -15,6 +15,7 @@ const {
   isGoogleRdnsHostname,
   parseBlockedIpList,
   isBlockedClientIp,
+  getClientIp,
   ipMatchesBlockedEntry,
 } = require('../../lib/catalogBotGate');
 
@@ -243,6 +244,7 @@ describe('catalogInternalHeaders', () => {
 describe('catalogBotGateMiddleware (HTTP)', () => {
   function appWithGate(deps) {
     const app = express();
+    app.set('trust proxy', 1); // igual que server.js en Render
     app.use(catalogBotGateMiddleware({ env: {}, deps }));
     app.get('/api/public/catalog/items', (_req, res) => res.json({ items: ['ref-1'] }));
     return app;
@@ -356,17 +358,51 @@ describe('BLOCKED_IPS', () => {
   });
 
   test('bloquea la IP de env sin cachear el valor entre requests', () => {
-    const req = { headers: { 'x-forwarded-for': '90.94.193.52' }, method: 'GET' };
+    const req = { headers: {}, ip: '90.94.193.52', method: 'GET' };
     expect(isBlockedClientIp(req, {})).toBe(false);
     expect(isBlockedClientIp(req, { BLOCKED_IPS: '90.94.193.52' })).toBe(true);
     expect(isBlockedClientIp(req, { BLOCKED_IPS: '1.2.3.4, 90.94.193.0/24' })).toBe(true);
-    expect(isBlockedClientIp({ headers: { 'x-forwarded-for': '8.8.8.8' } }, { BLOCKED_IPS: '90.94.193.52' })).toBe(
+    expect(isBlockedClientIp({ headers: {}, ip: '8.8.8.8' }, { BLOCKED_IPS: '90.94.193.52' })).toBe(
       false,
+    );
+  });
+
+  test('Render/Express: ignora X-Forwarded-For y cabeceras Vercel enviadas por el cliente', () => {
+    const env = { BLOCKED_IPS: '90.94.193.52' };
+    // Cliente normal que se hace pasar por la IP bloqueada: no se bloquea.
+    const spoofBlock = {
+      headers: { 'x-forwarded-for': '90.94.193.52', 'x-vercel-forwarded-for': '90.94.193.52', 'x-real-ip': '90.94.193.52' },
+      ip: '8.8.8.8',
+    };
+    expect(isBlockedClientIp(spoofBlock, env)).toBe(false);
+    // IP bloqueada que inventa un XFF: req.ip (trust proxy) sigue siendo la real.
+    const evade = { headers: { 'x-forwarded-for': '1.1.1.1, 90.94.193.52' }, ip: '90.94.193.52' };
+    expect(isBlockedClientIp(evade, env)).toBe(true);
+    expect(getClientIp(evade, {})).toBe('90.94.193.52');
+  });
+
+  test('Render: usa CF-Connecting-IP y no el XFF que manda el cliente', () => {
+    const env = { RENDER: 'true', BLOCKED_IPS: '90.94.193.52' };
+    const blocked = { headers: { 'cf-connecting-ip': '90.94.193.52', 'x-forwarded-for': '1.1.1.1, 172.71.0.1' }, ip: '10.0.0.5' };
+    expect(isBlockedClientIp(blocked, env)).toBe(true);
+    const spoof = { headers: { 'cf-connecting-ip': '140.248.50.27', 'x-forwarded-for': '90.94.193.52, 140.248.50.27' }, ip: '10.0.0.5' };
+    expect(isBlockedClientIp(spoof, env)).toBe(false);
+    // cf-connecting-ip solo se lee en Render
+    expect(getClientIp({ headers: { 'cf-connecting-ip': '90.94.193.52' }, ip: '8.8.8.8' }, {})).toBe('8.8.8.8');
+  });
+
+  test('Vercel: usa x-vercel-forwarded-for / x-real-ip fijadas por el edge', () => {
+    const env = { VERCEL: '1', BLOCKED_IPS: '90.94.193.52' };
+    expect(isBlockedClientIp({ headers: { 'x-vercel-forwarded-for': '90.94.193.52' } }, env)).toBe(true);
+    expect(isBlockedClientIp({ headers: { 'x-real-ip': '90.94.193.52' } }, env)).toBe(true);
+    expect(getClientIp({ headers: { 'x-vercel-forwarded-for': '9.9.9.9', 'x-forwarded-for': '90.94.193.52' } }, env)).toBe(
+      '9.9.9.9',
     );
   });
 
   test('middleware responde 403 a la IP bloqueada aunque el UA sea Chrome', async () => {
     const app = express();
+    app.set('trust proxy', 1); // igual que server.js en Render
     app.use(
       catalogBotGateMiddleware({
         env: { BLOCKED_IPS: '90.94.193.52' },
