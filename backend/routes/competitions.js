@@ -19,6 +19,11 @@ const {
   requireViewCompetition,
   requireManageCompetition,
 } = require('../lib/competitionPermissions');
+const {
+  listEnrolledCompetitionIds,
+  mergeMyCompetitions,
+  resolveCompetitionViewerRole,
+} = require('../lib/competitionParticipation');
 const { isLicenseAdminUser } = require('../lib/licenseAdminAuth');
 const { resolveCircuitForClubCompetition } = require('../lib/clubCircuits');
 const {
@@ -519,19 +524,34 @@ router.get('/my-competitions', async (req, res) => {
       clubComps = cc || [];
     }
 
-    const byId = new Map();
-    const format = (comp) => ({
-      ...comp,
-      participants_count: comp.competition_participants[0]?.count || 0,
-    });
-    for (const comp of owned || []) {
-      byId.set(comp.id, format(comp));
-    }
-    for (const comp of clubComps) {
-      if (!byId.has(comp.id)) byId.set(comp.id, format(comp));
+    const enrolledIds = await listEnrolledCompetitionIds(supabase, effectiveUserId);
+    const knownIds = new Set([
+      ...(owned || []).map((comp) => comp.id),
+      ...clubComps.map((comp) => comp.id),
+    ]);
+    const missingEnrolledIds = enrolledIds.filter((id) => !knownIds.has(id));
+    let enrolledComps = [];
+    if (missingEnrolledIds.length > 0) {
+      const { data: enrolledRows, error: enrolledErr } = await supabase
+        .from('competitions')
+        .select(`
+          *,
+          competition_participants(count),
+          circuits(id, name, num_lanes, lane_lengths)
+        `)
+        .in('id', missingEnrolledIds);
+      if (enrolledErr) {
+        console.error('Error al obtener competiciones del inscrito:', enrolledErr);
+        return res.status(500).json({ error: enrolledErr.message });
+      }
+      enrolledComps = enrolledRows || [];
     }
 
-    const competitions = [...byId.values()].map(({ competition_participants, ...rest }) => rest);
+    const competitions = mergeMyCompetitions({
+      owned: owned || [],
+      club: clubComps,
+      enrolled: enrolledComps,
+    });
 
     res.json(competitions);
   } catch (error) {
@@ -585,6 +605,13 @@ router.get('/:id', async (req, res) => {
     if (!canView) {
       return res.status(404).json({ error: 'Competición no encontrada' });
     }
+
+    const viewerRole = await resolveCompetitionViewerRole(
+      supabase,
+      req.user,
+      competition,
+      isLicenseAdminUser,
+    );
 
     // Obtener los participantes
     const { data: participantsRaw, error: partError } = await supabase
@@ -695,6 +722,7 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       ...appendRegulationFileUrl(supabase, competition),
+      viewer_role: viewerRole,
       participants: participants || [],
       categories: (categories || []).map((cat) => appendRegulationFileUrl(supabase, cat)),
       signups_count: signupsPending || 0,

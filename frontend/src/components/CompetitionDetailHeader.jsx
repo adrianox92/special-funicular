@@ -98,7 +98,11 @@ const CompetitionDetailHeader = ({ competition, competitionId, section, onSectio
               )}
             </div>
             <p className="text-muted-foreground text-sm">
-              {canUseOrganizerTools ? t('detail.subtitleOrganizer') : t('detail.subtitleMember')}
+              {canUseOrganizerTools
+                ? t('detail.subtitleOrganizer')
+                : competition.viewer_role === 'participant'
+                  ? t('detail.subtitleParticipant')
+                  : t('detail.subtitleMember')}
             </p>
           </div>
         </div>

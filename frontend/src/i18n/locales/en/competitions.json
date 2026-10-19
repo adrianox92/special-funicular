@@ -201,10 +201,12 @@
   "classification": "Standings",
   "round": "Round {{n}}",
   "list": {
-    "subtitle": "Create competitions, manage participants and record timings from one place.",
+    "subtitle": "Create competitions and review the events you are entered in.",
     "debugSubtitle": "Debug mode: competitions for organizer {{id}}",
     "empty": "You have no competitions yet",
     "openCompetition": "Open competition",
+    "viewPerformance": "View my result",
+    "enrolledBadge": "Entered",
     "copyPublicLink": "Copy public link",
     "delete": "Delete",
     "recentTitle": "Recent competitions",
@@ -222,6 +224,7 @@
     "notFound": "Competition not found",
     "subtitleOrganizer": "Setup, participants, categories and rules",
     "subtitleMember": "View your club competition",
+    "subtitleParticipant": "Your timings and result in this event",
     "sectionLabel": "Competition section",
     "sections": {
       "setup": "Setup",

@@ -1,10 +1,11 @@
 /**
- * Permisos de competición: organizador vs miembros del club (lectura).
+ * Permisos de competición: organizador, inscrito (coche propio) o miembro del club.
  * La gestión (reglas, participantes, etc.) sigue siendo solo `organizer`,
  * salvo administradores de licencia (`LICENSE_ADMIN_EMAILS`) para depuración.
  */
 
 const { isLicenseAdminUser } = require('./licenseAdminAuth');
+const { userIsEnrolledParticipant } = require('./competitionParticipation');
 
 function ensureSelectIncludesStatus(select) {
   const s = select && String(select).trim() ? String(select).trim() : 'id, organizer, club_id';
@@ -37,6 +38,9 @@ async function canViewCompetition(supabase, user, competition) {
   if (isLicenseAdminUser(user)) return true;
   const userId = user.id;
   if (competition.organizer === userId) return true;
+  if (competition.id && (await userIsEnrolledParticipant(supabase, userId, competition.id))) {
+    return true;
+  }
   if (!competition.club_id) return false;
   const { data: mem } = await supabase
     .from('club_members')

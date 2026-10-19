@@ -201,10 +201,12 @@
   "classification": "Clasificación",
   "round": "Manga {{n}}",
   "list": {
-    "subtitle": "Crea competiciones, gestiona participantes y registra tiempos desde un solo lugar.",
+    "subtitle": "Crea competiciones y consulta las pruebas en las que estás inscrito.",
     "debugSubtitle": "Modo depuración: competiciones del organizador {{id}}",
     "empty": "No tienes competiciones creadas",
     "openCompetition": "Abrir competición",
+    "viewPerformance": "Ver mi desempeño",
+    "enrolledBadge": "Inscrito",
     "copyPublicLink": "Copiar enlace público",
     "delete": "Eliminar",
     "recentTitle": "Competiciones recientes",
@@ -222,6 +224,7 @@
     "notFound": "Competición no encontrada",
     "subtitleOrganizer": "Configuración, participantes, categorías y reglas",
     "subtitleMember": "Consulta la competición de tu club",
+    "subtitleParticipant": "Tus tiempos y tu resultado en esta prueba",
     "sectionLabel": "Sección de la competición",
     "sections": {
       "setup": "Gestión",

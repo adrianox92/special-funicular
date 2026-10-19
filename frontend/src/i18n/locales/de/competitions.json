@@ -201,10 +201,12 @@
   "classification": "Wertung",
   "round": "Runde {{n}}",
   "list": {
-    "subtitle": "Erstelle Wettkämpfe, verwalte Teilnehmer und erfasse Zeiten an einem Ort.",
+    "subtitle": "Erstelle Wettkämpfe und sieh die Läufe, für die du gemeldet bist.",
     "debugSubtitle": "Debug-Modus: Wettkämpfe des Organisators {{id}}",
     "empty": "Du hast noch keine Wettkämpfe erstellt",
     "openCompetition": "Wettkampf öffnen",
+    "viewPerformance": "Mein Ergebnis ansehen",
+    "enrolledBadge": "Gemeldet",
     "copyPublicLink": "Öffentlichen Link kopieren",
     "delete": "Löschen",
     "recentTitle": "Aktuelle Wettkämpfe",
@@ -222,6 +224,7 @@
     "notFound": "Wettkampf nicht gefunden",
     "subtitleOrganizer": "Einrichtung, Teilnehmer, Kategorien und Regeln",
     "subtitleMember": "Wettkampf deines Clubs ansehen",
+    "subtitleParticipant": "Deine Zeiten und dein Ergebnis in diesem Lauf",
     "sectionLabel": "Wettkampf-Bereich",
     "sections": {
       "setup": "Verwaltung",

@@ -1026,13 +1026,14 @@ const Competitions = () => {
             const slotCap = competition.num_slots ?? 0;
             const occupancyPct =
               slotCap > 0 ? Math.min(100, (participantCount / slotCap) * 100) : 0;
+            const enrolledOnly = competition.viewer_role === 'participant';
             return (
             <Card key={competition.id} className="overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start gap-2 mb-4 min-w-0">
                   <h5 className="font-semibold text-lg min-w-0 flex-1 truncate">{competition.name}</h5>
                   <div className="flex shrink-0 items-center gap-1">
-                    {competition.public_slug ? (
+                    {competition.public_slug && !enrolledOnly ? (
                       <Button
                         type="button"
                         variant="ghost"
@@ -1057,6 +1058,9 @@ const Competitions = () => {
 
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <CompetitionStatusBadge status={competition.status} />
+                  {enrolledOnly && (
+                    <Badge variant="secondary">{t('list.enrolledBadge')}</Badge>
+                  )}
                   {(isLicenseAdmin || user?.id === competition.organizer) && (
                     <>
                       {(competition.status || 'published') === 'draft' && (
@@ -1142,13 +1146,20 @@ const Competitions = () => {
                 <div className="flex flex-col gap-2">
                   <Button
                     className="w-full gap-2 justify-between"
-                    onClick={() => navigate(competitionDetailPath(competition.id))}
+                    onClick={() =>
+                      navigate(
+                        competitionDetailPath(
+                          competition.id,
+                          enrolledOnly ? { section: 'timings' } : {},
+                        ),
+                      )
+                    }
                   >
-                    {t('list.openCompetition')}
+                    {enrolledOnly ? t('list.viewPerformance') : t('list.openCompetition')}
                     <ChevronRight className="size-4" />
                   </Button>
                   <div className="flex flex-wrap gap-2">
-                    {competition.public_slug && (
+                    {competition.public_slug && !enrolledOnly && (
                       <Button
                         type="button"
                         variant="outline"
