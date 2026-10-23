@@ -100,6 +100,11 @@ function mockGets({ refs = { total: 0, rows: [] } } = {}) {
     if (url === '/admin/platform-metrics') {
       return Promise.resolve({ data: METRICS });
     }
+    if (url === '/admin/catalog-link-suggestions') {
+      return Promise.resolve({
+        data: { suggestions: refs.suggestions ?? [] },
+      });
+    }
     if (url === '/admin/vehicle-refs-not-in-catalog') {
       const q = config?.params?.q;
       const manufacturer = config?.params?.manufacturer;
@@ -201,6 +206,7 @@ describe('AdminPlatformDashboard — búsqueda y enlace de refs de garaje', () =
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/admin/link-garage-refs-to-catalog', {
         garage_reference: 'AV52802',
+        catalog_item_id: IN_CATALOG_ROW.catalog_item_id,
         catalog_reference: 'AV52802',
         catalog_manufacturer_id: CATALOG_ID,
         garage_manufacturer: 'Avant Slot',
@@ -262,5 +268,63 @@ describe('AdminPlatformDashboard — búsqueda y enlace de refs de garaje', () =
       expect(withMfg.length).toBeGreaterThan(0);
     });
     expect(screen.getByText(/agrupados por marca/i)).toBeInTheDocument();
+  });
+
+  it('elige la ficha que termina en la referencia del garaje y enlaza por id', async () => {
+    const suggestion = {
+      id: '900e8585-d110-45a9-915c-c5669ddaca7e',
+      reference: '20027131',
+      manufacturer_id: CATALOG_ID,
+      manufacturer: 'Carrera',
+      model_name: 'Mercedes C DTM 2006 red',
+      match: 'suffix',
+      manufacturer_rank: 0,
+    };
+    mockGets({
+      refs: {
+        total: 1,
+        suggestions: [suggestion],
+        rows: [
+          {
+            reference: '27131',
+            vehicle_count: 1,
+            distinct_user_count: 1,
+            linkable_vehicle_count: 1,
+            linkable_distinct_user_count: 1,
+            sample_manufacturer: 'Carrera',
+            sample_model: 'Mercedes',
+            in_catalog: false,
+            catalog_item_count: 0,
+          },
+        ],
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <AdminPlatformDashboard />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByLabelText('Buscar referencia');
+    await userEvent.type(input, '27131');
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Enlazar' }));
+
+    const match = await screen.findByRole('button', { name: /20027131/ });
+    expect(match).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/Termina en la ref/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar enlace' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/admin/link-garage-refs-to-catalog', {
+        garage_reference: '27131',
+        catalog_item_id: suggestion.id,
+        catalog_reference: '20027131',
+        catalog_manufacturer_id: CATALOG_ID,
+        garage_manufacturer: 'Carrera',
+      });
+    });
   });
 });

@@ -190,3 +190,127 @@ describe('GET /api/admin/vehicle-refs-not-in-catalog', () => {
     );
   });
 });
+
+function queryChain(result) {
+  const builder = {
+    select: jest.fn(() => builder),
+    eq: jest.fn(() => builder),
+    ilike: jest.fn(() => builder),
+    limit: jest.fn(() => builder),
+    maybeSingle: jest.fn().mockResolvedValue(result),
+    then(onFulfilled, onRejected) {
+      return Promise.resolve(result).then(onFulfilled, onRejected);
+    },
+  };
+  return builder;
+}
+
+describe('enlace de referencias de garaje al catálogo', () => {
+  const previousAdmins = process.env.LICENSE_ADMIN_EMAILS;
+  const ITEM_ID = '900e8585-d110-45a9-915c-c5669ddaca7e';
+  const MFG_ID = '9a49046d-edc6-4a04-9eda-9bcf4aeb5f4d';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.LICENSE_ADMIN_EMAILS = ADMIN_EMAIL;
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: 'admin-id', email: ADMIN_EMAIL } },
+      error: null,
+    });
+    mockSupabase.rpc = jest.fn().mockResolvedValue({ data: 2, error: null });
+  });
+
+  afterAll(() => {
+    if (previousAdmins === undefined) delete process.env.LICENSE_ADMIN_EMAILS;
+    else process.env.LICENSE_ADMIN_EMAILS = previousAdmins;
+  });
+
+  test('GET suggestions llama al RPC con referencia y marca', async () => {
+    mockSupabase.rpc.mockResolvedValue({
+      data: [
+        {
+          id: ITEM_ID,
+          reference: '20027131',
+          manufacturer_id: MFG_ID,
+          manufacturer: 'Carrera',
+          model_name: 'Mercedes C DTM 2006 red',
+          match: 'suffix',
+          manufacturer_rank: 0,
+        },
+      ],
+      error: null,
+    });
+
+    const response = await request(app)
+      .get('/api/admin/catalog-link-suggestions?reference=27131&manufacturer=Carrera')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(response.status).toBe(200);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('admin_suggest_catalog_items_for_garage_ref', {
+      p_reference: '27131',
+      p_manufacturer: 'Carrera',
+    });
+    expect(response.body.suggestions).toHaveLength(1);
+    expect(response.body.suggestions[0].reference).toBe('20027131');
+  });
+
+  test('POST con catalog_item_id no recorre la marca y enlaza esa ficha', async () => {
+    const itemQuery = queryChain({ data: { id: ITEM_ID }, error: null });
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemQuery;
+      throw new Error(`tabla inesperada: ${table}`);
+    });
+
+    const response = await request(app)
+      .post('/api/admin/link-garage-refs-to-catalog')
+      .set('Authorization', 'Bearer test-token')
+      .send({
+        garage_reference: '27131',
+        catalog_item_id: ITEM_ID,
+        garage_manufacturer: 'Carrera',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.updated_count).toBe(2);
+    expect(itemQuery.ilike).not.toHaveBeenCalled();
+    expect(mockSupabase.rpc).toHaveBeenCalledWith(
+      'admin_link_vehicles_by_garage_ref_to_catalog_item',
+      {
+        p_garage_ref: '27131',
+        p_garage_manufacturer: 'Carrera',
+        p_catalog_item_id: ITEM_ID,
+      },
+    );
+  });
+
+  test('POST por referencia filtra en la consulta y acepta un alias', async () => {
+    const itemsQuery = queryChain({ data: [], error: null });
+    const aliasQuery = queryChain({
+      data: [{ catalog_item_id: ITEM_ID, alias_reference: '27131' }],
+      error: null,
+    });
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemsQuery;
+      if (table === 'slot_catalog_item_aliases') return aliasQuery;
+      throw new Error(`tabla inesperada: ${table}`);
+    });
+
+    const response = await request(app)
+      .post('/api/admin/link-garage-refs-to-catalog')
+      .set('Authorization', 'Bearer test-token')
+      .send({
+        garage_reference: '27131',
+        catalog_reference: '27131',
+        catalog_manufacturer_id: MFG_ID,
+      });
+
+    expect(response.status).toBe(200);
+    expect(itemsQuery.ilike).toHaveBeenCalledWith('reference', '27131');
+    expect(itemsQuery.eq).toHaveBeenCalledWith('manufacturer_id', MFG_ID);
+    expect(aliasQuery.ilike).toHaveBeenCalledWith('alias_reference', '27131');
+    expect(mockSupabase.rpc).toHaveBeenCalledWith(
+      'admin_link_vehicles_by_garage_ref_to_catalog_item',
+      expect.objectContaining({ p_catalog_item_id: ITEM_ID, p_garage_ref: '27131' }),
+    );
+  });
+});
