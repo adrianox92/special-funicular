@@ -5,12 +5,13 @@ const express = require('express');
 const { getAnonClient } = require('../lib/supabaseClients');
 const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
 const { fetchCatalogNeighbors } = require('../lib/catalogNeighbors');
+const { fetchCatalogSimilar } = require('../lib/catalogSimilar');
 
 const router = express.Router();
 const supabase = getAnonClient();
 
 const PUBLIC_SELECT =
-  'id, reference, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count';
+  'id, reference, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count, car_make, car_model';
 
 function escapeIlikePattern(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
@@ -293,7 +294,15 @@ router.get('/items/:id', async (req, res) => {
       console.warn('[publicCatalog] neighbors', neighborErr.message);
     }
 
-    res.json({ ...data, registered_user_count, neighbors });
+    let similar = [];
+    try {
+      similar = await fetchCatalogSimilar(supabase, data);
+    } catch (similarErr) {
+      console.warn('[publicCatalog] similar', similarErr.message);
+      similar = [];
+    }
+
+    res.json({ ...data, registered_user_count, neighbors, similar });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -113,7 +113,9 @@
     "send": "Senden",
     "sending": "Senden…",
     "addToGarage": "Zur Garage hinzufügen",
-    "addToGarageHint": "Öffnet das Formular für ein neues Fahrzeug mit dieser Referenz."
+    "addToGarageHint": "Öffnet das Formular für ein neues Fahrzeug mit dieser Referenz.",
+    "similarTitle": "Ähnliche Fahrzeuge",
+    "similarAria": "Karussell ähnlicher Fahrzeuge"
   },
   "guest": {
     "addTitle": "Diese Referenz zu deiner Garage hinzufügen",
@@ -169,6 +171,7 @@
     "pagePrev": "Zurück",
     "pageNext": "Weiter",
     "brands": "Marken",
+    "similarTitle": "Ähnliche Fahrzeuge",
     "motorLabels": {
       "inline": "längs",
       "angular": "Anglewinder",

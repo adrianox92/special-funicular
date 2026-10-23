@@ -113,7 +113,9 @@
     "send": "Enviar",
     "sending": "Enviando…",
     "addToGarage": "Añadir a mi garaje",
-    "addToGarageHint": "Se abrirá el alta de vehículo con esta referencia ya rellenada."
+    "addToGarageHint": "Se abrirá el alta de vehículo con esta referencia ya rellenada.",
+    "similarTitle": "Vehículos similares",
+    "similarAria": "Carrusel de vehículos similares"
   },
   "guest": {
     "addTitle": "Añade esta referencia a tu garaje",
@@ -169,6 +171,7 @@
     "pagePrev": "Anterior",
     "pageNext": "Siguiente",
     "brands": "Marcas",
+    "similarTitle": "Vehículos similares",
     "motorLabels": {
       "inline": "en línea",
       "angular": "angular",

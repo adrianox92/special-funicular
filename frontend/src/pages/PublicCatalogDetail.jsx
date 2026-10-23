@@ -35,6 +35,7 @@ import {
 } from '../utils/catalogItemSeo';
 import { ChevronRight, ExternalLink, Package, Star, X } from 'lucide-react';
 import StoreListingsSection from '../components/StoreListingsSection';
+import CatalogSimilarVehicles from '../components/CatalogSimilarVehicles';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
@@ -43,7 +44,7 @@ import CatalogPrevNext from '../components/CatalogPrevNext';
 import { useLocale } from '../hooks/useLocale';
 import { localizePath } from '../i18n/localeUtils';
 import { buildLoginPath, withIntent } from '../utils/authReturnUrl';
-import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import { cachedStorageImageUrl, rewritePublicCatalogMediaUrls } from '../utils/cachedStorageImageUrl';
 
 function readItemBootstrap(expectedId) {
   if (typeof window === 'undefined' || !expectedId) return null;
@@ -108,7 +109,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
 
   const loadItem = useCallback(async () => {
     const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(id)}`);
-    setItem(data);
+    setItem(rewritePublicCatalogMediaUrls(data));
     setSuggestForm({
       manufacturer_id: data.manufacturer_id ?? '',
       model_name: data.model_name ?? '',
@@ -212,7 +213,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       await api.put(`/catalog/items/${encodeURIComponent(id)}/rating`, { rating: value });
       setMyRating(value);
       const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(id)}`);
-      setItem(data);
+      setItem(rewritePublicCatalogMediaUrls(data));
       toast.success(t('detail.ratingSaved'));
     } catch (e) {
       toast.error(e.response?.data?.error || t('detail.ratingSaveError'));
@@ -225,7 +226,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       await api.delete(`/catalog/items/${encodeURIComponent(id)}/rating`);
       setMyRating(null);
       const { data } = await api.get(`/public/catalog/items/${encodeURIComponent(id)}`);
-      setItem(data);
+      setItem(rewritePublicCatalogMediaUrls(data));
       toast.success(t('detail.ratingCleared'));
     } catch (e) {
       toast.error(e.response?.data?.error || t('detail.ratingClearError'));
@@ -642,6 +643,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
           </CardContent>
         </Card>
         <StoreListingsSection catalogItemId={item.id} />
+        <CatalogSimilarVehicles items={item.similar} />
         <CatalogThirdPartyNotice />
 
         

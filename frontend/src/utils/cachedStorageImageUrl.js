@@ -217,6 +217,44 @@ function resolveStorageImageRequest(input) {
   };
 }
 
+const ITEM_MEDIA_KEYS = ['image_url', 'manufacturer_logo_url'];
+const BRAND_MEDIA_KEYS = ['logo_url'];
+
+function rewriteMediaFields(row, keys, opts) {
+  if (!row || typeof row !== 'object') return row;
+  const next = { ...row };
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    if (next[key] == null || String(next[key]).trim() === '') continue;
+    next[key] = cachedStorageImageUrl(next[key], opts);
+  }
+  return next;
+}
+
+/**
+ * Reescribe URLs de Storage en payloads del catálogo público
+ * (`items`, `brands`, `similar` y la ficha raíz).
+ * @param {unknown} payload
+ * @param {{ origin?: string, enabled?: boolean, allowedHosts?: Set<string> }} [opts]
+ */
+function rewritePublicCatalogMediaUrls(payload, opts) {
+  if (payload == null || typeof payload !== 'object') return payload;
+  if (Array.isArray(payload)) {
+    return payload.map((row) => rewriteMediaFields(row, ITEM_MEDIA_KEYS, opts));
+  }
+  const out = rewriteMediaFields(payload, ITEM_MEDIA_KEYS.concat(BRAND_MEDIA_KEYS), opts);
+  if (Array.isArray(payload.items)) {
+    out.items = payload.items.map((row) => rewriteMediaFields(row, ITEM_MEDIA_KEYS, opts));
+  }
+  if (Array.isArray(payload.brands)) {
+    out.brands = payload.brands.map((row) => rewriteMediaFields(row, BRAND_MEDIA_KEYS, opts));
+  }
+  if (Array.isArray(payload.similar)) {
+    out.similar = payload.similar.map((row) => rewriteMediaFields(row, ITEM_MEDIA_KEYS, opts));
+  }
+  return out;
+}
+
 function pathSegmentsFromReq(req) {
   const q = (req && req.query) || {};
   if (q.p) {
@@ -269,6 +307,7 @@ module.exports = {
   isSupabaseStorageHost,
   parseAllowedStorageUrl,
   cachedStorageImageUrl,
+  rewritePublicCatalogMediaUrls,
   resolveStorageImageRequest,
   pathSegmentsFromReq,
 };

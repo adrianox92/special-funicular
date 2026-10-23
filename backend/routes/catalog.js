@@ -18,6 +18,7 @@ const { catalogContributionsLimiter } = require('../middleware/rateLimits');
 const { isExcelImportFile, normalizeBlankColumnHeaders } = require('../lib/vehicleImport');
 const { parseImportCommercialReleaseYear } = require('../lib/importDateParse');
 const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
+const { catalogCarIdentityColumns } = require('../lib/catalogCarIdentity');
 const {
   computeCatalogDashboardStats,
   aggregateCompletenessByManufacturerId,
@@ -975,6 +976,7 @@ router.post('/items', adminGuard, adminCatalogServiceDb, itemUpload, async (req,
           real_race_results_url: raceResultsParsed.value,
           real_race_photos_url: racePhotosParsed.value,
           image_url,
+          ...catalogCarIdentityColumns(model_name),
           updated_at: new Date().toISOString(),
         },
       ])
@@ -1101,6 +1103,7 @@ router.put('/items/:id', adminGuard, adminCatalogServiceDb, itemUpload, async (r
         real_race_results_url,
         real_race_photos_url,
         image_url,
+        ...catalogCarIdentityColumns(model_name, existing.car_identity_source),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);
@@ -1377,6 +1380,7 @@ router.post('/change-requests/:requestId/approve', adminGuard, adminCatalogServi
         real_race_photos_url:
           patch.real_race_photos_url !== undefined ? patch.real_race_photos_url : item.real_race_photos_url,
         image_url: patch.image_url ?? null,
+        ...catalogCarIdentityColumns(patch.model_name ?? item.model_name, item.car_identity_source),
         updated_at: new Date().toISOString(),
       })
       .eq('id', row.catalog_item_id);
@@ -1607,6 +1611,7 @@ router.post('/insert-requests/:requestId/approve', adminGuard, adminCatalogServi
             return le ? lt : null;
           })(),
           image_url: row.proposed_image_url,
+          ...catalogCarIdentityColumns(row.proposed_model_name),
           updated_at: new Date().toISOString(),
         },
       ])
@@ -1752,7 +1757,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
 
     const { data: existing } = await sb
       .from('slot_catalog_items')
-      .select('id')
+      .select('id, car_identity_source')
       .eq('reference', ref)
       .eq('manufacturer_id', manufacturer_id)
       .maybeSingle();
@@ -1782,6 +1787,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
           dorsal,
           limited_edition,
           limited_edition_total,
+          ...catalogCarIdentityColumns(model_name, existing.car_identity_source),
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
@@ -1807,6 +1813,7 @@ async function runCatalogImportRows(rows, duplicateMode, onProgress, sb) {
           dorsal,
           limited_edition,
           limited_edition_total,
+          ...catalogCarIdentityColumns(model_name),
           updated_at: new Date().toISOString(),
         },
       ])
