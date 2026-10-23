@@ -27,6 +27,53 @@ function isUuid(s) {
   );
 }
 
+/** ILIKE sin comodines: la referencia se compara entera, sin distinguir mayúsculas. */
+function escapeIlikeExact(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+/**
+ * Busca el ítem por referencia canónica o alias dentro de una marca.
+ * El filtro va en la consulta: un select de toda la marca se queda en 1000 filas.
+ */
+async function findCatalogItemIdsByBrandReference(supabase, manufacturerId, reference) {
+  const needle = reference.trim().toLowerCase();
+  const pattern = escapeIlikeExact(reference.trim());
+  const [itemsRes, aliasRes] = await Promise.all([
+    supabase
+      .from('slot_catalog_items')
+      .select('id, reference')
+      .eq('manufacturer_id', manufacturerId)
+      .ilike('reference', pattern)
+      .limit(5),
+    supabase
+      .from('slot_catalog_item_aliases')
+      .select('catalog_item_id, alias_reference')
+      .eq('manufacturer_id', manufacturerId)
+      .ilike('alias_reference', pattern)
+      .limit(5),
+  ]);
+
+  if (itemsRes.error) return { error: itemsRes.error };
+  if (aliasRes.error) return { error: aliasRes.error };
+
+  const ids = new Set();
+  for (const row of itemsRes.data || []) {
+    if (row?.id && String(row.reference ?? '').trim().toLowerCase() === needle) {
+      ids.add(row.id);
+    }
+  }
+  for (const row of aliasRes.data || []) {
+    if (
+      row?.catalog_item_id &&
+      String(row.alias_reference ?? '').trim().toLowerCase() === needle
+    ) {
+      ids.add(row.catalog_item_id);
+    }
+  }
+  return { ids: [...ids] };
+}
+
 /**
  * GET /platform-metrics?from=&to=
  * Intervalo semicerrado [from, to) en ISO 8601.
@@ -172,8 +219,51 @@ router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
 });
 
 /**
+ * GET /catalog-link-suggestions?reference=&manufacturer=
+ * Fichas cuya referencia coincide con la del garaje o termina en ella.
+ */
+router.get('/catalog-link-suggestions', async (req, res) => {
+  try {
+    if (!assertLicenseAdmin(req, res)) return;
+
+    const supabaseAdmin = getServiceClient();
+    if (!supabaseAdmin) {
+      return res.status(503).json({
+        error: 'Servicio no disponible: falta SUPABASE_SERVICE_ROLE_KEY en el servidor.',
+      });
+    }
+
+    const reference = String(req.query.reference ?? req.query.q ?? '').trim().slice(0, 64);
+    const manufacturer = String(req.query.manufacturer ?? req.query.mfg ?? '').trim().slice(0, 100);
+    if (reference.length < 2) {
+      return res.status(400).json({ error: 'reference debe tener al menos 2 caracteres.' });
+    }
+
+    const { data, error } = await supabaseAdmin.rpc('admin_suggest_catalog_items_for_garage_ref', {
+      p_reference: reference,
+      p_manufacturer: manufacturer !== '' ? manufacturer : null,
+    });
+
+    if (error) {
+      console.error('admin_suggest_catalog_items_for_garage_ref:', error);
+      return res.status(500).json({ error: error.message || 'Error al buscar coincidencias' });
+    }
+
+    res.json({
+      reference,
+      manufacturer: manufacturer !== '' ? manufacturer : null,
+      suggestions: Array.isArray(data) ? data : [],
+    });
+  } catch (err) {
+    console.error('catalog-link-suggestions:', err);
+    res.status(500).json({ error: err?.message || 'Error interno' });
+  }
+});
+
+/**
  * POST /link-garage-refs-to-catalog
- * Body JSON: garage_reference, catalog_reference, catalog_manufacturer_id, garage_manufacturer? (opcional)
+ * Body JSON: garage_reference y, o bien catalog_item_id, o bien
+ * catalog_reference + catalog_manufacturer_id. garage_manufacturer es opcional.
  */
 router.post('/link-garage-refs-to-catalog', async (req, res) => {
   try {
@@ -189,42 +279,62 @@ router.post('/link-garage-refs-to-catalog', async (req, res) => {
     const garageRef = req.body?.garage_reference != null ? String(req.body.garage_reference).trim() : '';
     const catalogRef = req.body?.catalog_reference != null ? String(req.body.catalog_reference).trim() : '';
     const catalogManufacturerId = req.body?.catalog_manufacturer_id != null ? String(req.body.catalog_manufacturer_id).trim() : '';
+    const requestedItemId = req.body?.catalog_item_id != null ? String(req.body.catalog_item_id).trim() : '';
     const garageManufacturer =
       req.body?.garage_manufacturer != null ? String(req.body.garage_manufacturer).trim() : '';
 
-    if (!garageRef || !catalogRef || !catalogManufacturerId) {
-      return res.status(400).json({
-        error: 'garage_reference, catalog_reference y catalog_manufacturer_id son obligatorios.',
-      });
-    }
-    if (!isUuid(catalogManufacturerId)) {
-      return res.status(400).json({ error: 'catalog_manufacturer_id no es un UUID válido.' });
-    }
-    const { data: catalogRows, error: catErr } = await supabaseAdmin
-      .from('slot_catalog_items')
-      .select('id, reference')
-      .eq('manufacturer_id', catalogManufacturerId);
-
-    if (catErr) {
-      console.error('link-garage-refs catalog lookup:', catErr);
-      return res.status(500).json({ error: catErr.message || 'Error al buscar el ítem de catálogo' });
+    if (!garageRef) {
+      return res.status(400).json({ error: 'garage_reference es obligatorio.' });
     }
 
-    const catNorm = catalogRef.toLowerCase();
-    const matches = (catalogRows ?? []).filter(
-      (r) => r.reference != null && String(r.reference).trim().toLowerCase() === catNorm,
-    );
+    let catalogItemId = '';
 
-    if (matches.length === 0) {
-      return res.status(404).json({
-        error: 'No hay ningún ítem del catálogo con esa referencia para la marca indicada.',
-      });
-    }
-    if (matches.length > 1) {
-      return res.status(409).json({ error: 'Varios ítems coinciden; revisa datos en base de datos.' });
-    }
+    if (requestedItemId) {
+      if (!isUuid(requestedItemId)) {
+        return res.status(400).json({ error: 'catalog_item_id no es un UUID válido.' });
+      }
+      const { data: item, error: itemErr } = await supabaseAdmin
+        .from('slot_catalog_items')
+        .select('id')
+        .eq('id', requestedItemId)
+        .maybeSingle();
+      if (itemErr) {
+        console.error('link-garage-refs catalog item:', itemErr);
+        return res.status(500).json({ error: itemErr.message || 'Error al buscar el ítem de catálogo' });
+      }
+      if (!item?.id) {
+        return res.status(404).json({ error: 'Ítem de catálogo no encontrado.' });
+      }
+      catalogItemId = item.id;
+    } else {
+      if (!catalogRef || !catalogManufacturerId) {
+        return res.status(400).json({
+          error: 'Indica catalog_item_id, o catalog_reference y catalog_manufacturer_id.',
+        });
+      }
+      if (!isUuid(catalogManufacturerId)) {
+        return res.status(400).json({ error: 'catalog_manufacturer_id no es un UUID válido.' });
+      }
 
-    const catalogItemId = matches[0].id;
+      const found = await findCatalogItemIdsByBrandReference(
+        supabaseAdmin,
+        catalogManufacturerId,
+        catalogRef,
+      );
+      if (found.error) {
+        console.error('link-garage-refs catalog lookup:', found.error);
+        return res.status(500).json({ error: found.error.message || 'Error al buscar el ítem de catálogo' });
+      }
+      if (found.ids.length === 0) {
+        return res.status(404).json({
+          error: 'No hay ningún ítem del catálogo con esa referencia para la marca indicada.',
+        });
+      }
+      if (found.ids.length > 1) {
+        return res.status(409).json({ error: 'Varios ítems coinciden; revisa datos en base de datos.' });
+      }
+      catalogItemId = found.ids[0];
+    }
 
     const { data: rpcData, error: rpcErr } = await supabaseAdmin.rpc(
       'admin_link_vehicles_by_garage_ref_to_catalog_item',

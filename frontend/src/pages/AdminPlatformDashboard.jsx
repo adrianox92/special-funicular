@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { LayoutDashboard, RefreshCw, Search, Users, UserCheck, Car, Trophy, Timer } from 'lucide-react';
 import api from '../lib/axios';
+import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { Button } from '../components/ui/button';
@@ -85,7 +86,29 @@ function syncAdminRefsQueryInUrl({ q, manufacturer }) {
 function uniqueCatalogMatch(row) {
   if (!row?.in_catalog) return false;
   const count = Number(row.catalog_item_count);
-  return count === 1 && !!row.catalog_manufacturer_id;
+  return count === 1 && !!row.catalog_manufacturer_id && !!row.catalog_item_id;
+}
+
+const CATALOG_MATCH_LABEL = {
+  exact: 'Misma referencia',
+  alias: 'Alias',
+  ean: 'EAN',
+  prefix: 'Prefijo de marca',
+  suffix: 'Termina en la ref. del garaje',
+};
+
+/** Una sola ficha clara: la única, o la única de la misma marca de garaje. */
+function pickSuggestedCatalogItem(suggestions) {
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+  if (suggestions.length === 1) return suggestions[0];
+  const ranks = suggestions
+    .map((item) => Number(item?.manufacturer_rank))
+    .filter((rank) => Number.isFinite(rank));
+  if (ranks.length === 0) return null;
+  const best = Math.min(...ranks);
+  if (best > 1) return null;
+  const top = suggestions.filter((item) => Number(item?.manufacturer_rank) === best);
+  return top.length === 1 ? top[0] : null;
 }
 
 const PRESETS = [
@@ -176,10 +199,15 @@ const AdminPlatformDashboard = () => {
   const [linkDialogRow, setLinkDialogRow] = useState(null);
   const [linkCatalogManufacturerId, setLinkCatalogManufacturerId] = useState('');
   const [linkCatalogReference, setLinkCatalogReference] = useState('');
+  const [linkCatalogItemId, setLinkCatalogItemId] = useState('');
+  const [linkSuggestions, setLinkSuggestions] = useState([]);
+  const [linkSuggestionsLoading, setLinkSuggestionsLoading] = useState(false);
+  const [linkSuggestionsError, setLinkSuggestionsError] = useState(null);
   const [linkRestrictMfg, setLinkRestrictMfg] = useState(true);
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkFeedback, setLinkFeedback] = useState(null);
   const [refsLinkBanner, setRefsLinkBanner] = useState(null);
+  const linkSelectionTouchedRef = useRef(false);
 
   const fetchMetrics = useCallback(async () => {
     if (!range) return;
@@ -270,16 +298,31 @@ const AdminPlatformDashboard = () => {
     };
   };
 
+  const applyCatalogSuggestion = (item, { userChosen = false } = {}) => {
+    if (!item?.id) return;
+    if (userChosen) linkSelectionTouchedRef.current = true;
+    setLinkCatalogItemId(String(item.id));
+    setLinkCatalogManufacturerId(String(item.manufacturer_id || ''));
+    setLinkCatalogReference(String(item.reference || ''));
+    setLinkFeedback(null);
+  };
+
   const openLinkDialog = (row) => {
     setRefsLinkBanner(null);
     setLinkFeedback(null);
+    setLinkSuggestions([]);
+    setLinkSuggestionsError(null);
+    setLinkSuggestionsLoading(String(row.reference || '').trim().length >= 2);
+    linkSelectionTouchedRef.current = false;
     setLinkDialogRow(row);
     if (uniqueCatalogMatch(row)) {
       setLinkCatalogManufacturerId(String(row.catalog_manufacturer_id));
       setLinkCatalogReference(String(row.catalog_reference || row.reference || ''));
+      setLinkCatalogItemId(String(row.catalog_item_id));
     } else {
       setLinkCatalogManufacturerId('');
       setLinkCatalogReference('');
+      setLinkCatalogItemId('');
     }
     setLinkRestrictMfg(!!(row.sample_manufacturer && String(row.sample_manufacturer).trim()));
   };
@@ -287,10 +330,11 @@ const AdminPlatformDashboard = () => {
   const submitLinkGarageToCatalog = async () => {
     if (!linkDialogRow) return;
     const catRef = linkCatalogReference.trim();
-    if (!linkCatalogManufacturerId?.trim() || !catRef) {
+    const itemId = linkCatalogItemId.trim();
+    if (!itemId && (!linkCatalogManufacturerId?.trim() || !catRef)) {
       setLinkFeedback({
         variant: 'destructive',
-        text: 'Marca del catálogo y referencia del catálogo son obligatorias.',
+        text: 'Elige una coincidencia, o indica la marca y la referencia del catálogo.',
       });
       return;
     }
@@ -299,9 +343,12 @@ const AdminPlatformDashboard = () => {
     try {
       const payload = {
         garage_reference: linkDialogRow.reference ?? '',
-        catalog_reference: catRef,
-        catalog_manufacturer_id: linkCatalogManufacturerId.trim(),
       };
+      if (itemId) payload.catalog_item_id = itemId;
+      if (catRef) payload.catalog_reference = catRef;
+      if (linkCatalogManufacturerId?.trim()) {
+        payload.catalog_manufacturer_id = linkCatalogManufacturerId.trim();
+      }
       const sm = linkDialogRow.sample_manufacturer;
       if (linkRestrictMfg && sm != null && String(sm).trim() !== '') {
         payload.garage_manufacturer = String(sm).trim();
@@ -322,6 +369,48 @@ const AdminPlatformDashboard = () => {
       setLinkSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!linkDialogRow) return undefined;
+    const reference = String(linkDialogRow.reference || '').trim();
+    if (reference.length < 2) return undefined;
+
+    let cancelled = false;
+    const manufacturer = String(linkDialogRow.sample_manufacturer || '').trim();
+    setLinkSuggestionsLoading(true);
+    setLinkSuggestionsError(null);
+
+    api
+      .get('/admin/catalog-link-suggestions', {
+        params: {
+          reference,
+          ...(manufacturer ? { manufacturer } : {}),
+        },
+      })
+      .then(({ data: res }) => {
+        if (cancelled) return;
+        const list = Array.isArray(res?.suggestions) ? res.suggestions : [];
+        setLinkSuggestions(list);
+        if (!linkSelectionTouchedRef.current && !uniqueCatalogMatch(linkDialogRow)) {
+          const pick = pickSuggestedCatalogItem(list);
+          if (pick) applyCatalogSuggestion(pick);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLinkSuggestions([]);
+        setLinkSuggestionsError(
+          err.response?.data?.error || err.message || 'No se pudieron cargar las coincidencias',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLinkSuggestionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [linkDialogRow]);
 
   useEffect(() => {
     if (isAdmin && range) void fetchMetrics();
@@ -854,12 +943,13 @@ const AdminPlatformDashboard = () => {
       </Card>
 
       <Dialog open={!!linkDialogRow} onOpenChange={(open) => !open && setLinkDialogRow(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Enlazar referencia de garaje al catálogo</DialogTitle>
             <DialogDescription>
               Se actualizarán todos los vehículos con la misma referencia de garaje (y filtro de fabricante si
-              aplica) que tengan <span className="font-mono">catalog_item_id</span> vacío.
+              aplica) que tengan <span className="font-mono">catalog_item_id</span> vacío. Si la ficha no
+              coincide al pie de la letra, también aparecen las que terminan en ese código.
             </DialogDescription>
           </DialogHeader>
           {linkDialogRow && (
@@ -897,19 +987,74 @@ const AdminPlatformDashboard = () => {
                   correcta.
                 </p>
               )}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Coincidencias</p>
+                {linkSuggestionsLoading && (
+                  <p className="text-xs text-muted-foreground">Buscando fichas…</p>
+                )}
+                {linkSuggestionsError && (
+                  <p className="text-xs text-destructive">{linkSuggestionsError}</p>
+                )}
+                {!linkSuggestionsLoading && !linkSuggestionsError && linkSuggestions.length === 0 && !uniqueCatalogMatch(linkDialogRow) && (
+                  <p className="text-xs text-muted-foreground">
+                    Ninguna ficha tiene esta referencia ni termina en ella. Indica la marca y la referencia
+                    exacta del catálogo.
+                  </p>
+                )}
+                {linkSuggestions.length > 0 && (
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
+                    {linkSuggestions.map((item) => {
+                      const selected = linkCatalogItemId === String(item.id);
+                      const label = CATALOG_MATCH_LABEL[item.match] || 'Coincidencia';
+                      return (
+                        <Button
+                          key={item.id}
+                          type="button"
+                          variant="outline"
+                          aria-pressed={selected}
+                          className={cn(
+                            'h-auto w-full justify-start whitespace-normal px-3 py-2 text-left',
+                            selected && 'border-primary bg-primary/10',
+                          )}
+                          onClick={() => applyCatalogSuggestion(item, { userChosen: true })}
+                        >
+                          <span className="flex w-full flex-col gap-0.5">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-sm">{item.reference}</span>
+                              <Badge variant={selected ? 'default' : 'secondary'}>{label}</Badge>
+                            </span>
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {item.manufacturer || '—'}
+                              {item.model_name ? ` · ${item.model_name}` : ''}
+                            </span>
+                          </span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <CatalogBrandSelect
                 id="admin-gap-link-catalog-brand"
                 label="Marca en el catálogo"
                 value={linkCatalogManufacturerId}
-                onChange={setLinkCatalogManufacturerId}
-                required
+                onChange={(id) => {
+                  linkSelectionTouchedRef.current = true;
+                  setLinkCatalogManufacturerId(id);
+                  setLinkCatalogItemId('');
+                }}
+                required={!linkCatalogItemId}
               />
               <div className="space-y-2">
                 <Label htmlFor="admin-gap-link-catalog-ref">Referencia en el catálogo</Label>
                 <Input
                   id="admin-gap-link-catalog-ref"
                   value={linkCatalogReference}
-                  onChange={(e) => setLinkCatalogReference(e.target.value)}
+                  onChange={(e) => {
+                    linkSelectionTouchedRef.current = true;
+                    setLinkCatalogReference(e.target.value);
+                    setLinkCatalogItemId('');
+                  }}
                   placeholder="ej. AV52802"
                   className="font-mono"
                 />
