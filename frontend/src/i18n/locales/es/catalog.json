@@ -10,7 +10,9 @@
     "propose": "Proponer alta",
     "login": "Iniciar sesión",
     "register": "Crear cuenta",
-    "dashboard": "Panel"
+    "dashboard": "Panel",
+    "menu": "Menú",
+    "openMenu": "Abrir menú"
   },
   "list": {
     "heading": "Catálogo de referencias",

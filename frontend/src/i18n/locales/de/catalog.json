@@ -10,7 +10,9 @@
     "propose": "Eintrag vorschlagen",
     "login": "Anmelden",
     "register": "Konto erstellen",
-    "dashboard": "Übersicht"
+    "dashboard": "Übersicht",
+    "menu": "Menü",
+    "openMenu": "Menü öffnen"
   },
   "list": {
     "heading": "Referenzkatalog",

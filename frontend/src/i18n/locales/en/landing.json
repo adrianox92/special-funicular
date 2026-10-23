@@ -1,63 +1,84 @@
 {
   "hero": {
-    "title": "Take your slot collection management to the next level",
-    "subtitle": "Technical sheets, millisecond timing, competitions and cloud sync for Scalextric, Ninco and Avant Slot.",
-    "tagline": "Your slot database: cars, spare parts, setups and more",
-    "lead": "Manage slot cars with full sheets, parts and consumables inventory, time every lap, compare setups and run competitions with public entry and live ranking — all in one place.",
+    "title": "The most complete slot catalog, and your garage on the same platform",
+    "subtitle": "Over 9,600 references and 7,000 images. Collection, timing, leagues and clubs.",
+    "tagline": "The most complete slot catalog on the market",
+    "lead": "Over 9,600 slot-car references and 7,000 images in 1:32, 1:43 and 1:24, with technical sheets and ratings. On the same account you manage your collection, time laps, race in leagues and clubs, and sync with Slot Database Lap Timer.",
     "ctaLogin": "Log in",
     "ctaRegister": "Create free account",
-    "ctaRegisterShort": "Sign up",
+    "ctaRegisterShort": "Create account",
     "ctaCatalog": "Browse catalog",
     "ctaHaveAccount": "Already have an account? Sign in"
   },
   "nav": {
     "catalog": "Catalog",
-    "slotRaceManager": "Slot Race Manager",
+    "slotRaceManager": "Lap Timer",
     "login": "Log in",
     "register": "Sign up"
   },
   "themeToggle": "Toggle theme",
   "highlights": {
-    "pwa": "Installable PWA",
-    "pdf": "Exportable PDF",
-    "api": "Sync API"
+    "refs": "9,600+ references",
+    "images": "7,000+ images",
+    "scales": "Scales 1:32, 1:43 and 1:24"
   },
   "cards": {
-    "collection": { "title": "Collection", "blurb": "Sheets, photos and setups in one place." },
-    "timings": { "title": "Timings", "blurb": "Millisecond laps and per-session analysis." },
-    "competitions": { "title": "Competitions", "blurb": "Sign-ups, rules and live ranking." },
-    "inventory": { "title": "Inventory", "blurb": "Parts stock, alerts and car fitment." }
+    "catalog": { "title": "Catalog", "blurb": "Over 9,600 references and 7,000 images, open without an account." },
+    "collection": { "title": "Collection", "blurb": "Move a catalog model into your garage and finish the sheet." },
+    "timings": { "title": "Timings", "blurb": "Millisecond laps on the web or with Slot Database Lap Timer." },
+    "competitions": { "title": "Leagues and clubs", "blurb": "Events, a season and a public driver profile." }
   },
   "stats": {
     "aria": "Platform pillars",
-    "complete": {
-      "title": "Full management",
-      "text": "Multi-view photos, technical specs and modifications with cost."
+    "catalog": {
+      "title": "Reference catalog",
+      "text": "Over 9,600 sheets and 7,000 images. The most complete slot catalog on the market."
     },
     "precision": {
       "title": "Millisecond precision",
-      "text": "Lap timing, consistency and progress charts."
+      "text": "On the web and with Slot Database Lap Timer: desktop is available; mobile apps are still to come."
     },
     "competitions": {
-      "title": "Pro competitions",
-      "text": "Live ranking and TV-style presentation for your event."
+      "title": "Clubs and leagues",
+      "text": "Events, a season with discards and a live ranking."
     },
     "inventory": {
       "title": "Parts inventory",
       "text": "Stock, categories, restocking and links to car fitment."
     }
   },
+  "showcase": {
+    "kicker": "Reference catalog",
+    "title": "The best slot catalog on the market",
+    "lead": "Scalextric, Ninco, Avant Slot, Scaleauto and many more brands, in 1:32, 1:43 and 1:24. Each sheet brings together the reference, an image and technical data and, when they exist, an EAN and a link to the real-world race.",
+    "cta": "Open the catalog",
+    "previewAria": "Carousel of complete models, one from each brand",
+    "stats": {
+      "refs": { "value": "9,600+", "label": "catalogued references" },
+      "images": { "value": "7,000+", "label": "model images" },
+      "specs": { "value": "1:32 · 1:43 · 1:24", "label": "several scales in the same catalog" },
+      "open": { "value": "Free", "label": "browse without an account; sign in to rate and suggest" }
+    },
+    "bullets": [
+      "Search by reference, EAN, model or brand",
+      "Filters for brand, type, drivetrain, motor position, year and status",
+      "References in 1:32, 1:43 and 1:24",
+      "Technical sheet with dimensions, weight, magnet, gearing, lights and ratings",
+      "Correction suggestions and new listings, reviewed by the team",
+      "From the sheet to your garage: the new car opens with the reference filled in"
+    ]
+  },
   "features": {
     "collection": {
-      "title": "Collection management",
-      "description": "A professional catalog for slot cars (Scalextric, Ninco, Avant Slot, Scaleauto and more): images, purchase data, setup and documentation ready to share.",
+      "title": "Your collection, linked to the catalog",
+      "description": "The catalog is the starting point. From a reference you move into your garage and complete photos, purchase data, setup and that car's history.",
       "bullets": [
+        "Add from the catalog by reference, or import a CSV",
         "Photos from 6 views (front, sides, rear, top, chassis, 3/4)",
-        "Technical specs with components (motor, pinion, crown, guide, axles…)",
-        "Modification log with cost and history",
-        "Export a complete technical sheet to PDF",
-        "Advanced filters, grid/table view and CSV export",
-        "Digital, Museum and Workshop badges"
+        "Specs and components (motor, pinion, crown, guide, axles…)",
+        "Modifications with cost and a PDF export of the sheet",
+        "The car's record in completed competitions",
+        "Maintenance history and best-lap progress"
       ]
     },
     "inventory": {
@@ -74,55 +95,57 @@
     },
     "timing": {
       "title": "Timing and performance",
-      "description": "See how each car and each setup change performs with granular data and clear comparisons.",
+      "description": "Record every lap on the web or sync it with Slot Database Lap Timer, the timer for the DS200. The desktop version is already available; the mobile apps have not launched yet.",
       "bullets": [
         "Lap times with millisecond precision",
         "Session analysis: progress, histogram and delta vs best lap",
-        "Side-by-side comparison of two sessions",
-        "Setup analysis: compare setups across sessions",
-        "Performance comparison by lane",
-        "Charts for lap-time and speed progress"
+        "Compare sessions, setups and performance by lane",
+        "Correlation between voltage and performance",
+        "Training goals on the home dashboard",
+        "Slot Database Lap Timer on desktop, including offline. Mobile apps coming soon"
       ]
     },
     "competitions": {
-      "title": "Competition system",
-      "description": "Run events with the same rigour you apply in the garage: categories, rules and traceable results.",
+      "title": "Competitions, leagues and clubs",
+      "description": "From a one-day event to the club season: public entry, standings and a driver profile you can share.",
       "bullets": [
-        "Competitions with circuits and categories",
-        "Public entries via a shareable link",
-        "Custom scoring rules and templates",
-        "Round times with penalties",
-        "Live ranking and presentation mode (Live TV)",
+        "Competitions with circuits, categories and favourite drivers",
+        "Season leagues with discards, DNS, DNF, DSQ and points adjustments",
+        "Clubs with members, circuits, a calendar and a ranking",
+        "Public entry, live ranking and presentation mode (Live TV)",
+        "Public profile: record, podiums and best times per circuit",
         "CSV and PDF results export"
       ]
     },
     "analytics": {
       "title": "Dashboard and analytics",
-      "description": "A panel that summarises investment, fleet mix and performance so you can decide with data.",
+      "description": "A panel that summarises spend, catalog coverage and performance so you can decide with data.",
       "bullets": [
         "Collection metrics: cars, spend and trends",
         "Charts by brand, type, shop and modifications",
-        "Investment over time",
-        "Top cars by cost and most-used components"
+        "How much of your collection is linked to the reference catalog",
+        "Investment over time and top cars by cost"
       ]
     }
   },
   "extras": {
     "heading": "And more…",
-    "lead": "Details that make the tool better to use every day.",
+    "lead": "What has grown around the catalog and the garage so you can use it every day.",
     "pwa": { "title": "PWA", "text": "Installable on phone and desktop." },
-    "api": { "title": "API & sync", "text": "API keys and endpoints for external apps." },
-    "theme": { "title": "Light / dark theme", "text": "Comfortable in any environment." },
-    "responsive": { "title": "Responsive", "text": "Phone, tablet and desktop." },
-    "circuits": { "title": "Circuits", "text": "Several lanes and a length per lane." }
+    "api": { "title": "API & sync", "text": "Keys for Slot Database Lap Timer, clubs and external apps." },
+    "languages": { "title": "Three languages", "text": "Interface in Spanish, English and German." },
+    "clubs": { "title": "Clubs", "text": "Invites, shared circuits and club leagues." },
+    "profiles": { "title": "Public profile", "text": "Collection, record and best times you can share." }
   },
   "cta": {
-    "title": "Start managing your collection today",
-    "lead": "Create your account in seconds and keep a record of every car, every lap and every event.",
-    "register": "Create free account"
+    "title": "Start with the catalog or with your garage",
+    "lead": "The sheets are public. The account is free and lets you rate, move a model into your collection and time laps.",
+    "register": "Create free account",
+    "catalog": "Browse the catalog"
   },
   "seo": {
-    "title": "Slot Database | Take your slot collection to the next level",
-    "description": "Slot Database: manage Scalextric, Ninco and Avant Slot cars. Technical sheets, millisecond timing, competitions and cloud sync."
+    "title": "Slot Database | Slot catalog with over 9,600 references",
+    "description": "The most complete slot-car reference catalog on the market: over 9,600 models and 7,000 images in 1:32, 1:43 and 1:24. Collection, timing, leagues, clubs and Slot Database Lap Timer.",
+    "keywords": "slot, scalextric, ninco, avant slot, slot car catalog, 1:32, 1:43, 1:24, slot car database, scalextric collection, slot reference catalog"
   }
 }

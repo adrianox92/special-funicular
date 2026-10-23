@@ -17,6 +17,7 @@ const {
   catalogSearchOrClause,
 } = require('../lib/catalogAliases');
 const { rewritePublicCatalogResponse } = require('../lib/publicCatalogImageUrls');
+const { fetchCatalogCompleteHighlights } = require('../lib/catalogHighlights');
 
 /** Techo del listado público: la UI usa 24; 48 cubre grids densos sin dump masivo. */
 const PUBLIC_ITEMS_MAX_LIMIT = 48;
@@ -112,6 +113,18 @@ router.get('/brands', async (req, res) => {
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
     res.json(rewritePublicCatalogResponse({ brands: data ?? [] }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /highlights — un modelo 100% completo por marca, para el carrusel del homepage.
+ */
+router.get('/highlights', async (req, res) => {
+  try {
+    const items = await fetchCatalogCompleteHighlights(supabase);
+    res.json(rewritePublicCatalogResponse({ items }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

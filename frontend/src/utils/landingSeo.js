@@ -9,13 +9,10 @@ import {
   getOgLocaleAlternates,
 } from '../i18n/localeUtils';
 
-export const LANDING_PAGE_TITLE = 'Slot Database | Lleva la gestión de tu colección a otro nivel';
+export const LANDING_PAGE_TITLE = 'Slot Database | Catálogo de slot con más de 9.600 referencias';
 
 export const LANDING_PAGE_DESCRIPTION =
-  'Slot Database: gestiona coches de slot Scalextric, Ninco y Avant Slot. Fichas técnicas, cronometraje al milisegundo, competiciones y sincronización en la nube.';
-
-const KEYWORDS =
-  'slot, scalextric, ninco, avant slot, slot car, base de datos slot, colección scalextric';
+  'El catálogo de referencias de slot más completo del mercado: más de 9.600 modelos y 7.000 imágenes en 1:32, 1:43 y 1:24. Colección, cronometraje, ligas, clubes y Slot Database Lap Timer.';
 
 function setMeta(attrName, value, isProperty) {
   if (!value) return;
@@ -54,8 +51,9 @@ function setHreflangAlternates(origin, path = '/') {
  */
 export function applyLandingPageSeo(localeOverride) {
   const locale = localeOverride || i18n.language || DEFAULT_LOCALE;
-  const title = i18n.t('seo.title', { ns: 'landing' });
-  const description = i18n.t('seo.description', { ns: 'landing' });
+  const title = i18n.t('seo.title', { ns: 'landing', lng: locale });
+  const description = i18n.t('seo.description', { ns: 'landing', lng: locale });
+  const keywords = i18n.t('seo.keywords', { ns: 'landing', lng: locale });
   const origin =
     (typeof process !== 'undefined' && process.env.REACT_APP_SITE_URL) ||
     (typeof window !== 'undefined' ? window.location.origin : '');
@@ -65,7 +63,7 @@ export function applyLandingPageSeo(localeOverride) {
   document.title = title;
 
   setMeta('description', description, false);
-  setMeta('keywords', KEYWORDS, false);
+  setMeta('keywords', keywords, false);
 
   setMeta('og:type', 'website', true);
   setMeta('og:locale', toOgLocale(locale), true);
@@ -114,7 +112,7 @@ export function applyLandingPageSeo(localeOverride) {
       url: canonicalUrl || `${origin}/`,
       description,
       inLanguage,
-      keywords: KEYWORDS,
+      keywords,
     });
     document.head.appendChild(script);
   }

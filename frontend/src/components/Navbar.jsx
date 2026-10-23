@@ -464,14 +464,17 @@ const Navbar = () => {
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px]">
-              <SheetHeader>
+            <SheetContent
+              side="right"
+              className="flex w-[min(100vw-1.5rem,280px)] flex-col gap-0 overflow-hidden p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+            >
+              <SheetHeader className="shrink-0 px-6 pb-2 pt-6 pr-12">
                 <SheetTitle>{t('menu')}</SheetTitle>
               </SheetHeader>
-              <div className="mt-4 px-1">
+              <div className="shrink-0 px-6">
                 <LanguageSelector size="compact" />
               </div>
-              <nav className="flex flex-col gap-2 mt-6">
+              <nav className="mt-4 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-6 pb-6 [-webkit-overflow-scrolling:touch]">
                 {navItems.map((item) => (
                   <MobileNavItem
                     key={item.path}
