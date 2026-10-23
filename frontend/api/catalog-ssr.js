@@ -196,7 +196,7 @@ async function renderItem(req, res, parsed, spaHtml) {
       sendHtml(res, spaHtml ? 200 : 502, spaHtml || 'Bad gateway');
       return;
     }
-    item = JSON.parse(body);
+    item = rewritePublicCatalogMediaUrls(JSON.parse(body), { origin });
   } catch (e) {
     console.error('[api/catalog-ssr] item fetch failed', e);
     sendHtml(res, spaHtml ? 200 : 502, spaHtml || 'Bad gateway');
@@ -313,6 +313,9 @@ async function renderList(req, res, parsed, spaHtml) {
         const data = JSON.parse(brandsRes.body);
         brands = data.brands ?? [];
       }
+      const media = rewritePublicCatalogMediaUrls({ items, brands }, { origin });
+      items = media.items;
+      brands = media.brands;
     } catch (e) {
       console.error('[api/catalog-ssr] list fetch failed', e);
     }

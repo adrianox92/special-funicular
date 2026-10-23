@@ -86,6 +86,20 @@ function renderItemBody({ item, locale, origin, slug, neighbors }) {
     ? `<a href="${escapeHtml(catalogItemPath(locale, next.id, nextSlug))}">${escapeHtml(t.next)}: ${escapeHtml(next.model_name || next.reference || next.id)}</a>`
     : '';
 
+  const similarRows = (Array.isArray(item.similar) ? item.similar : []).filter((row) => row && row.id);
+  const similarHtml =
+    similarRows.length >= 2
+      ? `<h2>${escapeHtml(t.similarTitle)}</h2><ul>${similarRows
+          .slice(0, 4)
+          .map((row) => {
+            const rowSlug = catalogSlugify(row.model_name || row.reference);
+            const href = catalogItemPath(locale, row.id, rowSlug);
+            const label = [row.manufacturer, row.reference, row.model_name].filter(Boolean).join(' · ');
+            return `<li><a href="${escapeHtml(href)}">${escapeHtml(label || row.id)}</a></li>`;
+          })
+          .join('')}</ul>`
+      : '';
+
   const typeRow =
     item.vehicle_type != null && String(item.vehicle_type).trim() !== ''
       ? `<div><dt>${escapeHtml(t.type)}</dt><dd>${escapeHtml(item.vehicle_type)}</dd></div>`
@@ -106,6 +120,7 @@ function renderItemBody({ item, locale, origin, slug, neighbors }) {
     typeRow +
     `</dl>` +
     `<nav class="ssr-prevnext" aria-label="${escapeHtml(t.prev)} / ${escapeHtml(t.next)}">${prevLink}${nextLink}</nav>` +
+    similarHtml +
     `</div>`
   );
 }

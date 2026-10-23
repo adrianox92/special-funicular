@@ -192,7 +192,7 @@ function rewritePublicCatalogMediaRow(row, opts) {
 
 /**
  * Reescribe image_url / manufacturer_logo_url / logo_url de Storage a /api/img
- * en un ítem, lista de ítems, o payload { items, brands }.
+ * en un ítem, una lista, o un payload { items, brands, similar }.
  * @param {unknown} value
  * @param {{ origin?: string, enabled?: boolean, allowedHosts?: Set<string> }} [opts]
  */
@@ -208,6 +208,9 @@ function rewritePublicCatalogMediaUrls(value, opts) {
   }
   if (Array.isArray(out.brands)) {
     out.brands = out.brands.map((row) => rewritePublicCatalogMediaRow(row, opts));
+  }
+  if (Array.isArray(out.similar)) {
+    out.similar = out.similar.map((row) => rewritePublicCatalogMediaRow(row, opts));
   }
   return out;
 }

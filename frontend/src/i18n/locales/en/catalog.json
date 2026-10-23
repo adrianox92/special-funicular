@@ -118,6 +118,8 @@
     "sending": "Sending…",
     "addToGarage": "Add to my garage",
     "addToGarageHint": "Opens the add-vehicle form with this reference filled in.",
+    "similarTitle": "Similar vehicles",
+    "similarAria": "Similar vehicles carousel",
     "legacyValue": "{{value}} (previous value)"
   },
   "aliases": {
@@ -243,6 +245,7 @@
     "pagePrev": "Previous",
     "pageNext": "Next",
     "brands": "Brands",
+    "similarTitle": "Similar vehicles",
     "motorLabels": {
       "inline": "inline",
       "angular": "anglewinder",

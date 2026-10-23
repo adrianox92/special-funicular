@@ -171,6 +171,66 @@ describe('catalogSeoHtml', () => {
     expect(out).toContain(`property="og:url" content="${canonical}"`);
     expect(canonical).toMatch(/^https:\/\/www\.slotdatabase\.es\//);
   });
+
+  const similar = [
+    {
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      manufacturer: 'Ninco',
+      reference: '50601',
+      model_name: 'Porsche 911 GT3',
+    },
+    {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      manufacturer: 'Scalextric',
+      reference: 'C3990',
+      model_name: 'Porsche 911 GT3',
+    },
+  ];
+
+  test('con 2 o más similares incluye h2 y enlaces de ficha', () => {
+    const html = renderItemBody({
+      item: { ...item, similar },
+      locale: 'es',
+      origin: 'https://www.slotdatabase.es',
+      slug: 'porsche-911-gt3',
+      neighbors: item.neighbors,
+    });
+    expect(html).toContain('<h2>Vehículos similares</h2>');
+    expect(html).toContain('href="/catalogo/dddddddd-dddd-4ddd-8ddd-dddddddddddd/porsche-911-gt3"');
+    expect(html).toContain('href="/catalogo/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/porsche-911-gt3"');
+    expect(html).toContain('Ninco · 50601 · Porsche 911 GT3');
+    expect(html).toContain('Scalextric · C3990 · Porsche 911 GT3');
+
+    const en = renderItemBody({
+      item: { ...item, similar },
+      locale: 'en',
+      origin: 'https://www.slotdatabase.es',
+      slug: 'porsche-911-gt3',
+      neighbors: item.neighbors,
+    });
+    expect(en).toContain('<h2>Similar vehicles</h2>');
+    expect(en).toContain('href="/en/catalog/dddddddd-dddd-4ddd-8ddd-dddddddddddd/porsche-911-gt3"');
+  });
+
+  test('sin suficientes similares no pinta el bloque', () => {
+    const none = renderItemBody({
+      item: { ...item, similar: [] },
+      locale: 'es',
+      origin: 'https://www.slotdatabase.es',
+      slug: 'porsche-911-gt3',
+      neighbors: item.neighbors,
+    });
+    const one = renderItemBody({
+      item: { ...item, similar: [similar[0]] },
+      locale: 'es',
+      origin: 'https://www.slotdatabase.es',
+      slug: 'porsche-911-gt3',
+      neighbors: item.neighbors,
+    });
+    expect(none).not.toContain('Vehículos similares');
+    expect(one).not.toContain('Vehículos similares');
+    expect(one).not.toContain('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+  });
 });
 
 describe('catalog-ssr bot gate', () => {

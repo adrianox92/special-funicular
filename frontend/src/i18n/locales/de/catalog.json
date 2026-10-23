@@ -118,6 +118,8 @@
     "sending": "Senden…",
     "addToGarage": "Zur Garage hinzufügen",
     "addToGarageHint": "Öffnet das Formular für ein neues Fahrzeug mit dieser Referenz.",
+    "similarTitle": "Ähnliche Fahrzeuge",
+    "similarAria": "Karussell ähnlicher Fahrzeuge",
     "legacyValue": "{{value}} (bisheriger Wert)"
   },
   "aliases": {
@@ -243,6 +245,7 @@
     "pagePrev": "Zurück",
     "pageNext": "Weiter",
     "brands": "Marken",
+    "similarTitle": "Ähnliche Fahrzeuge",
     "motorLabels": {
       "inline": "längs",
       "angular": "Anglewinder",

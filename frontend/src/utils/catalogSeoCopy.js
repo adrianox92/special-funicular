@@ -92,6 +92,7 @@ function copyChrome(locale) {
     pagePrev: seo.pagePrev,
     pageNext: seo.pageNext,
     brands: seo.brands,
+    similarTitle: seo.similarTitle,
     notFoundTitle: interpolate(seo.notFoundTitle, { brand: BRAND }),
     notFoundBody: seo.notFoundBody,
     ogImageAlt: interpolate(seo.ogImageAlt, { brand: BRAND }),
@@ -235,6 +236,48 @@ function homePathForLocale(locale) {
   return loc === 'es' ? '/' : `/${loc}`;
 }
 
+function catalogPublicBase(locale) {
+  const loc = normalizeLocale(locale);
+  if (loc === 'en') return '/en/catalog';
+  if (loc === 'de') return '/de/katalog';
+  return '/catalogo';
+}
+
+function slugifyCatalogItem(text) {
+  const s = String(text || '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+  return s || 'item';
+}
+
+/**
+ * URLs canónicas de similares. [] si hay menos de 2 fichas con id.
+ * @returns {{ url: string, name: string }[]}
+ */
+function similarCatalogEntries(item, origin, locale) {
+  const rows = Array.isArray(item && item.similar) ? item.similar : [];
+  const originBase = String(origin || '').replace(/\/+$/, '');
+  const entries = [];
+  for (let i = 0; i < rows.length && entries.length < 4; i += 1) {
+    const row = rows[i];
+    if (!row || row.id == null || String(row.id).trim() === '') continue;
+    const slug = slugifyCatalogItem(row.model_name || row.reference);
+    const path = `${catalogPublicBase(locale)}/${row.id}/${slug}`;
+    const name = [row.manufacturer, row.reference, row.model_name]
+      .filter((part) => part != null && String(part).trim() !== '')
+      .join(' · ');
+    entries.push({
+      url: `${originBase}${path}`,
+      name: name || String(row.model_name || row.reference || row.id),
+    });
+  }
+  return entries.length >= 2 ? entries : [];
+}
+
 function toIsoDateModified(iso) {
   if (iso == null || iso === '') return '';
   try {
@@ -327,7 +370,23 @@ function buildItemJsonLd({
     };
   }
 
-  return { '@context': 'https://schema.org', '@graph': [breadcrumb, product] };
+  const similarEntries = similarCatalogEntries(item, origin, locale);
+  const graph = [breadcrumb, product];
+  if (similarEntries.length >= 2) {
+    product.isSimilarTo = similarEntries.map((entry) => entry.url);
+    graph.push({
+      '@type': 'ItemList',
+      name: seo.similarTitle,
+      itemListElement: similarEntries.map((entry, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: entry.url,
+        name: entry.name,
+      })),
+    });
+  }
+
+  return { '@context': 'https://schema.org', '@graph': graph };
 }
 
 module.exports = {

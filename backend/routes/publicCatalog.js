@@ -5,6 +5,7 @@ const express = require('express');
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
 const { fetchCatalogNeighbors } = require('../lib/catalogNeighbors');
+const { fetchCatalogSimilar } = require('../lib/catalogSimilar');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -25,7 +26,7 @@ const PUBLIC_LIST_SELECT =
 
 const PUBLIC_SELECT = PUBLIC_LIST_SELECT;
 
-const PUBLIC_DETAIL_SELECT = `${PUBLIC_LIST_SELECT}, ${CATALOG_TECH_SPEC_SELECT}`;
+const PUBLIC_DETAIL_SELECT = `${PUBLIC_LIST_SELECT}, ${CATALOG_TECH_SPEC_SELECT}, car_make, car_model`;
 
 function escapeIlikePattern(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
@@ -315,8 +316,18 @@ router.get('/items/:id', async (req, res) => {
       console.warn('[publicCatalog] neighbors', neighborErr.message);
     }
 
+    let similar = [];
+    try {
+      similar = await fetchCatalogSimilar(supabase, data);
+    } catch (similarErr) {
+      console.warn('[publicCatalog] similar', similarErr.message);
+      similar = [];
+    }
+
     const withAliases = await attachAliasesToCatalogItems(supabase, data);
-    res.json(rewritePublicCatalogResponse({ ...withAliases, registered_user_count, neighbors }));
+    res.json(
+      rewritePublicCatalogResponse({ ...withAliases, registered_user_count, neighbors, similar }),
+    );
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
