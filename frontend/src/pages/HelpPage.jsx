@@ -15,10 +15,11 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
 import { Badge } from '../components/ui/badge';
+import { useTranslation } from 'react-i18next';
 import HelpAssistant from '../components/HelpAssistant';
 import { useAuth } from '../context/AuthContext';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
-import { primerosPasos, getHelpTableOfContents, visibleHelpSections } from '../content/helpGuide';
+import { getPrimerosPasos, getHelpTableOfContents, visibleHelpSections } from '../content/helpGuide';
 
 const SECTION_ICONS = {
   inicio: Home,
@@ -49,20 +50,22 @@ const StepsList = ({ items }) => (
 
 const HelpPage = () => {
   const { user } = useAuth();
+  const { t, i18n } = useTranslation('help');
   const isAdmin = isLicenseAdminUser(user);
-  const helpTableOfContents = getHelpTableOfContents(isAdmin);
-  const sections = visibleHelpSections(isAdmin);
+  const locale = i18n.language;
+  const primerosPasos = getPrimerosPasos(locale);
+  const helpTableOfContents = getHelpTableOfContents(isAdmin, locale);
+  const sections = visibleHelpSections(isAdmin, locale);
 
   return (
   <div className="space-y-8 max-w-3xl">
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-primary">
         <BookOpen className="size-7" aria-hidden />
-        <h1 className="text-2xl font-bold tracking-tight">Onboarding y ayuda</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('page.title')}</h1>
       </div>
       <p className="text-muted-foreground text-sm">
-        Guía para empezar con Slot Database y referencia de cada sección: qué hace, en qué orden conviene
-        configurarla y buenas prácticas. También puedes usar el buscador de abajo con preguntas en lenguaje natural.
+        {t('page.lead')}
       </p>
     </div>
 
@@ -70,11 +73,11 @@ const HelpPage = () => {
 
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Índice</CardTitle>
-        <CardDescription>Saltar a una sección o abrirla en la app.</CardDescription>
+        <CardTitle className="text-base">{t('page.tocTitle')}</CardTitle>
+        <CardDescription>{t('page.tocDesc')}</CardDescription>
       </CardHeader>
       <CardContent>
-        <nav aria-label="Índice de ayuda" className="flex flex-wrap gap-2">
+        <nav aria-label={t('page.tocAria')} className="flex flex-wrap gap-2">
           {helpTableOfContents.map(({ id, label }) => {
             const Icon =
               id === 'primeros-pasos'
@@ -103,7 +106,7 @@ const HelpPage = () => {
               <ListChecks className="size-5 text-primary" aria-hidden />
               {primerosPasos.title}
             </CardTitle>
-            <Badge variant="outline">Recomendado</Badge>
+            <Badge variant="outline">{t('page.recommended')}</Badge>
           </div>
           <CardDescription>{primerosPasos.intro}</CardDescription>
         </CardHeader>
@@ -143,25 +146,25 @@ const HelpPage = () => {
               <p>{sec.intro}</p>
               {sec.steps?.length > 0 && (
                 <div>
-                  <p className="font-medium text-foreground mb-2">Pasos</p>
+                  <p className="font-medium text-foreground mb-2">{t('page.steps')}</p>
                   <StepsList items={sec.steps} />
                 </div>
               )}
               {sec.tips?.length > 0 && (
                 <div>
-                  <p className="font-medium text-foreground mb-2">Qué tener en cuenta</p>
+                  <p className="font-medium text-foreground mb-2">{t('page.tips')}</p>
                   <BulletList items={sec.tips} />
                 </div>
               )}
               {sec.qa?.length > 0 && (
                 <div>
-                  <p className="font-medium text-foreground mb-2">Comportamiento esperado (QA)</p>
+                  <p className="font-medium text-foreground mb-2">{t('page.qa')}</p>
                   <BulletList items={sec.qa} />
                 </div>
               )}
               {sec.gotchas?.length > 0 && (
                 <div>
-                  <p className="font-medium text-foreground mb-2">Errores frecuentes</p>
+                  <p className="font-medium text-foreground mb-2">{t('page.gotchas')}</p>
                   <BulletList items={sec.gotchas} />
                 </div>
               )}
@@ -177,8 +180,7 @@ const HelpPage = () => {
     <Separator />
 
     <p className="text-xs text-muted-foreground">
-      ¿Algo no cuadra con lo que ves en pantalla? Comprueba que estás en la última versión de la app y vuelve a cargar la
-      página.
+      {t('page.footer')}
     </p>
   </div>
   );

@@ -26,6 +26,7 @@ import {
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogTechSpecsSection from './CatalogTechSpecsSection';
 
 const imageFields = [
   { name: 'front', label: 'Delantera' },
@@ -307,6 +308,8 @@ const VehicleDetail = () => {
             </CardContent>
           </Card>
         </div>
+
+        <CatalogTechSpecsSection item={vehicle} />
 
         {vehicle.anotaciones != null &&
           vehicle.anotaciones !== '' &&

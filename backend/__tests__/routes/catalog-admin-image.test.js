@@ -82,6 +82,25 @@ function createRatingsBuilder(row) {
   };
 }
 
+function createAliasesBuilder(rows = []) {
+  const builder = {
+    select: jest.fn(() => builder),
+    eq: jest.fn(() => builder),
+    in: jest.fn(() => builder),
+    or: jest.fn(() => builder),
+    order: jest.fn(() => builder),
+    limit: jest.fn(() => builder),
+    delete: jest.fn(() => builder),
+    insert: jest.fn(() => builder),
+    update: jest.fn(() => builder),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    then(onFulfilled, onRejected) {
+      return Promise.resolve({ data: rows, error: null }).then(onFulfilled, onRejected);
+    },
+  };
+  return builder;
+}
+
 describe('admin catalog item image', () => {
   const previousAdmins = process.env.LICENSE_ADMIN_EMAILS;
   let itemsBuilder;
@@ -99,6 +118,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
     removeCatalogObjectByPublicUrl.mockResolvedValue({ error: null });
@@ -136,6 +156,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -161,6 +182,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -184,6 +206,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -223,6 +246,7 @@ describe('admin catalog item image', () => {
     mockSupabase.from.mockImplementation((table) => {
       if (table === 'slot_catalog_items') return itemsBuilder;
       if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
       return createItemsBuilder(null);
     });
 
@@ -247,5 +271,93 @@ describe('admin catalog item image', () => {
 
     expect(response.status).toBe(403);
     expect(removeCatalogObjectByPublicUrl).not.toHaveBeenCalled();
+  });
+
+  test('PUT /items/:id sin specs conserva las existentes', async () => {
+    const existing = { ...EXISTING, spec_scale: '1:32', spec_magnet: true, spec_length_mm: 145 };
+    itemsBuilder = createItemsBuilder(existing);
+    ratingsBuilder = createRatingsBuilder(existing);
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemsBuilder;
+      if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
+      return createItemsBuilder(null);
+    });
+
+    const response = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name);
+
+    expect(response.status).toBe(200);
+    expect(itemsBuilder.updatePayload).toEqual(
+      expect.objectContaining({
+        spec_scale: '1:32',
+        spec_magnet: true,
+        spec_length_mm: 145,
+      }),
+    );
+  });
+
+  test('PUT /items/:id guarda specs técnicas y valida números', async () => {
+    ratingsBuilder = createRatingsBuilder({ ...EXISTING, spec_scale: '1:32' });
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') return itemsBuilder;
+      if (table === 'slot_catalog_items_with_ratings') return ratingsBuilder;
+      if (table === 'slot_catalog_item_aliases') return createAliasesBuilder([]);
+      return createItemsBuilder(null);
+    });
+
+    const bad = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name)
+      .field('spec_weight_g', '-3');
+    expect(bad.status).toBe(400);
+
+    const response = await request(app)
+      .put(`/api/catalog/items/${ITEM_ID}`)
+      .set('Authorization', 'Bearer test-token')
+      .field('reference', EXISTING.reference)
+      .field('manufacturer_id', MFG_ID)
+      .field('model_name', EXISTING.model_name)
+      .field('spec_scale', '1:32')
+      .field('spec_color', 'Black')
+      .field('spec_system', 'analog')
+      .field('spec_front_lights', 'true')
+      .field('spec_rear_lights', 'false')
+      .field('spec_length_mm', '145,5')
+      .field('spec_front_axle_length_mm', '52')
+      .field('spec_rear_axle_length_mm', '53,5')
+      .field('spec_magnet', 'false')
+      .field('spec_motor', 'S-Can 18,000rpm')
+      .field('spec_front_rim', 'plastic')
+      .field('spec_rear_rim', 'aluminium')
+      .field('spec_front_rim_diameter_mm', '15,8')
+      .field('spec_rear_rim_diameter_mm', '16.5');
+
+    expect(response.status).toBe(200);
+    expect(itemsBuilder.updatePayload).toEqual(
+      expect.objectContaining({
+        spec_scale: '1:32',
+        spec_color: 'Black',
+        spec_system: 'analog',
+        spec_front_lights: true,
+        spec_rear_lights: false,
+        spec_length_mm: 145.5,
+        spec_front_axle_length_mm: 52,
+        spec_rear_axle_length_mm: 53.5,
+        spec_magnet: false,
+        spec_motor: 'S-Can 18,000rpm',
+        spec_front_rim: 'plastic',
+        spec_rear_rim: 'aluminum',
+        spec_front_rim_diameter_mm: 15.8,
+        spec_rear_rim_diameter_mm: 16.5,
+      }),
+    );
   });
 });

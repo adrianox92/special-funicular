@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Users, Trash2, Pencil, ArrowLeft, Check, X, Trophy, AlertTriangle, Clock, Tags, Link2, Star, Plus, ArrowUp, ArrowDown, Calendar, Flag } from 'lucide-react';
 import axios from '../lib/axios';
 import CompetitionSignups from '../components/CompetitionSignups';
@@ -60,9 +60,13 @@ import { competitionDetailPath } from '../utils/competitionRoutes';
 
 const SETUP_TABS = new Set(['participants', 'signups', 'stages', 'categories', 'rules']);
 
-function formatCompetitionDate(dateString) {
+const DATE_LOCALE_BY_LANG = { es: 'es-ES', en: 'en-US', de: 'de-DE' };
+
+function formatCompetitionDate(dateString, language) {
   if (!dateString) return '';
-  return new Date(dateString).toLocaleDateString('es-ES', {
+  const lang = language?.split('-')[0] || 'es';
+  const locale = DATE_LOCALE_BY_LANG[lang] || 'es-ES';
+  return new Date(dateString).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -71,7 +75,7 @@ function formatCompetitionDate(dateString) {
   });
 }
 
-function getCompetitionProgressStatus(competition, participantsCount, timingsCount) {
+function getCompetitionProgressStatus(competition, participantsCount, timingsCount, t) {
   const status = competition?.status || 'published';
   const slotCap = competition?.num_slots ?? 0;
   const isFull = slotCap > 0 && participantsCount >= slotCap;
@@ -79,19 +83,19 @@ function getCompetitionProgressStatus(competition, participantsCount, timingsCou
   const allTimingsComplete = maxTimings > 0 && timingsCount >= maxTimings;
 
   if (status === 'draft') {
-    return { label: 'Borrador', variant: 'outline' };
+    return { label: t('manage.progressStatus.draft'), variant: 'outline' };
   }
   if (status === 'closed') {
-    return { label: 'Cerrada', variant: 'destructive' };
+    return { label: t('manage.progressStatus.closed'), variant: 'destructive' };
   }
   if (isFull && allTimingsComplete) {
-    return { label: 'Completa', variant: 'default' };
+    return { label: t('manage.progressStatus.complete'), variant: 'default' };
   }
   if (status === 'running') {
-    return { label: 'En curso', variant: 'secondary' };
+    return { label: t('manage.progressStatus.running'), variant: 'secondary' };
   }
   if (status === 'published') {
-    return { label: 'En proceso de inscripción', variant: 'secondary' };
+    return { label: t('manage.progressStatus.registrationOpen'), variant: 'secondary' };
   }
   return { label: status, variant: 'outline' };
 }
@@ -101,7 +105,8 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const { t } = useTranslation('competitions');
+  const { t, i18n } = useTranslation('competitions');
+  const { t: tCommon } = useTranslation('common');
 
   const [competition, setCompetition] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -170,15 +175,25 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const showRoundConfigTab = showStagesTab || showRoundLapsTab;
   const participantTabOptions = useMemo(() => {
     const waitlistSuffix =
-      competition?.waitlist_count > 0 ? ` · espera ${competition.waitlist_count}` : '';
+      competition?.waitlist_count > 0
+        ? t('manage.tabs.waitlistSuffix', { count: competition.waitlist_count })
+        : '';
+    const participantsTabLabel = t('manage.tabs.participantsCount', { count: participants.length });
+    const signupsTabLabel =
+      t('manage.tabs.signupsCount', { count: competition?.signups_count || 0 }) + waitlistSuffix;
+    const stagesTabLabel = showStagesTab ? t('manage.tabs.stages') : t('manage.tabs.roundLaps');
+    const categoriesTabLabel = t('manage.tabs.categoriesCount', {
+      count: competition?.categories?.length || 0,
+    });
+    const rulesTabLabel = t('manage.tabs.rules');
     return [
       {
         value: 'participants',
-        label: `Participantes (${participants.length})`,
+        label: participantsTabLabel,
         trigger: (
           <>
             <Users className="size-4" />
-            Participantes ({participants.length})
+            {participantsTabLabel}
           </>
         ),
       },
@@ -186,12 +201,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         ? [
             {
               value: 'signups',
-              label: `Inscripciones (${competition?.signups_count || 0}${waitlistSuffix})`,
+              label: signupsTabLabel,
               trigger: (
                 <>
                   <Users className="size-4" />
-                  Inscripciones ({competition?.signups_count || 0}
-                  {waitlistSuffix})
+                  {signupsTabLabel}
                 </>
               ),
             },
@@ -201,11 +215,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         ? [
             {
               value: 'stages',
-              label: showStagesTab ? 'Tramos' : 'Vueltas por ronda',
+              label: stagesTabLabel,
               trigger: (
                 <>
                   <Flag className="size-4" />
-                  {showStagesTab ? 'Tramos' : 'Vueltas por ronda'}
+                  {stagesTabLabel}
                 </>
               ),
             },
@@ -213,21 +227,21 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         : []),
       {
         value: 'categories',
-        label: `Categorías (${competition?.categories?.length || 0})`,
+        label: categoriesTabLabel,
         trigger: (
           <>
             <Tags className="size-4" />
-            Categorías ({competition?.categories?.length || 0})
+            {categoriesTabLabel}
           </>
         ),
       },
       {
         value: 'rules',
-        label: 'Reglas',
+        label: rulesTabLabel,
         trigger: (
           <>
             <Trophy className="size-4" />
-            Reglas
+            {rulesTabLabel}
           </>
         ),
       },
@@ -240,6 +254,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     competition?.signups_count,
     competition?.waitlist_count,
     competition?.categories?.length,
+    t,
   ]);
   const effectiveCompetitionStatus = competition?.status || 'published';
   const registrationDeadlineExpired = Boolean(
@@ -281,11 +296,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       setError(null);
     } catch (err) {
       console.error('Error al cargar competición:', err);
-      setError('Error al cargar la competición');
+      setError(t('detail.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [competitionId]);
+  }, [competitionId, t]);
 
   const loadFavorites = useCallback(async (organizerId) => {
     if (!organizerId) return;
@@ -356,18 +371,18 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const handleAddParticipant = useCallback(async (e) => {
     e.preventDefault();
     if (!addForm.category_id) {
-      setAddError('Debes seleccionar una categoría');
+      setAddError(t('manage.errors.selectCategory'));
       return;
     }
 
     if (participantType === 'favorite') {
       if (!selectedFavoriteId) {
-        setAddError('Selecciona un piloto favorito');
+        setAddError(t('manage.errors.selectFavorite'));
         return;
       }
       const fav = favorites.find((f) => f.id === selectedFavoriteId);
       if (!fav) {
-        setAddError('Favorito no encontrado');
+        setAddError(t('manage.errors.favoriteNotFound'));
         return;
       }
       const hasDefault = !!fav.default_vehicle_id || !!fav.default_vehicle_model;
@@ -379,7 +394,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
             ? 'favorite_default'
             : null;
       if (!vehicleSource) {
-        setAddError('Este favorito no tiene vehículo por defecto. Indica uno.');
+        setAddError(t('manage.errors.favoriteNoDefaultVehicle'));
         return;
       }
       try {
@@ -399,9 +414,9 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         const created = response.data?.created?.length || 0;
         const skipped = response.data?.skipped || [];
         if (created > 0) {
-          toast.success('Favorito añadido como participante');
+          toast.success(t('manage.toasts.favoriteAdded'));
         } else if (skipped.length > 0) {
-          setAddError(skipped[0].reason || 'No se pudo añadir el favorito');
+          setAddError(skipped[0].reason || t('manage.errors.favoriteAddFailed'));
           return;
         }
         setShowAddModal(false);
@@ -411,7 +426,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         loadCompetition();
       } catch (err) {
         console.error('Error al añadir favorito:', err);
-        setAddError(err.response?.data?.error || 'Error al añadir el favorito');
+        setAddError(err.response?.data?.error || t('manage.errors.addFavoriteFailed'));
       } finally {
         setAdding(false);
       }
@@ -470,15 +485,15 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     }
 
     if (!addForm.driver_name.trim()) {
-      setAddError('El nombre del piloto es requerido');
+      setAddError(t('manage.errors.driverNameRequired'));
       return;
     }
     if (participantType === 'own' && !addForm.vehicle_id) {
-      setAddError('Debes seleccionar un vehículo');
+      setAddError(t('manage.errors.selectVehicle'));
       return;
     }
     if (participantType === 'external' && !addForm.vehicle_model.trim()) {
-      setAddError('Debes especificar el modelo del vehículo');
+      setAddError(t('manage.errors.vehicleModelRequired'));
       return;
     }
     try {
@@ -501,7 +516,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       loadCompetition();
     } catch (err) {
       console.error('Error al añadir participante:', err);
-      setAddError(err.response?.data?.error || 'Error al añadir el participante');
+      setAddError(err.response?.data?.error || t('manage.errors.addParticipantFailed'));
     } finally {
       setAdding(false);
     }
@@ -510,11 +525,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const handleEditParticipant = useCallback(async (e) => {
     e.preventDefault();
     if (!editForm.driver_name.trim()) {
-      setEditError('El nombre del piloto es requerido');
+      setEditError(t('manage.errors.driverNameRequired'));
       return;
     }
     if (!editForm.category_id) {
-      setEditError('Debes seleccionar una categoría');
+      setEditError(t('manage.errors.selectCategory'));
       return;
     }
     try {
@@ -536,11 +551,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       loadCompetition();
     } catch (err) {
       console.error('Error al editar participante:', err);
-      setEditError(err.response?.data?.error || 'Error al editar el participante');
+      setEditError(err.response?.data?.error || t('manage.errors.editParticipantFailed'));
     } finally {
       setEditing(false);
     }
-  }, [editForm, editingParticipant, competitionId, loadCompetition]);
+  }, [editForm, editingParticipant, competitionId, loadCompetition, t]);
 
   const openEditModal = useCallback((participant) => {
     setEditingParticipant(participant);
@@ -561,15 +576,15 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     async (e) => {
       e.preventDefault();
       if (!memberSignupForm.category_id) {
-        toast.error('Selecciona una categoría');
+        toast.error(t('manage.memberSignup.selectCategoryError'));
         return;
       }
       if (memberVehicleSource === 'own' && !memberSignupForm.vehicle_id) {
-        toast.error('Selecciona un vehículo de tu colección');
+        toast.error(t('manage.memberSignup.selectVehicleError'));
         return;
       }
       if (memberVehicleSource === 'text' && !memberSignupForm.vehicle?.trim()) {
-        toast.error('Indica el vehículo');
+        toast.error(t('manage.memberSignup.enterVehicleError'));
         return;
       }
       try {
@@ -586,21 +601,23 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         const res = await axios.post(`/competitions/${competitionId}/signups`, payload);
         if (res.data?.waitlisted) {
           toast.success(
-            `Lista de espera (posición ${res.data.waitlist_position ?? '—'}). Te avisaremos por email si hay plaza.`,
+            t('manage.memberSignup.waitlistSuccess', {
+              position: res.data.waitlist_position ?? '—',
+            }),
           );
         } else {
-          toast.success('Inscripción enviada. El organizador la validará.');
+          toast.success(t('manage.memberSignup.submittedSuccess'));
         }
         setMemberSignupForm({ category_id: '', vehicle: '', vehicle_id: '', name: '' });
         setMemberVehicleSource('own');
         loadCompetition();
       } catch (err) {
-        toast.error(err.response?.data?.error || 'No se pudo enviar la inscripción');
+        toast.error(err.response?.data?.error || t('manage.memberSignup.submitError'));
       } finally {
         setMemberSignupLoading(false);
       }
     },
-    [competitionId, memberSignupForm, memberVehicleSource, loadCompetition],
+    [competitionId, memberSignupForm, memberVehicleSource, loadCompetition, t],
   );
 
   const usedFavoriteIds = useMemo(() => {
@@ -666,11 +683,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       });
     }
     if (items.length === 0) {
-      setBulkError('Selecciona al menos un favorito');
+      setBulkError(t('manage.errors.selectAtLeastOneFavorite'));
       return;
     }
     if (!favoritesCategoryId) {
-      setBulkError('Selecciona una categoría para los nuevos participantes');
+      setBulkError(t('manage.errors.selectCategoryForNew'));
       return;
     }
     try {
@@ -683,20 +700,20 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       const created = response.data?.created?.length || 0;
       const skipped = response.data?.skipped || [];
       if (created > 0) {
-        toast.success(`${created} participante${created === 1 ? '' : 's'} añadido${created === 1 ? '' : 's'}`);
+        toast.success(t('manage.toasts.participantsAdded', { count: created }));
       }
       if (skipped.length > 0) {
-        toast.warning(`${skipped.length} no se pudieron añadir`);
+        toast.warning(t('manage.toasts.bulkSkipped', { count: skipped.length }));
       }
       setShowFavoritesModal(false);
       loadCompetition();
     } catch (err) {
       console.error('Error alta masiva favoritos:', err);
-      setBulkError(err.response?.data?.error || 'No se pudieron añadir los favoritos');
+      setBulkError(err.response?.data?.error || t('manage.errors.bulkFavoritesFailed'));
     } finally {
       setBulkSaving(false);
     }
-  }, [competitionId, favoritesSelection, favoritesCategoryId, loadCompetition]);
+  }, [competitionId, favoritesSelection, favoritesCategoryId, loadCompetition, t]);
 
   const openGuestsModal = useCallback(() => {
     const defaultCat = competition?.categories?.[0]?.id || '';
@@ -784,25 +801,25 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       loadCompetition();
     } catch (err) {
       console.error('Error al eliminar participante:', err);
-      toast.error('Error al eliminar el participante');
+      toast.error(t('manage.errors.deleteParticipantFailed'));
     }
-  }, [competitionId, loadCompetition, deleteConfirm.participantId]);
+  }, [competitionId, loadCompetition, deleteConfirm.participantId, t]);
 
   const getVehicleInfo = useCallback((participant) => {
     if (participant.vehicle_id && participant.vehicles) {
       return { model: participant.vehicles.model, manufacturer: participant.vehicles.manufacturer, type: 'own' };
     }
     if (participant.vehicle_model) {
-      return { model: participant.vehicle_model, manufacturer: 'Externo', type: 'external' };
+      return { model: participant.vehicle_model, manufacturer: t('manage.externalVehicle'), type: 'external' };
     }
     return null;
-  }, []);
+  }, [t]);
 
   const getCategoryName = useCallback((categoryId) => {
-    if (!competition?.categories) return 'Sin categoría';
+    if (!competition?.categories) return t('manage.noCategory');
     const category = competition.categories.find(cat => cat.id === categoryId);
-    return category ? category.name : 'Sin categoría';
-  }, [competition?.categories]);
+    return category ? category.name : t('manage.noCategory');
+  }, [competition?.categories, t]);
 
   const sortedParticipants = useMemo(() => {
     return [...(participants || [])].sort((a, b) => {
@@ -819,7 +836,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     const trimmed = String(value ?? '').trim();
     const parsed = trimmed === '' ? null : Number(trimmed);
     if (parsed != null && (!Number.isFinite(parsed) || parsed < 1)) {
-      toast.error('El orden de salida debe ser un número ≥ 1');
+      toast.error(t('manage.errors.startOrderInvalid'));
       return;
     }
     try {
@@ -839,7 +856,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         return next;
       });
     } catch (err) {
-      toast.error(err.response?.data?.error || 'No se pudo guardar el orden de salida');
+      toast.error(err.response?.data?.error || t('manage.errors.startOrderSaveFailed'));
       setStartOrderDraft((prev) => {
         const next = { ...prev };
         delete next[participantId];
@@ -849,7 +866,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
     } finally {
       setStartOrderSavingId(null);
     }
-  }, [competitionId, participants, loadCompetition]);
+  }, [competitionId, participants, loadCompetition, t]);
 
   const moveParticipantOrder = useCallback(async (participantId, direction) => {
     const list = [...sortedParticipants];
@@ -868,24 +885,24 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       setStartOrderDraft({});
       await loadCompetition();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'No se pudo reordenar');
+      toast.error(err.response?.data?.error || t('manage.errors.reorderFailed'));
     } finally {
       setStartOrderSavingId(null);
     }
-  }, [competitionId, sortedParticipants, loadCompetition]);
+  }, [competitionId, sortedParticipants, loadCompetition, t]);
 
   const patchCompetitionStatus = useCallback(
     async (status) => {
       try {
         await axios.patch(`/competitions/${competitionId}/status`, { status });
-        toast.success('Estado actualizado');
+        toast.success(t('detail.statusUpdated'));
         await loadCompetition();
         onCompetitionChange?.();
       } catch (err) {
-        toast.error(err.response?.data?.error || 'No se pudo cambiar el estado');
+        toast.error(err.response?.data?.error || t('detail.statusUpdateError'));
       }
     },
-    [competitionId, loadCompetition, onCompetitionChange],
+    [competitionId, loadCompetition, onCompetitionChange, t],
   );
 
   const generatePublicLink = () => {
@@ -921,7 +938,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   if (!competition) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>Competición no encontrada</AlertDescription>
+        <AlertDescription>{t('detail.notFound')}</AlertDescription>
       </Alert>
     );
   }
@@ -933,7 +950,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
   const progressPercent = (participants.length / competition.num_slots) * 100;
   const timingsCount = competition.timings_count ?? 0;
   const maxTimings = participants.length * competition.rounds;
-  const progressStatus = getCompetitionProgressStatus(competition, participants.length, timingsCount);
+  const progressStatus = getCompetitionProgressStatus(competition, participants.length, timingsCount, t);
 
   return (
     <div className="space-y-6">
@@ -941,12 +958,11 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
         <Alert>
           <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              Esta competición está en <strong>borrador</strong>: el formulario público de inscripción no es visible.
-              Publícala cuando esté lista.
+              <Trans i18nKey="manage.alerts.draftHtml" ns="competitions" components={{ strong: <strong /> }} />
             </span>
             {!embedded && (
               <Button type="button" size="sm" variant="secondary" onClick={() => patchCompetitionStatus('published')}>
-                Publicar
+                {t('detail.publish')}
               </Button>
             )}
           </AlertDescription>
@@ -957,23 +973,23 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
           <Alert variant={effectiveCompetitionStatus === 'closed' ? 'destructive' : 'default'}>
             <AlertDescription>
               {effectiveCompetitionStatus === 'running'
-                ? 'Competición en curso: no se pueden añadir ni eliminar participantes ni aprobar inscripciones nuevas.'
-                : 'Competición cerrada: no se pueden modificar participantes ni tiempos desde la web.'}
+                ? t('manage.alerts.runningLocked')
+                : t('manage.alerts.closedLocked')}
             </AlertDescription>
           </Alert>
         )}
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, participantId: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar participante?</AlertDialogTitle>
+            <AlertDialogTitle>{t('manage.deleteParticipant.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro de que quieres eliminar este participante? Esta acción no se puede deshacer.
+              {t('manage.deleteParticipant.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('actions.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteParticipant} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
+              {t('list.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -986,7 +1002,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate('/competitions')}>
               <ArrowLeft className="size-4 mr-2" />
-              Volver
+              {tCommon('actions.back')}
             </Button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -996,22 +1012,22 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                   <>
                     {effectiveCompetitionStatus === 'draft' && (
                       <Button type="button" size="sm" variant="secondary" onClick={() => patchCompetitionStatus('published')}>
-                        Publicar
+                        {t('detail.publish')}
                       </Button>
                     )}
                     {effectiveCompetitionStatus === 'published' && (
                       <Button type="button" size="sm" variant="outline" onClick={() => patchCompetitionStatus('draft')}>
-                        Despublicar
+                        {t('detail.unpublish')}
                       </Button>
                     )}
                     {effectiveCompetitionStatus === 'running' && (
                       <Button type="button" size="sm" variant="destructive" onClick={() => patchCompetitionStatus('closed')}>
-                        Cerrar
+                        {t('detail.close')}
                       </Button>
                     )}
                     {effectiveCompetitionStatus === 'closed' && (
                       <Button type="button" size="sm" variant="outline" onClick={() => patchCompetitionStatus('published')}>
-                        Reabrir
+                        {t('detail.reopen')}
                       </Button>
                     )}
                   </>
@@ -1019,13 +1035,13 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                 {competition.league && (
                   <Link to={`/leagues/${competition.league.id}`}>
                     <Badge variant="secondary" className="hover:bg-secondary/80">
-                      Liga: {competition.league.name}
+                      {t('detail.leagueBadge', { name: competition.league.name })}
                     </Badge>
                   </Link>
                 )}
               </div>
               <p className="text-muted-foreground text-sm">
-                {canUseOrganizerTools ? 'Gestionar competición' : 'Miembro del club — la gestión la lleva el organizador'}
+                {canUseOrganizerTools ? t('manage.subtitleOrganizer') : t('manage.subtitleMember')}
               </p>
             </div>
           </div>
@@ -1036,12 +1052,12 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                 size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(publicLink);
-                  toast.success('Enlace copiado al portapapeles');
+                  toast.success(t('manage.linkCopiedToClipboard'));
                 }}
-                title="Copiar enlace de inscripción pública"
+                title={t('manage.copySignupLinkTitle')}
               >
                 <Link2 className="size-4 mr-2" />
-                Formulario de inscripción
+                {t('manage.signupFormButton')}
               </Button>
             )}
             {!canUseOrganizerTools && publicLink && (
@@ -1053,23 +1069,27 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                 }}
               >
                 <Link2 className="size-4 mr-2" />
-                Inscripción pública
+                {t('detail.openSignup')}
               </Button>
             )}
             {canUseOrganizerTools && (
               <Button
                 onClick={() => navigate(competitionDetailPath(competitionId, { section: 'timings' }))}
                 disabled={!canStartCompetition}
-                title={!canStartCompetition ? 'Necesitas al menos un participante' : 'Gestionar tiempos'}
+                title={
+                  !canStartCompetition
+                    ? t('manage.needParticipantForTimings')
+                    : t('manage.manageTimingsTitle')
+                }
               >
                 <Clock className="size-4 mr-2" />
-                Gestionar Tiempos
+                {t('manage.manageTimings')}
               </Button>
             )}
             {!canUseOrganizerTools && canStartCompetition && (
               <Button variant="outline" size="sm" onClick={() => navigate(competitionDetailPath(competitionId, { section: 'timings' }))}>
                 <Clock className="size-4 mr-2" />
-                Ver tiempos
+                {t('manage.viewTimings')}
               </Button>
             )}
           </div>
@@ -1085,7 +1105,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Users className="size-4 text-primary" />
-                <strong>Participantes:</strong>
+                <strong>{t('manage.stats.participantsLabel')}</strong>
                 <Badge variant={isFull ? 'default' : participants.length > 0 ? 'default' : 'secondary'}>
                   {participants.length}/{competition.num_slots}
                 </Badge>
@@ -1099,89 +1119,89 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               {isFull && (
                 <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                   <Check className="size-4" />
-                  Cupo de participación completo
+                  {t('manage.stats.slotFull')}
                 </div>
               )}
               {participants.length > 0 && !isFull && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="size-4" />
-                  Lista para comenzar
+                  {t('manage.stats.readyToStart')}
                 </div>
               )}
               {participants.length === 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <AlertTriangle className="size-4" />
-                  Sin participantes
+                  {t('manage.stats.noParticipants')}
                 </div>
               )}
             </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Trophy className="size-4" />
-                <strong>Estado:</strong>
+                <strong>{t('manage.stats.statusLabel')}</strong>
                 <Badge variant={progressStatus.variant}>{progressStatus.label}</Badge>
               </div>
               {effectiveCompetitionStatus === 'published' && participants.length === 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <AlertTriangle className="size-4" />
-                  Añade al menos un participante
+                  {t('manage.stats.addAtLeastOne')}
                 </div>
               )}
             </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Trophy className="size-4" />
-                <strong>Rondas:</strong>
+                <strong>{t('manage.stats.roundsLabel')}</strong>
                 <Badge variant="secondary">{competition.rounds}</Badge>
               </div>
               <div className="text-sm text-muted-foreground">
-                Total de tiempos: {timingsCount} / {maxTimings}
+                {t('manage.stats.totalTimings', { current: timingsCount, max: maxTimings })}
               </div>
             </div>
             {competition.registration_deadline && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Calendar className="size-4" />
-                  <strong>Inscripciones hasta:</strong>
+                  <strong>{t('manage.stats.registrationUntil')}</strong>
                 </div>
                 <div
                   className={`text-sm ${registrationDeadlineExpired ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
                 >
-                  {formatCompetitionDate(competition.registration_deadline)}
-                  {registrationDeadlineExpired ? ' (plazo cerrado)' : ''}
+                  {formatCompetitionDate(competition.registration_deadline, i18n.language)}
+                  {registrationDeadlineExpired ? t('manage.stats.deadlineClosed') : ''}
                 </div>
               </div>
             )}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Link2 className="size-4" />
-                <strong>Enlace público:</strong>
+                <strong>{t('manage.stats.publicLinkLabel')}</strong>
               </div>
               {publicLink ? (
                 <span
                   className="text-sm font-medium text-primary break-all cursor-pointer select-all"
                   onClick={() => {
                     navigator.clipboard.writeText(statusLink);
-                    toast.success('Enlace copiado al portapapeles');
+                    toast.success(t('manage.linkCopiedToClipboard'));
                   }}
-                  title="Haz clic para copiar"
+                  title={t('manage.clickToCopy')}
                 >
                   {statusLink}
                 </span>
               ) : !competition.public_slug ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <X className="size-4" />
-                  No disponible
+                  {t('manage.stats.notAvailable')}
                 </div>
               ) : !competition.categories || competition.categories.length === 0 ? (
                 <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
                   <AlertTriangle className="size-4" />
-                  Sin categorías
+                  {t('manage.stats.noCategories')}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <X className="size-4" />
-                  No disponible
+                  {t('manage.stats.notAvailable')}
                 </div>
               )}
             </div>
@@ -1201,27 +1221,27 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
           options={participantTabOptions}
           listClassName="sm:grid-cols-2 lg:grid-cols-5"
           triggerClassName="flex items-center gap-2"
-          mobileLabel="Sección de la competición"
+          mobileLabel={t('detail.sectionLabel')}
         />
 
         <TabsContent value="participants" className="mt-4">
           {!canUseOrganizerTools && (
             <Card className="mb-6 border-primary/30">
               <CardContent className="pt-6 space-y-4">
-                <h5 className="font-semibold">Solicitar plaza</h5>
+                <h5 className="font-semibold">{t('manage.memberSignup.title')}</h5>
                 <p className="text-sm text-muted-foreground">
-                  Envía tu inscripción con el email de tu cuenta. El organizador la aprobará cuando corresponda.
+                  {t('manage.memberSignup.description')}
                 </p>
                 <form onSubmit={handleMemberSignup} className="space-y-3 max-w-md">
                   <div className="space-y-2">
-                    <Label>Categoría</Label>
+                    <Label>{t('manage.memberSignup.category')}</Label>
                     <Select
                       value={memberSignupForm.category_id}
                       onValueChange={(v) => setMemberSignupForm((f) => ({ ...f, category_id: v }))}
                       disabled={memberSignupBlocked || !competition.categories?.length}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona categoría" />
+                        <SelectValue placeholder={t('manage.memberSignup.selectCategory')} />
                       </SelectTrigger>
                       <SelectContent>
                         {(competition.categories || []).map((cat) => (
@@ -1231,7 +1251,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Vehículo</Label>
+                    <Label>{t('manage.memberSignup.vehicle')}</Label>
                     <div className="flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1242,7 +1262,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                           disabled={memberSignupBlocked}
                           className="rounded-full"
                         />
-                        De mi colección
+                        {t('manage.memberSignup.vehicleFromCollection')}
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1253,7 +1273,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                           disabled={memberSignupBlocked}
                           className="rounded-full"
                         />
-                        Otro (texto)
+                        {t('manage.memberSignup.vehicleOtherText')}
                       </label>
                     </div>
                     {memberVehicleSource === 'own' ? (
@@ -1266,33 +1286,33 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                         />
                       ) : (
                         <p className="text-sm text-muted-foreground">
-                          No tienes vehículos en tu colección. Cambia a "Otro (texto)" para escribir un modelo.
+                          {t('manage.memberSignup.noVehiclesHint')}
                         </p>
                       )
                     ) : (
                       <Input
                         value={memberSignupForm.vehicle}
                         onChange={(e) => setMemberSignupForm((f) => ({ ...f, vehicle: e.target.value }))}
-                        placeholder="Ej: McLaren F1 nº 1"
+                        placeholder={t('manage.memberSignup.vehiclePlaceholder')}
                         disabled={memberSignupBlocked}
                       />
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Nombre en pista (opcional)</Label>
+                    <Label>{t('manage.memberSignup.trackNameOptional')}</Label>
                     <Input
                       value={memberSignupForm.name}
                       onChange={(e) => setMemberSignupForm((f) => ({ ...f, name: e.target.value }))}
-                      placeholder="Si vacío, usamos tu nombre de perfil o email"
+                      placeholder={t('manage.memberSignup.trackNamePlaceholder')}
                       disabled={memberSignupBlocked}
                     />
                   </div>
                   <Button type="submit" disabled={memberSignupLoading || memberSignupBlocked}>
                     {memberSignupLoading
-                      ? 'Enviando…'
+                      ? t('manage.memberSignup.submitting')
                       : memberSignupBlocked
-                        ? 'Inscripción no disponible'
-                        : 'Enviar inscripción'}
+                        ? t('manage.memberSignup.unavailable')
+                        : t('manage.memberSignup.submit')}
                   </Button>
                 </form>
               </CardContent>
@@ -1300,7 +1320,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
           )}
 
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
-            <h5 className="font-semibold">Participantes Confirmados</h5>
+            <h5 className="font-semibold">{t('manage.confirmedTitle')}</h5>
             {canUseOrganizerTools && (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1309,7 +1329,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                   disabled={participantsFull || !competition.categories || competition.categories.length === 0 || favorites.length === 0}
                 >
                   <Star className="size-4 mr-2" />
-                  Añadir desde favoritos
+                  {t('manage.addFromFavorites')}
                   {favorites.length > 0 && (
                     <Badge variant="secondary" className="ml-2">{favorites.length}</Badge>
                   )}
@@ -1337,7 +1357,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                   disabled={participantsFull || !competition.categories || competition.categories.length === 0}
                 >
                   <Plus className="size-4 mr-2" />
-                  Añadir Participante
+                  {t('manage.addParticipant')}
                 </Button>
               </div>
             )}
@@ -1347,9 +1367,9 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
             <Card className="text-center py-12">
               <CardContent>
                 <Users className="size-12 mx-auto text-muted-foreground mb-4" />
-                <h4 className="mb-2">No hay participantes</h4>
+                <h4 className="mb-2">{t('manage.empty.title')}</h4>
                 <p className="text-muted-foreground mb-6">
-                  {canUseOrganizerTools ? 'Añade el primer participante para empezar' : 'El organizador aún no ha confirmado participantes.'}
+                  {canUseOrganizerTools ? t('manage.empty.organizerHint') : t('manage.empty.memberHint')}
                 </p>
                 {canUseOrganizerTools && (
                   <Button
@@ -1357,7 +1377,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                     disabled={participantsFull || !competition.categories || competition.categories.length === 0}
                   >
                     <span className="mr-2">+</span>
-                    {participantsFull ? 'Cupo completo' : 'Añadir Primer Participante'}
+                    {participantsFull ? t('manage.empty.slotFull') : t('manage.empty.addFirst')}
                   </Button>
                 )}
               </CardContent>
@@ -1368,12 +1388,12 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>#</TableHead>
-                    <TableHead>Orden salida</TableHead>
-                    <TableHead>Piloto</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead>Vehículo</TableHead>
-                    {competition?.rules?.length > 0 && <TableHead>Puntos</TableHead>}
-                    {canUseOrganizerTools && <TableHead>Acciones</TableHead>}
+                    <TableHead>{t('manage.table.startOrder')}</TableHead>
+                    <TableHead>{t('manage.table.driver')}</TableHead>
+                    <TableHead>{t('manage.table.category')}</TableHead>
+                    <TableHead>{t('manage.table.vehicle')}</TableHead>
+                    {competition?.rules?.length > 0 && <TableHead>{t('manage.table.points')}</TableHead>}
+                    {canUseOrganizerTools && <TableHead>{t('manage.table.actions')}</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1508,9 +1528,9 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Añadir desde favoritos</DialogTitle>
+            <DialogTitle>{t('manage.favoritesModal.title')}</DialogTitle>
             <DialogDescription>
-              Selecciona los pilotos habituales que quieras añadir de una vez a esta competición.
+              {t('manage.favoritesModal.description')}
             </DialogDescription>
           </DialogHeader>
 
@@ -1522,10 +1542,10 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
             )}
 
             <div className="space-y-2">
-              <Label>Categoría para los favoritos</Label>
+              <Label>{t('manage.favoritesModal.categoryForFavorites')}</Label>
               <Select value={favoritesCategoryId} onValueChange={setFavoritesCategoryId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona categoría" />
+                  <SelectValue placeholder={t('manage.memberSignup.selectCategory')} />
                 </SelectTrigger>
                 <SelectContent>
                   {(competition?.categories || []).map((cat) => (
@@ -1537,7 +1557,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
 
             {favorites.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Aún no tienes favoritos. Créalos desde la sección Pilotos del menú.
+                {t('manage.favoritesModal.empty')}
               </p>
             ) : (
               <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
@@ -1559,7 +1579,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{fav.display_name}</span>
                             {already && (
-                              <Badge variant="outline" className="text-xs">Ya añadido</Badge>
+                              <Badge variant="outline" className="text-xs">{t('manage.favoritesModal.alreadyAdded')}</Badge>
                             )}
                             {fav.linked_slug && (
                               <Badge variant="secondary" className="flex items-center gap-1 text-xs">
@@ -1589,7 +1609,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                                   checked={cfg.vehicle_source === 'favorite_default'}
                                   onChange={() => updateFavoriteBulkRow(fav.id, { vehicle_source: 'favorite_default' })}
                                 />
-                                Por defecto
+                                {t('manage.favoritesModal.vehicleDefault')}
                               </label>
                             )}
                             <label className="flex items-center gap-1 cursor-pointer">
@@ -1599,7 +1619,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                                 checked={cfg.vehicle_source === 'own'}
                                 onChange={() => updateFavoriteBulkRow(fav.id, { vehicle_source: 'own' })}
                               />
-                              De mi colección
+                              {t('guestMembers.vehicleCollection')}
                             </label>
                             <label className="flex items-center gap-1 cursor-pointer">
                               <input
@@ -1608,7 +1628,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                                 checked={cfg.vehicle_source === 'text'}
                                 onChange={() => updateFavoriteBulkRow(fav.id, { vehicle_source: 'text' })}
                               />
-                              Texto
+                              {t('guestMembers.vehicleText')}
                             </label>
                           </div>
                           {cfg.vehicle_source === 'own' && (
@@ -1617,7 +1637,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                               onValueChange={(v) => updateFavoriteBulkRow(fav.id, { vehicle_id: v })}
                             >
                               <SelectTrigger className="h-8">
-                                <SelectValue placeholder="Selecciona vehículo" />
+                                <SelectValue placeholder={t('manage.favoritesModal.selectVehicle')} />
                               </SelectTrigger>
                               <SelectContent>
                                 {vehicles.map((v) => (
@@ -1632,7 +1652,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                             <Input
                               value={cfg.vehicle_model}
                               onChange={(e) => updateFavoriteBulkRow(fav.id, { vehicle_model: e.target.value })}
-                              placeholder="Modelo de vehículo"
+                              placeholder={t('guestMembers.vehicleTextPlaceholder')}
                               className="h-8 text-sm"
                             />
                           )}
@@ -1647,16 +1667,16 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setShowFavoritesModal(false)}>
-              Cancelar
+              {tCommon('actions.cancel')}
             </Button>
             <Button type="button" onClick={handleBulkAddFromFavorites} disabled={bulkSaving}>
               {bulkSaving ? (
                 <>
                   <Spinner className="size-4 mr-2" />
-                  Añadiendo...
+                  {t('guestMembers.adding')}
                 </>
               ) : (
-                'Añadir seleccionados'
+                t('guestMembers.addSelected')
               )}
             </Button>
           </DialogFooter>
@@ -1793,7 +1813,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setShowGuestsModal(false)}>
-              Cancelar
+              {tCommon('actions.cancel')}
             </Button>
             <Button type="button" onClick={handleBulkAddFromGuests} disabled={bulkSaving}>
               {bulkSaving ? (
@@ -1813,8 +1833,8 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Añadir Participante</DialogTitle>
-            <DialogDescription>Añade un nuevo participante a la competición</DialogDescription>
+            <DialogTitle>{t('manage.addModal.title')}</DialogTitle>
+            <DialogDescription>{t('manage.addModal.description')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddParticipant}>
             <div className="space-y-4 py-4">
@@ -1825,7 +1845,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               )}
 
               <div className="space-y-2">
-                <Label>Tipo de participante</Label>
+                <Label>{t('manage.addModal.participantType')}</Label>
                 <div className="flex flex-wrap gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1838,7 +1858,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                       }}
                       className="rounded-full"
                     />
-                    De mi colección
+                    {t('manage.addModal.fromCollection')}
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1851,7 +1871,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                       }}
                       className="rounded-full"
                     />
-                    Externo
+                    {t('manage.addModal.external')}
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1864,7 +1884,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                     />
                     <span className="flex items-center gap-1">
                       <Star className="size-3" />
-                      Favorito
+                      {t('manage.addModal.favorite')}
                     </span>
                   </label>
                   {competition?.club_id && (
@@ -1890,14 +1910,14 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="add-category">Categoría *</Label>
+                <Label htmlFor="add-category">{t('manage.addModal.categoryRequired')}</Label>
                 <Select
                   value={addForm.category_id}
                   onValueChange={(v) => setAddForm({ ...addForm, category_id: v })}
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
+                    <SelectValue placeholder={t('manage.addModal.selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
                     {competition.categories?.map(cat => (
@@ -1910,7 +1930,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               {participantType === 'favorite' ? (
                 <>
                   <div className="space-y-2">
-                    <Label>Piloto favorito *</Label>
+                    <Label>{t('manage.addModal.favoritePilotRequired')}</Label>
                     <Select
                       value={selectedFavoriteId}
                       onValueChange={(v) => {
@@ -1927,7 +1947,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                       }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un favorito" />
+                        <SelectValue placeholder={t('manage.addModal.selectFavorite')} />
                       </SelectTrigger>
                       <SelectContent>
                         {favorites.map((fav) => (
@@ -1936,19 +1956,20 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                             value={fav.id}
                             disabled={usedFavoriteIds.has(fav.id)}
                           >
-                            {fav.display_name}{usedFavoriteIds.has(fav.id) ? ' (ya añadido)' : ''}
+                            {fav.display_name}
+                            {usedFavoriteIds.has(fav.id) ? t('manage.favoritesModal.alreadyAddedInSelect') : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      El nombre del piloto y el vehículo se rellenarán con los datos del favorito. Puedes sobrescribir el vehículo abajo.
+                      {t('manage.addModal.favoriteHint')}
                     </p>
                   </div>
 
                   {selectedFavoriteId && (
                     <div className="space-y-2">
-                      <Label>Vehículo</Label>
+                      <Label>{t('guestMembers.vehicleLabel')}</Label>
                       <Select
                         value={addForm.vehicle_id || 'none'}
                         onValueChange={(v) =>
@@ -1960,10 +1981,10 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Usar el del favorito" />
+                          <SelectValue placeholder={t('manage.addModal.useFavoriteVehicle')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Usar por defecto del favorito / texto</SelectItem>
+                          <SelectItem value="none">{t('manage.addModal.useFavoriteDefaultOrText')}</SelectItem>
                           {vehicles.map((v) => (
                             <SelectItem key={v.id} value={String(v.id)}>
                               {v.manufacturer} {v.model} ({v.type})
@@ -1975,7 +1996,7 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                         <Input
                           value={addForm.vehicle_model}
                           onChange={(e) => setAddForm({ ...addForm, vehicle_model: e.target.value })}
-                          placeholder="O escribe un modelo (si el favorito no tiene vehículo por defecto)"
+                          placeholder={t('manage.addModal.favoriteVehiclePlaceholder')}
                         />
                       )}
                     </div>
@@ -2055,26 +2076,26 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               ) : (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="add-driver">Nombre del piloto *</Label>
+                    <Label htmlFor="add-driver">{t('manage.addModal.driverNameRequired')}</Label>
                     <Input
                       id="add-driver"
                       value={addForm.driver_name}
                       onChange={(e) => setAddForm({ ...addForm, driver_name: e.target.value })}
-                      placeholder="Nombre del piloto"
+                      placeholder={t('manage.addModal.driverNamePlaceholder')}
                       required
                     />
                   </div>
 
                   {participantType === 'own' ? (
                     <div className="space-y-2">
-                      <Label>Vehículo *</Label>
+                      <Label>{t('manage.addModal.vehicleRequired')}</Label>
                       <Select
                         value={addForm.vehicle_id}
                         onValueChange={(v) => setAddForm({ ...addForm, vehicle_id: v })}
                         required
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un vehículo" />
+                          <SelectValue placeholder={t('manage.addModal.selectVehicle')} />
                         </SelectTrigger>
                         <SelectContent>
                           {vehicles.map((v) => (
@@ -2087,12 +2108,12 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <Label htmlFor="add-model">Modelo del vehículo *</Label>
+                      <Label htmlFor="add-model">{t('manage.addModal.vehicleModelRequired')}</Label>
                       <Input
                         id="add-model"
                         value={addForm.vehicle_model}
                         onChange={(e) => setAddForm({ ...addForm, vehicle_model: e.target.value })}
-                        placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
+                        placeholder={t('manage.addModal.vehicleModelPlaceholder')}
                         required
                       />
                     </div>
@@ -2102,16 +2123,16 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
-                Cancelar
+                {tCommon('actions.cancel')}
               </Button>
               <Button type="submit" disabled={adding}>
                 {adding ? (
                   <>
                     <Spinner className="size-4 mr-2" />
-                    Añadiendo...
+                    {t('manage.addModal.adding')}
                   </>
                 ) : (
-                  'Añadir Participante'
+                  t('manage.addParticipant')
                 )}
               </Button>
             </DialogFooter>
@@ -2123,8 +2144,8 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
       <Dialog open={showEditModal} onOpenChange={(open) => !open && setShowEditModal(false)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Participante</DialogTitle>
-            <DialogDescription>Modifica los datos del participante</DialogDescription>
+            <DialogTitle>{t('manage.editModal.title')}</DialogTitle>
+            <DialogDescription>{t('manage.editModal.description')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditParticipant}>
             <div className="space-y-4 py-4">
@@ -2135,25 +2156,25 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="edit-driver">Nombre del piloto *</Label>
+                <Label htmlFor="edit-driver">{t('manage.addModal.driverNameRequired')}</Label>
                 <Input
                   id="edit-driver"
                   value={editForm.driver_name}
                   onChange={(e) => setEditForm({ ...editForm, driver_name: e.target.value })}
-                  placeholder="Nombre del piloto"
+                  placeholder={t('manage.addModal.driverNamePlaceholder')}
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Categoría *</Label>
+                <Label>{t('manage.addModal.categoryRequired')}</Label>
                 <Select
                   value={editForm.category_id}
                   onValueChange={(v) => setEditForm({ ...editForm, category_id: v })}
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
+                    <SelectValue placeholder={t('manage.addModal.selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
                     {competition.categories?.map(cat => (
@@ -2164,13 +2185,13 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               </div>
 
               <div className="space-y-2">
-                <Label>Vehículo</Label>
+                <Label>{t('guestMembers.vehicleLabel')}</Label>
                 <Select
                   value={editForm.vehicle_id}
                   onValueChange={(v) => setEditForm({ ...editForm, vehicle_id: v })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un vehículo" />
+                    <SelectValue placeholder={t('manage.addModal.selectVehicle')} />
                   </SelectTrigger>
                   <SelectContent>
                     {vehicles.map((v) => (
@@ -2183,29 +2204,29 @@ const CompetitionParticipants = ({ embedded = false, onCompetitionChange }) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-model">O modelo personalizado</Label>
+                <Label htmlFor="edit-model">{t('manage.editModal.customModel')}</Label>
                 <Input
                   id="edit-model"
                   value={editForm.vehicle_model}
                   onChange={(e) => setEditForm({ ...editForm, vehicle_model: e.target.value })}
-                  placeholder="Ej: Scalextric Ferrari F1, Carrera Porsche 911..."
+                  placeholder={t('manage.addModal.vehicleModelPlaceholder')}
                 />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>
-                Cancelar
+                {tCommon('actions.cancel')}
               </Button>
               <Button type="submit" disabled={editing}>
                 {editing ? (
                   <>
                     <Spinner className="size-4 mr-2" />
-                    Guardando...
+                    {t('manage.editModal.saving')}
                   </>
                 ) : (
                   <>
                     <Pencil className="size-4 mr-2" />
-                    Guardar Cambios
+                    {t('manage.editModal.saveChanges')}
                   </>
                 )}
               </Button>

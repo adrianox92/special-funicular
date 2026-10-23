@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import Profile from '../../pages/Profile';
 import api from '../../lib/axios';
 import { PARTNER_SWAGGER_PRODUCTION_URL } from '../../utils/partnerApiUrls';
+import i18n from '../../i18n';
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
@@ -23,7 +24,9 @@ jest.mock('../../lib/licenseAdmin', () => ({
 }));
 
 describe('Profile API key docs links', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.loadNamespaces(['profile']);
+    await i18n.changeLanguage('es');
     api.get.mockImplementation((url) => {
       if (url === '/api-keys/me') {
         return Promise.resolve({

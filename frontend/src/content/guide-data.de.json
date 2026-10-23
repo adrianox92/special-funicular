@@ -1,0 +1,1059 @@
+{
+  "primerosPasos": {
+    "title": "Erste Schritte",
+    "intro": "Empfohlene Reihenfolge, um mit Slot Database zu starten, ohne den Überblick zu verlieren. Du kannst sie an deinen Fall anpassen (z. B. wenn du nur Autos katalogisieren willst, ohne Zeiten).",
+    "steps": [
+      {
+        "title": "Start-Dashboard prüfen",
+        "body": "Es gibt dir einen Gesamtüberblick über Investition, Fahrzeugtypen und Schnellzugriffe. Je mehr Daten du erfasst, desto nützlicher wird es.",
+        "linkTo": "/dashboard",
+        "linkLabel": "Zum Start"
+      },
+      {
+        "title": "Strecken anlegen (wenn du Zeiten oder Wettkämpfe erfassen willst)",
+        "body": "Zeiten und viele Wettkämpfe verweisen auf eine bestehende Strecke. Lege sie vorher oder genau dann an, wenn du sie brauchst.",
+        "linkTo": "/circuits",
+        "linkLabel": "Zu Strecken"
+      },
+      {
+        "title": "Fahrzeuge hinzufügen oder aus einer Datei importieren",
+        "body": "Unter Fahrzeuge kannst du Stammdaten mit Fotos, Typ, Umbauten und mehr anlegen oder CSV/Excel hochladen: Das System schlägt die Spaltenzuordnung vor, zeigt eine Vorschau und berücksichtigt mögliche Kopfzeilen oder leere Spalten. Vollständige Stammdaten verbessern Metriken und Berichte.",
+        "linkTo": "/vehicles",
+        "linkLabel": "Zu Fahrzeuge"
+      },
+      {
+        "title": "Sitzungszeiten erfassen",
+        "body": "Am schnellsten geht es mit «Neue Sitzung» (Start oder Menü): Strecke, Auto und die Mindestzeiten wählen. Du kannst es auch über die Zeiten-Liste oder den Tab «Rundenzeiten-Tabelle» jedes Autos machen und CSV oder JSON mit «Sitzungen importieren» importieren.",
+        "linkTo": "/session",
+        "linkLabel": "Neue Sitzung"
+      },
+      {
+        "title": "Optional: Teile-Inventar",
+        "body": "Wenn du Ersatzteile vorrätig hältst, erfasse sie hier; du kannst sie bei Bedarf in Fahrzeuge einbauen.",
+        "linkTo": "/inventory",
+        "linkLabel": "Zum Inventar"
+      },
+      {
+        "title": "Optional: Wettkämpfe",
+        "body": "Lege ein Event an, verwalte Teilnehmer und Zeiten. Es gibt öffentliche URLs für Anmeldung und Verfolgung. Im Menü öffnet «Wettkämpfe» ein Untermenü: «Meine Wettkämpfe» und «Lieblingsfahrer» (Liste stammhafter Fahrer zum Anlegen, ohne nur auf den öffentlichen Link angewiesen zu sein).",
+        "linkTo": "/competitions",
+        "linkLabel": "Zu Wettkämpfe"
+      },
+      {
+        "title": "Warnungen und Konto einrichten",
+        "body": "Unter Einstellungen Dashboard-Warnungen und Benachrichtigungen anpassen; unter Profil die Integrations-API und die Slot Race Manager-Lizenz.",
+        "linkTo": "/settings",
+        "linkLabel": "Einstellungen"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "inicio",
+      "title": "Homepage",
+      "pathBadge": "/dashboard",
+      "description": "Zusammenfassung Ihrer Sammlung: Kennzahlen, Diagramme und Handlungsvorschläge.",
+      "intro": "Hier sehen Sie die Gesamtinvestition, die Aufschlüsselung nach Fahrzeugtyp, Marken, Geschäften, Komponenten mit den höchsten Kosten und Trends. Es erscheinen auch aktive Wettbewerbe und Schnellzugriffsblöcke für den Rest der Website.",
+      "steps": [
+        "Öffnen Sie Home in der Seitenleiste, um das Dashboard zu laden.",
+        "Überprüfen Sie die Diagramme und Karten: Sie werden von Fahrzeugen, Komponenten und Zeiten gespeist, die Sie aufgezeichnet haben.",
+        "Verwenden Sie die Schnelllinks, um zu Fahrzeugen, Zeiten oder anderen Abschnitten zu springen, ohne zum Menü zurückzukehren.",
+        "Verwenden Sie für Ihre erste Timing-Sitzung \"Neue Sitzung\": Strecke, Auto und Mindestzeiten, ohne die Fahrzeugaufzeichnung zu öffnen."
+      ],
+      "tips": [
+        "Die Daten hängen davon ab, was Sie in Fahrzeugen, Komponenten und Zeiten aufzeichnen.",
+        "Wenn etwas nicht geladen werden kann, überprüfen Sie Ihre Verbindung. Einige Informationen stammen aus mehreren Serveranfragen.",
+        "Wenn Sie bereits Autos haben und keine Zeiten (oder keine in 30 Tagen), zeigt Home einen auffälligen Link zu «New session» (/session)."
+      ],
+      "gotchas": [],
+      "linkTo": "/dashboard",
+      "linkLabel": "Zur Startseite",
+      "keywords": [
+        "dashboard",
+        "inicio",
+        "resumen",
+        "gráficos",
+        "inversión",
+        "colección",
+        "métricas",
+        "Start",
+        "Übersicht",
+        "Diagramme",
+        "Investition",
+        "Sammlung",
+        "Metriken"
+      ]
+    },
+    {
+      "id": "vehiculos",
+      "title": "Fahrzeuge",
+      "pathBadge": "/vehicles",
+      "description": "Autokatalog: Erstellen, Bearbeiten, Massenimport (CSV/Excel), Filter und Export.",
+      "intro": "Sie können die Liste in Raster oder Tabelle anzeigen, nach Hersteller, Typ, modifiziert/analog-digital filtern und Kriterien wie Museum oder Werkstatt markieren. Filter werden in diesem Browser für Ihren nächsten Besuch gespeichert. Aus der Liste können Sie auch viele Fahrzeuge auf einmal mit einem Assistenten importieren, der das Blatt liest (einschließlich Kopfzeilen unter leeren Zeilen oder leeren Spalten) und die Zuordnung mit Excel- oder Zahlen-Spaltenbuchstaben ausrichtet.",
+      "steps": [
+        "Gehen Sie im Menü zu Fahrzeuge.",
+        "Einfach hinzufügen: „Fahrzeug hinzufügen“ (oder die neue Fahrzeugroute), das Formular ausfüllen, optional Fotos hinzufügen und speichern.",
+        "Importieren: Klicken Sie in der Liste Fahrzeuge auf \"Importieren\" (neben CSV exportieren) und wählen Sie eine CSV- oder Excel-Datei (.xlsx, .xlsm, .xlsb, .xls, .xltx, .xltm). Optional: Blattindex in Arbeitsmappen mit mehreren Registerkarten.",
+        "Review Mapping: Das System schlägt vor, welche Spalte in Ihrer Datei zu jedem Feld passt (Modell, Marke, Typ, Laufwerk, Daten usw.). Sie können Spalten ignorieren. In der Zuordnung sind nur Marke und Modell erforderlich; der Rest ist optional. Die Vorschau wird aktualisiert, wenn Sie die Zuordnung ändern.",
+        "Duplikate bearbeiten: Sie können Zeilen überspringen, die mit dem übereinstimmen, was Sie bereits haben, sie trotzdem importieren oder vorhandene Datensätze je nach gewähltem Modus (Referenz+Hersteller oder Hersteller+Modell) aktualisieren.",
+        "Bestätigen Sie den Import. Wenn Sie den Kartentyp oder andere Felder, die normalerweise im manuellen Formular erforderlich sind, nicht zugeordnet haben, werden Sie von der App aufgefordert, diese auszufüllen, indem Sie den Datensatz nach dem Import bearbeiten.",
+        "Öffnen Sie nach dem Hinzufügen den Fahrzeugdatensatz, um Spezifikationen, Komponenten, Wartung und Zeiten hinzuzufügen."
+      ],
+      "tips": [
+        "Jedes Fahrzeug verfügt über eine detaillierte Aufzeichnung (Komponenten, Wartung, zugehörige Zeiten usw.).",
+        "\"Fahrzeug hinzufügen\" und Bearbeiten verwenden dasselbe Datenmodell: Je vollständiger der Datensatz ist, desto besser sind die Metriken für Home und Times.",
+        "Daten und Jahr im Importeur: Das Kaufdatum wird als JJJJ-MM-TT gespeichert; es akzeptiert ISO, europäische d/m/y oder d-m-y, Excel-Serien, ein eigenständiges Jahr (1. Januar dieses Jahres) und Serien als Text. Das Veröffentlichungsjahr wird als Nummer gespeichert (nur Jahr, vollständiges Datum oder Excel-Seriennummer). Wenn ein Wert nicht erkannt wird, zeigt die Vorschau eine Warnung in dieser Zeile an.",
+        "Auf der Registerkarte «Rundenzeittabelle» des Datensatzes können Sie Sitzungen aus CSV oder json mit «Sitzungen importieren» importieren; sie werden diesem Fahrzeug automatisch zugewiesen (gleicher Ablauf wie die globale Zeitliste). Das unterscheidet sich vom Importieren von ** Fahrzeugdatensätzen** aus der Liste.",
+        "Exportieren und Seitennummerierung respektieren Filter und Limits, die Sie auf dem Bildschirm festlegen."
+      ],
+      "gotchas": [],
+      "linkTo": "/vehicles",
+      "linkLabel": "Gehe zu Fahrzeuge",
+      "keywords": [
+        "vehículo",
+        "vehiculos",
+        "coche",
+        "coches",
+        "añadir",
+        "alta",
+        "ficha",
+        "catálogo",
+        "filtros",
+        "fotos",
+        "imágenes",
+        "importar",
+        "importación",
+        "csv",
+        "excel",
+        "xlsx",
+        "mapeo",
+        "duplicados",
+        "vista previa",
+        "fechas",
+        "año de comercialización",
+        "marca",
+        "modelo",
+        "Fahrzeug",
+        "Fahrzeuge",
+        "Auto",
+        "Autos",
+        "hinzufügen",
+        "anlegen",
+        "Stammdaten",
+        "Katalog",
+        "Filter",
+        "Fotos",
+        "Bilder",
+        "Import",
+        "Zuordnung",
+        "Duplikate",
+        "Vorschau",
+        "Daten",
+        "Markteinführungsjahr",
+        "Marke",
+        "Modell"
+      ]
+    },
+    {
+      "id": "tiempos",
+      "title": "Zeiten",
+      "pathBadge": "/timings",
+      "description": "Sitzungsprotokoll nach Fahrzeug, Strecke und Fahrspur: beste Runden, Geschwindigkeit und Vergleiche.",
+      "intro": "Die Zeiten sind nach Fahrzeug, Strecke und Fahrspur gruppiert. Für das Heimtraining verwenden Sie «New session» (/session): Track → Car → Best Lap, Total und Runden, ohne den Fahrzeugrekord zu öffnen. In der Liste (/timings) können Sie den Verlauf erweitern, Spezifikationen anzeigen, Sitzungen vergleichen, die Leistung analysieren und CSV (benutzerdefiniertes Format oder SmartRace) oder json importieren. Auf einem Fahrzeugdatensatz, Registerkarte \"Rundenzeittabelle\", weist derselbe Importassistent diesem Auto Sitzungen zu.",
+      "steps": [
+        "Öffnen Sie in der Startseite oder im Menü «Neue Sitzung», wählen Sie die Strecke (oder erstellen Sie bei Bedarf eine) und das Auto, geben Sie die beste Runde, die Gesamtzeit und die Runden ein und speichern Sie.",
+        "Zeigen Sie unter Zeiten den Verlauf gruppiert nach Fahrzeug, Strecke und Fahrspur an.",
+        "Für den Massenimport: Klicken Sie in Zeiten auf «Sitzungen importieren», wählen Sie CSV oder json, fügen Sie Inhalte ein oder laden Sie eine Datei hoch, wählen Sie das Fahrzeug aus (erforderlich, es sei denn, jede Zeile/jedes Objekt enthält vehicle_id) und bestätigen Sie; mit SmartRace CSV mit mehreren Treibern können Sie Zeilen markieren und, wenn Spur oder Fahrspur in der Datei fehlt, sie aus Ihren registrierten Spuren auswählen.",
+        "Alternativ: Öffnen Sie den Fahrzeugdatensatz (bearbeiten), gehen Sie auf die Registerkarte «Rundenzeitentabelle» und klicken Sie auf «Sitzungen importieren»; der Ablauf ist derselbe (CSV/JSON, Vorlage, SmartRace), aber das Auto ist fixiert und Sie müssen es nicht auswählen.",
+        "Zeigen Sie den Verlauf und Vergleiche aus demselben Bereich der App an."
+      ],
+      "tips": [
+        "Tracks müssen im Abschnitt Tracks vorhanden sein, damit die Datensätze konsistent bleiben. Bei SmartRace-Importen müssen Sie manchmal Track and Lane manuell auswählen.",
+        "Fahrspur und Entfernung beeinflussen Rankings und Statistiken pro Strecke.",
+        "Wenn SmartRace CSV erkannt wird, ist das Sitzungsauto das, das Sie im Modal auswählen (nicht die Spalte \"Auto\" des Exports).",
+        "Wenn Sie externe Integrationen verwenden (z. B. Sendezeiten), überprüfen Sie die API und Benachrichtigungen im Profil."
+      ],
+      "gotchas": [],
+      "linkTo": "/timings",
+      "linkLabel": "Gehe zu Zeiten",
+      "keywords": [
+        "tiempos",
+        "vueltas",
+        "sesión",
+        "carril",
+        "circuito",
+        "cronometrar",
+        "ranking",
+        "importar",
+        "csv",
+        "json",
+        "smartrace",
+        "entrenar",
+        "nueva sesión",
+        "Zeiten",
+        "Runden",
+        "Sitzung",
+        "Spur",
+        "Strecke",
+        "Zeitnahme",
+        "Rangliste",
+        "trainieren",
+        "neue Sitzung"
+      ]
+    },
+    {
+      "id": "circuitos",
+      "title": "Spuren",
+      "pathBadge": "/circuits",
+      "description": "Ihre Spuren: Name, Beschreibung, Anzahl der Spuren und Länge pro Spur.",
+      "intro": "Definieren Sie hier die Strecken, die Sie für Zeiten und Wettbewerbe verwenden werden. Geben Sie beim Erstellen oder Bearbeiten an, wie viele Spuren es hat und gegebenenfalls die Länge der einzelnen Spuren.",
+      "steps": [
+        "Öffnen Sie Tracks und erstellen Sie einen neuen Track.",
+        "Geben Sie Namen, Anzahl der Fahrspuren und Längen ein, wenn Sie sie in Statistiken verwenden.",
+        "Speichern. Sie können diesen Titel dann auswählen, wenn Sie Zeiten aufzeichnen oder Wettbewerbe erstellen."
+      ],
+      "tips": [
+        "Wenn du einen Wettbewerb erstellst, kannst du einen Track verlinken; es hilft, ihn vorher registrieren zu lassen.",
+        "Das Löschen einer Spur kann sich auf Daten auswirken, die auf sie verweisen: Tun Sie dies nur, wenn Sie sicher sind."
+      ],
+      "gotchas": [],
+      "linkTo": "/circuits",
+      "linkLabel": "Gehe zu Tracks",
+      "keywords": [
+        "circuito",
+        "circuitos",
+        "pista",
+        "carriles",
+        "longitud",
+        "Strecke",
+        "Strecken",
+        "Spuren",
+        "Länge"
+      ]
+    },
+    {
+      "id": "inventario",
+      "title": "Inventar",
+      "pathBadge": "/inventory",
+      "description": "Teile und Verbrauchsmaterialien: Lagerbestand, Kategorien, Preise und Verknüpfung mit Fahrzeugen.",
+      "intro": "Verwalten Sie Ersatzteile mit Kategorie, Einheiten, Kaufpreis, Daten und Notizen. Sie können nach Kategorie, Suche und niedrigem Lagerbestand filtern, Mengen auffüllen, Teile in ein Fahrzeug einbauen und den Bewegungsverlauf anzeigen.",
+      "steps": [
+        "Erstellen Sie Bestandsartikel mit Kategorie und Menge.",
+        "Verwenden Sie Filter, um geringe Lagerbestände zu sehen oder nach Namen zu suchen.",
+        "Aus einem Fahrzeugdatensatz können Sie Bestandsteile installieren, wenn die App dies zulässt; Bestandsaktualisierungen gemäß der Anwendungslogik."
+      ],
+      "tips": [
+        "Der Mindestbestand hilft Ihnen zu sehen, was Sie nachfüllen müssen.",
+        "Der Einbau eines Teils in ein Fahrzeug zieht gemäß der Anwendungslogik vom Bestand ab.",
+        "Einige Felder sind teilespezifisch (Material, Verzahnung, etc.)."
+      ],
+      "gotchas": [],
+      "linkTo": "/inventory",
+      "linkLabel": "Gehe zum Inventar",
+      "keywords": [
+        "inventario",
+        "stock",
+        "piezas",
+        "repuestos",
+        "montar",
+        "consumibles",
+        "Inventar",
+        "Teile",
+        "Ersatzteile",
+        "einbauen",
+        "Verbrauchsmaterial"
+      ]
+    },
+    {
+      "id": "competiciones",
+      "title": "Wettbewerbe",
+      "pathBadge": "/competitions",
+      "description": "Veranstaltungen mit Sitzplätzen, Runden, Strecken, Teilnehmern, Lieblingsfahrern und Zeitmanagement.",
+      "intro": "QUERY LENGTH LIMIT EXCEEDED. MAX ALLOWED QUERY : 500 CHARS",
+      "steps": [
+        "Menü «Wettbewerbe»: Wählen Sie «Meine Wettbewerbe» oder «Lieblingsfahrer». Unter Bevorzugte Fahrer pflegen Sie Ihre Liste (Name, optionales Standardfahrzeug, Notizen und, wenn Sie möchten, Verknüpfung mit dem öffentlichen Profil eines anderen Fahrers über Slug, mit optionaler Validierung).",
+        "Erstellen Sie in Meine Wettbewerbe ein neues Event mit Namen, Plätzen, Runden und Basisdaten.",
+        "Optional beim Erstellen: Erweitern Sie \"Bevorzugte Fahrer jetzt hinzufügen\", markieren Sie Favoriten und Fahrzeugquelle pro Zeile; die angegebene Kategorie wird erstellt und sie werden als bestätigte Teilnehmer registriert.",
+        "In Event-Teilnehmer: Kategorien, Registrierungen, falls zutreffend, manuelles Hinzufügen, Favoritenmodus oder «Aus Favoriten hinzufügen» in großen Mengen; diejenigen, die bereits aus einem Favoriten hinzugefügt wurden, werden nicht aus demselben Favoriten dupliziert.",
+        "Legen Sie in den Teilnehmern die Startreihenfolge mit der Spalte «Startreihenfolge» oder den Aufwärts-/Abwärtspfeilen fest. Diese Reihenfolge wird im Präsentations-/TV-Modus für den Block «Nächster Fahrer» verwendet.",
+        "Verknüpfen Sie bei Bedarf eine Spur (sie muss unter Spuren vorhanden sein).",
+        "Verwalten Sie Teilnehmer und Zeiten über die Veranstaltungsbildschirme.",
+        "In Competition Times, Registerkarte «By Rounds»: Erfassen Sie Zeiten mit der allgemeinen Schaltfläche oder verwenden Sie für jeden Fahrer, der noch keine Zeit in dieser Runde hat, «Times» in der Liste «Pending this round», um das Formular mit der bereits ausgewählten Runde und dem Fahrer zu öffnen.",
+        "Um eine gespeicherte Zeit zu fixieren, verwenden Sie in der Treiberzeile das Bleistiftsymbol (Bearbeitungszeit); das Modal zeigt den richtigen Treiber an und sperrt die Auswahl nicht wie bei einem neuen Eintrag.",
+        "Sanktionen: Flaggensymbol-Schaltfläche; öffnet ein Feld, um der Gesamtzeit Sekunden hinzuzufügen. Gilt nicht für Zeilen, die mit NP gekennzeichnet sind. Hover-Aktionsschaltflächen für kurze Beschreibungen.",
+        "Hat nicht teilgenommen (NP): Schalten Sie das Zeitformular oder die Schaltfläche «NP» neben einem ausstehenden Fahrer um. Dieser Fahrer erhält in dieser Runde 0 Punkte, aber die Runde zählt immer noch als aufgezeichnet, damit er die Runde abschließen und Punkte für andere freischalten kann.",
+        "Teilen Sie öffentliche Registrierungs- oder Status-URLs mit dem Antragsteller."
+      ],
+      "tips": [
+        "Bevorzugte Treiber sind privat: Nur Sie sehen Ihre Liste; es hilft, Aufstellungen zu wiederholen, ohne Daten erneut einzugeben.",
+        "Wenn du einen Favoriten mit dem öffentlichen Slug eines Fahrers verknüpfst, kannst du vor dem Speichern überprüfen, ob er existiert. Der Name, den du im Favoriten speicherst, ist immer noch der, den du angegeben hast.",
+        "Sie benötigen mindestens eine Kategorie, um Teilnehmer manuell hinzuzufügen. Wenn Sie beim Erstellen des Ereignisses Favoriten hinzufügen, wird diese Kategorie automatisch erstellt.",
+        "Sie müssen Tracks erstellen, wenn Sie einen bei der Erstellung des Wettbewerbs verknüpfen möchten.",
+        "Aus der Liste können Sie je nach Ablauf der einzelnen Veranstaltungen Teilnehmer und Zeiten öffnen.",
+        "In Tabellen und öffentlichen Ansichten zeigen Differenzspalten gegen Führer oder vorherige das richtige Zeichen (+ langsamer, − schneller), auch wenn die Tabelle nach Punkten geordnet ist.",
+        "Das Löschen einer Zeit aus einer Runde lässt den Fahrer in dieser Runde erneut anstehen; Sie können ihm erneut eine Zeit geben oder NP markieren."
+      ],
+      "qa": [
+        "Präsentation/TV-Modus (`/competitions/presentation/:slug`, `?tv=1`, OBS-Overlay): Der Block \"Nächster Fahrer\" zeigt an, wer als nächstes auf die Strecke gehen soll.",
+        "Rundenpriorität: Es wird die erste Runde (1, dann 2, …) verwendet, die noch ausstehende Fahrer hat (keine erfasste Zeit und kein NP). Auch wenn jemand bereits eine spätere Runde begonnen hat, bleibt der Block auf der ältesten Runde mit Lücken.",
+        "Innerhalb dieser Runde wird der Fahrer mit der niedrigsten Startbestellung angezeigt (`start_order` in Teilnehmer). Wenn keine explizite Bestellung erfolgt, wird das Registrierungsdatum verwendet.",
+        "Die Beschriftung «Aktuelle Position: P…» spiegelt die Punktewertung wider, nicht die Startreihenfolge.",
+        "Beispiel (2 Runden, 5 Fahrer): Wenn 4 Runden abgeschlossen sind, 1 Fahrer noch in R1 und ein anderer bereits in R2 aussteht, wird der ausstehende R1-Fahrer angezeigt (z. B. Eva, «Round 1 · Next on track»), nicht der nächste in R2.",
+        "Wenn alle alle Runden abgeschlossen haben, zeigt der Block keine ausstehenden Läufe mehr an."
+      ],
+      "gotchas": [],
+      "linkTo": "/competitions",
+      "linkLabel": "Zu den Wettbewerben",
+      "keywords": [
+        "competición",
+        "competiciones",
+        "evento",
+        "participantes",
+        "inscripción",
+        "rondas",
+        "favoritos",
+        "pilotos favoritos",
+        "slug",
+        "cupo",
+        "plazas",
+        "menú",
+        "submenú",
+        "NP",
+        "no participado",
+        "penalización",
+        "editar tiempo",
+        "pendientes",
+        "organizador",
+        "tiempos",
+        "presentación",
+        "tv",
+        "próximo piloto",
+        "orden de salida",
+        "broadcast",
+        "Wettkampf",
+        "Wettkämpfe",
+        "Event",
+        "Teilnehmer",
+        "Anmeldung",
+        "Runden",
+        "Favoriten",
+        "Lieblingsfahrer",
+        "Kontingent",
+        "Plätze",
+        "Menü",
+        "Untermenü",
+        "Strafe",
+        "Zeit bearbeiten",
+        "ausstehend",
+        "Organisator",
+        "Präsentation",
+        "nächster Fahrer",
+        "Startreihenfolge"
+      ]
+    },
+    {
+      "id": "configuracion",
+      "title": "Einstellungen",
+      "pathBadge": "/settings",
+      "description": "Dashboard-Einstellungen, Benachrichtigungen und Passwortänderung.",
+      "intro": "Schwellenwert für Tage ohne Sitzung auf Ihrem üblichen Track (für den Block Home «Pending and alerts»), Discord-Webhook und Telegramm-Chat-ID. Auf der Registerkarte Konto können Sie Ihr Passwort ändern, ohne das vorherige Passwort einzugeben (während Sie angemeldet sind), oder eines festlegen, wenn Sie nur Google verwenden. Sie können?tab=Benachrichtigungen oder ?tab=cuenta in der URL verwenden, um den gewünschten Tab zu öffnen.",
+      "steps": [
+        "Öffnen Sie Einstellungen aus dem Menü oder dem Benutzermenü.",
+        "Passen Sie Dashboard-Warnungen und Benachrichtigungen (Discord/Telegramm) an, wenn Sie sie verwenden.",
+        "Ändern Sie auf der Registerkarte Konto bei Bedarf Ihr Passwort."
+      ],
+      "tips": [
+        "Nachdem Sie den Tagesgrenzwert geändert haben, laden Sie das Dashboard neu, um die neuen Warnkriterien anzuzeigen.",
+        "Die Passwortänderung für das Konto fragt nicht nach dem vorherigen: Es reicht aus, angemeldet zu sein.",
+        "Das Regenerieren des API-Schlüssels wird hier nicht durchgeführt: Der Integrationsschlüssel befindet sich in Mein Profil."
+      ],
+      "gotchas": [],
+      "linkTo": "/settings",
+      "linkLabel": "Gehe zu Einstellungen",
+      "keywords": [
+        "configuración",
+        "settings",
+        "alertas",
+        "discord",
+        "telegram",
+        "contraseña",
+        "cuenta",
+        "notificaciones",
+        "Einstellungen",
+        "Warnungen",
+        "Passwort",
+        "Konto",
+        "Benachrichtigungen"
+      ]
+    },
+    {
+      "id": "perfil",
+      "title": "Profil",
+      "pathBadge": "/profile",
+      "description": "Konto, Integrations-API-Schlüssel und Slot Race Manager-Lizenz.",
+      "intro": "Zeigen Sie Ihre E-Mail an, generieren oder regenerieren Sie den API-Schlüssel für den X-API-Key-Header und überprüfen Sie Desktop-Lizenzinstallationen. Dashboard-Einstellungen und Discord/Telegramm befinden sich in den Einstellungen.",
+      "steps": [
+        "Mein Profil.",
+        "Kopieren oder erneuern Sie den API-Schlüssel für Integrationen mit dem X-API-Schlüssel-Header.",
+        "Überprüfen Sie den Lizenzstatus des Slot Race Managers, falls zutreffend."
+      ],
+      "tips": [
+        "Durch das Regenerieren des API-Schlüssels wird der vorherige ungültig: Aktualisieren Sie jedes Skript oder Gerät, das ihn verwendet.",
+        "Benutzer-Metadaten werden mit dem Authentifizierungsanbieter synchronisiert. Wenn etwas nicht gespeichert wird, überprüfen Sie die Sitzungsberechtigungen."
+      ],
+      "gotchas": [],
+      "linkTo": "/profile",
+      "linkLabel": "Zum Profil gehen",
+      "keywords": [
+        "perfil",
+        "api",
+        "api key",
+        "licencia",
+        "slot race",
+        "cuenta",
+        "email",
+        "Profil",
+        "Lizenz",
+        "Konto",
+        "E-Mail"
+      ]
+    },
+    {
+      "id": "catalogo-admin",
+      "adminOnly": true,
+      "title": "Slot-Katalog (Administratoren)",
+      "pathBadge": "/admin/slot-catalog",
+      "description": "Gemeinsamer Referenzkatalog: CRUD, CSV/Excel-Import und Moderationswarteschlangen.",
+      "intro": "Nur Benutzer, deren E-Mail auf der Administratorliste steht (LICENSE_ADMIN_EMAILS). Referenzen werden hier mit Marke, Name, Fahrzeugtyp (gleiche Liste wie bei der Erstellung eines Autos), Freigabedatum und Bild gepflegt; Massenimport- und Anforderungswarteschlangen sind verfügbar.",
+      "steps": [
+        "Benutzermenü → Slotkatalog (Admin).",
+        "In Elementen Datensätze erstellen oder bearbeiten; in Import CSV oder Excel mit Spaltenreferenz, Hersteller, Modellname, Fahrzeugtyp (optional) und Commercial Release Year (optional, nur Jahr) hochladen.",
+        "Genehmigen oder lehnen Sie in Warteschlangen Bearbeitungs- oder neue Eingabeanforderungen ab."
+      ],
+      "tips": [
+        "In Fahrzeug hinzufügen füllt die Registerkarte «Katalog suchen» die Daten durch Verweis für jeden registrierten Benutzer.",
+        "Import aus PDF wird nicht unterstützt: zuerst in CSV oder Excel konvertieren.",
+        "Beim Import bedeutet Duplikat die gleiche Referenz und die gleiche Marke; mehrere Marken können den gleichen Referenzcode teilen."
+      ],
+      "gotchas": [],
+      "linkTo": "/admin/slot-catalog",
+      "linkLabel": "Zum Katalog (Admin)",
+      "keywords": [
+        "catálogo",
+        "admin",
+        "referencia",
+        "importar",
+        "csv",
+        "excel",
+        "marca",
+        "moderación",
+        "Katalog",
+        "Referenz",
+        "Moderation"
+      ]
+    },
+    {
+      "id": "catalogo-publico",
+      "title": "Referenzkatalog (öffentlich)",
+      "pathBadge": "/catalogo",
+      "description": "Auflistung und Aufzeichnung für jedes Modell; ohne Konto stöbern; mit einem Konto können Sie Änderungen bewerten und vorschlagen.",
+      "intro": "Von der Zielseite oder Fußzeile aus können Sie den öffentlichen Katalog öffnen: Filtern Sie nach Marke, Typ und Erscheinungsjahr, paginieren Sie und öffnen Sie jeden Referenzdatensatz (Bild und Details). Durchschnittliche Bewertungen und Zählungen werden in der Liste und im Datensatz angezeigt. Wenn Sie angemeldet sind, können Sie 1–5 Punkte erzielen, Korrekturen in einem Datensatz vorschlagen, ein neues Modell vorschlagen und den Status Ihrer Vorschläge einsehen.",
+      "steps": [
+        "Referenzkatalog (Route /Katalog) öffnen.",
+        "Verwenden Sie Filter oder die Liste; klicken Sie auf eine Karte, um den vollständigen Datensatz anzuzeigen.",
+        "Teilen Sie die Datensatz-URL; der Link enthält ein lesbares Fragment des Namens sowie die Kennung.",
+        "Melden Sie sich an, um zu bewerten (Sterne), öffnen Sie „Korrektur vorschlagen“ oder verlinken Sie auf „Neues Modell vorschlagen“ und „Meine Vorschläge“ (Routen /proponer-alta-catalogo und /mis-sugerencias-catalogo)."
+      ],
+      "tips": [
+        "Genehmigungen werden vom Team aus dem Slot-Katalog (Admin) durchgeführt; bis dahin bleiben Ihre Vorschläge ausstehend.",
+        "Sie können nicht zwei ausstehende Änderungen an demselben Artikel oder zwei ausstehende neue Einträge mit derselben Referenz und Marke haben.",
+        "Unter Fahrzeug hinzufügen steht jedem registrierten Benutzer die Registerkarte «Katalog suchen» zur Verfügung."
+      ],
+      "gotchas": [],
+      "linkTo": "/catalogo",
+      "linkLabel": "Zum öffentlichen Katalog",
+      "keywords": [
+        "catálogo",
+        "público",
+        "referencia",
+        "marca",
+        "slot",
+        "consultar",
+        "valorar",
+        "sugerencia",
+        "colaborar",
+        "öffentlich",
+        "bewerten",
+        "Vorschlag",
+        "mitarbeiten"
+      ]
+    }
+  ],
+  "faq": [
+    {
+      "id": "crear-vehiculo",
+      "question": "Wie erstelle oder registriere ich ein Fahrzeug?",
+      "keywords": [
+        "crear",
+        "coche",
+        "vehículo",
+        "alta",
+        "añadir",
+        "nuevo",
+        "registrar",
+        "erstellen",
+        "Auto",
+        "Fahrzeug",
+        "anlegen",
+        "hinzufügen",
+        "neu",
+        "registrieren"
+      ],
+      "answerSteps": [
+        "Gehen Sie im Menü zu Fahrzeuge.",
+        "Klicken Sie auf „Fahrzeug hinzufügen“ (oder gehen Sie zur neuen Fahrzeugroute).",
+        "Füllen Sie die erforderlichen und optionalen Felder aus (Typ, Hersteller, Notizen usw.).",
+        "Optional: Fügen Sie Fotos zum Datensatz hinzu.",
+        "Speichern. Sie können Spezifikationen, Komponenten und Zeiten später aus demselben Datensatz vervollständigen."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles/new",
+      "linkLabel": "Fahrzeug hinzufügen"
+    },
+    {
+      "id": "api-integracion",
+      "question": "Wo ist der API-Schlüssel für Integrationen?",
+      "keywords": [
+        "api",
+        "clave",
+        "integración",
+        "x-api-key",
+        "header",
+        "Schlüssel",
+        "Integration",
+        "Header"
+      ],
+      "answerSteps": [
+        "Der Integrationsschlüssel befindet sich in Mein Profil, nicht in den Einstellungen.",
+        "Es wird im X-API-Key-Header auf Anfragen gesendet, die von der API dokumentiert werden.",
+        "Wenn Sie den Schlüssel neu generieren, funktioniert der alte nicht mehr: Aktualisieren Sie Skripte und Geräte."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Zum Profil gehen"
+    },
+    {
+      "id": "registrar-tiempos",
+      "question": "Wie zeichne ich eine Zeitmessung oder eine Runde auf?",
+      "keywords": [
+        "tiempos",
+        "sesión",
+        "vueltas",
+        "cronómetro",
+        "registrar",
+        "carril",
+        "Zeiten",
+        "Sitzung",
+        "Runden",
+        "Stoppuhr",
+        "registrieren",
+        "Spur"
+      ],
+      "answerSteps": [
+        "Es ist hilfreich, die Strecke zuerst unter Schienen und das Fahrzeug zuerst unter Fahrzeuge registrieren zu lassen.",
+        "Gehen Sie zu Zeiten und suchen Sie das passende Fahrzeug und die passende Spur.",
+        "Fügen Sie die Sitzung hinzu oder bearbeiten Sie sie mit Fahrspur-, Rundendaten und was auch immer das Formular verlangt.",
+        "Aus einem Fahrzeugdatensatz (bearbeiten), Registerkarte \"Rundenzeittabelle\", können Sie Sitzungen manuell hinzufügen oder \"Import-Sitzungen\" verwenden, um CSV (einschließlich SmartRace) oder json zu laden; Sitzungen werden diesem Auto direkt zugewiesen."
+      ],
+      "sectionId": "tiempos",
+      "linkTo": "/timings",
+      "linkLabel": "Gehe zu Zeiten"
+    },
+    {
+      "id": "circuito-antes-tiempos",
+      "question": "Muss ich den Track vor der Eingabe der Zeiten erstellen?",
+      "keywords": [
+        "circuito",
+        "pista",
+        "antes",
+        "orden",
+        "tiempos",
+        "Strecke",
+        "vorher",
+        "Reihenfolge"
+      ],
+      "answerSteps": [
+        "Ja: Zeitaufzeichnungen bleiben konsistent, wenn die Spur im Abschnitt Spuren vorhanden ist.",
+        "Erstellen Sie die Spur mit Namen, Bahnen und Längen, wenn Sie sie verwenden.",
+        "Sie können es dann bei der Aufzeichnung von Sitzungen und bei Wettbewerben auswählen."
+      ],
+      "sectionId": "circuitos",
+      "linkTo": "/circuits",
+      "linkLabel": "Gehe zu Tracks"
+    },
+    {
+      "id": "crear-circuito",
+      "question": "Wie erstelle oder bearbeite ich einen Track?",
+      "keywords": [
+        "circuito",
+        "pista",
+        "nuevo",
+        "carriles",
+        "longitud",
+        "Strecke",
+        "neu",
+        "Spuren",
+        "Länge"
+      ],
+      "answerSteps": [
+        "Öffnen Sie Tracks im Menü.",
+        "Erstellen Sie eine neue Spur und geben Sie gegebenenfalls den Namen, die optionale Beschreibung, die Anzahl der Fahrspuren und die Länge pro Fahrspur ein.",
+        "Speichern. Die Strecke kann in Zeiten und beim Erstellen von Wettbewerben verwendet werden."
+      ],
+      "sectionId": "circuitos",
+      "linkTo": "/circuits",
+      "linkLabel": "Gehe zu Tracks"
+    },
+    {
+      "id": "competicion-publica",
+      "question": "Wie teile ich die Registrierung oder den Status für einen Wettbewerb?",
+      "keywords": [
+        "competición",
+        "público",
+        "url",
+        "inscripción",
+        "slug",
+        "compartir",
+        "Wettkampf",
+        "öffentlich",
+        "URL",
+        "Anmeldung",
+        "teilen"
+      ],
+      "answerSteps": [
+        "Erstellen oder öffnen Sie die Veranstaltung in Wettbewerben; jede hat eine Kennung (Slug) in der App.",
+        "Öffentliche URLs existieren für Registrierung, Status und Präsentation, ohne sich auf der Hauptseite anzumelden.",
+        "Teilen Sie den entsprechenden Link mit Fahrern oder Organisatoren, je nach Veranstaltungsablauf."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Zu den Wettbewerben"
+    },
+    {
+      "id": "pilotos-favoritos",
+      "question": "Was sind Lieblingsfahrer und wie setze ich sie in einem Wettbewerb ein?",
+      "keywords": [
+        "favoritos",
+        "pilotos",
+        "habituales",
+        "amigos",
+        "lista",
+        "competición",
+        "slug",
+        "Favoriten",
+        "Fahrer",
+        "Stammfahrer",
+        "Freunde",
+        "Liste"
+      ],
+      "answerSteps": [
+        "Öffnen Sie im Menü «Wettbewerbe» und wählen Sie «Lieblingsfahrer» (Route /Piloten/Favoriten). Registrieren Sie reguläre Fahrer mit Namen, optionalem Standardfahrzeug, Notizen und optional dem öffentlichen Profil-Slug eines anderen Benutzers, um den Link zu validieren.",
+        "Wenn Sie einen Wettbewerb erstellen, können Sie «Bevorzugte Fahrer jetzt hinzufügen» erweitern: Es wird eine Kategorie erstellt (Standard «Allgemein» oder Ihr Name) und ausgewählte Fahrer werden zu bestätigten Teilnehmern, ohne sich nur auf den Registrierungslink zu verlassen.",
+        "Bei Veranstaltungsteilnehmern können Sie \"Aus Favoriten hinzufügen\" in großen Mengen oder den \"Favoriten\" -Modus für einen einzelnen Teilnehmer verwenden. Derselbe Favorit wird nicht dupliziert, wenn er bereits in diesem Wettbewerb registriert ist."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/pilots/favorites",
+      "linkLabel": "Zu den bevorzugten Fahrern"
+    },
+    {
+      "id": "cupo-competicion",
+      "question": "Warum kann ich nicht mehr Teilnehmer zu einem Wettbewerb hinzufügen?",
+      "keywords": [
+        "cupo",
+        "plazas",
+        "completo",
+        "límite",
+        "participantes",
+        "añadir",
+        "Kontingent",
+        "Plätze",
+        "voll",
+        "Limit",
+        "Teilnehmer",
+        "hinzufügen"
+      ],
+      "answerSteps": [
+        "Jeder Wettbewerb hat eine maximale Anzahl von Plätzen, die bei der Erstellung definiert werden.",
+        "Bestätigte Teilnehmer können dieses Kontingent nicht überschreiten: Wenn sie erreicht sind, sind \"Teilnehmer hinzufügen\" und \"Aus Favoriten hinzufügen\" deaktiviert.",
+        "Um eine neue Person hinzuzufügen, geben Sie einen Platz frei (z. B. entfernen Sie einen bestätigten Teilnehmer) oder erstellen Sie einen anderen Wettbewerb mit mehr Plätzen."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Zu den Wettbewerben"
+    },
+    {
+      "id": "competicion-tiempos-np-penalizacion",
+      "question": "Wie bearbeite ich Zeiten, markiere NP oder füge Strafen in einem Wettbewerb hinzu?",
+      "keywords": [
+        "competición",
+        "tiempos",
+        "editar",
+        "NP",
+        "no participado",
+        "penalización",
+        "pendientes",
+        "organizador",
+        "ronda",
+        "puntos",
+        "Wettkampf",
+        "Zeiten",
+        "bearbeiten",
+        "nicht teilgenommen",
+        "Strafe",
+        "ausstehend",
+        "Organisator",
+        "Runde",
+        "Punkte"
+      ],
+      "answerSteps": [
+        "Öffnen Sie den Wettbewerb als Organisator und gehen Sie zum Zeitmanagement. In «Nach Runden» hat jede Zeile Aktionen: Bleistift (Bearbeitungszeit), Flag (Strafe in Sekunden), Papierkorb (diesen Rundeneintrag löschen). Tooltips beschreiben jede Aktion.",
+        "Wenn ein Fahrer in dieser Runde noch keine Zeit hat, erscheint er in «Pending this round»: «Times» öffnet das Formular mit ausgewählter Runde und Fahrer; «NP» -Marken haben ohne gültige Zeiten nicht teilgenommen.",
+        "Sie können auch eine neue Zeit oder NP aus dem allgemeinen Formular erfassen; beim Bearbeiten einer vorhandenen Zeit wird der Treiber korrekt ausgewählt.",
+        "NP: Dieser Fahrer erhält 0 Punkte in dieser Runde; die Runde gilt für ihn immer noch als abgeschlossen und andere können Rundenpunkte erhalten, wenn jeder einen Rekord (Zeit oder NP) hat.",
+        "Tabellen zeigen Zeitlücken mit konsistentem Vorzeichen (+ oder -) im Vergleich zu Führenden oder Vorangegangenen, auch wenn sie nach Punkten geordnet sind."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Zu den Wettbewerben"
+    },
+    {
+      "id": "presentacion-proximo-piloto",
+      "question": "Was zeigt der Block «Nächster Fahrer» in der Präsentation oder im Fernsehen?",
+      "keywords": [
+        "presentación",
+        "tv",
+        "próximo piloto",
+        "orden de salida",
+        "broadcast",
+        "obs",
+        "proyector",
+        "modo presentación",
+        "Präsentation",
+        "nächster Fahrer",
+        "Startreihenfolge",
+        "Beamer",
+        "Präsentationsmodus"
+      ],
+      "answerSteps": [
+        "Der Block folgt der Startreihenfolge, die in den Wettbewerbsteilnehmern festgelegt wurde (Spalte «Startreihenfolge»), nicht der Punktewertung.",
+        "Zuerst wird die älteste Runde gewählt, die noch ausstehende Fahrer hat (keine Zeit und kein NP). Wenn jemand nicht in Runde 1 gelaufen ist, bleibt der Block in Runde 1, auch wenn andere in Runde 2 begonnen haben.",
+        "Unter den ausstehenden Fahrern in dieser Runde wird derjenige mit der niedrigsten Startreihenfolge angezeigt; wenn keine explizite Bestellung vorliegt, wird das Registrierungsdatum verwendet.",
+        "«Aktuelle Position: P…» ist die Position der Punkte, die sich von der Startreihenfolge unterscheidet.",
+        "Zugriff: öffentliche Präsentations-URL (`/competitions/presentation/:slug`), TV-Modus (`?tv=1`) oder OBS-Overlays aus dem Event-Links-Hub."
+      ],
+      "sectionId": "competiciones",
+      "linkTo": "/competitions",
+      "linkLabel": "Zu den Wettbewerben"
+    },
+    {
+      "id": "cambiar-contrasena",
+      "question": "Wie ändere ich mein Passwort?",
+      "keywords": [
+        "contraseña",
+        "password",
+        "cuenta",
+        "google",
+        "Passwort",
+        "Konto"
+      ],
+      "answerSteps": [
+        "Gehen Sie zu Einstellungen und öffnen Sie die Registerkarte Konto (Sie können auch?tab=cuenta in der URL verwenden).",
+        "Während Sie eingeloggt sind, können Sie Ihr Passwort festlegen oder ändern, ohne das alte eingeben zu müssen.",
+        "Wenn Sie sich nur mit Google anmelden, können Sie dort ein lokales Passwort festlegen, wenn die App dies zulässt."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Gehe zu Einstellungen"
+    },
+    {
+      "id": "discord-telegram",
+      "question": "Wo konfiguriere ich Discord oder Telegram?",
+      "keywords": [
+        "discord",
+        "telegram",
+        "webhook",
+        "notificaciones",
+        "chat id",
+        "Webhook",
+        "Benachrichtigungen",
+        "Chat-ID"
+      ],
+      "answerSteps": [
+        "Benachrichtigungen (Discord-Webhook, Telegramm-Chat-ID) werden in Einstellungen, Registerkarte Benachrichtigungen (?tab=Benachrichtigungen) konfiguriert.",
+        "Mein Profil verfügt über ein Konto und einen API-Schlüssel. Dashboard-Warnungen und der Tagesschwellenwert werden ebenfalls in den Einstellungen angepasst."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Gehe zu Einstellungen"
+    },
+    {
+      "id": "inventario-montar",
+      "question": "Wie kann ich ein Inventarteil an einem Fahrzeug abziehen oder installieren?",
+      "keywords": [
+        "inventario",
+        "pieza",
+        "montar",
+        "stock",
+        "repuesto",
+        "Teil",
+        "einbauen",
+        "Bestand",
+        "Ersatzteil"
+      ],
+      "answerSteps": [
+        "Teile zuerst im Bestand mit Kategorie und Menge registrieren.",
+        "Öffnen Sie den Fahrzeugdatensatz (bearbeiten) und verwenden Sie den Ablauf, um ein Teil aus dem Bestand zu installieren, wenn die App es anbietet.",
+        "Bestandsaktualisierungen pro App-Logik beim Installieren oder Entfernen von Komponenten."
+      ],
+      "sectionId": "inventario",
+      "linkTo": "/inventory",
+      "linkLabel": "Gehe zum Inventar"
+    },
+    {
+      "id": "busqueda-rapida",
+      "question": "Gibt es eine Schnellsuche in der App?",
+      "keywords": [
+        "buscar",
+        "búsqueda",
+        "atajo",
+        "teclado",
+        "comando",
+        "suchen",
+        "Suche",
+        "Tastenkürzel",
+        "Tastatur",
+        "Befehl"
+      ],
+      "answerSteps": [
+        "Die obere Leiste bietet eine schnelle Suche nach Fahrzeugen, Spuren, Inventar und mehr.",
+        "Auf dem Desktop wird die Tastenkombination (z. B. Strg+K oder Cmd+K auf dem Mac) normalerweise neben dem Suchfeld angezeigt.",
+        "Öffnen Sie es, geben Sie es ein und wählen Sie ein Ergebnis aus, um zu diesem Bildschirm zu gelangen."
+      ],
+      "sectionId": "inicio",
+      "linkTo": "/dashboard",
+      "linkLabel": "Zur Startseite"
+    },
+    {
+      "id": "exportar-vehiculos",
+      "question": "Kann ich die Fahrzeugliste exportieren?",
+      "keywords": [
+        "exportar",
+        "csv",
+        "excel",
+        "descargar",
+        "lista",
+        "exportieren",
+        "herunterladen",
+        "Liste"
+      ],
+      "answerSteps": [
+        "In Fahrzeuge können Sie unter Berücksichtigung aktiver Filter und Paginierung exportieren.",
+        "Passen Sie die Filter zuerst an, wenn Sie nur eine Teilmenge der Sammlung möchten.",
+        "Der Export spiegelt wider, was Sie gemäß den auf dem Bildschirm festgelegten Limits sehen."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Gehe zu Fahrzeuge"
+    },
+    {
+      "id": "importar-vehiculos",
+      "question": "Wie importiere ich Fahrzeuge aus Excel oder CSV?",
+      "keywords": [
+        "importar",
+        "vehículos",
+        "excel",
+        "csv",
+        "xlsx",
+        "hoja",
+        "mapeo",
+        "columnas",
+        "vista previa",
+        "duplicados",
+        "plantilla",
+        "Fahrzeuge",
+        "Blatt",
+        "Spalten",
+        "Vorlage"
+      ],
+      "answerSteps": [
+        "Öffnen Sie Fahrzeuge und klicken Sie auf „Importieren“ (neben „CSV exportieren“). Wählen Sie eine unterstützte CSV- oder Excel-Datei. Wenn die Arbeitsmappe mehrere Blätter enthält, geben Sie den Blattindex (Excel) an.",
+        "Der Assistent erkennt Zeilen und Kopfzeilen auch bei leeren Zeilen über oder leeren Spalten; Spaltenbuchstaben (A, B, C…) stimmen bei der Zuordnung mit Excel oder Zahlen überein.",
+        "Überprüfen oder Anpassen der Zuordnung: Welche Dateispalten werden nach Modell, Marke, Typ, Datum, Referenz usw. zugeordnet? Sie können Spalten auf «Ignorieren» setzen. In der Zuordnung sind nur Marke und Modell erforderlich; der Rest ist optional.",
+        "Überprüfen Sie die Vorschau: Sie wird aktualisiert, wenn sich die Zuordnung ändert. Wähle aus, wie Duplikate im Vergleich zu deiner Sammlung behandelt werden sollen (Überspringen, Importieren oder Aktualisieren), und bestätige dies.",
+        "Über den Typ: Im Handbuch ist der Formulartyp \"Formular hinzufügen\" erforderlich; beim Import ist dies nicht der Fall. Wenn nicht zugeordnet oder leer, vervollständigen Sie den Typ, indem Sie den Datensatz nach dem Import bearbeiten. Kauftermine und Erscheinungsjahr akzeptieren mehrere Formate (ISO, europäisch, Excel seriell) und speichern im App-Format.",
+        "Siehe Abschnitt Fahrzeuge der Hilfe für Formatdetails und den vollständigen Ablauf."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Gehe zu Fahrzeuge"
+    },
+    {
+      "id": "importar-tiempos",
+      "question": "Kann ich Rundenzeiten importieren?",
+      "keywords": [
+        "importar",
+        "tiempos",
+        "csv",
+        "json",
+        "smartrace",
+        "pegar",
+        "ficha",
+        "sesiones",
+        "Zeiten",
+        "einfügen",
+        "Stammdaten",
+        "Sitzungen"
+      ],
+      "answerSteps": [
+        "Ja. Klicken Sie in Times auf \"Sitzungen importieren\": Wählen Sie CSV oder json, laden Sie die Vorlage bei Bedarf herunter, fügen Sie Text ein oder wählen Sie eine Datei aus. Wählen Sie das Fahrzeug aus, dem Sitzungen zugeordnet werden sollen (es sei denn, CSV/JSON enthält vehicle_id pro Zeile oder Objekt).",
+        "Auf dem Fahrzeugdatensatz, Registerkarte «Rundenzeittabelle», gibt es auch «Import-Sitzungen» mit dem gleichen Ablauf (benutzerdefinierte CSV, SmartRace oder json); das Auto ist fixiert und die Sitzungen werden für dieses Fahrzeug gespeichert.",
+        "Mit SmartRace CSV mit mehreren Treibern können Sie Zeilen zum Importieren auswählen. Wenn Spur oder Spur fehlt, wählen Sie aus Ihren registrierten Spuren. Das Sitzungsauto in SmartRace ist das, das Sie in der Modal- und nicht in der Exportspalte \"Auto\" auswählen.",
+        "Lassen Sie Tracks unter Tracks erstellen, die Sie verwenden werden, und überprüfen Sie Fehler vom Assistenten, bevor Sie sie schließen."
+      ],
+      "sectionId": "tiempos",
+      "linkTo": "/timings",
+      "linkLabel": "Gehe zu Zeiten"
+    },
+    {
+      "id": "licencia-srm",
+      "question": "Was ist die Slot Race Manager-Lizenz und wo sehe ich sie?",
+      "keywords": [
+        "licencia",
+        "slot race",
+        "srm",
+        "escritorio",
+        "instalaciones",
+        "Lizenz",
+        "Desktop",
+        "Installationen"
+      ],
+      "answerSteps": [
+        "In Mein Profil können Sie die Lizenzinformationen von Slot Race Manager und die damit verbundenen Desktop-Installationen anzeigen.",
+        "Der API-Schlüssel für Integrationen mit dem X-API-Key-Header wird ebenfalls in Mein Profil verwaltet.",
+        "Dashboard-Warn- und Benachrichtigungseinstellungen befinden sich in den Einstellungen."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Zum Profil gehen"
+    },
+    {
+      "id": "filtros-vehiculos",
+      "question": "Werden Filter in Fahrzeugen gespeichert?",
+      "keywords": [
+        "filtros",
+        "guardar",
+        "navegador",
+        "tabla",
+        "cuadrícula",
+        "Filter",
+        "speichern",
+        "Browser",
+        "Tabelle",
+        "Raster"
+      ],
+      "answerSteps": [
+        "Fahrzeuglistenfilter werden in diesem Browser für Ihren nächsten Besuch gespeichert.",
+        "Sie können die Raster- oder Tabellenansicht wechseln und nach Hersteller, Typ, Museum/Werkstatt usw. filtern.",
+        "Der Export berücksichtigt aktive Filter."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Gehe zu Fahrzeuge"
+    },
+    {
+      "id": "mantenimiento-coche",
+      "question": "Wo erfasse ich die Wartung eines Autos?",
+      "keywords": [
+        "mantenimiento",
+        "revision",
+        "historial",
+        "ficha",
+        "Wartung",
+        "Inspektion",
+        "Verlauf",
+        "Stammdaten"
+      ],
+      "answerSteps": [
+        "Öffnen Sie das Fahrzeug von Vehicles und geben Sie seinen detaillierten Datensatz ein.",
+        "Der Datensatz enthält Abschnitte für die Wartung und Komponenten, die von der App angezeigt werden.",
+        "Zeiten und Wartung können mit der Leistungsentwicklung zusammenhängen."
+      ],
+      "sectionId": "vehiculos",
+      "linkTo": "/vehicles",
+      "linkLabel": "Gehe zu Fahrzeuge"
+    },
+    {
+      "id": "alertas-dashboard",
+      "question": "Was sind Benachrichtigungen oder ausstehende Posten auf der Startseite?",
+      "keywords": [
+        "alertas",
+        "pendientes",
+        "días",
+        "circuito",
+        "dashboard",
+        "Warnungen",
+        "ausstehend",
+        "Tage",
+        "Strecke"
+      ],
+      "answerSteps": [
+        "In den Einstellungen können Sie einen Schwellenwert von Tagen ohne Sitzung auf Ihrem üblichen Track festlegen.",
+        "Dieser Wert speist den Block \"Pending\" und \"Alerts\" im Home-Panel.",
+        "Nachdem Sie den Schwellenwert geändert haben, laden Sie Home neu, um die aktualisierten Kriterien anzuzeigen."
+      ],
+      "sectionId": "configuracion",
+      "linkTo": "/settings",
+      "linkLabel": "Gehe zu Einstellungen"
+    },
+    {
+      "id": "datos-no-cargan",
+      "question": "Daten oder Diagramme werden nicht richtig geladen. Was soll ich tun?",
+      "keywords": [
+        "error",
+        "carga",
+        "conexión",
+        "vacío",
+        "gráficos"
+      ],
+      "answerSteps": [
+        "Überprüfen Sie Ihre Internetverbindung; das Dashboard kombiniert mehrere Serveranfragen.",
+        "Laden Sie die Seite neu und stellen Sie sicher, dass Sie die neueste App-Version verwenden.",
+        "Wenn das Problem weiterhin besteht, melden Sie sich ab und wieder an, falls das Token abgelaufen ist."
+      ],
+      "sectionId": "inicio",
+      "linkTo": "/dashboard",
+      "linkLabel": "Zur Startseite"
+    },
+    {
+      "id": "diferencia-perfil-settings",
+      "question": "Was ist der Unterschied zwischen Profil und Einstellungen?",
+      "keywords": [
+        "perfil",
+        "configuración",
+        "diferencia",
+        "api",
+        "alertas",
+        "Unterschied",
+        "Warnungen"
+      ],
+      "answerSteps": [
+        "Mein Profil: E-Mail, API-Schlüssel (X-API-Key-Header), Slot Race Manager-Lizenz und ähnliche Integrationen.",
+        "Einstellungen: Dashboard-Warnungen, Tagesschwelle, Discord, Telegramm und Konto-Registerkarte (Passwort).",
+        "Regenerieren Sie den API-Schlüssel nur aus dem Profil, nicht aus den Einstellungen."
+      ],
+      "sectionId": "perfil",
+      "linkTo": "/profile",
+      "linkLabel": "Zum Profil gehen"
+    }
+  ]
+}

@@ -70,7 +70,12 @@ router.get('/vehicles', async (req, res) => {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const { count, error: countError } = await supabase
+    // Service role: la petición va con X-API-Key (sin JWT). Tras cerrar las
+    // políticas ALL públicas, el cliente anon ya no puede leer vehicles/images.
+    // El contrato HTTP (path, headers, campos) no cambia; se filtra por req.user.id.
+    const db = supabaseForSyncWrite();
+
+    const { count, error: countError } = await db
       .from('vehicles')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', req.user.id);
@@ -79,7 +84,7 @@ router.get('/vehicles', async (req, res) => {
       return res.status(500).json({ error: countError.message });
     }
 
-    const { data: vehicles, error: vehiclesError } = await supabase
+    const { data: vehicles, error: vehiclesError } = await db
       .from('vehicles')
       .select('id, model, manufacturer, type, traction')
       .eq('user_id', req.user.id)
@@ -94,7 +99,7 @@ router.get('/vehicles', async (req, res) => {
     let imagesMap = {};
 
     if (vehicleIds.length > 0) {
-      const { data: images } = await supabase
+      const { data: images } = await db
         .from('vehicle_images')
         .select('vehicle_id, image_url')
         .in('vehicle_id', vehicleIds);

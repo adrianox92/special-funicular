@@ -2,7 +2,7 @@
  * Catálogo slot — solo lectura, sin autenticación.
  */
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { fetchSupabaseRangePage } = require('../lib/supabaseRangePage');
 const { fetchCatalogNeighbors } = require('../lib/catalogNeighbors');
 const { fetchCatalogSimilar } = require('../lib/catalogSimilar');
@@ -10,8 +10,23 @@ const { fetchCatalogSimilar } = require('../lib/catalogSimilar');
 const router = express.Router();
 const supabase = getAnonClient();
 
-const PUBLIC_SELECT =
-  'id, reference, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count, car_make, car_model';
+const { CATALOG_TECH_SPEC_SELECT } = require('../lib/catalogTechSpecs');
+const {
+  attachAliasesToCatalogItems,
+  findCatalogItemIdsByAliasOrEan,
+  catalogSearchOrClause,
+} = require('../lib/catalogAliases');
+const { rewritePublicCatalogResponse } = require('../lib/publicCatalogImageUrls');
+
+/** Techo del listado público: la UI usa 24; 48 cubre grids densos sin dump masivo. */
+const PUBLIC_ITEMS_MAX_LIMIT = 48;
+
+const PUBLIC_LIST_SELECT =
+  'id, reference, ean, manufacturer_id, manufacturer, manufacturer_slug, manufacturer_logo_url, model_name, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release, dorsal, limited_edition, limited_edition_total, real_race_results_url, real_race_photos_url, image_url, updated_at, rating_avg, rating_count';
+
+const PUBLIC_SELECT = PUBLIC_LIST_SELECT;
+
+const PUBLIC_DETAIL_SELECT = `${PUBLIC_LIST_SELECT}, ${CATALOG_TECH_SPEC_SELECT}, car_make, car_model`;
 
 function escapeIlikePattern(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
@@ -96,7 +111,7 @@ router.get('/brands', async (req, res) => {
       .select('id, name, logo_url, slug')
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ brands: data ?? [] });
+    res.json(rewritePublicCatalogResponse({ brands: data ?? [] }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -114,7 +129,7 @@ router.get('/brands', async (req, res) => {
  *   year               — año exacto (legacy)
  *
  * Filtros extra (query string):
- *   q                  — búsqueda libre (reference, model_name, manufacturer)
+ *   q                  — búsqueda libre (reference, alias, ean, model_name, manufacturer)
  *   motor_position     — posición de motor exacta
  *   discontinued       — "true" | "false"
  *   upcoming_release   — "true" | "false"
@@ -126,7 +141,10 @@ router.get('/brands', async (req, res) => {
 router.get('/items', async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(String(req.query.page  || '1'),  10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24));
+    const limit = Math.min(
+      PUBLIC_ITEMS_MAX_LIMIT,
+      Math.max(1, parseInt(String(req.query.limit || '24'), 10) || 24),
+    );
 
     // --- Filtros básicos (SEO path) ---
     const manufacturerSlug = String(req.query.manufacturer_slug ?? '').trim();
@@ -147,6 +165,10 @@ router.get('/items', async (req, res) => {
     const yearTo   = req.query.year_to   != null && req.query.year_to   !== ''
       ? parseInt(String(req.query.year_to),   10) : null;
     const sort = String(req.query.sort ?? 'manufacturer').trim();
+
+    const aliasIds = q
+      ? await findCatalogItemIdsByAliasOrEan(supabase, q, { limit: 80 })
+      : [];
 
     let resolvedManufacturerId = null;
 
@@ -192,10 +214,7 @@ router.get('/items', async (req, res) => {
       }
 
       if (q) {
-        const escaped = escapeIlikePattern(q);
-        q_builder = q_builder.or(
-          `reference.ilike.%${escaped}%,model_name.ilike.%${escaped}%,manufacturer.ilike.%${escaped}%`,
-        );
+        q_builder = q_builder.or(catalogSearchOrClause(q, aliasIds));
       }
 
       if (motorPosition) {
@@ -246,13 +265,15 @@ router.get('/items', async (req, res) => {
       limit,
     });
 
-    res.json({
-      items: data,
-      total: count,
-      page,
-      limit,
-      totalPages,
-    });
+    res.json(
+      rewritePublicCatalogResponse({
+        items: data,
+        total: count,
+        page,
+        limit,
+        totalPages,
+      }),
+    );
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -269,14 +290,15 @@ router.get('/items/:id', async (req, res) => {
     }
     const { data, error } = await supabase
       .from('slot_catalog_items_with_ratings')
-      .select(`${PUBLIC_SELECT}, created_at`)
+      .select(`${PUBLIC_DETAIL_SELECT}, created_at`)
       .eq('id', id)
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Ítem no encontrado' });
 
     let registered_user_count = 0;
-    const { data: countVal, error: countErr } = await supabase.rpc(
+    const countClient = getServiceClient() || supabase;
+    const { data: countVal, error: countErr } = await countClient.rpc(
       'slot_catalog_item_registered_user_count',
       { p_catalog_item_id: id },
     );
@@ -302,10 +324,14 @@ router.get('/items/:id', async (req, res) => {
       similar = [];
     }
 
-    res.json({ ...data, registered_user_count, neighbors, similar });
+    const withAliases = await attachAliasesToCatalogItems(supabase, data);
+    res.json(
+      rewritePublicCatalogResponse({ ...withAliases, registered_user_count, neighbors, similar }),
+    );
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 module.exports = router;
+module.exports.PUBLIC_ITEMS_MAX_LIMIT = PUBLIC_ITEMS_MAX_LIMIT;

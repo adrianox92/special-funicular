@@ -51,8 +51,8 @@ function EditVehicleShell() {
     if (q.get('tab') === 'palmares' || location.hash === '#palmares') {
       setActiveTab('palmares');
     }
-    if (q.get('tab') === 'timings' || location.hash === '#timings') {
-      setActiveTab('timings');
+    if (q.get('tab') === 'car-specs' || location.hash === '#car-specs') {
+      setActiveTab('technical');
     }
   }, [location.search, location.hash]);
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -87,6 +88,7 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100, 250];
 const PAGE_SIZE_STORAGE_KEY = 'inventoryPageSize';
 
 const Inventory = () => {
+  const { t } = useTranslation('inventory');
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -207,13 +209,14 @@ const Inventory = () => {
       setError(null);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.error || 'Error al cargar el inventario');
+      setError(err.response?.data?.error || t('errors.load'));
       setItems([]);
       setParts([]);
       setPagination({ total: 0, page: currentPage, limit: pageSize, totalPages: 0 });
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t estable por idioma; no re-disparar fetch
   }, [categoryFilter, lowStockOnly, debouncedQ, viewMode, onlyMounted, currentPage, pageSize]);
 
   useEffect(() => {
@@ -267,7 +270,7 @@ const Inventory = () => {
 
   const handleDuplicate = (item) => {
     setFormData({
-      name: `${(item.name || '').trim()} (copia)`,
+      name: `${(item.name || '').trim()}${t('duplicate.nameSuffix')}`,
       reference: item.reference ?? '',
       url: item.url ?? '',
       category: item.category || 'otro',
@@ -318,7 +321,7 @@ const Inventory = () => {
         }
         if (cancelled) return;
         if (!item) {
-          toast.error('Ítem no encontrado.');
+          toast.error(t('toasts.itemNotFound'));
           clearOpenIntent();
           return;
         }
@@ -327,7 +330,7 @@ const Inventory = () => {
       } catch (e) {
         if (!cancelled) {
           console.error(e);
-          toast.error('No se pudo abrir el ítem del inventario.');
+          toast.error(t('errors.openItem'));
         }
         if (!cancelled) clearOpenIntent();
       }
@@ -343,12 +346,12 @@ const Inventory = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      setFormError('El nombre es obligatorio');
+      setFormError(t('formErrors.nameRequired'));
       return;
     }
     const qty = parseInt(formData.quantity, 10);
     if (Number.isNaN(qty) || qty < 0) {
-      setFormError('La cantidad debe ser un número entero mayor o igual a 0');
+      setFormError(t('formErrors.quantityInvalid'));
       return;
     }
 
@@ -356,7 +359,7 @@ const Inventory = () => {
     if (formData.teeth.trim() !== '') {
       teethVal = parseInt(formData.teeth, 10);
       if (Number.isNaN(teethVal)) {
-        setFormError('Dientes no válidos');
+        setFormError(t('formErrors.teethInvalid'));
         return;
       }
     }
@@ -364,7 +367,7 @@ const Inventory = () => {
     if (formData.rpm.trim() !== '') {
       rpmVal = Number(formData.rpm);
       if (Number.isNaN(rpmVal)) {
-        setFormError('RPM no válidas');
+        setFormError(t('formErrors.rpmInvalid'));
         return;
       }
     }
@@ -372,7 +375,7 @@ const Inventory = () => {
     if (formData.gaus.trim() !== '') {
       gausVal = Number(formData.gaus);
       if (Number.isNaN(gausVal)) {
-        setFormError('Gaus no válidos');
+        setFormError(t('formErrors.gausInvalid'));
         return;
       }
     }
@@ -404,29 +407,29 @@ const Inventory = () => {
       };
 
       if (payload.min_stock != null && (Number.isNaN(payload.min_stock) || payload.min_stock < 0)) {
-        setFormError('Stock mínimo no válido');
+        setFormError(t('formErrors.minStockInvalid'));
         setSaving(false);
         return;
       }
       if (payload.purchase_price != null && (Number.isNaN(payload.purchase_price) || payload.purchase_price < 0)) {
-        setFormError('Precio no válido');
+        setFormError(t('formErrors.priceInvalid'));
         setSaving(false);
         return;
       }
 
       if (editingItem) {
         await api.put(`/inventory/${editingItem.id}`, payload);
-        toast.success('Ítem actualizado');
+        toast.success(t('toasts.itemUpdated'));
       } else {
         await api.post('/inventory', payload);
-        toast.success('Ítem creado');
+        toast.success(t('toasts.itemCreated'));
       }
 
       setShowModal(false);
       setEditingItem(null);
       loadItems();
     } catch (err) {
-      setFormError(err.response?.data?.error || 'Error al guardar');
+      setFormError(err.response?.data?.error || t('errors.save'));
     } finally {
       setSaving(false);
     }
@@ -441,10 +444,10 @@ const Inventory = () => {
     try {
       await api.delete(`/inventory/${deleteConfirm.item.id}`);
       setDeleteConfirm({ open: false, item: null });
-      toast.success('Ítem eliminado');
+      toast.success(t('toasts.itemDeleted'));
       loadItems();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al eliminar');
+      toast.error(err.response?.data?.error || t('errors.delete'));
     }
   };
 
@@ -479,33 +482,33 @@ const Inventory = () => {
     e.preventDefault();
     if (!mountTarget || !mountForm) return;
     if (!mountForm.manufacturer?.trim()) {
-      setMountError('La marca del fabricante es obligatoria');
+      setMountError(t('mountErrors.manufacturerRequired'));
       return;
     }
     if (mountForm.vehicle_id === 'none' || !mountForm.vehicle_id) {
-      setMountError('Selecciona un vehículo');
+      setMountError(t('mountErrors.selectVehicle'));
       return;
     }
     const mq = parseInt(mountForm.mount_qty, 10);
     const maxQ = Number(mountTarget.quantity);
     if (Number.isNaN(mq) || mq < 1) {
-      setMountError('La cantidad a descontar debe ser al menos 1');
+      setMountError(t('mountErrors.mountQtyMin'));
       return;
     }
     if (mq > maxQ) {
-      setMountError(`No hay suficiente stock (disponible: ${maxQ})`);
+      setMountError(t('mountErrors.insufficientStock', { available: maxQ }));
       return;
     }
     const cat = mountTarget.category;
     if (mountCategoryIs(cat, 'pinion', 'crown')) {
       if (mountForm.teeth === '' || Number.isNaN(Number(mountForm.teeth))) {
-        setMountError('Los dientes son obligatorios para piñón/corona');
+        setMountError(t('mountErrors.teethRequired'));
         return;
       }
     }
     if (mountCategoryIs(cat, 'motor')) {
       if (mountForm.rpm === '' || Number.isNaN(Number(mountForm.rpm))) {
-        setMountError('Las RPM son obligatorias para motor');
+        setMountError(t('mountErrors.rpmRequired'));
         return;
       }
     }
@@ -525,11 +528,11 @@ const Inventory = () => {
         rpm: mountForm.rpm !== '' ? Number(mountForm.rpm) : undefined,
         gaus: mountForm.gaus !== '' ? Number(mountForm.gaus) : undefined,
       });
-      toast.success('Pieza montada y stock actualizado');
+      toast.success(t('toasts.mounted'));
       closeMount();
       loadItems();
     } catch (err) {
-      const msg = err.response?.data?.error || 'Error al montar';
+      const msg = err.response?.data?.error || t('errors.mount');
       setMountError(msg);
       toast.error(msg);
     } finally {
@@ -568,20 +571,20 @@ const Inventory = () => {
     if (!restockTarget || !restockForm) return;
     const addQty = parseInt(restockForm.quantity, 10);
     if (Number.isNaN(addQty) || addQty < 1) {
-      setRestockError('Indica cuántas unidades añades (mínimo 1)');
+      setRestockError(t('restockErrors.quantityMin'));
       return;
     }
     if (!restockForm.supplier?.trim()) {
-      setRestockError('Indica dónde lo has comprado (tienda o proveedor)');
+      setRestockError(t('restockErrors.supplierRequired'));
       return;
     }
     if (restockForm.purchase_price.trim() === '') {
-      setRestockError('Indica el precio de compra por unidad');
+      setRestockError(t('restockErrors.purchasePriceRequired'));
       return;
     }
     const price = Number(restockForm.purchase_price);
     if (Number.isNaN(price) || price < 0) {
-      setRestockError('Precio de compra no válido');
+      setRestockError(t('restockErrors.purchasePriceInvalid'));
       return;
     }
     try {
@@ -598,7 +601,9 @@ const Inventory = () => {
           unit: restockTarget.unit || 'uds',
           purchase_price: price,
           purchase_date: restockForm.purchase_date.trim() || null,
-          notes: restockForm.notes.trim() || `Compra: ${restockForm.supplier.trim()}`,
+          notes:
+            restockForm.notes.trim() ||
+            t('notes.purchasePrefix', { supplier: restockForm.supplier.trim() }),
           manufacturer: p.manufacturer,
           material: p.material,
           size: p.size,
@@ -617,11 +622,11 @@ const Inventory = () => {
           notes: restockForm.notes.trim() || null,
         });
       }
-      toast.success('Stock actualizado y compra registrada');
+      toast.success(t('toasts.restockSuccess'));
       closeRestock();
       loadItems();
     } catch (err) {
-      setRestockError(err.response?.data?.error || 'Error al reponer stock');
+      setRestockError(err.response?.data?.error || t('errors.restock'));
     } finally {
       setRestockSaving(false);
     }
@@ -636,7 +641,7 @@ const Inventory = () => {
       const { data } = await api.get(`/inventory/${item.id}/purchase-history`);
       setHistoryEntries(Array.isArray(data) ? data : []);
     } catch (err) {
-      setHistoryError(err.response?.data?.error || 'Error al cargar el historial');
+      setHistoryError(err.response?.data?.error || t('errors.historyLoad'));
       setHistoryEntries([]);
     } finally {
       setHistoryLoading(false);
@@ -687,7 +692,7 @@ const Inventory = () => {
   const openPartHistory = (view) => {
     const line = view?.inventory_lines?.[0];
     if (!line) {
-      toast.info('Esta pieza aún no tiene líneas de stock ni historial de compras.');
+      toast.info(t('toasts.noPartHistory'));
       return;
     }
     openHistory(line);
@@ -723,7 +728,7 @@ const Inventory = () => {
     e.preventDefault();
     if (!editingPart || !partForm) return;
     if (!partForm.name.trim()) {
-      setPartFormError('El nombre es obligatorio');
+      setPartFormError(t('formErrors.nameRequired'));
       return;
     }
     try {
@@ -744,21 +749,21 @@ const Inventory = () => {
         description: partForm.description.trim() || null,
       };
       if (payload.teeth != null && Number.isNaN(payload.teeth)) {
-        setPartFormError('Dientes no válidos');
+        setPartFormError(t('formErrors.teethInvalid'));
         setPartSaving(false);
         return;
       }
       if (payload.rpm != null && Number.isNaN(payload.rpm)) {
-        setPartFormError('RPM no válidas');
+        setPartFormError(t('formErrors.rpmInvalid'));
         setPartSaving(false);
         return;
       }
       await api.put(`/inventory/parts/${editingPart.part.id}`, payload);
-      toast.success('Pieza actualizada en inventario y coches');
+      toast.success(t('toasts.partUpdated'));
       closeEditPart();
       loadItems();
     } catch (err) {
-      setPartFormError(err.response?.data?.error || 'Error al guardar la pieza');
+      setPartFormError(err.response?.data?.error || t('errors.partSave'));
     } finally {
       setPartSaving(false);
     }
@@ -767,7 +772,8 @@ const Inventory = () => {
   const isLowStock = (item) =>
     item.min_stock != null && Number(item.quantity) <= Number(item.min_stock);
 
-  const unitLabel = (u) => INVENTORY_UNITS.find((x) => x.value === u)?.label || u;
+  const unitLabel = (u) =>
+    t(`units.${u}`, { defaultValue: INVENTORY_UNITS.find((x) => x.value === u)?.label || u });
 
   const catalogTotal = pagination.total;
   const totalPages = Math.max(1, pagination.totalPages || Math.ceil(catalogTotal / pageSize) || 1);
@@ -807,11 +813,24 @@ const Inventory = () => {
     setCurrentPage(1);
   };
 
+  const paginationUnitLabel =
+    viewMode === 'parts'
+      ? catalogTotal === 1
+        ? t('pagination.unitPartsOne')
+        : t('pagination.unitPartsMany')
+      : catalogTotal === 1
+        ? t('pagination.unitItemsOne')
+        : t('pagination.unitItemsMany');
+
   const paginationBar = catalogTotal > 0 ? (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
       <div className="text-sm text-muted-foreground order-2 sm:order-1">
-        Mostrando {rangeStart}–{rangeEnd} de {catalogTotal}{' '}
-        {viewMode === 'parts' ? (catalogTotal === 1 ? 'pieza' : 'piezas') : (catalogTotal === 1 ? 'ítem' : 'ítems')}
+        {t('pagination.showing', {
+          start: rangeStart,
+          end: rangeEnd,
+          total: catalogTotal,
+          unit: paginationUnitLabel,
+        })}
       </div>
       <div className="order-1 sm:order-2">
         <PageRangePagination
@@ -823,7 +842,7 @@ const Inventory = () => {
       </div>
       <div className="flex items-center gap-2 order-3">
         <label htmlFor="inv-page-size" className="text-sm text-muted-foreground whitespace-nowrap">
-          Por página:
+          {t('pagination.perPage')}
         </label>
         <select
           id="inv-page-size"
@@ -851,44 +870,42 @@ const Inventory = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Inventario</h1>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="text-muted-foreground">
-            {viewMode === 'parts'
-              ? 'Todas las piezas: stock en almacén y unidades montadas en coches, consolidadas por identidad.'
-              : 'Líneas de stock. Para más unidades del mismo ítem con otro precio o tienda, usa «Reponer» y consulta el historial de compras.'}
+            {viewMode === 'parts' ? t('subtitle.parts') : t('subtitle.stock')}
           </p>
         </div>
         <Button className="flex items-center gap-2" onClick={handleOpenCreate}>
           <Plus className="size-4" />
-          Nuevo ítem
+          {t('actions.newItem')}
         </Button>
       </div>
 
       <Tabs value={viewMode} onValueChange={handleViewModeChange}>
         <TabsList>
-          <TabsTrigger value="parts">Todas las piezas</TabsTrigger>
-          <TabsTrigger value="stock">Líneas de stock</TabsTrigger>
+          <TabsTrigger value="parts">{t('tabs.parts')}</TabsTrigger>
+          <TabsTrigger value="stock">{t('tabs.stock')}</TabsTrigger>
         </TabsList>
       </Tabs>
 
       <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, item: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar ítem?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteConfirm.item
-                ? `Se eliminará «${deleteConfirm.item.name}». Esta acción no se puede deshacer.`
-                : 'Esta acción no se puede deshacer.'}
+                ? t('deleteDialog.description', { name: deleteConfirm.item.name })
+                : t('deleteDialog.descriptionFallback')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel type="button">{t('actions.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               type="button"
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Eliminar
+              {t('actions.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -897,7 +914,7 @@ const Inventory = () => {
       <Dialog open={!!mountTarget} onOpenChange={(open) => { if (!open) closeMount(); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Montar en vehículo</DialogTitle>
+            <DialogTitle>{t('mountDialog.title')}</DialogTitle>
             <DialogDescription>
               {mountTarget && mountForm
                 ? (() => {
@@ -906,7 +923,12 @@ const Inventory = () => {
                       Number(mountTarget.quantity),
                     );
                     const left = Math.max(0, Number(mountTarget.quantity) - n);
-                    return `Se creará un componente a partir de «${mountTarget.name}». Se descontarán ${n} ${n === 1 ? 'unidad' : 'unidades'} del stock (quedarán ${left}).`;
+                    return t('mountDialog.description', {
+                      name: mountTarget.name,
+                      count: n,
+                      unitWord: n === 1 ? t('mountDialog.unitOne') : t('mountDialog.unitMany'),
+                      left,
+                    });
                   })()
                 : ''}
             </DialogDescription>
@@ -920,16 +942,16 @@ const Inventory = () => {
                   </Alert>
                 )}
                 <div className="space-y-2">
-                  <Label>Vehículo</Label>
+                  <Label>{t('mountDialog.vehicle')}</Label>
                   <Select
                     value={mountForm.vehicle_id}
                     onValueChange={(v) => setMountForm({ ...mountForm, vehicle_id: v })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar vehículo" />
+                      <SelectValue placeholder={t('mountDialog.selectVehicle')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Seleccionar…</SelectItem>
+                      <SelectItem value="none">{t('mountDialog.selectPlaceholder')}</SelectItem>
                       {vehicles.map((v) => (
                         <SelectItem key={v.id} value={v.id}>
                           {v.manufacturer} {v.model}
@@ -945,11 +967,11 @@ const Inventory = () => {
                     onCheckedChange={(checked) => setMountForm({ ...mountForm, is_modification: checked })}
                   />
                   <Label htmlFor="mount-is-mod" className="cursor-pointer">
-                    Registrar como modificación
+                    {t('mountDialog.registerAsModification')}
                   </Label>
                 </div>
                 <div className="space-y-2 max-w-xs">
-                  <Label htmlFor="mount-qty">Unidades a descontar del inventario</Label>
+                  <Label htmlFor="mount-qty">{t('mountDialog.mountQtyLabel')}</Label>
                   <Input
                     id="mount-qty"
                     type="number"
@@ -959,11 +981,11 @@ const Inventory = () => {
                     onChange={(e) => setMountForm({ ...mountForm, mount_qty: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Por ejemplo 2 para un par de neumáticos o llantas, o 1 si solo cambias uno.
+                    {t('mountDialog.mountQtyHint')}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="mount-mfg">Marca (fabricante)</Label>
+                  <Label htmlFor="mount-mfg">{t('fields.manufacturer')}</Label>
                   <Input
                     id="mount-mfg"
                     value={mountForm.manufacturer}
@@ -973,7 +995,7 @@ const Inventory = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="mount-mat">Material</Label>
+                    <Label htmlFor="mount-mat">{t('fields.material')}</Label>
                     <Input
                       id="mount-mat"
                       value={mountForm.material}
@@ -981,7 +1003,7 @@ const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="mount-size">Tamaño</Label>
+                    <Label htmlFor="mount-size">{t('fields.size')}</Label>
                     <Input
                       id="mount-size"
                       value={mountForm.size}
@@ -990,7 +1012,7 @@ const Inventory = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="mount-color">Color</Label>
+                  <Label htmlFor="mount-color">{t('fields.color')}</Label>
                   <Input
                     id="mount-color"
                     value={mountForm.color}
@@ -999,7 +1021,7 @@ const Inventory = () => {
                 </div>
                 {mountCategoryIs(mountTarget.category, 'pinion', 'crown') && (
                   <div className="space-y-2">
-                    <Label htmlFor="mount-teeth">Dientes</Label>
+                    <Label htmlFor="mount-teeth">{t('fields.teeth')}</Label>
                     <Input
                       id="mount-teeth"
                       type="number"
@@ -1012,7 +1034,7 @@ const Inventory = () => {
                 {mountCategoryIs(mountTarget.category, 'motor') && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="mount-rpm">RPM</Label>
+                      <Label htmlFor="mount-rpm">{t('fields.rpm')}</Label>
                       <Input
                         id="mount-rpm"
                         type="number"
@@ -1022,7 +1044,7 @@ const Inventory = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mount-gaus">Gaus</Label>
+                      <Label htmlFor="mount-gaus">{t('fields.gaus')}</Label>
                       <Input
                         id="mount-gaus"
                         type="number"
@@ -1033,7 +1055,7 @@ const Inventory = () => {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="mount-desc">Descripción</Label>
+                  <Label htmlFor="mount-desc">{t('fields.description')}</Label>
                   <Textarea
                     id="mount-desc"
                     rows={2}
@@ -1044,16 +1066,16 @@ const Inventory = () => {
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" onClick={closeMount}>
-                  Cancelar
+                  {t('actions.cancel')}
                 </Button>
                 <Button type="submit" disabled={mountSaving}>
                   {mountSaving ? (
                     <>
                       <Spinner className="size-4 mr-2" />
-                      Montando…
+                      {t('mountDialog.mounting')}
                     </>
                   ) : (
-                    'Montar y descontar'
+                    t('mountDialog.submit')
                   )}
                 </Button>
               </DialogFooter>
@@ -1065,10 +1087,10 @@ const Inventory = () => {
       <Dialog open={!!restockTarget} onOpenChange={(open) => { if (!open) closeRestock(); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reponer stock</DialogTitle>
+            <DialogTitle>{t('restockDialog.title')}</DialogTitle>
             <DialogDescription>
               {restockTarget
-                ? `Añade unidades a «${restockTarget.name}». Se registrará dónde compraste y el precio para el historial.`
+                ? t('restockDialog.description', { name: restockTarget.name })
                 : ''}
             </DialogDescription>
           </DialogHeader>
@@ -1081,7 +1103,7 @@ const Inventory = () => {
                   </Alert>
                 )}
                 <div className="space-y-2 max-w-xs">
-                  <Label htmlFor="restock-qty">Unidades que entran en stock</Label>
+                  <Label htmlFor="restock-qty">{t('restockDialog.qtyLabel')}</Label>
                   <Input
                     id="restock-qty"
                     type="number"
@@ -1092,18 +1114,18 @@ const Inventory = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="restock-supplier">Dónde lo has comprado</Label>
+                  <Label htmlFor="restock-supplier">{t('restockDialog.supplierLabel')}</Label>
                   <Input
                     id="restock-supplier"
                     value={restockForm.supplier}
                     onChange={(e) => setRestockForm({ ...restockForm, supplier: e.target.value })}
-                    placeholder="Tienda, web, proveedor…"
+                    placeholder={t('restockDialog.supplierPlaceholder')}
                     required
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="restock-price">Precio unitario de compra (€)</Label>
+                    <Label htmlFor="restock-price">{t('restockDialog.unitPriceLabel')}</Label>
                     <Input
                       id="restock-price"
                       type="number"
@@ -1115,7 +1137,7 @@ const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="restock-pdate">Fecha de compra</Label>
+                    <Label htmlFor="restock-pdate">{t('restockDialog.purchaseDateLabel')}</Label>
                     <Input
                       id="restock-pdate"
                       type="date"
@@ -1125,28 +1147,28 @@ const Inventory = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="restock-notes">Notas (opcional)</Label>
+                  <Label htmlFor="restock-notes">{t('restockDialog.notesLabel')}</Label>
                   <Textarea
                     id="restock-notes"
                     rows={2}
                     value={restockForm.notes}
                     onChange={(e) => setRestockForm({ ...restockForm, notes: e.target.value })}
-                    placeholder="Pedido, factura, observaciones…"
+                    placeholder={t('restockDialog.notesPlaceholder')}
                   />
                 </div>
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" onClick={closeRestock}>
-                  Cancelar
+                  {t('actions.cancel')}
                 </Button>
                 <Button type="submit" disabled={restockSaving}>
                   {restockSaving ? (
                     <>
                       <Spinner className="size-4 mr-2" />
-                      Guardando…
+                      {t('restockDialog.saving')}
                     </>
                   ) : (
-                    'Registrar compra y sumar stock'
+                    t('restockDialog.submit')
                   )}
                 </Button>
               </DialogFooter>
@@ -1158,9 +1180,9 @@ const Inventory = () => {
       <Dialog open={!!historyTarget} onOpenChange={(open) => { if (!open) closeHistory(); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Historial de compras</DialogTitle>
+            <DialogTitle>{t('historyDialog.title')}</DialogTitle>
             <DialogDescription>
-              {historyTarget ? `Reposiciones registradas para «${historyTarget.name}».` : ''}
+              {historyTarget ? t('historyDialog.description', { name: historyTarget.name }) : ''}
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-3">
@@ -1176,7 +1198,7 @@ const Inventory = () => {
             )}
             {!historyLoading && !historyError && historyEntries.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">
-                Aún no hay compras registradas con «Reponer». La compra inicial del ítem no aparece aquí salvo que la registres con una reposición.
+                {t('historyDialog.empty')}
               </p>
             )}
             {!historyLoading && historyEntries.length > 0 && (
@@ -1197,18 +1219,18 @@ const Inventory = () => {
                     </div>
                     {entry.supplier && (
                       <p>
-                        <span className="text-muted-foreground">Dónde:</span> {entry.supplier}
+                        <span className="text-muted-foreground">{t('historyDialog.where')}</span> {entry.supplier}
                       </p>
                     )}
                     {entry.purchase_price != null && entry.purchase_price !== '' && (
                       <p>
-                        <span className="text-muted-foreground">Precio unitario:</span>{' '}
+                        <span className="text-muted-foreground">{t('historyDialog.unitPrice')}</span>{' '}
                         {Number(entry.purchase_price).toFixed(2)} €
                       </p>
                     )}
                     {entry.purchase_date && (
                       <p>
-                        <span className="text-muted-foreground">Fecha compra:</span>{' '}
+                        <span className="text-muted-foreground">{t('historyDialog.purchaseDate')}</span>{' '}
                         {formatHistoryDate(entry.purchase_date)}
                       </p>
                     )}
@@ -1222,7 +1244,7 @@ const Inventory = () => {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={closeHistory}>
-              Cerrar
+              {t('actions.close')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1231,9 +1253,9 @@ const Inventory = () => {
       <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingItem(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Editar ítem' : 'Nuevo ítem'}</DialogTitle>
+            <DialogTitle>{editingItem ? t('itemDialog.editTitle') : t('itemDialog.newTitle')}</DialogTitle>
             <DialogDescription>
-              Una fila por compra. La categoría define el tipo de pieza y qué campos técnicos aplica al montarla en un vehículo.
+              {t('itemDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -1246,22 +1268,22 @@ const Inventory = () => {
 
               <section className="space-y-4" aria-labelledby="inv-modal-h-producto">
                 <h3 id="inv-modal-h-producto" className="text-sm font-semibold text-foreground">
-                  Producto
+                  {t('itemDialog.sectionProduct')}
                 </h3>
                 <div className="space-y-2">
-                  <Label htmlFor="inv-name">Nombre</Label>
+                  <Label htmlFor="inv-name">{t('fields.name')}</Label>
                   <Input
                     id="inv-name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
-                    placeholder="Ej: Corona 26d Anglewinder"
+                    placeholder={t('itemDialog.namePlaceholder')}
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label id="inv-category-label" htmlFor="inv-category">
-                      Categoría
+                      {t('fields.category')}
                     </Label>
                     <SearchableCategorySelect
                       id="inv-category"
@@ -1272,7 +1294,7 @@ const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Unidad de stock</Label>
+                    <Label>{t('itemDialog.stockUnit')}</Label>
                     <Select value={formData.unit} onValueChange={(v) => setFormData({ ...formData, unit: v })}>
                       <SelectTrigger>
                         <SelectValue />
@@ -1288,22 +1310,22 @@ const Inventory = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inv-ref">Referencia</Label>
+                  <Label htmlFor="inv-ref">{t('fields.reference')}</Label>
                   <Input
                     id="inv-ref"
                     value={formData.reference}
                     onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                    placeholder="SKU / ref. fabricante (opcional)"
+                    placeholder={t('itemDialog.referencePlaceholder')}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inv-url">Enlace</Label>
+                  <Label htmlFor="inv-url">{t('fields.url')}</Label>
                   <Input
                     id="inv-url"
                     type="url"
                     value={formData.url}
                     onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                    placeholder="https://… (opcional)"
+                    placeholder={t('itemDialog.urlPlaceholder')}
                   />
                 </div>
               </section>
@@ -1312,11 +1334,11 @@ const Inventory = () => {
 
               <section className="space-y-4" aria-labelledby="inv-modal-h-stock">
                 <h3 id="inv-modal-h-stock" className="text-sm font-semibold text-foreground">
-                  Stock y compra
+                  {t('itemDialog.sectionStock')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="inv-qty">Cantidad en stock</Label>
+                    <Label htmlFor="inv-qty">{t('itemDialog.qtyInStock')}</Label>
                     <Input
                       id="inv-qty"
                       type="number"
@@ -1327,20 +1349,20 @@ const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="inv-min">Alerta stock mínimo</Label>
+                    <Label htmlFor="inv-min">{t('fields.minStock')}</Label>
                     <Input
                       id="inv-min"
                       type="number"
                       min="0"
                       value={formData.min_stock}
                       onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
-                      placeholder="Opcional"
+                      placeholder={t('itemDialog.optional')}
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="inv-price">Precio unitario de compra (€)</Label>
+                    <Label htmlFor="inv-price">{t('fields.unitPrice')}</Label>
                     <Input
                       id="inv-price"
                       type="number"
@@ -1348,14 +1370,14 @@ const Inventory = () => {
                       step="0.01"
                       value={formData.purchase_price}
                       onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
-                      placeholder="Opcional"
+                      placeholder={t('itemDialog.optional')}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Por unidad. Si montas varias en un coche, el coste de la modificación será este precio × unidades.
+                      {t('itemDialog.unitPriceHint')}
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="inv-pdate">Fecha de compra</Label>
+                    <Label htmlFor="inv-pdate">{t('fields.purchaseDate')}</Label>
                     <Input
                       id="inv-pdate"
                       type="date"
@@ -1374,25 +1396,25 @@ const Inventory = () => {
               >
                 <div className="space-y-1">
                   <h3 id="inv-modal-h-spec" className="text-sm font-semibold text-foreground">
-                    Especificación técnica
+                    {t('itemDialog.sectionTech')}
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Opcional. Misma información que al dar de alta un componente en el coche: se propone al montar desde inventario o al enlazar el ítem al editar un vehículo.
+                    {t('itemDialog.sectionTechHint')}
                   </p>
                 </div>
                 <div className="space-y-4 pt-1">
                   <div className="space-y-2">
-                    <Label htmlFor="inv-mfg">Marca (fabricante)</Label>
+                    <Label htmlFor="inv-mfg">{t('fields.manufacturer')}</Label>
                     <Input
                       id="inv-mfg"
                       value={formData.manufacturer}
                       onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
-                      placeholder="Puedes dejarlo vacío y rellenarlo al montar"
+                      placeholder={t('itemDialog.manufacturerPlaceholder')}
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="inv-mat">Material</Label>
+                      <Label htmlFor="inv-mat">{t('fields.material')}</Label>
                       <Input
                         id="inv-mat"
                         value={formData.material}
@@ -1400,7 +1422,7 @@ const Inventory = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="inv-size">Tamaño</Label>
+                      <Label htmlFor="inv-size">{t('fields.size')}</Label>
                       <Input
                         id="inv-size"
                         value={formData.size}
@@ -1409,7 +1431,7 @@ const Inventory = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="inv-color">Color</Label>
+                    <Label htmlFor="inv-color">{t('fields.color')}</Label>
                     <Input
                       id="inv-color"
                       value={formData.color}
@@ -1418,30 +1440,30 @@ const Inventory = () => {
                   </div>
                   {mountCategoryIs(formData.category, 'pinion', 'crown') && (
                     <div className="space-y-2">
-                      <Label htmlFor="inv-teeth">Dientes</Label>
+                      <Label htmlFor="inv-teeth">{t('fields.teeth')}</Label>
                       <Input
                         id="inv-teeth"
                         type="number"
                         value={formData.teeth}
                         onChange={(e) => setFormData({ ...formData, teeth: e.target.value })}
-                        placeholder="Ej. 26"
+                        placeholder={t('itemDialog.teethPlaceholder')}
                       />
                     </div>
                   )}
                   {mountCategoryIs(formData.category, 'motor') && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="inv-rpm">RPM</Label>
+                        <Label htmlFor="inv-rpm">{t('fields.rpm')}</Label>
                         <Input
                           id="inv-rpm"
                           type="number"
                           value={formData.rpm}
                           onChange={(e) => setFormData({ ...formData, rpm: e.target.value })}
-                          placeholder="Ej. 20000"
+                          placeholder={t('itemDialog.rpmPlaceholder')}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="inv-gaus">Gaus</Label>
+                        <Label htmlFor="inv-gaus">{t('fields.gaus')}</Label>
                         <Input
                           id="inv-gaus"
                           type="number"
@@ -1452,13 +1474,13 @@ const Inventory = () => {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <Label htmlFor="inv-spec-desc">Descripción técnica</Label>
+                    <Label htmlFor="inv-spec-desc">{t('fields.techDescription')}</Label>
                     <Textarea
                       id="inv-spec-desc"
                       rows={2}
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Detalle del repuesto (no confundir con «Notas» de compra abajo)"
+                      placeholder={t('itemDialog.techDescPlaceholder')}
                     />
                   </div>
                 </div>
@@ -1468,16 +1490,16 @@ const Inventory = () => {
 
               <section className="space-y-4" aria-labelledby="inv-modal-h-context">
                 <h3 id="inv-modal-h-context" className="text-sm font-semibold text-foreground">
-                  Ubicación y notas
+                  {t('itemDialog.sectionLocation')}
                 </h3>
                 <div className="space-y-2">
-                  <Label>Vehículo donde está montado</Label>
+                  <Label>{t('itemDialog.mountedVehicle')}</Label>
                   <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Ninguno" />
+                      <SelectValue placeholder={t('itemDialog.none')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Ninguno</SelectItem>
+                      <SelectItem value="none">{t('itemDialog.none')}</SelectItem>
                       {vehicles.map((v) => (
                         <SelectItem key={v.id} value={v.id}>
                           {v.manufacturer} {v.model}
@@ -1485,32 +1507,32 @@ const Inventory = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Opcional. Indica si esta compra ya está puesta en un coche.</p>
+                  <p className="text-xs text-muted-foreground">{t('itemDialog.mountedVehicleHint')}</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inv-notes">Notas de compra / almacén</Label>
+                  <Label htmlFor="inv-notes">{t('itemDialog.purchaseNotes')}</Label>
                   <Textarea
                     id="inv-notes"
                     rows={2}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Tienda, ubicación en cajón, recordatorios…"
+                    placeholder={t('itemDialog.purchaseNotesPlaceholder')}
                   />
                 </div>
               </section>
             </div>
             <DialogFooter className="gap-2 border-t pt-4 mt-2 sm:mt-0 sm:pt-4">
               <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
-                Cancelar
+                {t('actions.cancel')}
               </Button>
               <Button type="submit" disabled={saving}>
                 {saving ? (
                   <>
                     <Spinner className="size-4 mr-2" />
-                    Guardando…
+                    {t('itemDialog.saving')}
                   </>
                 ) : (
-                  'Guardar'
+                  t('actions.save')
                 )}
               </Button>
             </DialogFooter>
@@ -1521,9 +1543,9 @@ const Inventory = () => {
       <Dialog open={!!editingPart} onOpenChange={(open) => { if (!open) closeEditPart(); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Editar pieza</DialogTitle>
+            <DialogTitle>{t('partDialog.title')}</DialogTitle>
             <DialogDescription>
-              Los cambios de nombre, marca, referencia y datos técnicos se aplican a las líneas de inventario y a las piezas montadas en los coches. No se modifican cantidades ni precios.
+              {t('partDialog.description')}
             </DialogDescription>
           </DialogHeader>
           {partForm && (
@@ -1535,7 +1557,7 @@ const Inventory = () => {
                   </Alert>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="part-name">Nombre</Label>
+                  <Label htmlFor="part-name">{t('fields.name')}</Label>
                   <Input
                     id="part-name"
                     value={partForm.name}
@@ -1544,7 +1566,7 @@ const Inventory = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="part-category">Categoría</Label>
+                  <Label htmlFor="part-category">{t('fields.category')}</Label>
                   <SearchableCategorySelect
                     id="part-category"
                     value={partForm.category}
@@ -1554,7 +1576,7 @@ const Inventory = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="part-mfg">Marca</Label>
+                    <Label htmlFor="part-mfg">{t('fields.brand')}</Label>
                     <Input
                       id="part-mfg"
                       value={partForm.manufacturer}
@@ -1562,7 +1584,7 @@ const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="part-ref">Referencia</Label>
+                    <Label htmlFor="part-ref">{t('fields.reference')}</Label>
                     <Input
                       id="part-ref"
                       value={partForm.reference}
@@ -1571,7 +1593,7 @@ const Inventory = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="part-url">Enlace</Label>
+                  <Label htmlFor="part-url">{t('fields.url')}</Label>
                   <Input
                     id="part-url"
                     type="url"
@@ -1581,7 +1603,7 @@ const Inventory = () => {
                 </div>
                 {mountCategoryIs(partForm.category, 'pinion', 'crown') && (
                   <div className="space-y-2">
-                    <Label htmlFor="part-teeth">Dientes</Label>
+                    <Label htmlFor="part-teeth">{t('fields.teeth')}</Label>
                     <Input
                       id="part-teeth"
                       type="number"
@@ -1593,7 +1615,7 @@ const Inventory = () => {
                 {mountCategoryIs(partForm.category, 'motor') && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="part-rpm">RPM</Label>
+                      <Label htmlFor="part-rpm">{t('fields.rpm')}</Label>
                       <Input
                         id="part-rpm"
                         type="number"
@@ -1602,7 +1624,7 @@ const Inventory = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="part-gaus">Gaus</Label>
+                      <Label htmlFor="part-gaus">{t('fields.gaus')}</Label>
                       <Input
                         id="part-gaus"
                         type="number"
@@ -1614,7 +1636,7 @@ const Inventory = () => {
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="part-mat">Material</Label>
+                    <Label htmlFor="part-mat">{t('fields.material')}</Label>
                     <Input
                       id="part-mat"
                       value={partForm.material}
@@ -1622,7 +1644,7 @@ const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="part-size">Tamaño</Label>
+                    <Label htmlFor="part-size">{t('fields.size')}</Label>
                     <Input
                       id="part-size"
                       value={partForm.size}
@@ -1631,7 +1653,7 @@ const Inventory = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="part-color">Color</Label>
+                  <Label htmlFor="part-color">{t('fields.color')}</Label>
                   <Input
                     id="part-color"
                     value={partForm.color}
@@ -1639,7 +1661,7 @@ const Inventory = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="part-desc">Descripción</Label>
+                  <Label htmlFor="part-desc">{t('fields.description')}</Label>
                   <Textarea
                     id="part-desc"
                     rows={2}
@@ -1650,16 +1672,16 @@ const Inventory = () => {
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" onClick={closeEditPart}>
-                  Cancelar
+                  {t('actions.cancel')}
                 </Button>
                 <Button type="submit" disabled={partSaving}>
                   {partSaving ? (
                     <>
                       <Spinner className="size-4 mr-2" />
-                      Guardando…
+                      {t('partDialog.saving')}
                     </>
                   ) : (
-                    'Guardar pieza'
+                    t('actions.savePart')
                   )}
                 </Button>
               </DialogFooter>
@@ -1670,13 +1692,13 @@ const Inventory = () => {
 
       <div className="flex flex-col lg:flex-row gap-4 flex-wrap items-start lg:items-end">
         <div className="space-y-2 min-w-[180px]">
-          <Label htmlFor="inv-filter-cat">Categoría</Label>
+          <Label htmlFor="inv-filter-cat">{t('filters.category')}</Label>
           <Select value={categoryFilter} onValueChange={handleCategoryFilterChange}>
             <SelectTrigger id="inv-filter-cat">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="all">{t('filters.allCategories')}</SelectItem>
               {INVENTORY_CATEGORIES.map((c) => (
                 <SelectItem key={c.value} value={c.value}>
                   {c.label}
@@ -1686,25 +1708,25 @@ const Inventory = () => {
           </Select>
         </div>
         <div className="space-y-2 flex-1 min-w-[200px] max-w-md">
-          <Label htmlFor="inv-search">Buscar (nombre o referencia)</Label>
+          <Label htmlFor="inv-search">{t('filters.searchLabel')}</Label>
           <Input
             id="inv-search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Buscar…"
+            placeholder={t('filters.searchPlaceholder')}
           />
         </div>
         <div className="flex items-center gap-2 pb-2">
           <Switch id="inv-low" checked={lowStockOnly} onCheckedChange={handleLowStockChange} />
           <Label htmlFor="inv-low" className="cursor-pointer">
-            Solo stock bajo
+            {t('filters.lowStockOnly')}
           </Label>
         </div>
         {viewMode === 'parts' && (
           <div className="flex items-center gap-2 pb-2">
             <Switch id="inv-mounted" checked={onlyMounted} onCheckedChange={handleOnlyMountedChange} />
             <Label htmlFor="inv-mounted" className="cursor-pointer">
-              Solo montadas en coches
+              {t('filters.onlyMounted')}
             </Label>
           </div>
         )}
@@ -1726,13 +1748,13 @@ const Inventory = () => {
         <Card className="text-center py-12">
           <CardContent>
             <Package className="size-12 mx-auto text-muted-foreground mb-4" />
-            <h4 className="mb-2">{viewMode === 'parts' ? 'No hay piezas' : 'No hay ítems'}</h4>
+            <h4 className="mb-2">{viewMode === 'parts' ? t('empty.partsTitle') : t('empty.itemsTitle')}</h4>
             <p className="text-muted-foreground mb-6">
-              Añade repuestos o ajusta los filtros de búsqueda.
+              {t('empty.description')}
             </p>
             <Button onClick={handleOpenCreate} className="flex items-center gap-2 mx-auto">
               <Plus className="size-4" />
-              Añadir primer ítem
+              {t('empty.addFirst')}
             </Button>
           </CardContent>
         </Card>
@@ -1752,24 +1774,24 @@ const Inventory = () => {
                   <h3 className="font-semibold text-lg leading-tight break-words">{p.name}</h3>
                   {p.reference && (
                     <p className="text-sm text-muted-foreground">
-                      Ref: <span className="font-mono text-foreground/90">{p.reference}</span>
+                      {t('card.ref')} <span className="font-mono text-foreground/90">{p.reference}</span>
                     </p>
                   )}
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge variant="secondary">{formatInventoryCategory(p.category)}</Badge>
-                    {view.low_stock && <Badge variant="destructive">Stock bajo</Badge>}
+                    {view.low_stock && <Badge variant="destructive">{t('badges.lowStock')}</Badge>}
                     {Number(view.stock_qty) === 0 && Number(view.mounted_qty) > 0 && (
-                      <Badge variant="outline">Solo montada</Badge>
+                      <Badge variant="outline">{t('badges.mountedOnly')}</Badge>
                     )}
                     {p.manufacturer && <Badge variant="outline">{p.manufacturer}</Badge>}
                   </div>
                   <div className="mt-3 text-sm space-y-1">
                     <div>
-                      <span className="text-muted-foreground">En stock:</span>{' '}
+                      <span className="text-muted-foreground">{t('card.inStock')}</span>{' '}
                       <span className="font-medium">{view.stock_qty}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Montadas:</span>{' '}
+                      <span className="text-muted-foreground">{t('card.mountedQty')}</span>{' '}
                       <span className="font-medium">{view.mounted_qty}</span>
                     </div>
                   </div>
@@ -1778,10 +1800,14 @@ const Inventory = () => {
                       <div className="flex items-start gap-1">
                         <Car className="size-3 shrink-0 mt-0.5" aria-hidden />
                         <span className="leading-snug">
-                          Montado en{' '}
+                          {t('card.mountedOn')}{' '}
                           {view.mounted_in.map((m, idx) => (
                             <span key={`${m.component_id}-${m.vehicle.id}`}>
-                              {idx > 0 ? (idx === view.mounted_in.length - 1 ? ' y ' : ', ') : ''}
+                              {idx > 0
+                                ? idx === view.mounted_in.length - 1
+                                  ? t('list.separatorAnd')
+                                  : t('list.separatorComma')
+                                : ''}
                               <Link
                                 to={`/vehicles/${m.vehicle.id}`}
                                 className="font-medium text-primary hover:underline"
@@ -1798,14 +1824,14 @@ const Inventory = () => {
                   <div
                     className="mt-auto flex w-full min-w-0 flex-nowrap items-center justify-end gap-0.5 overflow-x-auto border-t border-border pt-3"
                     role="toolbar"
-                    aria-label="Acciones de la pieza"
+                    aria-label={t('a11y.partToolbar')}
                   >
                     <Button
                       variant="ghost"
                       size="icon"
                       type="button"
                       className="h-8 w-8 shrink-0"
-                      title="Reponer stock"
+                      title={t('actions.restock')}
                       onClick={() => openPartRestock(view)}
                     >
                       <PackagePlus className="size-4" />
@@ -1815,7 +1841,7 @@ const Inventory = () => {
                       size="icon"
                       type="button"
                       className="h-8 w-8 shrink-0"
-                      title="Historial de compras"
+                      title={t('actions.history')}
                       onClick={() => openPartHistory(view)}
                     >
                       <History className="size-4" />
@@ -1826,7 +1852,7 @@ const Inventory = () => {
                         size="icon"
                         type="button"
                         className="h-8 w-8 shrink-0"
-                        title="Montar en vehículo"
+                        title={t('actions.mount')}
                         onClick={() => openPartMount(view)}
                       >
                         <Wrench className="size-4" />
@@ -1837,7 +1863,7 @@ const Inventory = () => {
                       size="icon"
                       type="button"
                       className="h-8 w-8 shrink-0"
-                      title="Editar pieza (afecta a inventario y coches)"
+                      title={t('actions.editPart')}
                       onClick={() => openEditPart(view)}
                     >
                       <Pen className="size-4" />
@@ -1859,23 +1885,23 @@ const Inventory = () => {
                 <h3 className="font-semibold text-lg leading-tight break-words">{item.name}</h3>
                 {item.reference && (
                   <p className="text-sm text-muted-foreground">
-                    Ref: <span className="font-mono text-foreground/90">{item.reference}</span>
+                    {t('card.ref')} <span className="font-mono text-foreground/90">{item.reference}</span>
                   </p>
                 )}
                 <div className="mt-2 flex flex-wrap gap-1">
                   <Badge variant="secondary">{formatInventoryCategory(item.category)}</Badge>
-                  {isLowStock(item) && <Badge variant="destructive">Stock bajo</Badge>}
+                  {isLowStock(item) && <Badge variant="destructive">{t('badges.lowStock')}</Badge>}
                 </div>
 
                 <div className="mt-3 text-sm">
-                  <span className="text-muted-foreground">Cantidad:</span>{' '}
+                  <span className="text-muted-foreground">{t('card.quantity')}</span>{' '}
                   <span className="font-medium">
                     {item.quantity} {unitLabel(item.unit)}
                   </span>
                 </div>
                 {item.purchase_price != null && (
                   <div className="mt-1 text-sm">
-                    <span className="text-muted-foreground">Precio unitario:</span>{' '}
+                    <span className="text-muted-foreground">{t('card.unitPrice')}</span>{' '}
                     <span className="font-medium">{Number(item.purchase_price).toFixed(2)} €</span>
                   </div>
                 )}
@@ -1884,7 +1910,7 @@ const Inventory = () => {
                   {item.purchase_date && (
                     <div className="flex items-center gap-1">
                       <Calendar className="size-3 shrink-0" aria-hidden />
-                      <span>Compra: {formatHistoryDate(item.purchase_date)}</span>
+                      <span>{t('card.purchase')} {formatHistoryDate(item.purchase_date)}</span>
                     </div>
                   )}
                   {item.url && (
@@ -1896,7 +1922,7 @@ const Inventory = () => {
                         rel="noopener noreferrer"
                         className="min-w-0 break-all text-primary hover:underline"
                       >
-                        Abrir enlace
+                        {t('card.openLink')}
                       </a>
                     </div>
                   )}
@@ -1905,10 +1931,14 @@ const Inventory = () => {
                       <div className="flex items-start gap-1">
                         <Car className="size-3 shrink-0 mt-0.5" aria-hidden />
                         <span className="leading-snug">
-                          Montado en{' '}
+                          {t('card.mountedOn')}{' '}
                           {item.mounted_vehicles.map((v, idx) => (
                             <span key={v.id}>
-                              {idx > 0 ? (idx === item.mounted_vehicles.length - 1 ? ' y ' : ', ') : ''}
+                              {idx > 0
+                                ? idx === item.mounted_vehicles.length - 1
+                                  ? t('list.separatorAnd')
+                                  : t('list.separatorComma')
+                                : ''}
                               <Link
                                 to={`/vehicles/${v.id}`}
                                 className="font-medium text-primary hover:underline"
@@ -1930,14 +1960,14 @@ const Inventory = () => {
                 <div
                   className="mt-auto flex w-full min-w-0 flex-nowrap items-center justify-end gap-0.5 overflow-x-auto border-t border-border pt-3"
                   role="toolbar"
-                  aria-label="Acciones del ítem"
+                  aria-label={t('a11y.itemToolbar')}
                 >
                   <Button
                     variant="ghost"
                     size="icon"
                     type="button"
                     className="h-8 w-8 shrink-0"
-                    title="Reponer stock"
+                    title={t('actions.restock')}
                     onClick={() => openRestock(item)}
                   >
                     <PackagePlus className="size-4" />
@@ -1947,7 +1977,7 @@ const Inventory = () => {
                     size="icon"
                     type="button"
                     className="h-8 w-8 shrink-0"
-                    title="Historial de compras"
+                    title={t('actions.history')}
                     onClick={() => openHistory(item)}
                   >
                     <History className="size-4" />
@@ -1958,7 +1988,7 @@ const Inventory = () => {
                       size="icon"
                       type="button"
                       className="h-8 w-8 shrink-0"
-                      title="Montar en vehículo"
+                      title={t('actions.mount')}
                       onClick={() => openMount(item)}
                     >
                       <Wrench className="size-4" />
@@ -1969,7 +1999,7 @@ const Inventory = () => {
                     size="icon"
                     type="button"
                     className="h-8 w-8 shrink-0"
-                    title="Editar"
+                    title={t('actions.edit')}
                     onClick={() => handleOpenEdit(item)}
                   >
                     <Pen className="size-4" />
@@ -1979,7 +2009,7 @@ const Inventory = () => {
                     size="icon"
                     type="button"
                     className="h-8 w-8 shrink-0"
-                    title="Duplicar"
+                    title={t('actions.duplicate')}
                     onClick={() => handleDuplicate(item)}
                   >
                     <Copy className="size-4" />
@@ -1989,7 +2019,7 @@ const Inventory = () => {
                     size="icon"
                     type="button"
                     className="h-8 w-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    title="Eliminar"
+                    title={t('actions.delete')}
                     onClick={() => handleDelete(item)}
                   >
                     <Trash2 className="size-4" />

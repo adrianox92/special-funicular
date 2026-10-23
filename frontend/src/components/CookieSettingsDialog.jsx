@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useCookieConsent } from "../context/CookieConsentContext";
 import {
   Dialog,
@@ -13,6 +14,7 @@ import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 
 const CookieSettingsDialog = () => {
+  const { t } = useTranslation("common");
   const { consent, settingsOpen, setSettingsOpen, saveConsent } =
     useCookieConsent();
 
@@ -36,10 +38,9 @@ const CookieSettingsDialog = () => {
     <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md" aria-describedby="cookie-settings-desc">
         <DialogHeader>
-          <DialogTitle>Preferencias de cookies</DialogTitle>
+          <DialogTitle>{t("cookies.settingsTitle")}</DialogTitle>
           <DialogDescription id="cookie-settings-desc">
-            Elige qué cookies permites. Las necesarias son imprescindibles para el
-            funcionamiento seguro del sitio (sesión, autenticación).
+            {t("cookies.settingsLead")}
           </DialogDescription>
         </DialogHeader>
 
@@ -47,10 +48,10 @@ const CookieSettingsDialog = () => {
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
               <Label htmlFor="cookie-necessary" className="text-base">
-                Necesarias
+                {t("cookies.necessary")}
               </Label>
               <p className="text-sm text-muted-foreground">
-                Sesión, seguridad y acceso a tu cuenta.
+                {t("cookies.necessaryHint")}
               </p>
             </div>
             <Switch id="cookie-necessary" checked disabled aria-readonly />
@@ -59,10 +60,10 @@ const CookieSettingsDialog = () => {
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
               <Label htmlFor="cookie-analytics" className="text-base">
-                Analíticas
+                {t("cookies.analytics")}
               </Label>
               <p className="text-sm text-muted-foreground">
-                Uso agregado del sitio (Vercel Analytics y Speed Insights).
+                {t("cookies.analyticsHint")}
               </p>
             </div>
             <Switch
@@ -75,10 +76,10 @@ const CookieSettingsDialog = () => {
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
               <Label htmlFor="cookie-functional" className="text-base">
-                Funcionales
+                {t("cookies.functional")}
               </Label>
               <p className="text-sm text-muted-foreground">
-                Recordar preferencias como el tema claro/oscuro.
+                {t("cookies.functionalHint")}
               </p>
             </div>
             <Switch
@@ -91,10 +92,10 @@ const CookieSettingsDialog = () => {
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-            Cancelar
+            {t("actions.cancel")}
           </Button>
           <Button type="button" onClick={handleSave}>
-            Guardar preferencias
+            {t("cookies.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,9 +1,9 @@
 const express = require('express');
-const { getAnonClient } = require('../lib/supabaseClients');
+const { getServiceOrAnonClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
-const supabase = getAnonClient();
+const supabase = getServiceOrAnonClient();
 
 router.use(authMiddleware);
 

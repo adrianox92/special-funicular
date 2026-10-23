@@ -1,6 +1,7 @@
 /**
- * SSR del catálogo público: misma HTML para usuarios y crawlers.
+ * SSR del catálogo público: misma HTML para usuarios y crawlers de Google.
  * Reescribe /catalogo, /en/catalog, /de/katalog (ficha o listado) hacia aquí.
+ * Otros bots se cortan en catalogBotGate antes de renderizar.
  */
 const { getBackendApiBase } = require('./_lib/backendUrls');
 const {
@@ -26,7 +27,11 @@ const {
   injectIntoSpaHtml,
   fallbackDocument,
 } = require('./_lib/catalogSeoHtml');
-const { cachedStorageImageUrl, rewritePublicCatalogMediaUrls } = require('../src/utils/cachedStorageImageUrl');
+const {
+  cachedStorageImageUrl,
+  rewritePublicCatalogMediaUrls,
+} = require('../src/utils/cachedStorageImageUrl');
+const { catalogInternalHeaders, gateCatalogRequest } = require('./_lib/catalogBotGate');
 
 const LIST_PAGE_SIZE = 24;
 const FETCH_MS = 8000;
@@ -101,12 +106,12 @@ function originalSearchParams(req) {
   return params;
 }
 
-async function fetchText(url, timeoutMs = FETCH_MS) {
+async function fetchText(url, timeoutMs = FETCH_MS, extraHeaders = {}) {
   const ctrl = typeof AbortSignal !== 'undefined' && AbortSignal.timeout
     ? AbortSignal.timeout(timeoutMs)
     : undefined;
   const res = await fetch(url, {
-    headers: { Accept: 'text/html, application/json, */*' },
+    headers: { Accept: 'text/html, application/json, */*', ...extraHeaders },
     redirect: 'follow',
     signal: ctrl,
   });
@@ -135,7 +140,8 @@ async function getSpaShell(req) {
 function sendHtml(res, status, html, extraHeaders) {
   res.status(status);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', extraHeaders?.cache || 'public, s-maxage=300, stale-while-revalidate=86400');
+  // private: un CDN público serviría la ficha a un bot que ignore robots.txt.
+  res.setHeader('Cache-Control', extraHeaders?.cache || 'private, max-age=120');
   if (extraHeaders?.location) res.setHeader('Location', extraHeaders.location);
   res.send(html);
 }
@@ -164,6 +170,8 @@ async function renderItem(req, res, parsed, spaHtml) {
   try {
     const { ok, status, body } = await fetchText(
       `${apiBase}/public/catalog/items/${encodeURIComponent(parsed.id)}`,
+      FETCH_MS,
+      catalogInternalHeaders(),
     );
     if (status === 404) {
       const canonicalUrl = `${origin}${catalogItemPath(locale, parsed.id, parsed.slug || 'item')}`;
@@ -180,7 +188,7 @@ async function renderItem(req, res, parsed, spaHtml) {
         headTags,
         rootHtml: renderNotFoundBody(locale),
       });
-      sendHtml(res, 404, html, { cache: 'public, s-maxage=60' });
+      sendHtml(res, 404, html, { cache: 'private, max-age=60' });
       return;
     }
     if (!ok) {
@@ -196,7 +204,7 @@ async function renderItem(req, res, parsed, spaHtml) {
   }
 
   if (!item?.id) {
-    sendHtml(res, 404, spaHtml || 'Not found', { cache: 'public, s-maxage=60' });
+    sendHtml(res, 404, spaHtml || 'Not found', { cache: 'private, max-age=60' });
     return;
   }
 
@@ -205,7 +213,7 @@ async function renderItem(req, res, parsed, spaHtml) {
     const location = catalogItemPath(locale, item.id, slug);
     res.status(301);
     res.setHeader('Location', location);
-    res.setHeader('Cache-Control', 'public, s-maxage=86400');
+    res.setHeader('Cache-Control', 'private, max-age=300');
     res.end();
     return;
   }
@@ -229,9 +237,10 @@ async function renderItem(req, res, parsed, spaHtml) {
     jsonLd,
   });
   const rootHtml = renderItemBody({ item, locale, origin, slug, neighbors });
+  const itemForBootstrap = rewritePublicCatalogMediaUrls(item, { origin });
   const bootstrapScript = `<script>window.__PUBLIC_CATALOG_BOOTSTRAP__=${JSON.stringify({
     kind: 'item',
-    item,
+    item: itemForBootstrap,
   }).replace(/</g, '\\u003c')};</script>`;
 
   const html = wrapHtml(spaHtml, {
@@ -289,9 +298,10 @@ async function renderList(req, res, parsed, spaHtml) {
         apiParams.set('sort', search.get('sort'));
       }
 
+      const ssrHeaders = catalogInternalHeaders();
       const [listRes, brandsRes] = await Promise.all([
-        fetchText(`${apiBase}/public/catalog/items?${apiParams.toString()}`),
-        fetchText(`${apiBase}/public/catalog/brands`),
+        fetchText(`${apiBase}/public/catalog/items?${apiParams.toString()}`, FETCH_MS, ssrHeaders),
+        fetchText(`${apiBase}/public/catalog/brands`, FETCH_MS, ssrHeaders),
       ]);
       if (listRes.ok) {
         const data = JSON.parse(listRes.body);
@@ -346,7 +356,7 @@ async function renderList(req, res, parsed, spaHtml) {
   });
   const bootstrapScript = `<script>window.__PUBLIC_CATALOG_BOOTSTRAP__=${JSON.stringify({
     kind: 'list',
-    items,
+    items: rewritePublicCatalogMediaUrls(items, { origin }),
     total,
     totalPages,
     page,
@@ -366,6 +376,9 @@ module.exports = async function handler(req, res) {
     res.status(405).setHeader('Allow', 'GET, HEAD').send('Method Not Allowed');
     return;
   }
+
+  const allowed = await gateCatalogRequest(req, res, { html: true });
+  if (!allowed) return;
 
   const pathname = originalPathname(req);
   const parsed = parsePublicCatalogPath(pathname);

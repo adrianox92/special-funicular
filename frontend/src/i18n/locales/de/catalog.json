@@ -15,7 +15,7 @@
   "list": {
     "heading": "Referenzkatalog",
     "lead": "Katalogisierte Slotcars: Referenz, Marke, Typ und Erscheinungsjahr.",
-    "searchPlaceholder": "Suche nach Referenz, Modell oder Marke…",
+    "searchPlaceholder": "Suche nach Referenz, Alias, EAN, Modell oder Marke…",
     "clearSearch": "Suche löschen",
     "brand": "Marke",
     "allBrands": "Alle Marken",
@@ -66,6 +66,10 @@
     "noImage": "Kein Katalogbild",
     "specsTitle": "Technische Daten",
     "fieldReference": "Referenz",
+    "fieldEan": "EAN",
+    "aliasesTitle": "Alternative Referenzen",
+    "aliasMarket": "Markt",
+    "aliasEan": "EAN",
     "fieldBrand": "Marke",
     "fieldName": "Name / Modell",
     "fieldType": "Typ",
@@ -115,7 +119,77 @@
     "addToGarage": "Zur Garage hinzufügen",
     "addToGarageHint": "Öffnet das Formular für ein neues Fahrzeug mit dieser Referenz.",
     "similarTitle": "Ähnliche Fahrzeuge",
-    "similarAria": "Karussell ähnlicher Fahrzeuge"
+    "similarAria": "Karussell ähnlicher Fahrzeuge",
+    "legacyValue": "{{value}} (bisheriger Wert)"
+  },
+  "aliases": {
+    "tab": "Alternative Referenzen",
+    "canonicalEan": "EAN (kanonische Referenz)",
+    "canonicalEanHelp": "Strichcode der Haupt-Referenz. Jeder Alias kann einen eigenen haben.",
+    "help": "Weitere Referenzen desselben Modells (Markt, Kurzform, Shop-Präfix oder Tippfehler). Jede kann eine eigene EAN haben.",
+    "empty": "Keine alternativen Referenzen.",
+    "add": "Alias hinzufügen",
+    "remove": "Entfernen",
+    "reference": "Alternative Referenz",
+    "type": "Typ",
+    "market": "Markt",
+    "brandLabel": "Marke in diesem Markt",
+    "ean": "EAN",
+    "source": "Quelle",
+    "sourceUrl": "Quellen-URL",
+    "types": {
+      "market": "Markt (S/X)",
+      "short": "Kurzform",
+      "shop_prefix": "Shop-Präfix",
+      "legacy_typo": "Tippfehler / Alt"
+    }
+  },
+  "techSpecs": {
+    "title": "Technische Informationen",
+    "tab": "Technische Daten",
+    "tabGeneral": "Allgemein",
+    "tabNavAria": "Formularabschnitt",
+    "formHelp": "Maße in Millimetern und Gewicht in Gramm. Leer lassen, wenn unbekannt. Antrieb und Motorhalterung werden im Reiter Allgemein bearbeitet.",
+    "yes": "Ja",
+    "no": "Nein",
+    "unspecified": "— Nicht angegeben —",
+    "invalidNumber": "{{field}} muss eine Zahl größer oder gleich 0 sein.",
+    "fields": {
+      "scale": "Maßstab",
+      "body": "Karosserie",
+      "color": "Farbe",
+      "system": "System",
+      "lengthMm": "Länge (mm)",
+      "heightMm": "Höhe (mm)",
+      "wheelbaseMm": "Radstand (mm)",
+      "frontTrackMm": "Spurweite vorn (mm)",
+      "rearTrackMm": "Spurweite hinten (mm)",
+      "frontAxleLengthMm": "Vorderachse (mm)",
+      "rearAxleLengthMm": "Hinterachse (mm)",
+      "weightG": "Gewicht (g)",
+      "magnet": "Magnet",
+      "motor": "Motor",
+      "motorMount": "Motorhalterung",
+      "drivetrain": "Antrieb",
+      "pinionGear": "Ritzel / Zahnrad",
+      "frontWheels": "Vorderräder",
+      "rearWheels": "Hinterräder",
+      "frontRim": "Felge vorn",
+      "rearRim": "Felge hinten",
+      "frontRimDiameterMm": "Felgendurchmesser vorn (mm)",
+      "rearRimDiameterMm": "Felgendurchmesser hinten (mm)",
+      "frontLights": "Frontbeleuchtung",
+      "rearLights": "Heckbeleuchtung"
+    },
+    "systemValues": {
+      "analog": "Analog",
+      "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Kunststoff",
+      "aluminum": "Aluminium",
+      "magnesium": "Magnesium"
+    }
   },
   "guest": {
     "addTitle": "Diese Referenz zu deiner Garage hinzufügen",
@@ -176,6 +250,35 @@
       "inline": "längs",
       "angular": "Anglewinder",
       "transverse": "Sidewinder"
+    }
+  },
+  "values": {
+    "vehicleTypes": {
+      "Rally": "Rally",
+      "GT": "GT",
+      "LMP": "LMP",
+      "Hypercar": "Hypercar",
+      "Grupo 5": "Gruppe 5",
+      "Road Car": "Straßenwagen",
+      "Turismo": "Tourenwagen",
+      "Clásico": "Klassiker",
+      "DTM": "DTM",
+      "F1": "F1",
+      "Camiones": "LKW",
+      "Raid": "Raid"
+    },
+    "traction": {
+      "4x4": "4x4",
+      "Trasera": "Hinterrad",
+      "Delantera": "Vorderrad"
+    },
+    "motorPosition": {
+      "inline": "Längs",
+      "angular": "Anglewinder",
+      "transverse": "Sidewinder",
+      "En línea": "Längs",
+      "Angular": "Anglewinder",
+      "Transversal": "Sidewinder"
     }
   }
 }

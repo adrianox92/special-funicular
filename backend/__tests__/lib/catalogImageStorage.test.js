@@ -1,5 +1,6 @@
 const {
   catalogStoragePathFromPublicUrl,
+  thumbStoragePathFromDetailPath,
   CATALOG_IMAGES_BUCKET,
 } = require('../../lib/catalogImageStorage');
 
@@ -21,5 +22,15 @@ describe('catalogStoragePathFromPublicUrl', () => {
   it('devuelve null para entrada vacía', () => {
     expect(catalogStoragePathFromPublicUrl('')).toBeNull();
     expect(catalogStoragePathFromPublicUrl(null)).toBeNull();
+  });
+});
+
+describe('thumbStoragePathFromDetailPath', () => {
+  it('añade -thumb al objeto de detalle', () => {
+    expect(thumbStoragePathFromDetailPath('catalog/foo.webp')).toBe('catalog/foo-thumb.webp');
+  });
+
+  it('no genera sibling de un thumb', () => {
+    expect(thumbStoragePathFromDetailPath('catalog/foo-thumb.webp')).toBeNull();
   });
 });

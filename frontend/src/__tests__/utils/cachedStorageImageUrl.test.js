@@ -5,7 +5,9 @@ const {
   pathSegmentsFromReq,
   allowedStorageHostsFromEnv,
   isSafeObjectPath,
+  rewritePublicCatalogMediaUrls,
 } = require('../../utils/cachedStorageImageUrl');
+const { catalogThumbUrl } = require('../../utils/catalogImageVariants');
 
 const CATALOG =
   'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/catalog/1710000000-ab12cd.webp';
@@ -76,6 +78,59 @@ describe('cachedStorageImageUrl', () => {
 
   test('enabled:false deja la URL original (dev local)', () => {
     expect(cachedStorageImageUrl(CATALOG, { enabled: false })).toBe(CATALOG);
+  });
+
+  test('con origin, una ruta /api/img relativa se absolutiza; /logo no', () => {
+    expect(
+      cachedStorageImageUrl('/api/img/catalog-images/catalog/a.webp', {
+        origin: 'https://www.slotdatabase.es',
+      }),
+    ).toBe('https://www.slotdatabase.es/api/img/catalog-images/catalog/a.webp');
+    expect(cachedStorageImageUrl('/logo512.png', { origin: 'https://www.slotdatabase.es' })).toBe(
+      '/logo512.png',
+    );
+  });
+});
+
+describe('rewritePublicCatalogMediaUrls', () => {
+  const origin = 'https://www.slotdatabase.es';
+  const proxied = `${origin}/api/img/catalog-images/catalog/1710000000-ab12cd.webp`;
+  const logo =
+    'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/brands/logo.webp';
+
+  test('reescribe image_url, manufacturer_logo_url y logo_url con origin', () => {
+    const out = rewritePublicCatalogMediaUrls(
+      {
+        items: [
+          {
+            id: '1',
+            image_url: CATALOG,
+            manufacturer_logo_url: logo,
+            reference: 'C1',
+          },
+        ],
+        brands: [{ id: 'b1', name: 'Scalextric', logo_url: logo }],
+        total: 1,
+      },
+      { origin },
+    );
+    expect(out.items[0].image_url).toBe(proxied);
+    expect(out.items[0].manufacturer_logo_url).toBe(
+      `${origin}/api/img/catalog-images/brands/logo.webp`,
+    );
+    expect(out.items[0].reference).toBe('C1');
+    expect(out.brands[0].logo_url).toBe(`${origin}/api/img/catalog-images/brands/logo.webp`);
+    expect(out.total).toBe(1);
+    expect(JSON.stringify(out)).not.toContain('supabase.co');
+  });
+
+  test('es idempotente sobre URLs ya proxificadas y conserva -thumb', () => {
+    const once = rewritePublicCatalogMediaUrls({ image_url: CATALOG }, { origin });
+    const twice = rewritePublicCatalogMediaUrls(once, { origin });
+    expect(twice.image_url).toBe(proxied);
+    expect(catalogThumbUrl(twice.image_url)).toBe(
+      `${origin}/api/img/catalog-images/catalog/1710000000-ab12cd-thumb.webp`,
+    );
   });
 });
 

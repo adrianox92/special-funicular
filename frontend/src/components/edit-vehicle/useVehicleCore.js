@@ -4,9 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import api from '../../lib/axios';
 import { IMAGE_FIELD_NAMES, viewTypeMap } from './constants';
+import {
+  appendTechSpecsToFormData,
+  CATALOG_TECH_SPEC_KEYS,
+  techSpecFormFromRow,
+  validateTechSpecForm,
+} from '../../data/catalogTechSpecs';
 
 export function useVehicleCore(id) {
   const { t } = useTranslation('vehicles');
+  const { t: tCatalog } = useTranslation('catalog');
   const navigate = useNavigate();
   const [vehicle, setVehicle] = useState(null);
   const [images, setImages] = useState({});
@@ -238,6 +245,11 @@ export function useVehicleCore(id) {
     if (submitter?.name !== 'save-vehicle') {
       return;
     }
+    const invalidSpec = validateTechSpecForm(techSpecFormFromRow(vehicle));
+    if (invalidSpec) {
+      setError(tCatalog('techSpecs.invalidNumber', { field: tCatalog(`techSpecs.fields.${invalidSpec}`) }));
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -250,7 +262,9 @@ export function useVehicleCore(id) {
       };
 
       const sendEmptyIfNull = new Set(['dorsal', 'limited_edition_unit_number']);
+      const specKeySet = new Set(CATALOG_TECH_SPEC_KEYS);
       Object.entries(processedVehicle).forEach(([key, value]) => {
+        if (specKeySet.has(key)) return;
         // FormData convierte null en la cadena "null" → Postgres rechaza fechas y tipos
         if (value !== undefined && value !== null && typeof value !== 'object') {
           formData.append(key, value);
@@ -258,6 +272,7 @@ export function useVehicleCore(id) {
           formData.append(key, '');
         }
       });
+      appendTechSpecsToFormData(formData, techSpecFormFromRow(vehicle));
 
       imageFields.forEach(({ name }) => {
         if (images[name]) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import api from '../lib/axios';
 import { Button } from './ui/button';
@@ -13,6 +13,7 @@ import {
 } from './ui/dropdown-menu';
 
 const CHANGELOG_SEEN_EVENT = 'slotdb-changelog-seen';
+const UNREAD_POLL_MS = 10 * 60 * 1000;
 
 const CATEGORY_LABEL = {
   feature: 'Novedad',
@@ -36,7 +37,6 @@ function formatRelativeTime(iso) {
 }
 
 export function ChangelogBell() {
-  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [entries, setEntries] = useState([]);
@@ -65,10 +65,10 @@ export function ChangelogBell() {
 
   useEffect(() => {
     void fetchCount();
-  }, [fetchCount, location.pathname]);
+  }, [fetchCount]);
 
   useEffect(() => {
-    const t = setInterval(() => void fetchCount(), 60_000);
+    const t = setInterval(() => void fetchCount(), UNREAD_POLL_MS);
     return () => clearInterval(t);
   }, [fetchCount]);
 

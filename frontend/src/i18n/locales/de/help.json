@@ -1,0 +1,39 @@
+{
+  "page": {
+    "title": "Einstieg und Hilfe",
+    "lead": "Anleitung für den Einstieg in Slot Database und Referenz jeder Sektion: was sie tut, in welcher Reihenfolge du sie einrichten solltest und bewährte Praktiken. Unten kannst du auch in natürlicher Sprache suchen.",
+    "tocTitle": "Inhalt",
+    "tocDesc": "Zu einem Abschnitt springen oder ihn in der App öffnen.",
+    "tocAria": "Hilfe-Inhalt",
+    "recommended": "Empfohlen",
+    "steps": "Schritte",
+    "tips": "Das solltest du beachten",
+    "qa": "Erwartetes Verhalten (QA)",
+    "gotchas": "Häufige Fehler",
+    "footer": "Stimmt etwas nicht mit dem überein, was du siehst? Prüfe, ob du die neueste App-Version nutzt, und lade die Seite neu."
+  },
+  "assistant": {
+    "title": "Die Anleitung fragen",
+    "lead": "Schreibe in natürlicher Sprache (zum Beispiel: „Wie lege ich ein Auto an?“). Die Antwort basiert auf diesem Leitfaden.",
+    "label": "Deine Frage",
+    "placeholder": "z. B.: Wie erfasse ich eine Zeitsitzung?",
+    "submit": "Antwort suchen",
+    "searching": "Suche Antwort…",
+    "minLength": "Schreibe mindestens 3 Zeichen.",
+    "unavailableHint": "Der Assistent ist gerade nicht verfügbar. Nutze das Inhaltsverzeichnis und die Abschnitte auf dieser Seite.",
+    "unavailableNow": "Der Assistent ist derzeit nicht verfügbar. Du kannst das Inhaltsverzeichnis und die Abschnitte auf dieser Seite nutzen.",
+    "genericError": "Es konnte keine Antwort geholt werden. Bitte später erneut versuchen.",
+    "requestFailed": "Antwort konnte nicht geholt werden.",
+    "answerPlaceholder": "Die Antwort erscheint hier.",
+    "guideSections": "Abschnitte der Anleitung:"
+  },
+  "plain": {
+    "guideTitle": "Slot Database — Leitfaden und Einstieg",
+    "firstSteps": "Erste Schritte",
+    "steps": "Schritte:",
+    "tips": "Tipps:",
+    "qa": "Erwartetes Verhalten (QA):",
+    "faq": "Häufige Fragen",
+    "related": "Verwandte Themen: {{topics}}."
+  }
+}

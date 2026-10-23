@@ -18,6 +18,23 @@
     "sectionLabel": "Go to section",
     "chooseSection": "Choose a section"
   },
+  "cookies": {
+    "bannerAria": "Cookie notice",
+    "title": "We use cookies to improve your experience",
+    "body": "Necessary cookies enable sign-in and security. With your consent we also use analytics and preferences (theme). You can accept all, reject optional cookies or choose by category.",
+    "necessaryOnly": "Necessary only",
+    "configure": "Settings",
+    "acceptAll": "Accept all",
+    "settingsTitle": "Cookie preferences",
+    "settingsLead": "Choose which cookies you allow. Necessary cookies are required for the site to work securely (session, authentication).",
+    "necessary": "Necessary",
+    "necessaryHint": "Session, security and access to your account.",
+    "analytics": "Analytics",
+    "analyticsHint": "Aggregated site usage (Vercel Analytics and Speed Insights).",
+    "functional": "Functional",
+    "functionalHint": "Remember preferences such as light/dark theme.",
+    "save": "Save preferences"
+  },
   "footer": {
     "copyright": "© {{year}} Adrian Palomera Sanz. All rights reserved.",
     "privacy": "Privacy policy",

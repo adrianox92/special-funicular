@@ -20,7 +20,12 @@ const CompetitionDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const section = resolveCompetitionSection(searchParams.get('section'));
+  const sectionParam = searchParams.get('section');
+  const section = sectionParam
+    ? resolveCompetitionSection(sectionParam)
+    : competition?.viewer_role === 'participant'
+      ? 'timings'
+      : 'setup';
 
   const loadCompetition = useCallback(async () => {
     if (!competitionId) return;

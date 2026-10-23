@@ -1,0 +1,218 @@
+{
+  "title": "Inventario",
+  "subtitle": {
+    "parts": "Todas las piezas: stock en almacén y unidades montadas en coches, consolidadas por identidad.",
+    "stock": "Líneas de stock. Para más unidades del mismo ítem con otro precio o tienda, usa «Reponer» y consulta el historial de compras."
+  },
+  "tabs": {
+    "parts": "Todas las piezas",
+    "stock": "Líneas de stock"
+  },
+  "filters": {
+    "category": "Categoría",
+    "allCategories": "Todas",
+    "searchLabel": "Buscar (nombre o referencia)",
+    "searchPlaceholder": "Buscar…",
+    "lowStockOnly": "Solo stock bajo",
+    "onlyMounted": "Solo montadas en coches"
+  },
+  "pagination": {
+    "showing": "Mostrando {{start}}–{{end}} de {{total}} {{unit}}",
+    "perPage": "Por página:",
+    "unitPartsOne": "pieza",
+    "unitPartsMany": "piezas",
+    "unitItemsOne": "ítem",
+    "unitItemsMany": "ítems"
+  },
+  "empty": {
+    "partsTitle": "No hay piezas",
+    "itemsTitle": "No hay ítems",
+    "description": "Añade repuestos o ajusta los filtros de búsqueda.",
+    "addFirst": "Añadir primer ítem"
+  },
+  "actions": {
+    "newItem": "Nuevo ítem",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "close": "Cerrar",
+    "delete": "Eliminar",
+    "restock": "Reponer stock",
+    "history": "Historial de compras",
+    "mount": "Montar en vehículo",
+    "edit": "Editar",
+    "editPart": "Editar pieza (afecta a inventario y coches)",
+    "duplicate": "Duplicar",
+    "savePart": "Guardar pieza"
+  },
+  "a11y": {
+    "partToolbar": "Acciones de la pieza",
+    "itemToolbar": "Acciones del ítem"
+  },
+  "card": {
+    "ref": "Ref:",
+    "inStock": "En stock:",
+    "mountedQty": "Montadas:",
+    "quantity": "Cantidad:",
+    "unitPrice": "Precio unitario:",
+    "purchase": "Compra:",
+    "openLink": "Abrir enlace",
+    "mountedOn": "Montado en"
+  },
+  "badges": {
+    "lowStock": "Stock bajo",
+    "mountedOnly": "Solo montada"
+  },
+  "list": {
+    "separatorAnd": " y ",
+    "separatorComma": ", "
+  },
+  "duplicate": {
+    "nameSuffix": " (copia)"
+  },
+  "notes": {
+    "purchasePrefix": "Compra: {{supplier}}"
+  },
+  "units": {
+    "uds": "Unidades",
+    "pares": "Pares",
+    "ml": "ml",
+    "metros": "Metros",
+    "juego": "Juego"
+  },
+  "errors": {
+    "load": "Error al cargar el inventario",
+    "save": "Error al guardar",
+    "delete": "Error al eliminar",
+    "mount": "Error al montar",
+    "restock": "Error al reponer stock",
+    "historyLoad": "Error al cargar el historial",
+    "partSave": "Error al guardar la pieza",
+    "openItem": "No se pudo abrir el ítem del inventario."
+  },
+  "formErrors": {
+    "nameRequired": "El nombre es obligatorio",
+    "quantityInvalid": "La cantidad debe ser un número entero mayor o igual a 0",
+    "teethInvalid": "Dientes no válidos",
+    "rpmInvalid": "RPM no válidas",
+    "gausInvalid": "Gaus no válidos",
+    "minStockInvalid": "Stock mínimo no válido",
+    "priceInvalid": "Precio no válido"
+  },
+  "mountErrors": {
+    "manufacturerRequired": "La marca del fabricante es obligatoria",
+    "selectVehicle": "Selecciona un vehículo",
+    "mountQtyMin": "La cantidad a descontar debe ser al menos 1",
+    "insufficientStock": "No hay suficiente stock (disponible: {{available}})",
+    "teethRequired": "Los dientes son obligatorios para piñón/corona",
+    "rpmRequired": "Las RPM son obligatorias para motor"
+  },
+  "restockErrors": {
+    "quantityMin": "Indica cuántas unidades añades (mínimo 1)",
+    "supplierRequired": "Indica dónde lo has comprado (tienda o proveedor)",
+    "purchasePriceRequired": "Indica el precio de compra por unidad",
+    "purchasePriceInvalid": "Precio de compra no válido"
+  },
+  "toasts": {
+    "itemNotFound": "Ítem no encontrado.",
+    "itemUpdated": "Ítem actualizado",
+    "itemCreated": "Ítem creado",
+    "itemDeleted": "Ítem eliminado",
+    "mounted": "Pieza montada y stock actualizado",
+    "restockSuccess": "Stock actualizado y compra registrada",
+    "partUpdated": "Pieza actualizada en inventario y coches",
+    "noPartHistory": "Esta pieza aún no tiene líneas de stock ni historial de compras."
+  },
+  "deleteDialog": {
+    "title": "¿Eliminar ítem?",
+    "description": "Se eliminará «{{name}}». Esta acción no se puede deshacer.",
+    "descriptionFallback": "Esta acción no se puede deshacer."
+  },
+  "mountDialog": {
+    "title": "Montar en vehículo",
+    "description": "Se creará un componente a partir de «{{name}}». Se descontarán {{count}} {{unitWord}} del stock (quedarán {{left}}).",
+    "unitOne": "unidad",
+    "unitMany": "unidades",
+    "vehicle": "Vehículo",
+    "selectVehicle": "Seleccionar vehículo",
+    "selectPlaceholder": "Seleccionar…",
+    "registerAsModification": "Registrar como modificación",
+    "mountQtyLabel": "Unidades a descontar del inventario",
+    "mountQtyHint": "Por ejemplo 2 para un par de neumáticos o llantas, o 1 si solo cambias uno.",
+    "mounting": "Montando…",
+    "submit": "Montar y descontar"
+  },
+  "restockDialog": {
+    "title": "Reponer stock",
+    "description": "Añade unidades a «{{name}}». Se registrará dónde compraste y el precio para el historial.",
+    "qtyLabel": "Unidades que entran en stock",
+    "supplierLabel": "Dónde lo has comprado",
+    "supplierPlaceholder": "Tienda, web, proveedor…",
+    "unitPriceLabel": "Precio unitario de compra (€)",
+    "purchaseDateLabel": "Fecha de compra",
+    "notesLabel": "Notas (opcional)",
+    "notesPlaceholder": "Pedido, factura, observaciones…",
+    "saving": "Guardando…",
+    "submit": "Registrar compra y sumar stock"
+  },
+  "historyDialog": {
+    "title": "Historial de compras",
+    "description": "Reposiciones registradas para «{{name}}».",
+    "empty": "Aún no hay compras registradas con «Reponer». La compra inicial del ítem no aparece aquí salvo que la registres con una reposición.",
+    "where": "Dónde:",
+    "unitPrice": "Precio unitario:",
+    "purchaseDate": "Fecha compra:"
+  },
+  "itemDialog": {
+    "editTitle": "Editar ítem",
+    "newTitle": "Nuevo ítem",
+    "description": "Una fila por compra. La categoría define el tipo de pieza y qué campos técnicos aplica al montarla en un vehículo.",
+    "sectionProduct": "Producto",
+    "sectionStock": "Stock y compra",
+    "sectionTech": "Especificación técnica",
+    "sectionTechHint": "Opcional. Misma información que al dar de alta un componente en el coche: se propone al montar desde inventario o al enlazar el ítem al editar un vehículo.",
+    "sectionLocation": "Ubicación y notas",
+    "stockUnit": "Unidad de stock",
+    "namePlaceholder": "Ej: Corona 26d Anglewinder",
+    "referencePlaceholder": "SKU / ref. fabricante (opcional)",
+    "urlPlaceholder": "https://… (opcional)",
+    "qtyInStock": "Cantidad en stock",
+    "minStockAlert": "Alerta stock mínimo",
+    "optional": "Opcional",
+    "unitPriceHint": "Por unidad. Si montas varias en un coche, el coste de la modificación será este precio × unidades.",
+    "manufacturerPlaceholder": "Puedes dejarlo vacío y rellenarlo al montar",
+    "teethPlaceholder": "Ej. 26",
+    "rpmPlaceholder": "Ej. 20000",
+    "techDescPlaceholder": "Detalle del repuesto (no confundir con «Notas» de compra abajo)",
+    "mountedVehicle": "Vehículo donde está montado",
+    "none": "Ninguno",
+    "mountedVehicleHint": "Opcional. Indica si esta compra ya está puesta en un coche.",
+    "purchaseNotes": "Notas de compra / almacén",
+    "purchaseNotesPlaceholder": "Tienda, ubicación en cajón, recordatorios…",
+    "saving": "Guardando…"
+  },
+  "partDialog": {
+    "title": "Editar pieza",
+    "description": "Los cambios de nombre, marca, referencia y datos técnicos se aplican a las líneas de inventario y a las piezas montadas en los coches. No se modifican cantidades ni precios.",
+    "saving": "Guardando…"
+  },
+  "fields": {
+    "name": "Nombre",
+    "category": "Categoría",
+    "reference": "Referencia",
+    "url": "Enlace",
+    "quantity": "Cantidad en stock",
+    "minStock": "Alerta stock mínimo",
+    "unitPrice": "Precio unitario de compra (€)",
+    "purchaseDate": "Fecha de compra",
+    "manufacturer": "Marca (fabricante)",
+    "brand": "Marca",
+    "material": "Material",
+    "size": "Tamaño",
+    "color": "Color",
+    "teeth": "Dientes",
+    "rpm": "RPM",
+    "gaus": "Gaus",
+    "description": "Descripción",
+    "techDescription": "Descripción técnica"
+  }
+}

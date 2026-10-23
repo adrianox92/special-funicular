@@ -12,6 +12,8 @@ const {
   catalogSlugify,
 } = require('../../../frontend/api/_lib/catalogSeoHtml');
 const { sitemapBackendPath } = require('../../../frontend/api/_lib/backendUrls');
+const catalogSsrHandler = require('../../../frontend/api/catalog-ssr');
+const { rewritePublicCatalogMediaUrls } = require('../../../frontend/src/utils/cachedStorageImageUrl');
 
 describe('parsePublicCatalogPath', () => {
   test('ficha ES / EN / DE', () => {
@@ -228,6 +230,111 @@ describe('catalogSeoHtml', () => {
     expect(none).not.toContain('Vehículos similares');
     expect(one).not.toContain('Vehículos similares');
     expect(one).not.toContain('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+  });
+});
+
+describe('catalog-ssr bot gate', () => {
+  function mockRes() {
+    return {
+      statusCode: 200,
+      headers: {},
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      setHeader(key, value) {
+        this.headers[String(key).toLowerCase()] = value;
+        return this;
+      },
+      send(body) {
+        this.body = body;
+        return this;
+      },
+    };
+  }
+
+  test('GPTBot recibe 403 y no el HTML del catálogo', async () => {
+    const res = mockRes();
+    await catalogSsrHandler(
+      {
+        method: 'GET',
+        url: '/catalogo',
+        headers: { 'user-agent': 'GPTBot' },
+        query: {},
+      },
+      res,
+    );
+    expect(res.statusCode).toBe(403);
+    expect(String(res.body)).toContain('Catálogo no disponible para clientes automatizados');
+    expect(res.headers['x-robots-tag']).toMatch(/noindex/);
+  });
+
+  test('WhatsApp no es rechazado en la puerta (vista previa al compartir)', async () => {
+    const res = mockRes();
+    await catalogSsrHandler(
+      {
+        method: 'GET',
+        url: '/catalogo',
+        headers: {
+          host: '127.0.0.1:9',
+          'x-forwarded-proto': 'http',
+          'user-agent': 'WhatsApp/2.23.20.0',
+        },
+        query: {},
+      },
+      res,
+    );
+    expect(res.statusCode).not.toBe(403);
+  });
+
+  test('Chrome no es rechazado en la puerta (sigue al SSR)', async () => {
+    const res = mockRes();
+    await catalogSsrHandler(
+      {
+        method: 'GET',
+        url: '/catalogo',
+        headers: {
+          host: '127.0.0.1:9',
+          'x-forwarded-proto': 'http',
+          'user-agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        },
+        query: {},
+      },
+      res,
+    );
+    expect(res.statusCode).not.toBe(403);
+  });
+});
+
+describe('catalog-ssr bootstrap no filtra URLs de Storage', () => {
+  test('ficha y listado reescriben image_url / logos con origin', () => {
+    const origin = 'https://www.slotdatabase.es';
+    const storage =
+      'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/catalog/1710000000-ab12cd.webp';
+    const logo =
+      'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/brands/scx.webp';
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const itemBoot = JSON.stringify({
+      kind: 'item',
+      item: rewritePublicCatalogMediaUrls(
+        { id, image_url: storage, manufacturer_logo_url: logo },
+        { origin },
+      ),
+    });
+    expect(itemBoot).toContain(`${origin}/api/img/catalog-images/catalog/1710000000-ab12cd.webp`);
+    expect(itemBoot).not.toContain('abcdxyz.supabase.co');
+
+    const listBoot = JSON.stringify({
+      kind: 'list',
+      items: rewritePublicCatalogMediaUrls(
+        [{ id, image_url: storage, manufacturer_logo_url: logo }],
+        { origin },
+      ),
+    });
+    expect(listBoot).toContain('/api/img/catalog-images/brands/scx.webp');
+    expect(listBoot).not.toContain('storage/v1/object/public');
   });
 });
 

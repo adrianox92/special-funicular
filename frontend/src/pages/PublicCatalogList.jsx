@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
 import PublicCatalogShell from '../components/PublicCatalogShell';
 import CatalogThirdPartyNotice from '../components/CatalogThirdPartyNotice';
@@ -30,9 +30,9 @@ import {
   VEHICLE_TYPE_SLUG_TO_LABEL,
   TRACTION_SLUG_TO_LABEL,
   vehicleTypeToSlug,
-  tractionToSlug,
   vehicleTypeSlugToLabel,
   tractionSlugToLabel,
+  buildTractionFilterOptions,
 } from '../utils/catalogFilterSlugs';
 import { labelMotorPosition } from '../data/motorPosition';
 import { Package, Search, X } from 'lucide-react';
@@ -183,8 +183,10 @@ function PublicCatalogList() {
   useEffect(() => {
     const mfgBrand = brands.find((b) => b.slug === pathFilters.manufacturerSlug);
     const mfgName  = mfgBrand?.name ?? pathFilters.manufacturerSlug ?? null;
-    const vtLabel  = pathFilters.vehicleTypeSlug ? (VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug) : null;
-    const trLabel  = pathFilters.tractionSlug    ? (TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug]        ?? pathFilters.tractionSlug)    : null;
+    const vtStored = pathFilters.vehicleTypeSlug ? (VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug) : null;
+    const trStored = pathFilters.tractionSlug    ? (TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug]        ?? pathFilters.tractionSlug)    : null;
+    const vtLabel  = vtStored ? t(`values.vehicleTypes.${vtStored}`, { defaultValue: vtStored }) : null;
+    const trLabel  = trStored ? t(`values.traction.${trStored}`, { defaultValue: trStored }) : null;
 
     applyPublicCatalogListSeo({
       manufacturerName: mfgName,
@@ -196,7 +198,7 @@ function PublicCatalogList() {
       canonicalPath:    localizePath(locale, buildCatalogPath(pathFilters)),
     });
     return clearCatalogItemPageSeo;
-  }, [pathFilters, brands, total, locale]);
+  }, [pathFilters, brands, total, locale, t]);
 
   // ---- Helpers para cambiar filtros del PATH ----
   const setPathFilter = useCallback((key, value) => {
@@ -263,32 +265,28 @@ function PublicCatalogList() {
   const vehicleTypeOptions = useMemo(() => {
     const fromFacets = (facets.vehicle_types || []).map((v) => {
       const n = typeof v === 'string' ? v : v.name;
-      return { slug: vehicleTypeToSlug(n), label: VEHICLE_TYPE_SLUG_TO_LABEL[vehicleTypeToSlug(n)] ?? n };
+      const stored = VEHICLE_TYPE_SLUG_TO_LABEL[vehicleTypeToSlug(n)] ?? n;
+      return { slug: vehicleTypeToSlug(n), label: t(`values.vehicleTypes.${stored}`, { defaultValue: stored }) };
     });
     // Incluir el activo aunque no esté en facetas
     if (pathFilters.vehicleTypeSlug && !fromFacets.find((o) => o.slug === pathFilters.vehicleTypeSlug)) {
-      fromFacets.push({ slug: pathFilters.vehicleTypeSlug, label: VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug });
+      const stored = VEHICLE_TYPE_SLUG_TO_LABEL[pathFilters.vehicleTypeSlug] ?? pathFilters.vehicleTypeSlug;
+      fromFacets.push({ slug: pathFilters.vehicleTypeSlug, label: t(`values.vehicleTypes.${stored}`, { defaultValue: stored }) });
     }
     return fromFacets;
-  }, [facets.vehicle_types, pathFilters.vehicleTypeSlug]);
+  }, [facets.vehicle_types, pathFilters.vehicleTypeSlug, t]);
 
-  const tractionOptions = useMemo(() => {
-    const fromFacets = (facets.tractions || []).map((t) => {
-      const n = typeof t === 'string' ? t : t.name;
-      return { slug: tractionToSlug(n), label: TRACTION_SLUG_TO_LABEL[tractionToSlug(n)] ?? n };
-    });
-    if (pathFilters.tractionSlug && !fromFacets.find((o) => o.slug === pathFilters.tractionSlug)) {
-      fromFacets.push({ slug: pathFilters.tractionSlug, label: TRACTION_SLUG_TO_LABEL[pathFilters.tractionSlug] ?? pathFilters.tractionSlug });
-    }
-    return fromFacets;
-  }, [facets.tractions, pathFilters.tractionSlug]);
+  const tractionOptions = useMemo(
+    () => buildTractionFilterOptions(facets.tractions, pathFilters.tractionSlug, t),
+    [facets.tractions, pathFilters.tractionSlug, t],
+  );
 
   const motorPositionOptions = useMemo(() => {
     return (facets.motor_positions || []).map((row) => {
       const value = typeof row === 'string' ? row : row.name;
-      return { value, label: labelMotorPosition(value) };
+      return { value, label: labelMotorPosition(value, t) };
     });
-  }, [facets.motor_positions]);
+  }, [facets.motor_positions, t]);
 
   const hasActiveFilters = Boolean(
     pathFilters.manufacturerSlug || pathFilters.vehicleTypeSlug ||

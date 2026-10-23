@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import LegalDocumentLayout from '../components/LegalDocumentLayout';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,6 +11,7 @@ import api from '../lib/axios';
 import { toast } from 'sonner';
 
 const Contact = () => {
+  const { t } = useTranslation('legal');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -26,7 +28,7 @@ const Contact = () => {
         message: message.trim(),
         website: honeypot,
       });
-      toast.success('Mensaje enviado. Te responderemos cuando podamos.');
+      toast.success(t('contact.success'));
       setName('');
       setEmail('');
       setMessage('');
@@ -37,8 +39,8 @@ const Contact = () => {
         data?.error ||
         data?.errors?.[0]?.msg ||
         (err.message === 'Network Error'
-          ? 'No hay conexión con el servidor. Comprueba tu red o inténtalo más tarde.'
-          : 'No se pudo enviar el mensaje.');
+          ? t('contact.networkError')
+          : t('contact.sendError'));
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -46,26 +48,26 @@ const Contact = () => {
   };
 
   return (
-    <LegalDocumentLayout title="Contacto">
+    <LegalDocumentLayout title={t('contactTitle')}>
       <p className="text-sm text-muted-foreground leading-relaxed">
-        ¿Dudas sobre la aplicación, privacidad o los términos? Envía un mensaje; intentaremos responderte por correo.
+        {t('contact.intro')}
       </p>
 
       <p className="text-sm text-muted-foreground leading-relaxed">
-        También puedes revisar la{' '}
+        {t('contact.alsoReview')}{' '}
         <Link to="/privacidad" className="text-foreground underline underline-offset-4">
-          política de privacidad
+          {t('contact.privacyLink')}
         </Link>{' '}
-        y los{' '}
+        {t('contact.andThe')}{' '}
         <Link to="/terminos" className="text-foreground underline underline-offset-4">
-          términos de servicio
+          {t('contact.termsLink')}
         </Link>
         .
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-6 max-w-lg">
         <div className="hidden" aria-hidden="true">
-          <label htmlFor="contact-website">No rellenar</label>
+          <label htmlFor="contact-website">{t('contact.honeypot')}</label>
           <input
             id="contact-website"
             name="website"
@@ -78,7 +80,7 @@ const Contact = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="contact-name">Nombre</Label>
+          <Label htmlFor="contact-name">{t('contact.name')}</Label>
           <Input
             id="contact-name"
             name="name"
@@ -93,7 +95,7 @@ const Contact = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="contact-email">Correo electrónico</Label>
+          <Label htmlFor="contact-email">{t('contact.email')}</Label>
           <Input
             id="contact-email"
             name="email"
@@ -108,7 +110,7 @@ const Contact = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="contact-message">Mensaje</Label>
+          <Label htmlFor="contact-message">{t('contact.message')}</Label>
           <Textarea
             id="contact-message"
             name="message"
@@ -119,19 +121,19 @@ const Contact = () => {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             disabled={submitting}
-            placeholder="Escribe tu consulta (mínimo 10 caracteres)."
+            placeholder={t('contact.placeholder')}
           />
           <p className="text-xs text-muted-foreground">{message.length} / 10000</p>
         </div>
 
         <Button type="submit" disabled={submitting}>
-          {submitting ? 'Enviando…' : 'Enviar mensaje'}
+          {submitting ? t('contact.sending') : t('contact.submit')}
         </Button>
       </form>
 
       <Alert className="max-w-lg border-muted">
         <AlertDescription className="text-xs text-muted-foreground">
-          Los datos que envíes se usarán solo para atender tu consulta, conforme a nuestra política de privacidad.
+          {t('contact.privacyNote')}
         </AlertDescription>
       </Alert>
     </LegalDocumentLayout>

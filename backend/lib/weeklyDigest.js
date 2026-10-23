@@ -4,6 +4,7 @@ const { evaluateGoalProgress } = require('./trainingGoals');
 const { bestLapSecondsFromTimingRow } = require('./personalBest');
 const { formatSecondsToLapTime } = require('./timingUtils');
 const { resolveStaleDaysThreshold } = require('./userPreferences');
+const { getEmailCopy } = require('./emailCopy');
 
 function isoWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -110,7 +111,7 @@ async function buildWeeklyDigestForUser(admin, userId) {
     if (prevBest != null && sec < prevBest - 0.001) {
       const v = vehicleMap[s.vehicle_id];
       pbs.push({
-        vehicle: v ? `${v.manufacturer} ${v.model}`.trim() : 'Vehículo',
+        vehicle: v ? `${v.manufacturer} ${v.model}`.trim() : getEmailCopy().digest.vehicleFallback,
         circuit: s.circuit,
         lane: s.lane,
         time: formatSecondsToLapTime(sec),

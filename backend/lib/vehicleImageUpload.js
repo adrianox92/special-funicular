@@ -1,5 +1,6 @@
 const { removeObjectByPublicUrl } = require('./vehicleImageStorage');
 const { processVehicleImageBuffer } = require('./processVehicleImageBuffer');
+const { STORAGE_UPLOAD_CACHE } = require('./storageCacheControl');
 
 const VEHICLE_IMAGES_BUCKET = 'vehicle-images';
 
@@ -67,6 +68,7 @@ async function saveVehicleImagesFromMultipart(supabase, vehicleId, files, option
     const { error: storageError } = await supabase.storage.from(VEHICLE_IMAGES_BUCKET).upload(filePath, processed.buffer, {
       contentType: processed.contentType,
       upsert: !!replacePerView,
+      ...STORAGE_UPLOAD_CACHE,
     });
     if (storageError) throw new Error(storageError.message);
 
@@ -95,6 +97,7 @@ async function saveVehicleViewProcessed(supabase, vehicleId, viewType, processed
   const { error: storageError } = await supabase.storage.from(VEHICLE_IMAGES_BUCKET).upload(filePath, processed.buffer, {
     contentType: processed.contentType,
     upsert: false,
+    ...STORAGE_UPLOAD_CACHE,
   });
   if (storageError) throw new Error(storageError.message);
 

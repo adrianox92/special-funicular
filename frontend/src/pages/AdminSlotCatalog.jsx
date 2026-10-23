@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Link, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/axios';
 import { supabase } from '../lib/supabase';
@@ -64,9 +65,21 @@ import { Switch } from '../components/ui/switch';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogListingImage from '../components/CatalogListingImage';
+import CatalogTechSpecsFields from '../components/CatalogTechSpecsFields';
+import CatalogAliasesFields from '../components/CatalogAliasesFields';
+import {
+  appendTechSpecsToFormData,
+  emptyTechSpecForm,
+  techSpecFormFromRow,
+  validateTechSpecForm,
+} from '../data/catalogTechSpecs';
+import { aliasesFormFromItem, aliasesPayloadFromForm } from '../data/catalogAliases';
 
 const emptyItem = {
   reference: '',
+  ean: '',
+  aliases: [],
   manufacturer_id: '',
   model_name: '',
   vehicle_type: '',
@@ -80,6 +93,7 @@ const emptyItem = {
   real_race_photos_url: '',
   discontinued: false,
   upcoming_release: false,
+  ...emptyTechSpecForm(),
 };
 
 /** Parámetro `missing` en GET /catalog/items (huecos alineados con el dashboard). */
@@ -238,6 +252,7 @@ function formatCatalogDiffValue(field, value) {
 
 function AdminSlotCatalog() {
   const { user } = useAuth();
+  const { t } = useTranslation('catalog');
   const isAdmin = isLicenseAdminUser(user);
 
   const [tab, setTab] = useState('dashboard');
@@ -269,6 +284,7 @@ function AdminSlotCatalog() {
   const [newImageObjectUrl, setNewImageObjectUrl] = useState(null);
   const [formSaving, setFormSaving] = useState(false);
   const [imageDeleting, setImageDeleting] = useState(false);
+  const [formTab, setFormTab] = useState('general');
 
   useEffect(() => {
     if (!imageFile) {
@@ -690,6 +706,7 @@ function AdminSlotCatalog() {
     setExistingImageUrl(null);
     setClearImage(false);
     setNewImageObjectUrl(null);
+    setFormTab('general');
     setEditOpen(true);
   };
 
@@ -698,6 +715,8 @@ function AdminSlotCatalog() {
     setEditingId(row.id);
     setForm({
       reference: row.reference ?? '',
+      ean: row.ean ?? '',
+      aliases: aliasesFormFromItem(row),
       manufacturer_id: row.manufacturer_id ?? '',
       model_name: row.model_name ?? '',
       vehicle_type: row.vehicle_type ?? '',
@@ -717,12 +736,14 @@ function AdminSlotCatalog() {
       real_race_photos_url: row.real_race_photos_url != null ? String(row.real_race_photos_url) : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
+      ...techSpecFormFromRow(row),
     });
     setImageFile(null);
     const url = row.image_url != null && String(row.image_url).trim() ? String(row.image_url) : null;
     setExistingImageUrl(url);
     setClearImage(false);
     setNewImageObjectUrl(null);
+    setFormTab('general');
     setEditOpen(true);
   };
 
@@ -731,6 +752,8 @@ function AdminSlotCatalog() {
     setEditingId(null);
     setForm({
       reference: '',
+      ean: '',
+      aliases: [],
       manufacturer_id: row.manufacturer_id ?? '',
       model_name: row.model_name ?? '',
       vehicle_type: row.vehicle_type ?? '',
@@ -750,11 +773,13 @@ function AdminSlotCatalog() {
       real_race_photos_url: row.real_race_photos_url != null ? String(row.real_race_photos_url) : '',
       discontinued: Boolean(row.discontinued),
       upcoming_release: Boolean(row.upcoming_release),
+      ...techSpecFormFromRow(row),
     });
     setImageFile(null);
     setExistingImageUrl(null);
     setClearImage(false);
     setNewImageObjectUrl(null);
+    setFormTab('general');
     setEditOpen(true);
   };
 
@@ -763,10 +788,18 @@ function AdminSlotCatalog() {
       alert('Selecciona una marca registrada');
       return;
     }
+    const invalidSpec = validateTechSpecForm(form);
+    if (invalidSpec) {
+      setFormTab('tech');
+      alert(t('techSpecs.invalidNumber', { field: t(`techSpecs.fields.${invalidSpec}`) }));
+      return;
+    }
     setFormSaving(true);
     try {
       const fd = new FormData();
       fd.append('reference', form.reference);
+      fd.append('ean', form.ean ?? '');
+      fd.append('aliases', JSON.stringify(aliasesPayloadFromForm(form.aliases)));
       fd.append('manufacturer_id', form.manufacturer_id);
       fd.append('model_name', form.model_name);
       if (form.vehicle_type) fd.append('vehicle_type', form.vehicle_type);
@@ -785,6 +818,7 @@ function AdminSlotCatalog() {
       fd.append('upcoming_release', form.upcoming_release ? 'true' : 'false');
       fd.append('real_race_results_url', form.real_race_results_url?.trim() ?? '');
       fd.append('real_race_photos_url', form.real_race_photos_url?.trim() ?? '');
+      appendTechSpecsToFormData(fd, form);
       if (imageFile) fd.append('image', imageFile);
       if (editMode === 'edit' && clearImage && !imageFile) fd.append('clear_image', 'true');
 
@@ -1168,10 +1202,11 @@ function AdminSlotCatalog() {
                       <TableRow key={row.id}>
                         <TableCell>
                           {row.image_url ? (
-                            <img
-                              src={row.image_url}
+                            <CatalogListingImage
+                              imageUrl={row.image_url}
                               alt=""
                               className="h-12 w-auto max-w-[5rem] rounded border object-contain bg-muted/30"
+                              sizes="80px"
                             />
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
@@ -2019,10 +2054,37 @@ function AdminSlotCatalog() {
                   : 'Editar ítem'}
             </DialogTitle>
           </DialogHeader>
+          <Tabs value={formTab} onValueChange={setFormTab}>
+            <ResponsiveTabsNav
+              value={formTab}
+              onValueChange={setFormTab}
+              options={[
+                { value: 'general', label: t('techSpecs.tabGeneral') },
+                { value: 'aliases', label: t('aliases.tab') },
+                { value: 'tech', label: t('techSpecs.tab') },
+              ]}
+              listClassName="sm:grid-cols-3"
+              listAriaLabel={t('techSpecs.tabNavAria')}
+              selectId="catalog-item-form-tab"
+              mobileLabel={t('techSpecs.tabNavAria')}
+            />
+            <TabsContent value="general" className="mt-2 focus-visible:outline-none">
           <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Referencia</Label>
               <Input name="reference" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="catalog-item-ean">{t('aliases.canonicalEan')}</Label>
+              <Input
+                id="catalog-item-ean"
+                name="ean"
+                className="font-mono"
+                inputMode="numeric"
+                value={form.ean}
+                onChange={(e) => setForm((f) => ({ ...f, ean: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">{t('aliases.canonicalEanHelp')}</p>
             </div>
             <CatalogBrandSelect
               label="Marca"
@@ -2216,6 +2278,23 @@ function AdminSlotCatalog() {
               )}
             </div>
           </div>
+            </TabsContent>
+            <TabsContent value="aliases" className="mt-2 focus-visible:outline-none">
+              <CatalogAliasesFields
+                aliases={form.aliases}
+                setAliases={(next) => {
+                  if (typeof next === 'function') {
+                    setForm((f) => ({ ...f, aliases: next(f.aliases || []) }));
+                  } else {
+                    setForm((f) => ({ ...f, aliases: next }));
+                  }
+                }}
+              />
+            </TabsContent>
+            <TabsContent value="tech" className="mt-2 focus-visible:outline-none">
+              <CatalogTechSpecsFields form={form} setForm={setForm} />
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
             <Button onClick={saveItem} disabled={formSaving}>

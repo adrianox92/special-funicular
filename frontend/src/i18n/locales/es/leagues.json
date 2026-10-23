@@ -218,5 +218,28 @@
     "empty": "No hay participantes inscritos en la liga.",
     "emptyHint": "La general también puede salir de resultados de las pruebas. Un inscrito de liga se puede marcar DNS, DSQ o Ajustado.",
     "emptyImportHint": "Si tus pruebas ya tienen pilotos, usa «Importar desde competiciones»."
+  },
+  "publicSignup": {
+    "notFound": "Liga no encontrada",
+    "signupError": "Error al inscribirse",
+    "backHome": "Volver al inicio",
+    "slots": "{{count}}/{{max}} plazas",
+    "participants_one": "{{count}} participante",
+    "participants_other": "{{count}} participantes",
+    "waitlistCount": "Lista espera: {{count}}",
+    "closed": "Esta liga está cerrada y no acepta nuevas inscripciones.",
+    "name": "Nombre del piloto *",
+    "email": "Email",
+    "vehicle": "Vehículo",
+    "vehiclePlaceholder": "Ej: Porsche 911",
+    "joinWaitlist": "Unirme a la lista de espera",
+    "joinLeague": "Inscribirse en la liga",
+    "confirmed": "¡Inscripción confirmada!",
+    "waitlisted": "Estás en lista de espera",
+    "waitlistedBody": "Te has apuntado a la lista de espera de {{name}} en posición {{position}}.",
+    "confirmedBody": "Te has inscrito en {{name}}. Podrás apuntarte a cada prueba cuando se abran sus inscripciones.",
+    "viewSeason": "Ver mi temporada",
+    "viewStandings": "Ver clasificación",
+    "close": "Cerrar"
   }
 }

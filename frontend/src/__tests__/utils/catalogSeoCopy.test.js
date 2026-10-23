@@ -160,6 +160,25 @@ describe('catalogSeoCopy locale', () => {
     expect(deCatalog.seo.similarTitle).toBe('Ähnliche Fahrzeuge');
   });
 
+  test('EN/DE traducen tipo, tracción y posición de motor almacenados en español', () => {
+    const itemEsValues = {
+      ...item,
+      vehicle_type: 'Clásico',
+      traction: 'Trasera',
+      motor_position: 'inline',
+    };
+    const en = buildCatalogItemMetaDescription(itemEsValues, 'en');
+    expect(en).toMatch(/Classic/i);
+    expect(en).toMatch(/Rear/i);
+    expect(en).not.toMatch(/Clásico/);
+    expect(en).not.toMatch(/Trasera/);
+    const de = buildCatalogItemMetaDescription(itemEsValues, 'de');
+    expect(de).toMatch(/Klassiker/i);
+    expect(de).toMatch(/Hinterrad/i);
+    expect(de).not.toMatch(/Clásico/);
+    expect(de).not.toMatch(/Trasera/);
+  });
+
   test('listado filtrado localiza el recuento', () => {
     const en = buildPublicCatalogListMeta({ manufacturerName: 'Ninco', total: 2 }, 'en');
     expect(en.description).toMatch(/2 models/);

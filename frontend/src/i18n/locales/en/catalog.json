@@ -15,7 +15,7 @@
   "list": {
     "heading": "Reference catalog",
     "lead": "Catalogued slot cars: reference, brand, type and commercial year.",
-    "searchPlaceholder": "Search by reference, model or brand…",
+    "searchPlaceholder": "Search by reference, alias, EAN, model or brand…",
     "clearSearch": "Clear search",
     "brand": "Brand",
     "allBrands": "All brands",
@@ -66,6 +66,10 @@
     "noImage": "No catalog image",
     "specsTitle": "Technical details",
     "fieldReference": "Reference",
+    "fieldEan": "EAN",
+    "aliasesTitle": "Alternative references",
+    "aliasMarket": "Market",
+    "aliasEan": "EAN",
     "fieldBrand": "Brand",
     "fieldName": "Name / model",
     "fieldType": "Type",
@@ -115,7 +119,77 @@
     "addToGarage": "Add to my garage",
     "addToGarageHint": "Opens the add-vehicle form with this reference filled in.",
     "similarTitle": "Similar vehicles",
-    "similarAria": "Similar vehicles carousel"
+    "similarAria": "Similar vehicles carousel",
+    "legacyValue": "{{value}} (previous value)"
+  },
+  "aliases": {
+    "tab": "Alternative references",
+    "canonicalEan": "EAN (canonical reference)",
+    "canonicalEanHelp": "Barcode for the main reference. Each alias can have its own.",
+    "help": "Other references for the same model (market, short form, shop prefix or typo). Each one can have its own EAN.",
+    "empty": "No alternative references.",
+    "add": "Add alias",
+    "remove": "Remove",
+    "reference": "Alternative reference",
+    "type": "Type",
+    "market": "Market",
+    "brandLabel": "Brand in that market",
+    "ean": "EAN",
+    "source": "Source",
+    "sourceUrl": "Source URL",
+    "types": {
+      "market": "Market (S/X)",
+      "short": "Short form",
+      "shop_prefix": "Shop prefix",
+      "legacy_typo": "Typo / legacy"
+    }
+  },
+  "techSpecs": {
+    "title": "Technical information",
+    "tab": "Technical specs",
+    "tabGeneral": "General",
+    "tabNavAria": "Form section",
+    "formHelp": "Dimensions in millimetres and weight in grams. Leave blank if unknown. Drivetrain and motor mount are edited on the General tab.",
+    "yes": "Yes",
+    "no": "No",
+    "unspecified": "— Unspecified —",
+    "invalidNumber": "{{field}} must be a number greater than or equal to 0.",
+    "fields": {
+      "scale": "Scale",
+      "body": "Body",
+      "color": "Color",
+      "system": "System",
+      "lengthMm": "Length (mm)",
+      "heightMm": "Height (mm)",
+      "wheelbaseMm": "Wheelbase (mm)",
+      "frontTrackMm": "Front track (mm)",
+      "rearTrackMm": "Rear track (mm)",
+      "frontAxleLengthMm": "Front axle (mm)",
+      "rearAxleLengthMm": "Rear axle (mm)",
+      "weightG": "Weight (g)",
+      "magnet": "Magnet",
+      "motor": "Motor",
+      "motorMount": "Motor mount",
+      "drivetrain": "Drivetrain",
+      "pinionGear": "Pinion / gear",
+      "frontWheels": "Front wheels",
+      "rearWheels": "Rear wheels",
+      "frontRim": "Front rim",
+      "rearRim": "Rear rim",
+      "frontRimDiameterMm": "Front rim diameter (mm)",
+      "rearRimDiameterMm": "Rear rim diameter (mm)",
+      "frontLights": "Front lights",
+      "rearLights": "Rear lights"
+    },
+    "systemValues": {
+      "analog": "Analog",
+      "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Plastic",
+      "aluminum": "Aluminium",
+      "magnesium": "Magnesium"
+    }
   },
   "guest": {
     "addTitle": "Add this reference to your garage",
@@ -176,6 +250,35 @@
       "inline": "inline",
       "angular": "anglewinder",
       "transverse": "sidewinder"
+    }
+  },
+  "values": {
+    "vehicleTypes": {
+      "Rally": "Rally",
+      "GT": "GT",
+      "LMP": "LMP",
+      "Hypercar": "Hypercar",
+      "Grupo 5": "Group 5",
+      "Road Car": "Road car",
+      "Turismo": "Touring",
+      "Clásico": "Classic",
+      "DTM": "DTM",
+      "F1": "F1",
+      "Camiones": "Trucks",
+      "Raid": "Raid"
+    },
+    "traction": {
+      "4x4": "4x4",
+      "Trasera": "Rear",
+      "Delantera": "Front"
+    },
+    "motorPosition": {
+      "inline": "Inline",
+      "angular": "Anglewinder",
+      "transverse": "Sidewinder",
+      "En línea": "Inline",
+      "Angular": "Anglewinder",
+      "Transversal": "Sidewinder"
     }
   }
 }

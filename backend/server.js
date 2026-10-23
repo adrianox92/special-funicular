@@ -209,11 +209,13 @@ const pilotProfileRoute = require('./routes/pilotProfile');
 const contactRoute = require('./routes/contact');
 const publicCatalogRoute = require('./routes/publicCatalog');
 const publicVehicleRoute = require('./routes/publicVehicle');
+const catalogBotGate = require('./middleware/catalogBotGate');
 const debugRoute = require('./routes/debug');
 app.use('/api/debug', debugRoute);
 app.use('/api/public-signup', publicSignupLimiter, publicCompetitionsRoute);
 app.use('/api/public/pilot', publicSignupLimiter, publicPilotRoute);
-app.use('/api/public/catalog', publicCatalogReadLimiter, publicCatalogRoute);
+// Catálogo público: bloqueo de bots (excepto Google Search). /api/catalog (JWT) no se toca.
+app.use('/api/public/catalog', catalogBotGate, publicCatalogReadLimiter, publicCatalogRoute);
 app.use('/api/public/vehicles', publicCatalogReadLimiter, publicVehicleRoute);
 app.use('/api/public/contact', contactLimiter, contactRoute);
 const publicClubCalendarRoute = require('./routes/publicClubCalendar');

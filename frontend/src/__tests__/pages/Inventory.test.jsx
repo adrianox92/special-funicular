@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Inventory from '../../pages/Inventory';
 import api from '../../lib/axios';
+import i18n from '../../i18n';
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
@@ -53,10 +54,12 @@ function itemsCalls() {
 }
 
 describe('Inventory — filtros en query y paginación de servidor', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     window.localStorage.clear();
     mockApiGets();
+    await i18n.loadNamespaces(['inventory']);
+    await i18n.changeLanguage('es');
   });
 
   test('pide una página normal, nunca limit=10000, y envía filtros en la query', async () => {

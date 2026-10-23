@@ -212,4 +212,108 @@ describe('AdminSlotCatalog — eliminar imagen de ítem', () => {
     const [, fd] = api.put.mock.calls[0];
     expect(fd.get('commercial_release_year')).toBe('');
   });
+
+  it('pestaña de specs técnicas carga valores y los envía al guardar', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/catalog/stats') {
+        return Promise.resolve({
+          data: {
+            totalItems: 1,
+            weightedCompletenessPercent: 80,
+            fullyCompletePercent: 0,
+            fullyCompleteCount: 0,
+            weights: { image_url: 0.3, model_name: 0.14 },
+            missing: {},
+          },
+        });
+      }
+      if (url === '/catalog/items') {
+        return Promise.resolve({
+          data: {
+            items: [{
+              ...ITEM,
+              spec_scale: '1:32',
+              spec_color: 'Black',
+              spec_system: 'analog',
+              spec_front_lights: true,
+              spec_rear_lights: false,
+              spec_magnet: true,
+              spec_length_mm: 145,
+              spec_front_axle_length_mm: 52,
+              spec_front_rim_diameter_mm: 15.8,
+            }],
+            totalPages: 1,
+            page: 1,
+          },
+        });
+      }
+      if (url === '/catalog/change-requests' || url === '/catalog/insert-requests') {
+        return Promise.resolve({ data: { requests: [] } });
+      }
+      if (url === '/catalog/brands') {
+        return Promise.resolve({ data: { brands: [] } });
+      }
+      return Promise.reject(new Error(`unexpected url: ${url}`));
+    });
+
+    await openItemsAndEdit();
+
+    const techTabs = screen.getAllByRole('tab', { name: 'techSpecs.tab' });
+    await userEvent.click(techTabs[0]);
+
+    const scaleInput = await screen.findByLabelText('techSpecs.fields.scale');
+    expect(scaleInput).toHaveValue('1:32');
+    expect(screen.getByLabelText('techSpecs.fields.color')).toHaveValue('Black');
+    expect(screen.getByLabelText('techSpecs.fields.system')).toHaveTextContent(
+      'techSpecs.systemValues.analog',
+    );
+    expect(screen.getByLabelText('techSpecs.fields.frontAxleLengthMm')).toHaveValue(52);
+    expect(screen.getByLabelText('techSpecs.fields.frontRimDiameterMm')).toHaveValue(15.8);
+    expect(screen.getByLabelText('techSpecs.fields.frontLights')).toBeChecked();
+    expect(screen.getByLabelText('techSpecs.fields.rearLights')).not.toBeChecked();
+    await userEvent.clear(scaleInput);
+    await userEvent.type(scaleInput, '1:24');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalled();
+    });
+    const [, fd] = api.put.mock.calls[0];
+    expect(fd.get('spec_scale')).toBe('1:24');
+    expect(fd.get('spec_color')).toBe('Black');
+    expect(fd.get('spec_system')).toBe('analog');
+    expect(fd.get('spec_front_lights')).toBe('true');
+    expect(fd.get('spec_rear_lights')).toBe('false');
+    expect(fd.get('spec_magnet')).toBe('true');
+    expect(fd.get('spec_length_mm')).toBe('145');
+    expect(fd.get('spec_front_axle_length_mm')).toBe('52');
+    expect(fd.get('spec_front_rim_diameter_mm')).toBe('15.8');
+  });
+
+  it('envía EAN canónico y aliases al guardar', async () => {
+    await openItemsAndEdit();
+
+    await userEvent.type(screen.getByLabelText('aliases.canonicalEan'), '8436572913332');
+    const aliasTabs = screen.getAllByRole('tab', { name: 'aliases.tab' });
+    await userEvent.click(aliasTabs[0]);
+    await userEvent.click(screen.getByRole('button', { name: 'aliases.add' }));
+    await userEvent.type(screen.getByLabelText('aliases.reference'), 'A10068X300');
+    await userEvent.type(screen.getByLabelText('aliases.ean'), '8436572913349');
+    await userEvent.type(screen.getByLabelText('aliases.market'), 'INT');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalled();
+    });
+    const [, fd] = api.put.mock.calls[0];
+    expect(fd.get('ean')).toBe('8436572913332');
+    expect(JSON.parse(fd.get('aliases'))).toEqual([
+      expect.objectContaining({
+        alias_reference: 'A10068X300',
+        alias_type: 'market',
+        ean: '8436572913349',
+        market: 'INT',
+      }),
+    ]);
+  });
 });

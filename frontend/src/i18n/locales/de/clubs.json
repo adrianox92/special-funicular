@@ -207,5 +207,22 @@
     "copyNow": "Key jetzt kopieren. Er wird nicht erneut angezeigt.",
     "loadError": "Club-API-Key konnte nicht geladen werden",
     "rotateError": "Club-API-Key konnte nicht rotiert werden"
+  },
+  "publicProfile": {
+    "loading": "Club wird geladen…",
+    "notFound": "Club nicht gefunden",
+    "backHome": "Zurück zur Startseite",
+    "website": "Website",
+    "noDescription": "Dieser Club hat noch keine öffentliche Beschreibung.",
+    "join": "Dem Club beitreten",
+    "circuitsTitle": "Strecken und Rankings",
+    "boardTitle": "Öffentliches Brett",
+    "document": "Dokument",
+    "publishedOn": "Veröffentlicht am {{date}}",
+    "upcomingEvents": "Kommende Termine",
+    "noUpcoming": "Es gibt keine kommenden öffentlichen Termine.",
+    "joinTitle": "{{name}} beitreten",
+    "joinBody": "Für die Mitgliedschaft brauchst du einen Einladungslink eines Admins oder eine E-Mail-Einladung. Wenn du ein Mitglied kennst, bitte es um Zugang.",
+    "close": "Schließen"
   }
 }

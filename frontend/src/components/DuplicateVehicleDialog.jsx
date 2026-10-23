@@ -14,6 +14,11 @@ import {
 } from './ui/dialog';
 import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
+import {
+  appendTechSpecsToFormData,
+  CATALOG_TECH_SPEC_KEYS,
+  techSpecFormFromRow,
+} from '../data/catalogTechSpecs';
 
 function normalizeReference(ref) {
   if (ref == null || ref === '' || String(ref) === 'null') return '';
@@ -51,6 +56,7 @@ function buildDuplicateVehicleRecord(source, overrides) {
       source.limited_edition_unit_number != null && source.limited_edition_unit_number !== ''
         ? String(source.limited_edition_unit_number)
         : '',
+    ...techSpecFormFromRow(source),
   };
 }
 
@@ -105,10 +111,13 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
       const record = buildDuplicateVehicleRecord(vehicle, overrides);
 
       const formData = new FormData();
+      const specKeySet = new Set(CATALOG_TECH_SPEC_KEYS);
       Object.entries(record).forEach(([key, value]) => {
+        if (specKeySet.has(key)) return;
         if (value === undefined || value === null) return;
         formData.append(key, value);
       });
+      appendTechSpecsToFormData(formData, techSpecFormFromRow(record));
 
       const cid = vehicle.catalog_item_id;
       if (cid != null && cid !== '' && String(cid) !== 'null') {

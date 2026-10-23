@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from './ui/label';
 import {
   Select,
@@ -13,12 +14,14 @@ import { CATALOG_TRACTION_OPTIONS } from '../data/catalogTractionOptions';
  * Tracción del catálogo: solo valores fijos; si el ítem tenía texto libre distinto, se muestra como opción legacy.
  */
 export default function CatalogTractionSelect({
-  label = 'Tracción',
+  label,
   value,
   onChange,
   id = 'catalog-traction',
   disabled,
 }) {
+  const { t } = useTranslation('catalog');
+  const resolvedLabel = label ?? t('detail.fieldTraction');
   const v = value != null ? String(value) : '';
   const isLegacy = v !== '' && !CATALOG_TRACTION_OPTIONS.includes(v);
 
@@ -26,7 +29,7 @@ export default function CatalogTractionSelect({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>{resolvedLabel}</Label>
       <Select
         value={selectValue}
         onValueChange={(nv) => {
@@ -36,18 +39,18 @@ export default function CatalogTractionSelect({
         disabled={disabled}
       >
         <SelectTrigger id={id}>
-          <SelectValue placeholder="Opcional" />
+          <SelectValue placeholder={t('detail.optional')} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none__">— Sin especificar —</SelectItem>
+          <SelectItem value="__none__">{t('detail.unspecified')}</SelectItem>
           {isLegacy && (
             <SelectItem value={v}>
-              {v} (valor anterior)
+              {t('detail.legacyValue', { value: v })}
             </SelectItem>
           )}
           {CATALOG_TRACTION_OPTIONS.map((opt) => (
             <SelectItem key={opt} value={opt}>
-              {opt}
+              {t(`values.traction.${opt}`, { defaultValue: opt })}
             </SelectItem>
           ))}
         </SelectContent>

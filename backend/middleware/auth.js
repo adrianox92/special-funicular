@@ -1,4 +1,5 @@
 const { getAnonClient } = require('../lib/supabaseClients');
+const { resolveAuthUser } = require('../lib/resolveAuthUser');
 
 const supabase = getAnonClient();
 
@@ -16,7 +17,7 @@ const authMiddleware = async (req, res, next) => {
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const { user, error } = await resolveAuthUser(supabase, token);
     
     if (error || !user) {
       return res.status(401).json({ error: 'Token inválido o expirado' });
@@ -43,7 +44,7 @@ const optionalAuthMiddleware = async (req, res, next) => {
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const { user, error } = await resolveAuthUser(supabase, token);
     if (!error && user) {
       req.user = user;
     }

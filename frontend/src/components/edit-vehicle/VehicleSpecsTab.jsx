@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ExternalLink,
@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import {
   vehicleComponentTypes as componentTypes,
   getVehicleComponentTypeLabel,
@@ -39,12 +40,20 @@ import {
   formatInventoryCategory,
   modificationLineTotal,
 } from '../../utils/formatUtils';
+import CatalogTechSpecsFields from '../CatalogTechSpecsFields';
+import { techSpecFormFromRow, VEHICLE_FORM_OMIT_TECH_SPEC_KEYS } from '../../data/catalogTechSpecs';
 import { useEditVehicle } from './EditVehicleContext';
 
 export default function VehicleSpecsTab({ isModificationTab = false }) {
   const { t } = useTranslation('vehicles');
   const { t: tCommon } = useTranslation('common');
   const {
+    vehicle,
+    setVehicle,
+    error,
+    saving,
+    navigate,
+    handleSubmit,
     technicalSpecs,
     editingSpec,
     newSpec,
@@ -67,6 +76,16 @@ export default function VehicleSpecsTab({ isModificationTab = false }) {
     handleDeleteSpec,
   } = useEditVehicle();
 
+  const specForm = useMemo(() => techSpecFormFromRow(vehicle || {}), [vehicle]);
+
+  const setSpecForm = (updater) => {
+    setVehicle((prev) => {
+      const current = techSpecFormFromRow(prev || {});
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      return { ...prev, ...next };
+    });
+  };
+
   const currentSpec = isModificationTab ? technicalSpecs.modification : technicalSpecs.technical;
   const components = currentSpec?.components || [];
   const specValue = editingSpec || newSpec;
@@ -74,6 +93,44 @@ export default function VehicleSpecsTab({ isModificationTab = false }) {
 
   return (
     <div className="mt-4 space-y-4">
+      {!isModificationTab && (
+        <form onSubmit={handleSubmit}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{t('edit.cards.datasheet')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-2 text-sm text-muted-foreground">{t('edit.specs.datasheetHelp')}</p>
+              <CatalogTechSpecsFields
+                form={specForm}
+                setForm={setSpecForm}
+                idPrefix="vehicle-tech"
+                omitKeys={VEHICLE_FORM_OMIT_TECH_SPEC_KEYS}
+              />
+            </CardContent>
+          </Card>
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              {error}
+            </Alert>
+          )}
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="secondary" type="button" onClick={() => navigate('/vehicles')}>
+              {tCommon('actions.cancel')}
+            </Button>
+            <Button type="submit" name="save-vehicle" disabled={saving}>
+              {saving ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  {t('edit.saving')}
+                </>
+              ) : (
+                t('edit.update')
+              )}
+            </Button>
+          </div>
+        </form>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h4 className="text-lg font-semibold">
           {editingSpec

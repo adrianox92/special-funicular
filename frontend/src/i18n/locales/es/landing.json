@@ -2,10 +2,21 @@
   "hero": {
     "title": "Lleva la gestión de tu colección slot a otro nivel",
     "subtitle": "Fichas técnicas, cronometraje al milisegundo, competiciones y sincronización en la nube para Scalextric, Ninco y Avant Slot.",
+    "tagline": "Tu base de datos de slot: Coches, recambios, reglajes y más",
+    "lead": "Gestiona coches de slot con fichas completas, inventario de piezas y consumibles, cronometra por vuelta, compara reglajes y organiza competiciones con inscripción pública y ranking en vivo — todo en una sola plataforma.",
     "ctaLogin": "Iniciar sesión",
     "ctaRegister": "Crear cuenta gratis",
-    "ctaCatalog": "Explorar catálogo"
+    "ctaRegisterShort": "Registrarse",
+    "ctaCatalog": "Explorar catálogo",
+    "ctaHaveAccount": "¿Ya tienes cuenta? Entra aquí"
   },
+  "nav": {
+    "catalog": "Catálogo",
+    "slotRaceManager": "Slot Race Manager",
+    "login": "Iniciar sesión",
+    "register": "Registrarse"
+  },
+  "themeToggle": "Cambiar tema",
   "highlights": {
     "pwa": "PWA instalable",
     "pdf": "PDF exportable",
@@ -16,6 +27,99 @@
     "timings": { "title": "Tiempos", "blurb": "Vueltas al milisegundo y análisis por sesión." },
     "competitions": { "title": "Competiciones", "blurb": "Inscripciones, reglas y ranking en vivo." },
     "inventory": { "title": "Inventario", "blurb": "Stock de piezas, alertas y montaje en coches." }
+  },
+  "stats": {
+    "aria": "Pilares de la plataforma",
+    "complete": {
+      "title": "Gestión completa",
+      "text": "Fotos multi-vista, especificaciones técnicas y modificaciones con coste."
+    },
+    "precision": {
+      "title": "Precisión al ms",
+      "text": "Cronometraje por vuelta, consistencia y gráficos de evolución."
+    },
+    "competitions": {
+      "title": "Competiciones pro",
+      "text": "Ranking en vivo y modo presentación tipo TV para tu evento."
+    },
+    "inventory": {
+      "title": "Inventario de piezas",
+      "text": "Stock, categorías, reposición y vínculo con montajes en vehículos."
+    }
+  },
+  "features": {
+    "collection": {
+      "title": "Gestión de colección",
+      "description": "Catálogo profesional para coches de slot (Scalextric, Ninco, Avant Slot, Scaleauto, etc.): imágenes, datos de compra, reglaje y documentación lista para compartir.",
+      "bullets": [
+        "Fotos por 6 vistas (frontal, perfiles, trasera, superior, chasis, 3/4)",
+        "Especificaciones técnicas con componentes (motor, piñón, corona, guía, ejes…)",
+        "Registro de modificaciones con coste y evolución",
+        "Exportación a PDF de la ficha técnica completa",
+        "Filtros avanzados, vista grid/tabla y exportación CSV",
+        "Badges Digital, Museo y Taller"
+      ]
+    },
+    "inventory": {
+      "title": "Inventario de piezas",
+      "description": "Piezas y consumibles con el mismo rigor que tu colección: stock, precios y trazabilidad hasta el coche donde las montas.",
+      "bullets": [
+        "Categorías, unidades, precio de compra, fechas y notas por ítem",
+        "Stock mínimo, alertas y reposición cuando toca reponer",
+        "Filtros por categoría, búsqueda y piezas con stock bajo",
+        "Montaje en vehículos desde inventario (descuenta stock automáticamente)",
+        "Historial de movimientos y enlace con modificaciones del coche",
+        "Campos específicos según tipo de pieza (material, piñonería, etc.)"
+      ]
+    },
+    "timing": {
+      "title": "Cronometraje y rendimiento",
+      "description": "Entiende cómo rinde cada coche y cada cambio de setup con datos granulares y comparativas claras.",
+      "bullets": [
+        "Tiempos por vuelta con precisión de milisegundos",
+        "Análisis de sesión: evolución, histograma y delta vs mejor vuelta",
+        "Comparativa de dos sesiones lado a lado",
+        "Análisis de configuraciones: compara reglajes entre sesiones",
+        "Comparativa de rendimiento por carril",
+        "Gráficos de evolución de tiempos y velocidad"
+      ]
+    },
+    "competitions": {
+      "title": "Sistema de competiciones",
+      "description": "Organiza eventos con el mismo rigor que llevas en el garaje: categorías, reglas y resultados trazables.",
+      "bullets": [
+        "Competiciones con circuitos y categorías",
+        "Inscripciones públicas por enlace compartible",
+        "Reglas de puntuación personalizables y plantillas",
+        "Tiempos por ronda con penalizaciones",
+        "Ranking en vivo y modo presentación (Live TV)",
+        "Exportación CSV y PDF de resultados"
+      ]
+    },
+    "analytics": {
+      "title": "Dashboard y analítica",
+      "description": "Un panel que resume inversión, distribución de la flota y rendimiento para decidir con datos.",
+      "bullets": [
+        "Métricas de colección: vehículos, inversiones y tendencias",
+        "Gráficos por marca, tipo, tienda y modificaciones",
+        "Evolución de la inversión en el tiempo",
+        "Top vehículos por coste y componentes más usados"
+      ]
+    }
+  },
+  "extras": {
+    "heading": "Y además…",
+    "lead": "Detalles que marcan la diferencia para usar la herramienta cada día.",
+    "pwa": { "title": "PWA", "text": "Instalable en móvil y escritorio." },
+    "api": { "title": "API & sync", "text": "API keys y endpoints para apps externas." },
+    "theme": { "title": "Tema claro / oscuro", "text": "Cómodo en cualquier entorno." },
+    "responsive": { "title": "Responsive", "text": "Móvil, tablet y escritorio." },
+    "circuits": { "title": "Circuitos", "text": "Varios carriles y longitudes por carril." }
+  },
+  "cta": {
+    "title": "Empieza a gestionar tu colección hoy",
+    "lead": "Crea tu cuenta en segundos y lleva registro de cada coche, cada vuelta y cada evento.",
+    "register": "Crear cuenta gratis"
   },
   "seo": {
     "title": "Slot Database | Lleva la gestión de tu colección a otro nivel",

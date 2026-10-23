@@ -64,7 +64,7 @@ export default function VehicleEditTabsNav({ activeTab, onTabChange, tabOptions 
         className={cn(
           'mb-4 hidden h-auto min-h-9 w-full gap-1 sm:grid',
           hasMultipleConfigs(timings)
-            ? 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7'
+            ? 'sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7'
             : 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6',
         )}
       >

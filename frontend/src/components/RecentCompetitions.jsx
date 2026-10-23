@@ -116,7 +116,14 @@ const RecentCompetitions = () => {
             <div
               key={competition.id}
               className="flex justify-between items-center p-4 hover:bg-muted/50 cursor-pointer transition-colors"
-              onClick={() => navigate(competitionDetailPath(competition.id))}
+              onClick={() =>
+                navigate(
+                  competitionDetailPath(
+                    competition.id,
+                    competition.viewer_role === 'participant' ? { section: 'timings' } : {},
+                  ),
+                )
+              }
             >
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start gap-2 mb-1">

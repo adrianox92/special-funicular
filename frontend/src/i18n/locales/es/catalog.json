@@ -15,7 +15,7 @@
   "list": {
     "heading": "Catálogo de referencias",
     "lead": "Modelos de slot catalogados: referencia, marca, tipo y año de comercialización.",
-    "searchPlaceholder": "Buscar por referencia, modelo o marca…",
+    "searchPlaceholder": "Buscar por referencia, alias, EAN, modelo o marca…",
     "clearSearch": "Limpiar búsqueda",
     "brand": "Marca",
     "allBrands": "Todas las marcas",
@@ -66,6 +66,10 @@
     "noImage": "Sin imagen en catálogo",
     "specsTitle": "Detalles técnicos",
     "fieldReference": "Referencia",
+    "fieldEan": "EAN",
+    "aliasesTitle": "Referencias alternativas",
+    "aliasMarket": "Mercado",
+    "aliasEan": "EAN",
     "fieldBrand": "Marca",
     "fieldName": "Nombre / modelo",
     "fieldType": "Tipo",
@@ -115,7 +119,77 @@
     "addToGarage": "Añadir a mi garaje",
     "addToGarageHint": "Se abrirá el alta de vehículo con esta referencia ya rellenada.",
     "similarTitle": "Vehículos similares",
-    "similarAria": "Carrusel de vehículos similares"
+    "similarAria": "Carrusel de vehículos similares",
+    "legacyValue": "{{value}} (valor anterior)"
+  },
+  "aliases": {
+    "tab": "Referencias alternativas",
+    "canonicalEan": "EAN (referencia canónica)",
+    "canonicalEanHelp": "Código de barras de la referencia principal. Cada alias puede tener el suyo.",
+    "help": "Otras referencias del mismo modelo (mercado, forma corta, prefijo de tienda o typo). Cada una puede tener su EAN.",
+    "empty": "Sin referencias alternativas.",
+    "add": "Añadir alias",
+    "remove": "Quitar",
+    "reference": "Referencia alternativa",
+    "type": "Tipo",
+    "market": "Mercado",
+    "brandLabel": "Marca en ese mercado",
+    "ean": "EAN",
+    "source": "Fuente",
+    "sourceUrl": "URL de la fuente",
+    "types": {
+      "market": "Mercado (S/X)",
+      "short": "Forma corta",
+      "shop_prefix": "Prefijo de tienda",
+      "legacy_typo": "Typo / legado"
+    }
+  },
+  "techSpecs": {
+    "title": "Información técnica",
+    "tab": "Información técnica",
+    "tabGeneral": "General",
+    "tabNavAria": "Sección del formulario",
+    "formHelp": "Medidas en milímetros y peso en gramos. Deja vacío lo que no conozcas. La tracción y el soporte del motor se editan en la pestaña General.",
+    "yes": "Sí",
+    "no": "No",
+    "unspecified": "— Sin especificar —",
+    "invalidNumber": "{{field}} debe ser un número mayor o igual que 0.",
+    "fields": {
+      "scale": "Escala",
+      "body": "Carrocería",
+      "color": "Color",
+      "system": "Sistema",
+      "lengthMm": "Longitud (mm)",
+      "heightMm": "Altura (mm)",
+      "wheelbaseMm": "Distancia entre ejes (mm)",
+      "frontTrackMm": "Vía delantera (mm)",
+      "rearTrackMm": "Vía trasera (mm)",
+      "frontAxleLengthMm": "Eje delantero (mm)",
+      "rearAxleLengthMm": "Eje trasero (mm)",
+      "weightG": "Peso (g)",
+      "magnet": "Imán",
+      "motor": "Motor",
+      "motorMount": "Soporte del motor",
+      "drivetrain": "Transmisión",
+      "pinionGear": "Piñón / corona",
+      "frontWheels": "Ruedas delanteras",
+      "rearWheels": "Ruedas traseras",
+      "frontRim": "Llanta delantera",
+      "rearRim": "Llanta trasera",
+      "frontRimDiameterMm": "Diámetro llanta delantera (mm)",
+      "rearRimDiameterMm": "Diámetro llanta trasera (mm)",
+      "frontLights": "Luces delanteras",
+      "rearLights": "Luces traseras"
+    },
+    "systemValues": {
+      "analog": "Analógico",
+      "digital": "Digital"
+    },
+    "rimValues": {
+      "plastic": "Plástico",
+      "aluminum": "Aluminio",
+      "magnesium": "Magnesio"
+    }
   },
   "guest": {
     "addTitle": "Añade esta referencia a tu garaje",
@@ -176,6 +250,35 @@
       "inline": "en línea",
       "angular": "angular",
       "transverse": "transversal"
+    }
+  },
+  "values": {
+    "vehicleTypes": {
+      "Rally": "Rally",
+      "GT": "GT",
+      "LMP": "LMP",
+      "Hypercar": "Hypercar",
+      "Grupo 5": "Grupo 5",
+      "Road Car": "Road Car",
+      "Turismo": "Turismo",
+      "Clásico": "Clásico",
+      "DTM": "DTM",
+      "F1": "F1",
+      "Camiones": "Camiones",
+      "Raid": "Raid"
+    },
+    "traction": {
+      "4x4": "4x4",
+      "Trasera": "Trasera",
+      "Delantera": "Delantera"
+    },
+    "motorPosition": {
+      "inline": "En línea",
+      "angular": "Angular",
+      "transverse": "Transversal",
+      "En línea": "En línea",
+      "Angular": "Angular",
+      "Transversal": "Transversal"
     }
   }
 }

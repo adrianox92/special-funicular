@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageCircleQuestion, Loader2 } from 'lucide-react';
 import api from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +20,9 @@ function SectionAnchor({ id, children }) {
 
 export default function HelpAssistant() {
   const { user } = useAuth();
-  const helpSections = visibleHelpSections(isLicenseAdminUser(user));
+  const { t, i18n } = useTranslation('help');
+  const locale = i18n.language?.split('-')[0] || 'es';
+  const helpSections = visibleHelpSections(isLicenseAdminUser(user), locale);
   const formId = useId();
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,11 +49,11 @@ export default function HelpAssistant() {
     e.preventDefault();
     const trimmed = question.trim();
     if (trimmed.length < 3) {
-      setError('Escribe al menos 3 caracteres.');
+      setError(t('assistant.minLength'));
       return;
     }
     if (!serviceAvailable) {
-      setError('El asistente no está disponible en este momento. Consulta el índice y las secciones de esta página.');
+      setError(t('assistant.unavailableHint'));
       return;
     }
     setError(null);
@@ -58,16 +61,16 @@ export default function HelpAssistant() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/help/ask', { question: trimmed });
+      const { data } = await api.post('/help/ask', { question: trimmed, locale });
       if (data?.answer) {
         setAnswer(data.answer);
       } else if (data?.message) {
         setError(data.message);
       } else {
-        setError('No se ha podido obtener una respuesta. Inténtalo de nuevo más tarde.');
+        setError(t('assistant.genericError'));
       }
     } catch (err) {
-      const msg = err.response?.data?.error || 'No se pudo obtener respuesta.';
+      const msg = err.response?.data?.error || t('assistant.requestFailed');
       setError(msg);
     } finally {
       setLoading(false);
@@ -79,24 +82,23 @@ export default function HelpAssistant() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <MessageCircleQuestion className="size-5 text-primary" aria-hidden />
-          Pregunta a la guía
+          {t('assistant.title')}
         </CardTitle>
         <CardDescription>
-          Escribe en lenguaje natural (por ejemplo: «¿cómo doy de alta un coche?»). La respuesta se basa en el contenido de
-          esta guía.
+          {t('assistant.lead')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-3" aria-labelledby={`${formId}-label`}>
           <div className="space-y-2">
             <Label id={`${formId}-label`} htmlFor={`${formId}-q`}>
-              Tu pregunta
+              {t('assistant.label')}
             </Label>
             <Textarea
               id={`${formId}-q`}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ej.: ¿Cómo registro una sesión de tiempos?"
+              placeholder={t('assistant.placeholder')}
               rows={3}
               className="resize-y min-h-[80px]"
               disabled={loading || !serviceAvailable}
@@ -107,10 +109,10 @@ export default function HelpAssistant() {
               {loading ? (
                 <>
                   <Loader2 className="size-4 animate-spin mr-2" aria-hidden />
-                  Buscando respuesta…
+                  {t('assistant.searching')}
                 </>
               ) : (
-                'Buscar respuesta'
+                t('assistant.submit')
               )}
             </Button>
           </div>
@@ -121,7 +123,7 @@ export default function HelpAssistant() {
             <p className="text-sm text-destructive">{error}</p>
             {!serviceAvailable && (
               <p className="text-sm text-muted-foreground">
-                Secciones de la guía:{' '}
+                {t('assistant.guideSections')}{' '}
                 {helpSections.map((sec, i) => (
                   <span key={sec.id}>
                     {i > 0 ? ', ' : ''}
@@ -138,16 +140,16 @@ export default function HelpAssistant() {
           {loading ? (
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
-              Buscando respuesta…
+              {t('assistant.searching')}
             </p>
           ) : !serviceAvailable ? (
             <p className="text-sm text-muted-foreground">
-              El asistente no está disponible ahora mismo. Puedes usar el índice y las secciones de esta página.
+              {t('assistant.unavailableNow')}
             </p>
           ) : answer ? (
             <div className="text-sm text-foreground whitespace-pre-wrap">{answer}</div>
           ) : !error ? (
-            <p className="text-sm text-muted-foreground">La respuesta aparecerá aquí.</p>
+            <p className="text-sm text-muted-foreground">{t('assistant.answerPlaceholder')}</p>
           ) : null}
         </div>
       </CardContent>

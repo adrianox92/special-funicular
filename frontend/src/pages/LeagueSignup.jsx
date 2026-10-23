@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
+import { useTranslation } from 'react-i18next';
 import LeagueStatusBadge from '../components/league/LeagueStatusBadge';
 import LeagueSeasonCalendar from '../components/league/LeagueSeasonCalendar';
 
@@ -25,6 +26,7 @@ const headerImgClass =
 const LeagueSignup = () => {
   const { slug } = useParams();
   const { theme } = useTheme();
+  const { t } = useTranslation('leagues');
   const headerLogoSrc = `${process.env.PUBLIC_URL || ''}/${
     theme === 'dark' ? 'logo-header.png' : 'logo-header-dark.png'
   }`;
@@ -45,13 +47,13 @@ const LeagueSignup = () => {
         setLeague(res.data);
         setError(null);
       } catch (err) {
-        setError(err.response?.data?.error || 'Liga no encontrada');
+        setError(err.response?.data?.error || t('publicSignup.notFound'));
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [slug]);
+  }, [slug, t]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,7 +73,7 @@ const LeagueSignup = () => {
       setShowSuccessModal(true);
       setForm({ name: '', email: '', vehicle: '' });
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al inscribirse');
+      setError(err.response?.data?.error || t('publicSignup.signupError'));
     } finally {
       setSubmitting(false);
     }
@@ -92,7 +94,7 @@ const LeagueSignup = () => {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
         <Button variant="link" asChild className="mt-4">
-          <Link to="/"><ArrowLeft className="size-4 mr-2" />Volver al inicio</Link>
+          <Link to="/"><ArrowLeft className="size-4 mr-2" />{t('publicSignup.backHome')}</Link>
         </Button>
       </div>
     );
@@ -129,9 +131,9 @@ const LeagueSignup = () => {
             <p className="text-sm text-muted-foreground flex items-center gap-1 mt-2">
               <Users className="size-4" />
               {maxParticipants
-                ? `${participantsCount}/${maxParticipants} plazas`
-                : `${participantsCount} participante${participantsCount !== 1 ? 's' : ''}`}
-              {waitlistCount > 0 ? ` · Lista espera: ${waitlistCount}` : ''}
+                ? t('publicSignup.slots', { count: participantsCount, max: maxParticipants })
+                : t('publicSignup.participants', { count: participantsCount })}
+              {waitlistCount > 0 ? ` · ${t('publicSignup.waitlistCount', { count: waitlistCount })}` : ''}
             </p>
             {maxParticipants ? (
               <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -146,7 +148,7 @@ const LeagueSignup = () => {
             {signupClosed ? (
               <Alert>
                 <AlertTriangle className="size-4" />
-                <AlertDescription>Esta liga está cerrada y no acepta nuevas inscripciones.</AlertDescription>
+                <AlertDescription>{t('publicSignup.closed')}</AlertDescription>
               </Alert>
             ) : (
               <>
@@ -157,7 +159,7 @@ const LeagueSignup = () => {
                 )}
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nombre del piloto *</Label>
+                    <Label htmlFor="name">{t('publicSignup.name')}</Label>
                     <Input
                       id="name"
                       value={form.name}
@@ -166,7 +168,7 @@ const LeagueSignup = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t('publicSignup.email')}</Label>
                     <Input
                       id="email"
                       type="email"
@@ -175,21 +177,21 @@ const LeagueSignup = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="vehicle">Vehículo</Label>
+                    <Label htmlFor="vehicle">{t('publicSignup.vehicle')}</Label>
                     <Input
                       id="vehicle"
                       value={form.vehicle}
                       onChange={(e) => setForm({ ...form, vehicle: e.target.value })}
-                      placeholder="Ej: Porsche 911"
+                      placeholder={t('publicSignup.vehiclePlaceholder')}
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={submitting}>
                     {submitting ? (
                       <Spinner className="size-4" />
                     ) : slotsFull ? (
-                      'Unirme a la lista de espera'
+                      t('publicSignup.joinWaitlist')
                     ) : (
-                      'Inscribirse en la liga'
+                      t('publicSignup.joinLeague')
                     )}
                   </Button>
                 </form>
@@ -209,34 +211,30 @@ const LeagueSignup = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="size-5 text-green-500" />
-              {signupResult?.waitlisted ? 'Estás en lista de espera' : '¡Inscripción confirmada!'}
+              {signupResult?.waitlisted ? t('publicSignup.waitlisted') : t('publicSignup.confirmed')}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            {signupResult?.waitlisted ? (
-              <>
-                Te has apuntado a la lista de espera de <strong>{league.name}</strong> en posición{' '}
-                <strong>{signupResult.position ?? '—'}</strong>.
-              </>
-            ) : (
-              <>
-                Te has inscrito en <strong>{league.name}</strong>. Podrás apuntarte a cada prueba cuando se abran sus inscripciones.
-              </>
-            )}
+            {signupResult?.waitlisted
+              ? t('publicSignup.waitlistedBody', {
+                  name: league.name,
+                  position: signupResult.position ?? '—',
+                })
+              : t('publicSignup.confirmedBody', { name: league.name })}
           </p>
           <div className="flex flex-col gap-2 pt-2">
             {signupResult?.participantId ? (
               <Button asChild>
                 <Link to={`/leagues/standings/${slug}?pilot=${signupResult.participantId}`}>
-                  Ver mi temporada
+                  {t('publicSignup.viewSeason')}
                 </Link>
               </Button>
             ) : null}
             <Button asChild variant="outline">
-              <Link to={`/leagues/standings/${slug}`}>Ver clasificación</Link>
+              <Link to={`/leagues/standings/${slug}`}>{t('publicSignup.viewStandings')}</Link>
             </Button>
             <Button variant="ghost" onClick={() => setShowSuccessModal(false)}>
-              Cerrar
+              {t('publicSignup.close')}
             </Button>
           </div>
         </DialogContent>

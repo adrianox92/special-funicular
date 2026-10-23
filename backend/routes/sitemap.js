@@ -14,6 +14,7 @@ const {
   buildCatalogChunkXml,
   parseSitemapRequestPath,
 } = require('../lib/sitemapBuilder');
+const { gateCatalogRequest } = require('../lib/catalogBotGate');
 
 const PAGE_SIZE = 1000;
 
@@ -24,11 +25,11 @@ function getPublicSiteOrigin() {
   return '';
 }
 
-function sendXml(res, body) {
+function sendXml(res, body, cacheControl = 'public, max-age=3600') {
   res
     .status(200)
     .type('application/xml; charset=utf-8')
-    .set('Cache-Control', 'public, max-age=3600')
+    .set('Cache-Control', cacheControl)
     .send(body);
 }
 
@@ -86,6 +87,9 @@ function sitemapHandler(req, res) {
       return;
     }
 
+    const allowed = await gateCatalogRequest(req, res, { html: false });
+    if (!allowed) return;
+
     const chunk = parsed.chunk;
     const from = (chunk - 1) * CATALOG_CHUNK_SIZE;
     const to = from + CATALOG_CHUNK_SIZE - 1;
@@ -116,7 +120,7 @@ function sitemapHandler(req, res) {
       return;
     }
 
-    sendXml(res, buildCatalogChunkXml({ origin, rows }));
+    sendXml(res, buildCatalogChunkXml({ origin, rows }), 'private, max-age=300');
   })().catch((e) => {
     console.error('[sitemap]', e);
     res.status(500).type('text/plain; charset=utf-8').send('Sitemap generation failed');

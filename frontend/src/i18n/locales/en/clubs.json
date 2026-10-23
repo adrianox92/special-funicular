@@ -207,5 +207,22 @@
     "copyNow": "Copy the key now. It will not be shown again.",
     "loadError": "Could not load the club API key",
     "rotateError": "Could not rotate the club API key"
+  },
+  "publicProfile": {
+    "loading": "Loading club…",
+    "notFound": "Club not found",
+    "backHome": "Back to home",
+    "website": "Website",
+    "noDescription": "This club has not added a public description yet.",
+    "join": "Join the club",
+    "circuitsTitle": "Circuits and rankings",
+    "boardTitle": "Public board",
+    "document": "Document",
+    "publishedOn": "Published {{date}}",
+    "upcomingEvents": "Upcoming events",
+    "noUpcoming": "There are no upcoming public events.",
+    "joinTitle": "Join {{name}}",
+    "joinBody": "To join the club you need an invite link from an administrator or an email invitation. If you know a member, ask them for access.",
+    "close": "Close"
   }
 }

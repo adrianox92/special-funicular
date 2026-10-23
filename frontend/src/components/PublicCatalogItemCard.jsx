@@ -7,6 +7,7 @@ import { catalogSlugify } from '../utils/catalogSlug';
 import { localizePath } from '../i18n/localeUtils';
 import { useLocale } from '../hooks/useLocale';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import CatalogListingImage from './CatalogListingImage';
 
 // CJS: el import con nombre rompe el build de webpack en producción.
 const { buildCatalogItemImageAlt } = require('../utils/catalogSeoCopy');
@@ -27,11 +28,11 @@ export default function PublicCatalogItemCard({ row, descriptiveAlt = false }) {
       <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
         <div className="aspect-[4/3] bg-muted relative overflow-hidden">
           {row.image_url ? (
-            <img
-              src={cachedStorageImageUrl(row.image_url)}
+            <CatalogListingImage
+              imageUrl={row.image_url}
               alt={imageAlt}
               className="absolute inset-0 size-full object-cover"
-              loading="lazy"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
@@ -72,7 +73,9 @@ export default function PublicCatalogItemCard({ row, descriptiveAlt = false }) {
               </span>
             )}
             {row.vehicle_type && (
-              <span className="rounded-md bg-secondary px-2 py-0.5">{row.vehicle_type}</span>
+              <span className="rounded-md bg-secondary px-2 py-0.5">
+                {t(`values.vehicleTypes.${row.vehicle_type}`, { defaultValue: row.vehicle_type })}
+              </span>
             )}
             {row.commercial_release_year != null && (
               <span className="rounded-md bg-secondary px-2 py-0.5">{row.commercial_release_year}</span>

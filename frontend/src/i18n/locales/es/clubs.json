@@ -207,5 +207,22 @@
     "copyNow": "Copia la clave ahora. No se volverá a mostrar.",
     "loadError": "No se pudo cargar la API key del club",
     "rotateError": "No se pudo rotar la API key del club"
+  },
+  "publicProfile": {
+    "loading": "Cargando club…",
+    "notFound": "Club no encontrado",
+    "backHome": "Volver al inicio",
+    "website": "Sitio web",
+    "noDescription": "Este club aún no ha añadido una descripción pública.",
+    "join": "Unirme al club",
+    "circuitsTitle": "Circuitos y rankings",
+    "boardTitle": "Tablón público",
+    "document": "Documento",
+    "publishedOn": "Publicado el {{date}}",
+    "upcomingEvents": "Próximos eventos",
+    "noUpcoming": "No hay eventos públicos próximos.",
+    "joinTitle": "Unirme a {{name}}",
+    "joinBody": "Para formar parte del club necesitas un enlace de invitación del administrador o que te envíen una invitación por correo. Si conoces a algún miembro, contacta con ellos para obtener acceso.",
+    "close": "Cerrar"
   }
 }

@@ -2,6 +2,9 @@ const express = require('express');
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const { normalizePilotSlug } = require('../lib/pilotProfileUtils');
 const { calculatePoints } = require('../lib/pointsCalculator');
+const { fetchVehicleImagesForVehicleIds } = require('../lib/fetchVehicleImagesForVehicleIds');
+const { resolvePublicVehicleCardImage } = require('../lib/publicVehicleCardImage');
+const { CATALOG_TECH_SPEC_SELECT } = require('../lib/catalogTechSpecs');
 
 const router = express.Router();
 const supabase = getAnonClient();
@@ -47,7 +50,7 @@ router.get('/:slug/compare/:otherSlug', async (req, res) => {
     }
 
     const bestByUserCircuit = async (userId) => {
-      const { data: vehicles } = await supabase
+      const { data: vehicles } = await supabaseAdmin
         .from('vehicles')
         .select('id')
         .eq('user_id', userId);
@@ -139,9 +142,9 @@ router.get('/:slug', async (req, res) => {
 
     const userId = profile.user_id;
 
-    const { data: vehicles, error: vErr } = await supabase
+    const { data: vehicles, error: vErr } = await supabaseAdmin
       .from('vehicles')
-      .select('id, model, manufacturer, type')
+      .select(`id, model, manufacturer, type, catalog_item_id, ${CATALOG_TECH_SPEC_SELECT}`)
       .eq('user_id', userId)
       .order('model', { ascending: true });
 
@@ -150,26 +153,42 @@ router.get('/:slug', async (req, res) => {
     }
 
     const vehicleIds = (vehicles || []).map((v) => v.id);
-    const imagesMap = {};
+    const imagesByVehicle = new Map();
     if (vehicleIds.length > 0) {
-      const { data: images } = await supabase
-        .from('vehicle_images')
-        .select('vehicle_id, image_url')
-        .in('vehicle_id', vehicleIds);
-      (images || []).forEach((img) => {
-        if (!imagesMap[img.vehicle_id]) {
-          imagesMap[img.vehicle_id] = img.image_url;
-        }
-      });
+      // Service role: vehicle_images suele estar restringido por RLS al dueño.
+      // El perfil es público a propósito; solo devolvemos la URL de la foto.
+      const { data: images } = await fetchVehicleImagesForVehicleIds(supabaseAdmin, vehicleIds);
+      for (const img of images || []) {
+        if (!imagesByVehicle.has(img.vehicle_id)) imagesByVehicle.set(img.vehicle_id, []);
+        imagesByVehicle.get(img.vehicle_id).push(img);
+      }
     }
 
-    const vehiclesOut = (vehicles || []).map((v) => ({
-      id: v.id,
-      model: v.model,
-      manufacturer: v.manufacturer,
-      type: v.type,
-      image: imagesMap[v.id] || null,
-    }));
+    const catalogIds = [
+      ...new Set((vehicles || []).map((v) => v.catalog_item_id).filter(Boolean)),
+    ];
+    const catalogImageById = new Map();
+    if (catalogIds.length > 0) {
+      const { data: catalogRows } = await supabaseAdmin
+        .from('slot_catalog_items')
+        .select('id, image_url')
+        .in('id', catalogIds);
+      for (const row of catalogRows || []) {
+        const url = row.image_url != null ? String(row.image_url).trim() : '';
+        if (url) catalogImageById.set(row.id, url);
+      }
+    }
+
+    const vehiclesOut = (vehicles || []).map((v) => {
+      const { catalog_item_id: _omitCatalogId, ...publicVehicle } = v;
+      return {
+        ...publicVehicle,
+        image: resolvePublicVehicleCardImage({
+          vehicleImages: imagesByVehicle.get(v.id) || [],
+          catalogImageUrl: catalogImageById.get(v.catalog_item_id) || null,
+        }),
+      };
+    });
 
     /** @type {Map<string, any>} */
     const bestByCircuit = new Map();

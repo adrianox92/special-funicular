@@ -145,6 +145,17 @@ function isProxyEnabled(opts) {
   return true;
 }
 
+function originFromOpts(opts) {
+  if (!opts || opts.origin == null) return '';
+  return String(opts.origin).replace(/\/+$/, '');
+}
+
+function absolutizeProxyPath(path, origin) {
+  if (!origin) return path;
+  if (path.startsWith(PROXY_PREFIX)) return `${origin}${path}`;
+  return path;
+}
+
 /**
  * @param {unknown} rawUrl
  * @param {{ origin?: string, enabled?: boolean, allowedHosts?: Set<string> }} [opts]
@@ -154,15 +165,51 @@ function cachedStorageImageUrl(rawUrl, opts) {
   if (rawUrl == null) return '';
   const s = String(rawUrl).trim();
   if (!s) return '';
-  if (s.startsWith('blob:') || s.startsWith('data:') || s.startsWith('/')) return s;
+  if (s.startsWith('blob:') || s.startsWith('data:')) return s;
+  const origin = originFromOpts(opts);
+  if (s.startsWith('/')) return absolutizeProxyPath(s, origin);
   if (!isProxyEnabled(opts)) return s;
 
   const parsed = parseAllowedStorageUrl(s, opts);
   if (!parsed) return s;
 
   const rel = proxyPathFor(parsed.bucket, parsed.objectPath);
-  const origin = opts && opts.origin != null ? String(opts.origin).replace(/\/+$/, '') : '';
   return origin ? `${origin}${rel}` : rel;
+}
+
+const PUBLIC_MEDIA_URL_KEYS = Object.freeze(['image_url', 'manufacturer_logo_url', 'logo_url']);
+
+function rewritePublicCatalogMediaRow(row, opts) {
+  if (row == null || typeof row !== 'object' || Array.isArray(row)) return row;
+  const out = { ...row };
+  for (const key of PUBLIC_MEDIA_URL_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(out, key)) continue;
+    if (out[key] == null || out[key] === '') continue;
+    out[key] = cachedStorageImageUrl(out[key], opts);
+  }
+  return out;
+}
+
+/**
+ * Reescribe image_url / manufacturer_logo_url / logo_url de Storage a /api/img
+ * en un ítem, lista de ítems, o payload { items, brands }.
+ * @param {unknown} value
+ * @param {{ origin?: string, enabled?: boolean, allowedHosts?: Set<string> }} [opts]
+ */
+function rewritePublicCatalogMediaUrls(value, opts) {
+  if (value == null) return value;
+  if (Array.isArray(value)) {
+    return value.map((row) => rewritePublicCatalogMediaRow(row, opts));
+  }
+  if (typeof value !== 'object') return value;
+  const out = rewritePublicCatalogMediaRow(value, opts);
+  if (Array.isArray(out.items)) {
+    out.items = out.items.map((row) => rewritePublicCatalogMediaRow(row, opts));
+  }
+  if (Array.isArray(out.brands)) {
+    out.brands = out.brands.map((row) => rewritePublicCatalogMediaRow(row, opts));
+  }
+  return out;
 }
 
 /**
@@ -308,6 +355,7 @@ module.exports = {
   parseAllowedStorageUrl,
   cachedStorageImageUrl,
   rewritePublicCatalogMediaUrls,
+  PUBLIC_MEDIA_URL_KEYS,
   resolveStorageImageRequest,
   pathSegmentsFromReq,
 };

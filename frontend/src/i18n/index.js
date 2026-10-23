@@ -36,6 +36,11 @@ export const NAMESPACES = [
   'onboarding',
   'session',
   'leagues',
+  'slotRaceManager',
+  'inventory',
+  'seller',
+  'help',
+  'profile',
 ];
 
 const LazyLocaleBackend = {
