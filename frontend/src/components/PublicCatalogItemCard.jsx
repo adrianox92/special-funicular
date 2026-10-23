@@ -7,6 +7,7 @@ import { catalogSlugify } from '../utils/catalogSlug';
 import { localizePath } from '../i18n/localeUtils';
 import { useLocale } from '../hooks/useLocale';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 import CatalogListingImage from './CatalogListingImage';
 
 // CJS: el import con nombre rompe el build de webpack en producción.
@@ -26,7 +27,7 @@ export default function PublicCatalogItemCard({ row, descriptiveAlt = false }) {
   return (
     <Link to={href} className="group block h-full">
       <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
-        <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+        <div className={`aspect-[4/3] relative overflow-hidden ${row.image_url ? 'bg-muted' : 'bg-white'}`}>
           {row.image_url ? (
             <CatalogListingImage
               imageUrl={row.image_url}
@@ -35,9 +36,12 @@ export default function PublicCatalogItemCard({ row, descriptiveAlt = false }) {
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-              {t('list.noImage')}
-            </div>
+            <img
+              src={CATALOG_PLACEHOLDER_PATH}
+              alt={t('list.noImage')}
+              className="absolute inset-0 size-full object-cover"
+              loading="lazy"
+            />
           )}
         </div>
         <CardContent className="p-4 space-y-1">
