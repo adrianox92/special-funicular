@@ -14,6 +14,7 @@ const {
   homePathForLocale,
 } = require('../../src/utils/catalogSeoCopy');
 const { cachedStorageImageUrl } = require('../../src/utils/cachedStorageImageUrl');
+const { catalogPlaceholderUrl } = require('../../src/constants/catalogPlaceholder');
 
 function copyFor(locale) {
   return copyChrome(locale);
@@ -77,7 +78,7 @@ function renderItemBody({ item, locale, origin, slug, neighbors }) {
 
   const img = imageUrl
     ? `<p><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(alt)}" width="640" height="480" /></p>`
-    : `<p>${escapeHtml(t.imageFallback)}</p>`;
+    : `<p><img src="${escapeHtml(catalogPlaceholderUrl(origin))}" alt="${escapeHtml(t.imageFallback)}" width="1024" height="614" /></p>`;
 
   const prevLink = prev
     ? `<a href="${escapeHtml(catalogItemPath(locale, prev.id, prevSlug))}">${escapeHtml(t.prev)}: ${escapeHtml(prev.model_name || prev.reference || prev.id)}</a>`

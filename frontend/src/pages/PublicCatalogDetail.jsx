@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { catalogSlugify } from '../utils/catalogSlug';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 import { labelMotorPosition, MOTOR_POSITION_OPTIONS } from '../data/motorPosition';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import {
@@ -33,7 +34,7 @@ import {
   buildCatalogItemImageAlt,
   clearCatalogItemPageSeo,
 } from '../utils/catalogItemSeo';
-import { ChevronRight, ExternalLink, Package, Star, X } from 'lucide-react';
+import { ChevronRight, ExternalLink, Star, X } from 'lucide-react';
 import StoreListingsSection from '../components/StoreListingsSection';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
@@ -467,11 +468,12 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                 ) : null}
               </div>
             ) : (
-              <div className="aspect-[4/3] bg-muted flex items-center justify-center p-4 sm:p-8 rounded-xl overflow-hidden">
-                <div className="flex flex-col items-center gap-2 text-muted-foreground py-12">
-                  <Package className="size-16 opacity-40" />
-                  <span className="text-sm">{t('detail.noImage')}</span>
-                </div>
+              <div className="aspect-[4/3] bg-white rounded-xl overflow-hidden">
+                <img
+                  src={CATALOG_PLACEHOLDER_PATH}
+                  alt={t('detail.noImage')}
+                  className="size-full object-cover"
+                />
               </div>
             )}
           </Card>

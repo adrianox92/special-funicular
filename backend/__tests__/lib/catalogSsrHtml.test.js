@@ -129,6 +129,19 @@ describe('catalogSeoHtml', () => {
     expect(html).toContain('Siguiente');
   });
 
+  test('ficha sin foto propia muestra el placeholder y no el texto suelto', () => {
+    const html = renderItemBody({
+      item: { ...item, image_url: null },
+      locale: 'es',
+      origin: 'https://www.slotdatabase.es',
+      slug: 'porsche-911-gt3',
+      neighbors: item.neighbors,
+    });
+    expect(html).toContain('src="https://www.slotdatabase.es/catalog-placeholder.png"');
+    expect(html).toContain('alt="Sin imagen en catálogo"');
+    expect(html).not.toContain('cdn.example');
+  });
+
   test('injectIntoSpaHtml sustituye title y rellena #root', () => {
     const spa =
       '<!DOCTYPE html><html lang="es"><head><title>Slot Database | genérico</title>' +

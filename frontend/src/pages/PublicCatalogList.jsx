@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { catalogSlugify } from '../utils/catalogSlug';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 import {
   applyPublicCatalogListSeo,
   clearCatalogItemPageSeo,
@@ -566,19 +567,19 @@ function PublicCatalogList() {
                 return (
                   <Link key={row.id} to={href} className="group block">
                     <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
-                      <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                        {row.image_url ? (
-                          <img
-                            src={cachedStorageImageUrl(row.image_url)}
-                            alt=""
-                            className="absolute inset-0 size-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                            {t('list.noImage')}
-                          </div>
-                        )}
+                      <div
+                        className={`aspect-[4/3] relative overflow-hidden ${row.image_url ? 'bg-muted' : 'bg-white'}`}
+                      >
+                        <img
+                          src={
+                            row.image_url
+                              ? cachedStorageImageUrl(row.image_url)
+                              : CATALOG_PLACEHOLDER_PATH
+                          }
+                          alt={row.image_url ? '' : t('list.noImage')}
+                          className="absolute inset-0 size-full object-cover"
+                          loading="lazy"
+                        />
                       </div>
                       <CardContent className="p-4 space-y-1">
                         <p className="font-mono text-xs text-muted-foreground">{row.reference}</p>
