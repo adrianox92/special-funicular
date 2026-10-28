@@ -162,6 +162,41 @@ function createSyncApiKeyLimiter(overrides = {}) {
 
 const syncApiKeyLimiter = createSyncApiKeyLimiter();
 
+/** MCP de lectura: 60 req/min por token (o por IP si aún no hay Bearer). */
+function mcpRateLimitKey(req) {
+  const header = req.headers.authorization || '';
+  if (header.toLowerCase().startsWith('bearer ')) {
+    const token = header.slice(7).trim();
+    if (token) {
+      try {
+        return `mcp:${hashApiKey(token)}`;
+      } catch {
+        // fall through to IP
+      }
+    }
+  }
+  return `mcp-ip:${ipKeyGenerator(req.ip)}`;
+}
+
+const mcpReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
+  keyGenerator: (req) => mcpRateLimitKey(req),
+});
+
+/** OAuth del conector y metadatos: por IP, por debajo del cupo de carrera. */
+const mcpOauthLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Inténtalo más tarde.' },
+  keyGenerator: (req) => `oauth-ip:${ipKeyGenerator(req.ip)}`,
+});
+
 module.exports = {
   publicSignupLimiter,
   publicCatalogReadLimiter,
@@ -175,5 +210,7 @@ module.exports = {
   createSyncApiKeyLimiter,
   getSyncRateLimitMax,
   syncRateLimitKey,
+  mcpReadLimiter,
+  mcpOauthLimiter,
   isCatalogInternalRequest,
 };

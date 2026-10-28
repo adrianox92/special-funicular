@@ -35,9 +35,19 @@ const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
 const { processVehicleImageBuffer } = require('../lib/processVehicleImageBuffer');
 const { STORAGE_UPLOAD_CACHE } = require('../lib/storageCacheControl');
 const { buildTrackedUrl } = require('../lib/affiliateUrl');
+const { resolveAuthUser } = require('../lib/resolveAuthUser');
 
 /** Anon, sin sesión: lecturas/escrituras que RLS permite al rol anon (p. ej. listados públicos, INSERT de clics). */
 const supabasePublic = getAnonClient();
+
+async function userIdFromAuthorization(authHeader) {
+  if (!authHeader) return null;
+  const token = authHeader.replace('Bearer ', '');
+  if (!token) return null;
+  const { user, error } = await resolveAuthUser(supabasePublic, token);
+  if (error || !user) return null;
+  return user.id;
+}
 
 /** Service role: bypass RLS. Necesario para el panel admin de tiendas (ver todos los perfiles, notas internas, etc.). */
 const supabaseService = getServiceClient();
@@ -243,15 +253,10 @@ router.get('/go/:id', async (req, res) => {
 
     // Obtener user_id del token si existe (opcional)
     let userId = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token) {
-        try {
-          const { data: { user } } = await supabasePublic.auth.getUser(token);
-          userId = user?.id ?? null;
-        } catch { /* ignorar */ }
-      }
+    if (req.headers.authorization) {
+      try {
+        userId = await userIdFromAuthorization(req.headers.authorization);
+      } catch { /* ignorar */ }
     }
 
     supabasePublic.from('store_listing_clicks').insert([{
@@ -284,13 +289,8 @@ router.post('/:id/click', async (req, res) => {
 
     // Obtener user_id del token si viene (no es obligatorio)
     let userId = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token) {
-        const { data: { user } } = await supabasePublic.auth.getUser(token);
-        userId = user?.id ?? null;
-      }
+    if (req.headers.authorization) {
+      userId = await userIdFromAuthorization(req.headers.authorization);
     }
 
     const { data: listing, error: lErr } = await supabasePublic

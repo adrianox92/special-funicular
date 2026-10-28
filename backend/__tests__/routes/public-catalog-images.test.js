@@ -19,7 +19,7 @@ jest.mock('../../lib/supabaseClients', () => {
 const request = require('supertest');
 const app = require('../../server');
 const { mockSupabase } = require('../mocks/supabase');
-const { PUBLIC_ITEMS_MAX_LIMIT } = require('../../routes/publicCatalog');
+const { PUBLIC_ITEMS_MAX_LIMIT, clearPublicCatalogCache } = require('../../routes/publicCatalog');
 const { isCatalogInternalRequest } = require('../../middleware/rateLimits');
 
 const CHROME =
@@ -53,6 +53,7 @@ describe('GET /api/public/catalog image URLs', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    clearPublicCatalogCache();
     process.env.PUBLIC_IMAGE_ORIGIN = 'https://www.slotdatabase.es';
     process.env.CATALOG_BOT_GATE = 'off';
     delete process.env.BLOCKED_IPS;

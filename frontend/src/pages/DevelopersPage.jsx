@@ -22,6 +22,7 @@ import { applyDevelopersPageSeo } from '../utils/developersSeo';
 import { buildLoginPath } from '../utils/authReturnUrl';
 import {
   CONTACT_PATH,
+  MCP_CONNECTOR_URL,
   PARTNER_OPENAPI_LOCAL_URL,
   PARTNER_OPENAPI_PRODUCTION_URL,
   PARTNER_SWAGGER_LOCAL_URL,
@@ -130,6 +131,22 @@ const DevelopersPage = () => {
                   {t('auth.profileCta')}
                 </Link>
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('mcp.title')}</CardTitle>
+              <CardDescription>{t('mcp.lead')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">{t('mcp.urlLabel')}: </span>
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">{MCP_CONNECTOR_URL}</code>
+              </p>
+              <p>{t('mcp.claude')}</p>
+              <p>{t('mcp.chatgpt')}</p>
+              <p>{t('mcp.revoke')}</p>
             </CardContent>
           </Card>
 

@@ -45,6 +45,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
 import DevelopersPage from './pages/DevelopersPage';
+import OauthConsentPage from './pages/OauthConsentPage';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
@@ -171,6 +172,14 @@ const AppContent = () => {
         <Route path="/terminos" element={<TermsOfService />} />
         <Route path="/contacto" element={<Contact />} />
         <Route path="/developers" element={<DevelopersPage />} />
+        <Route
+          path="/oauth/consent"
+          element={(
+            <PrivateRoute>
+              <OauthConsentPage />
+            </PrivateRoute>
+          )}
+        />
         <Route path="/politicas/:slug" element={<PoliciesPage />} />
         <Route path="/slot-race-manager" element={<SlotRaceManagerPage />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />

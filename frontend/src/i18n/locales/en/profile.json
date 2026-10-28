@@ -75,6 +75,28 @@
     "revoked": "API key revoked.",
     "revokeError": "Could not revoke the API key"
   },
+  "mcp": {
+    "title": "Read-only connectors",
+    "description": "Apps such as Claude or ChatGPT can look up your garage, circuits, timings, competitions, and the catalog. They cannot change anything.",
+    "docs": "How to connect an assistant",
+    "loading": "Loading connectors...",
+    "loadError": "Could not load connectors",
+    "empty": "No assistant has read access.",
+    "revoke": "Revoke",
+    "revoked": "Access revoked.",
+    "revokeError": "Could not revoke access",
+    "lastUsed": "Last used: {{date}}",
+    "connectedAt": "Connected on {{date}}",
+    "unnamed": "Unnamed app",
+    "consentTitle": "Allow read access",
+    "consentLead": "{{name}} wants to read your garage, circuits, timings, competitions, and the public catalog.",
+    "consentReadOnly": "Read only. It cannot create, edit, or delete data.",
+    "consentApprove": "Allow reading",
+    "consentDeny": "Deny",
+    "consentLoading": "Checking the app...",
+    "consentError": "Could not finish authorization",
+    "consentMissing": "The request is missing data. Start the connection again from the assistant."
+  },
   "license": {
     "title": "Slot Race Manager (DS200)",
     "description": "Registered desktop-app installations. Maximum 3 computers per licensed account. To free a device, contact support.",

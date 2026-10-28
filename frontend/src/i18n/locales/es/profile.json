@@ -75,6 +75,28 @@
     "revoked": "API key revocada.",
     "revokeError": "Error al revocar la API key"
   },
+  "mcp": {
+    "title": "Conectores de lectura",
+    "description": "Aplicaciones como Claude o ChatGPT que pueden consultar tu garaje, circuitos, tiempos, competiciones y el catálogo. No pueden modificar nada.",
+    "docs": "Cómo conectar un asistente",
+    "loading": "Cargando conectores...",
+    "loadError": "No se pudieron cargar los conectores",
+    "empty": "Ningún asistente tiene acceso de lectura.",
+    "revoke": "Revocar",
+    "revoked": "Acceso revocado.",
+    "revokeError": "No se pudo revocar el acceso",
+    "lastUsed": "Último uso: {{date}}",
+    "connectedAt": "Conectado el {{date}}",
+    "unnamed": "Aplicación sin nombre",
+    "consentTitle": "Permitir acceso de lectura",
+    "consentLead": "{{name}} quiere leer tu garaje, circuitos, tiempos, competiciones y el catálogo público.",
+    "consentReadOnly": "Solo lectura. No puede crear, editar ni borrar datos.",
+    "consentApprove": "Permitir lectura",
+    "consentDeny": "Denegar",
+    "consentLoading": "Comprobando la aplicación...",
+    "consentError": "No se pudo completar la autorización",
+    "consentMissing": "Faltan datos de la solicitud. Vuelve a conectar desde el asistente."
+  },
   "license": {
     "title": "Slot Race Manager (DS200)",
     "description": "Instalaciones registradas de la app de escritorio. Máximo 3 ordenadores por cuenta con licencia. Para liberar un dispositivo, contacta con soporte.",

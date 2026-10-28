@@ -18,6 +18,17 @@ const {
 } = require('../lib/catalogAliases');
 const { rewritePublicCatalogResponse } = require('../lib/publicCatalogImageUrls');
 const { fetchCatalogCompleteHighlights } = require('../lib/catalogHighlights');
+const { createTtlCache } = require('../lib/ttlCache');
+
+const FACETS_TTL_MS = 10 * 60 * 1000;
+const BRANDS_TTL_MS = 10 * 60 * 1000;
+const ITEMS_TTL_MS = 3 * 60 * 1000;
+const DETAIL_TTL_MS = 10 * 60 * 1000;
+
+const facetsCache = createTtlCache({ ttlMs: FACETS_TTL_MS, maxEntries: 4 });
+const brandsCache = createTtlCache({ ttlMs: BRANDS_TTL_MS, maxEntries: 4 });
+const itemsCache = createTtlCache({ ttlMs: ITEMS_TTL_MS, maxEntries: 100 });
+const detailCache = createTtlCache({ ttlMs: DETAIL_TTL_MS, maxEntries: 500 });
 
 /** Techo del listado público: la UI usa 24; 48 cubre grids densos sin dump masivo. */
 const PUBLIC_ITEMS_MAX_LIMIT = 48;
@@ -40,63 +51,72 @@ function isUuid(id) {
   );
 }
 
+function publicCatalogCacheKey(scope, payload) {
+  return `${scope}:${process.env.PUBLIC_IMAGE_ORIGIN || ''}:${JSON.stringify(payload)}`;
+}
+
+function clearPublicCatalogCache() {
+  facetsCache.clear();
+  brandsCache.clear();
+  itemsCache.clear();
+  detailCache.clear();
+}
+
+function sortByName(rows) {
+  return rows.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+
+function shapeFacets(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const manufacturers = sortByName(
+    (Array.isArray(src.manufacturers) ? src.manufacturers : [])
+      .map((row) => ({
+        name: String(row?.name ?? '').trim(),
+        slug: String(row?.slug ?? '').trim(),
+        count: Number(row?.count) || 0,
+      }))
+      .filter((row) => row.name),
+  );
+  const named = (key) => sortByName(
+    (Array.isArray(src[key]) ? src[key] : [])
+      .map((row) => ({
+        name: String(row?.name ?? '').trim(),
+        count: Number(row?.count) || 0,
+      }))
+      .filter((row) => row.name),
+  );
+  const years = (Array.isArray(src.years) ? src.years : [])
+    .map((row) => ({
+      year: Number(row?.year),
+      count: Number(row?.count) || 0,
+    }))
+    .filter((row) => Number.isFinite(row.year))
+    .sort((a, b) => b.year - a.year);
+
+  return {
+    manufacturers,
+    vehicle_types: named('vehicle_types'),
+    tractions: named('tractions'),
+    motor_positions: named('motor_positions'),
+    years,
+  };
+}
+
 /**
  * GET /facets — valores distintos para filtros con conteos
  */
 router.get('/facets', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('slot_catalog_items_with_ratings')
-      .select('manufacturer, manufacturer_slug, vehicle_type, traction, motor_position, commercial_release_year, discontinued, upcoming_release');
+    const key = publicCatalogCacheKey('facets', {});
+    const hit = facetsCache.get(key);
+    if (hit) return res.json(hit);
+
+    const { data, error } = await supabase.rpc('catalog_public_facets');
     if (error) return res.status(500).json({ error: error.message });
 
-    const manufacturerMap   = new Map(); // slug -> { name, slug, count }
-    const vehicleTypeCounts = new Map();
-    const tractionCounts    = new Map();
-    const motorPositionCounts = new Map();
-    const yearCounts        = new Map();
-
-    for (const row of data || []) {
-      if (row.manufacturer != null && String(row.manufacturer).trim() !== '') {
-        const name = String(row.manufacturer).trim();
-        const slug = String(row.manufacturer_slug || '').trim();
-        const key  = slug || name.toLowerCase();
-        const prev = manufacturerMap.get(key) || { name, slug, count: 0 };
-        manufacturerMap.set(key, { ...prev, count: prev.count + 1 });
-      }
-      if (row.vehicle_type != null && String(row.vehicle_type).trim() !== '') {
-        const v = String(row.vehicle_type).trim();
-        vehicleTypeCounts.set(v, (vehicleTypeCounts.get(v) || 0) + 1);
-      }
-      if (row.traction != null && String(row.traction).trim() !== '') {
-        const t = String(row.traction).trim();
-        tractionCounts.set(t, (tractionCounts.get(t) || 0) + 1);
-      }
-      if (row.motor_position != null && String(row.motor_position).trim() !== '') {
-        const m = String(row.motor_position).trim();
-        motorPositionCounts.set(m, (motorPositionCounts.get(m) || 0) + 1);
-      }
-      if (row.commercial_release_year != null && Number.isFinite(Number(row.commercial_release_year))) {
-        const y = Number(row.commercial_release_year);
-        yearCounts.set(y, (yearCounts.get(y) || 0) + 1);
-      }
-    }
-
-    res.json({
-      manufacturers: Array.from(manufacturerMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'es')),
-      vehicle_types: Array.from(vehicleTypeCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'es')),
-      tractions: Array.from(tractionCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'es')),
-      motor_positions: Array.from(motorPositionCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'es')),
-      years: Array.from(yearCounts.entries())
-        .map(([year, count]) => ({ year, count }))
-        .sort((a, b) => b.year - a.year),
-    });
+    const body = shapeFacets(data);
+    facetsCache.set(key, body);
+    res.json(body);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -107,12 +127,18 @@ router.get('/facets', async (req, res) => {
  */
 router.get('/brands', async (req, res) => {
   try {
+    const key = publicCatalogCacheKey('brands', {});
+    const hit = brandsCache.get(key);
+    if (hit) return res.json(hit);
+
     const { data, error } = await supabase
       .from('slot_catalog_brands')
       .select('id, name, logo_url, slug')
       .order('name', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
-    res.json(rewritePublicCatalogResponse({ brands: data ?? [] }));
+    const body = rewritePublicCatalogResponse({ brands: data ?? [] });
+    brandsCache.set(key, body);
+    res.json(body);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -179,6 +205,26 @@ router.get('/items', async (req, res) => {
       ? parseInt(String(req.query.year_to),   10) : null;
     const sort = String(req.query.sort ?? 'manufacturer').trim();
 
+    const listKey = publicCatalogCacheKey('items', {
+      page,
+      limit,
+      manufacturerSlug,
+      manufacturerText,
+      manufacturerId,
+      vehicleType,
+      tractionFilter,
+      year,
+      q,
+      motorPosition,
+      discontinuedRaw: discontinuedRaw ?? null,
+      upcomingReleaseRaw: upcomingReleaseRaw ?? null,
+      yearFrom,
+      yearTo,
+      sort,
+    });
+    const listHit = itemsCache.get(listKey);
+    if (listHit) return res.json(listHit);
+
     const aliasIds = q
       ? await findCatalogItemIdsByAliasOrEan(supabase, q, { limit: 80 })
       : [];
@@ -193,7 +239,11 @@ router.get('/items', async (req, res) => {
         .eq('slug', manufacturerSlug)
         .maybeSingle();
       if (brand) resolvedManufacturerId = brand.id;
-      else return res.json({ items: [], total: 0, page, limit, totalPages: 0 });
+      else {
+        const empty = { items: [], total: 0, page, limit, totalPages: 0 };
+        itemsCache.set(listKey, empty);
+        return res.json(empty);
+      }
     }
 
     // manufacturer_id explícito (prioridad si no hay slug)
@@ -278,15 +328,15 @@ router.get('/items', async (req, res) => {
       limit,
     });
 
-    res.json(
-      rewritePublicCatalogResponse({
-        items: data,
-        total: count,
-        page,
-        limit,
-        totalPages,
-      }),
-    );
+    const body = rewritePublicCatalogResponse({
+      items: data,
+      total: count,
+      page,
+      limit,
+      totalPages,
+    });
+    itemsCache.set(listKey, body);
+    res.json(body);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -301,13 +351,22 @@ router.get('/items/:id', async (req, res) => {
     if (!isUuid(id)) {
       return res.status(404).json({ error: 'Ítem no encontrado' });
     }
+    const detailKey = publicCatalogCacheKey('item', { id });
+    const detailHit = detailCache.get(detailKey);
+    if (detailHit) {
+      if (detailHit.missing) return res.status(404).json({ error: 'Ítem no encontrado' });
+      return res.json(detailHit.body);
+    }
     const { data, error } = await supabase
       .from('slot_catalog_items_with_ratings')
       .select(`${PUBLIC_DETAIL_SELECT}, created_at`)
       .eq('id', id)
       .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
-    if (!data) return res.status(404).json({ error: 'Ítem no encontrado' });
+    if (!data) {
+      detailCache.set(detailKey, { missing: true });
+      return res.status(404).json({ error: 'Ítem no encontrado' });
+    }
 
     let registered_user_count = 0;
     const countClient = getServiceClient() || supabase;
@@ -338,9 +397,14 @@ router.get('/items/:id', async (req, res) => {
     }
 
     const withAliases = await attachAliasesToCatalogItems(supabase, data);
-    res.json(
-      rewritePublicCatalogResponse({ ...withAliases, registered_user_count, neighbors, similar }),
-    );
+    const body = rewritePublicCatalogResponse({
+      ...withAliases,
+      registered_user_count,
+      neighbors,
+      similar,
+    });
+    detailCache.set(detailKey, { missing: false, body });
+    res.json(body);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -348,3 +412,5 @@ router.get('/items/:id', async (req, res) => {
 
 module.exports = router;
 module.exports.PUBLIC_ITEMS_MAX_LIMIT = PUBLIC_ITEMS_MAX_LIMIT;
+module.exports.clearPublicCatalogCache = clearPublicCatalogCache;
+module.exports.shapeFacets = shapeFacets;

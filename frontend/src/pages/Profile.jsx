@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Switch } from '../components/ui/switch';
-import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2, BookOpen, ExternalLink } from 'lucide-react';
+import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2, BookOpen, ExternalLink, Link2 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { PARTNER_SWAGGER_PRODUCTION_URL } from '../utils/partnerApiUrls';
 import { toIntlLocale } from '../i18n/localeUtils';
@@ -48,6 +48,11 @@ const Profile = () => {
   const [creatingKey, setCreatingKey] = useState(false);
   const [newPlainKey, setNewPlainKey] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
+  const [mcpConnections, setMcpConnections] = useState([]);
+  const [mcpLoading, setMcpLoading] = useState(true);
+  const [mcpError, setMcpError] = useState(null);
+  const [mcpSuccess, setMcpSuccess] = useState(null);
+  const [revokingMcpId, setRevokingMcpId] = useState(null);
 
   const [licenseInfo, setLicenseInfo] = useState(null);
   const [licenseLoading, setLicenseLoading] = useState(false);
@@ -115,6 +120,38 @@ const Profile = () => {
   useEffect(() => {
     fetchApiKey();
   }, [fetchApiKey]);
+
+  const fetchMcpConnections = useCallback(async () => {
+    setMcpLoading(true);
+    try {
+      const { data } = await api.get('/oauth/connections');
+      setMcpConnections(Array.isArray(data?.connections) ? data.connections : []);
+      setMcpError(null);
+    } catch (err) {
+      setMcpError(err.response?.data?.error_description || err.response?.data?.error || t('mcp.loadError'));
+    } finally {
+      setMcpLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    fetchMcpConnections();
+  }, [fetchMcpConnections]);
+
+  const revokeMcpConnection = async (clientId) => {
+    setRevokingMcpId(clientId);
+    setMcpSuccess(null);
+    setMcpError(null);
+    try {
+      await api.delete(`/oauth/connections/${clientId}`);
+      setMcpSuccess(t('mcp.revoked'));
+      await fetchMcpConnections();
+    } catch (err) {
+      setMcpError(err.response?.data?.error_description || err.response?.data?.error || t('mcp.revokeError'));
+    } finally {
+      setRevokingMcpId(null);
+    }
+  };
 
   const fetchPilotProfile = useCallback(async () => {
     setPilotLoading(true);
@@ -685,6 +722,72 @@ const Profile = () => {
               <AlertDescription>{success}</AlertDescription>
             </Alert>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="size-5" />
+            {t('mcp.title')}
+          </CardTitle>
+          <CardDescription>{t('mcp.description')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/developers">{t('mcp.docs')}</Link>
+          </Button>
+          {mcpLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner className="size-4" />
+              {t('mcp.loading')}
+            </div>
+          ) : mcpConnections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('mcp.empty')}</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {mcpConnections.map((row) => (
+                <li
+                  key={row.client_id}
+                  className="flex flex-col gap-2 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <span className="font-medium">{row.client_name || t('mcp.unnamed')}</span>
+                    {row.connected_at ? (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {t('mcp.connectedAt', { date: new Date(row.connected_at).toLocaleDateString(intlLocale) })}
+                      </span>
+                    ) : null}
+                    {row.last_used_at ? (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {t('mcp.lastUsed', { date: new Date(row.last_used_at).toLocaleString(intlLocale) })}
+                      </span>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => revokeMcpConnection(row.client_id)}
+                    disabled={revokingMcpId === row.client_id}
+                  >
+                    {revokingMcpId === row.client_id ? <Spinner className="mr-2 size-4" /> : null}
+                    {t('mcp.revoke')}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {mcpError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{mcpError}</AlertDescription>
+            </Alert>
+          ) : null}
+          {mcpSuccess ? (
+            <Alert>
+              <AlertDescription>{mcpSuccess}</AlertDescription>
+            </Alert>
+          ) : null}
         </CardContent>
       </Card>
         </TabsContent>

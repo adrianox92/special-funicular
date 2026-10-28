@@ -75,6 +75,28 @@
     "revoked": "API-Key widerrufen.",
     "revokeError": "API-Key konnte nicht widerrufen werden"
   },
+  "mcp": {
+    "title": "Lese-Verbindungen",
+    "description": "Apps wie Claude oder ChatGPT können Garage, Strecken, Zeiten, Wettbewerbe und den Katalog abfragen. Sie können nichts ändern.",
+    "docs": "Assistenten verbinden",
+    "loading": "Verbindungen werden geladen...",
+    "loadError": "Verbindungen konnten nicht geladen werden",
+    "empty": "Kein Assistent hat Lesezugriff.",
+    "revoke": "Widerrufen",
+    "revoked": "Zugriff widerrufen.",
+    "revokeError": "Zugriff konnte nicht widerrufen werden",
+    "lastUsed": "Zuletzt verwendet: {{date}}",
+    "connectedAt": "Verbunden am {{date}}",
+    "unnamed": "App ohne Namen",
+    "consentTitle": "Lesezugriff erlauben",
+    "consentLead": "{{name}} möchte deine Garage, Strecken, Zeiten, Wettbewerbe und den öffentlichen Katalog lesen.",
+    "consentReadOnly": "Nur Lesen. Es kann keine Daten anlegen, ändern oder löschen.",
+    "consentApprove": "Lesen erlauben",
+    "consentDeny": "Ablehnen",
+    "consentLoading": "App wird geprüft...",
+    "consentError": "Autorisierung konnte nicht abgeschlossen werden",
+    "consentMissing": "Der Anfrage fehlen Daten. Starte die Verbindung erneut im Assistenten."
+  },
   "license": {
     "title": "Slot Race Manager (DS200)",
     "description": "Registrierte Installationen der Desktop-App. Maximal 3 Computer pro lizenziertem Konto. Um ein Gerät freizugeben, kontaktiere den Support.",

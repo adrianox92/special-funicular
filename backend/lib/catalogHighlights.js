@@ -11,27 +11,9 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 let cache = { at: 0, items: null };
 
 /**
- * Filtros de ítem 100% completo: imagen, nombre, tipo, tracción, motor y año.
- * Misma regla que `catalogItemIsWeightedComplete`.
- */
-function applyWeightedCompleteFilters(query) {
-  return query
-    .not('image_url', 'is', null)
-    .neq('image_url', '')
-    .not('model_name', 'is', null)
-    .neq('model_name', '')
-    .not('vehicle_type', 'is', null)
-    .neq('vehicle_type', '')
-    .not('traction', 'is', null)
-    .neq('traction', '')
-    .not('motor_position', 'is', null)
-    .neq('motor_position', '')
-    .gte('commercial_release_year', 1900)
-    .lte('commercial_release_year', 2100);
-}
-
-/**
  * Un modelo 100% completo por marca, el mejor valorado de cada una.
+ * La selección está en `catalog_public_highlights()` (una consulta). Aquí solo
+ * se descartan filas que no cumplan la regla de completitud y se ordenan.
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {{ force?: boolean }} [opts]
  */
@@ -41,33 +23,11 @@ async function fetchCatalogCompleteHighlights(supabase, opts = {}) {
     return cache.items;
   }
 
-  const { data: brands, error } = await supabase
-    .from('slot_catalog_brands')
-    .select('id, name')
-    .order('name', { ascending: true });
+  const { data, error } = await supabase.rpc('catalog_public_highlights');
   if (error) throw new Error(error.message);
 
-  const picked = await Promise.all(
-    (brands || []).map(async (brand) => {
-      const query = applyWeightedCompleteFilters(
-        supabase
-          .from('slot_catalog_items_with_ratings')
-          .select(HIGHLIGHT_SELECT)
-          .eq('manufacturer_id', brand.id),
-      );
-      const { data, error: itemErr } = await query
-        .order('rating_avg', { ascending: false, nullsFirst: false })
-        .order('reference', { ascending: true })
-        .limit(1);
-      if (itemErr || !data?.[0]) return null;
-      const row = data[0];
-      if (!catalogItemIsWeightedComplete(row)) return null;
-      return row;
-    }),
-  );
-
-  const items = picked
-    .filter(Boolean)
+  const items = (Array.isArray(data) ? data : [])
+    .filter((row) => row && catalogItemIsWeightedComplete(row))
     .sort((a, b) => String(a.manufacturer || '').localeCompare(String(b.manufacturer || ''), 'es'));
 
   cache = { at: now, items };
@@ -82,5 +42,4 @@ module.exports = {
   HIGHLIGHT_SELECT,
   fetchCatalogCompleteHighlights,
   clearCatalogHighlightCache,
-  applyWeightedCompleteFilters,
 };

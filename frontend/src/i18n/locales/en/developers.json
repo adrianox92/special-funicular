@@ -98,6 +98,14 @@
     "v11NoteMultiKey": "Multiple personal API keys: create, list, and revoke in Profile. At least one stays active. Regenerate rotates only the primary key.",
     "v11NoteClubKey": "Club API key (one per club). An admin rotates it on the club page. It covers roster and competitions; it does not open a personal garage."
   },
+  "mcp": {
+    "title": "Assistants (Claude and ChatGPT)",
+    "lead": "Any user can connect an assistant to look up their garage, circuits, timings, competitions, and the catalog. Access is read-only and is authorized with the Slot Database account.",
+    "urlLabel": "Connector URL",
+    "claude": "In Claude: Settings, Connectors, custom connector, and paste the URL. The browser opens Slot Database so you can allow read access.",
+    "chatgpt": "In ChatGPT: Settings, Apps or Connectors, remote server, and paste the same URL. The permission is the same.",
+    "revoke": "You can revoke access in Profile, next to the API key."
+  },
   "support": {
     "title": "Contact and support",
     "lead": "Questions about integration, the contract, or a key? Use the same product contact form and mention that you are an integrator.",

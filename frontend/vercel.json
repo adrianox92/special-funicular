@@ -4,6 +4,46 @@
   "outputDirectory": "build",
   "rewrites": [
     {
+      "source": "/mcp",
+      "destination": "https://special-funicular-3q60.onrender.com/mcp"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "https://special-funicular-3q60.onrender.com/.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource/mcp",
+      "destination": "https://special-funicular-3q60.onrender.com/.well-known/oauth-protected-resource/mcp"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "https://special-funicular-3q60.onrender.com/.well-known/oauth-authorization-server"
+    },
+    {
+      "source": "/oauth/register",
+      "destination": "https://special-funicular-3q60.onrender.com/oauth/register"
+    },
+    {
+      "source": "/oauth/authorize",
+      "destination": "https://special-funicular-3q60.onrender.com/oauth/authorize"
+    },
+    {
+      "source": "/oauth/token",
+      "destination": "https://special-funicular-3q60.onrender.com/oauth/token"
+    },
+    {
+      "source": "/oauth/approve",
+      "destination": "https://special-funicular-3q60.onrender.com/oauth/approve"
+    },
+    {
+      "source": "/oauth/deny",
+      "destination": "https://special-funicular-3q60.onrender.com/oauth/deny"
+    },
+    {
+      "source": "/oauth/client-info",
+      "destination": "https://special-funicular-3q60.onrender.com/oauth/client-info"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
     },

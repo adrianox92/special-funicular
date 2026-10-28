@@ -7,6 +7,7 @@ const { encryptApiKey, decryptApiKey } = require('../lib/apiKeyEncrypt');
 const { getDefaultUserApiKey, createUserApiKey } = require('../lib/userApiKeys');
 const { removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const authMiddleware = require('../middleware/auth');
+const { resolveAuthUser } = require('../lib/resolveAuthUser');
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -89,7 +90,7 @@ router.post('/api-key', async (req, res) => {
       : '';
     let userId;
     if (accessToken) {
-      const { data: { user }, error } = await getSupabase().auth.getUser(accessToken);
+      const { user, error } = await resolveAuthUser(getSupabase(), accessToken);
       if (error || !user) {
         return res.status(401).json({ error: 'Token inválido o expirado' });
       }

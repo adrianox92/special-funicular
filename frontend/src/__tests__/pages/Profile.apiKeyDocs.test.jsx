@@ -42,6 +42,9 @@ describe('Profile API key docs links', () => {
       if (url === '/license-account/me') {
         return Promise.resolve({ data: { is_paid: false } });
       }
+      if (url === '/oauth/connections') {
+        return Promise.resolve({ data: { connections: [] } });
+      }
       return Promise.reject(new Error(`unexpected GET ${url}`));
     });
   });

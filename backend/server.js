@@ -46,6 +46,8 @@ const {
   authSoftLimiter,
   contactLimiter,
   syncApiKeyLimiter,
+  mcpReadLimiter,
+  mcpOauthLimiter,
 } = require('./middleware/rateLimits');
 
 const app = express();
@@ -120,6 +122,10 @@ function pickCorsOptions(path) {
   if (path.startsWith('/api/lap-timer/license')) return corsSyncOptions;
   if (path.startsWith('/api/lap-timer/promo')) return corsSyncOptions;
   if (
+    path.startsWith('/mcp') ||
+    path.startsWith('/oauth') ||
+    path.startsWith('/.well-known') ||
+    path.startsWith('/api/oauth') ||
     path.startsWith('/api/docs') ||
     path.startsWith('/api/sync') ||
     path === '/api/auth/api-key' ||
@@ -226,6 +232,14 @@ const publicLeaguesRoute = require('./routes/publicLeagues');
 app.use('/api/public-leagues', publicSignupLimiter, publicLeaguesRoute);
 const partnerDocsRoute = require('./routes/partnerDocs');
 app.use('/api/docs', partnerDocsRoute);
+
+const oauthRoute = require('./routes/oauth');
+const mcpRoute = require('./routes/mcp');
+app.get('/.well-known/oauth-protected-resource', mcpOauthLimiter, oauthRoute.resourceMetadata);
+app.get('/.well-known/oauth-protected-resource/mcp', mcpOauthLimiter, oauthRoute.resourceMetadata);
+app.get('/.well-known/oauth-authorization-server', mcpOauthLimiter, oauthRoute.authorizationServerMetadata);
+app.use(['/oauth', '/api/oauth'], mcpOauthLimiter, oauthRoute);
+app.use('/mcp', mcpReadLimiter, mcpRoute);
 
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');
