@@ -161,6 +161,120 @@ function mcpCatalogOutcomeLabel(outcome) {
   return MCP_CATALOG_OUTCOME[outcome] || outcome || '—';
 }
 
+function catalogTopRows(data, historic, periodKey, allKey) {
+  const rows = historic ? data?.[allKey] : data?.[periodKey];
+  return Array.isArray(rows) ? rows : [];
+}
+
+function formatCatalogDelta(count, historic) {
+  const n = Number(count) || 0;
+  return historic ? String(n) : `+${n}`;
+}
+
+function CatalogAssignmentTops({ data, historic, onHistoricChange }) {
+  const brands = catalogTopRows(data, historic, 'catalog_brands_period', 'catalog_brands_all');
+  const refs = catalogTopRows(data, historic, 'catalog_refs_period', 'catalog_refs_all');
+  const emptyLabel = historic
+    ? 'Sin vehículos enlazados al catálogo.'
+    : 'Sin asignaciones en este periodo.';
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {historic
+            ? 'Total histórico de vehículos con enlace a catálogo, sin filtro de fechas.'
+            : 'Variación del periodo: vehículos creados en el intervalo de arriba que ya tienen ficha de catálogo.'}
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Variación del periodo</span>
+          <Switch
+            id="catalog-tops-historic"
+            checked={historic}
+            onCheckedChange={(v) => onHistoricChange(!!v)}
+          />
+          <Label htmlFor="catalog-tops-historic" className="text-sm font-normal cursor-pointer">
+            Total histórico
+          </Label>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="space-y-1 pb-3">
+            <CardTitle className="text-base">Marcas en el catálogo</CardTitle>
+            <CardDescription>
+              Top 10 por vehículos asignados. Entre paréntesis, usuarios distintos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {brands.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Marca</TableHead>
+                      <TableHead className="text-right w-[140px]">Vehículos</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {brands.map((row) => (
+                      <TableRow key={row.brand_name}>
+                        <TableCell>{row.brand_name}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCatalogDelta(row.vehicle_count, historic)} ({Number(row.user_count) || 0})
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="space-y-1 pb-3">
+            <CardTitle className="text-base">Referencias en el catálogo</CardTitle>
+            <CardDescription>Top 10 por usuarios que tienen ese coche.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {refs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead className="text-right w-[120px]">Usuarios</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {refs.map((row) => (
+                      <TableRow key={`${row.brand_name}:${row.reference}`}>
+                        <TableCell>
+                          <span className="font-mono">{row.reference}</span>
+                          <span className="block text-xs text-muted-foreground truncate">
+                            {[row.model_name, row.brand_name].filter(Boolean).join(' · ')}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCatalogDelta(row.user_count, historic)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 const AdminPlatformDashboard = () => {
   const { user } = useAuth();
   const isAdmin = isLicenseAdminUser(user);
@@ -189,6 +303,7 @@ const AdminPlatformDashboard = () => {
   const [mcpUsage, setMcpUsage] = useState(null);
   const [mcpUsageLoading, setMcpUsageLoading] = useState(false);
   const [mcpUsageError, setMcpUsageError] = useState(null);
+  const [catalogTopsHistoric, setCatalogTopsHistoric] = useState(false);
 
   const [refsPage, setRefsPage] = useState(1);
   const [refsOnlyUnlinked, setRefsOnlyUnlinked] = useState(false);
@@ -801,10 +916,17 @@ const AdminPlatformDashboard = () => {
       </div>
 
       {data && !loading && (
-        <VehicleCatalogCoverageChart
-          vehiclesTotal={data.vehicles_total ?? 0}
-          withCatalogItemId={data.vehicles_with_catalog_item_id ?? 0}
-        />
+        <>
+          <VehicleCatalogCoverageChart
+            vehiclesTotal={data.vehicles_total ?? 0}
+            withCatalogItemId={data.vehicles_with_catalog_item_id ?? 0}
+          />
+          <CatalogAssignmentTops
+            data={data}
+            historic={catalogTopsHistoric}
+            onHistoricChange={setCatalogTopsHistoric}
+          />
+        </>
       )}
 
       <Card>

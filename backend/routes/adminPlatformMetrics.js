@@ -21,6 +21,10 @@ function parseIsoDate(s) {
   return new Date(t);
 }
 
+function asMetricArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function isUuid(s) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     String(s || '').trim(),
@@ -129,9 +133,11 @@ router.get('/platform-metrics', async (req, res) => {
       users_active: payload.users_active ?? 0,
       competitions_created: payload.competitions_created ?? 0,
       vehicles_in_period: payload.vehicles_in_period ?? 0,
-      vehicles_by_user: Array.isArray(payload.vehicles_by_user)
-        ? payload.vehicles_by_user
-        : [],
+      vehicles_by_user: asMetricArray(payload.vehicles_by_user),
+      catalog_brands_period: asMetricArray(payload.catalog_brands_period),
+      catalog_brands_all: asMetricArray(payload.catalog_brands_all),
+      catalog_refs_period: asMetricArray(payload.catalog_refs_period),
+      catalog_refs_all: asMetricArray(payload.catalog_refs_all),
     });
   } catch (err) {
     console.error('adminPlatformMetrics:', err);
