@@ -100,10 +100,11 @@
   },
   "mcp": {
     "title": "Assistenten (Claude und ChatGPT)",
-    "lead": "Jede Nutzerin und jeder Nutzer kann einen Assistenten verbinden, um Garage, Strecken, Zeiten, Wettbewerbe und den Katalog abzufragen. Der Zugriff ist nur lesend und wird mit dem Slot-Database-Konto freigegeben.",
+    "lead": "Jede Nutzerin und jeder Nutzer kann einen Assistenten verbinden, um Garage, Strecken, Zeiten und Wettbewerbe abzufragen, plus eine konkrete Katalogkarte. Der Zugriff ist nur lesend und wird mit dem Slot-Database-Konto freigegeben.",
     "urlLabel": "Connector-URL",
     "claude": "In Claude: Einstellungen, Connectors, eigener Connector, und die URL einfügen. Der Browser öffnet Slot Database, damit du den Lesezugriff erlaubst.",
     "chatgpt": "In ChatGPT: Einstellungen, Apps oder Connectors, Remote-Server, und dieselbe URL einfügen. Die Freigabe ist dieselbe.",
+    "catalog": "Der Katalog kann nicht aufgelistet werden. Der Assistent kann nur eine genaue Karte abfragen, mit Referenz und Marke. Höchstens 10 Katalogabfragen pro Minute und 100 pro Tag, und jede Abfrage wird gespeichert.",
     "revoke": "Den Zugriff kannst du im Profil widerrufen, neben dem API-Key."
   },
   "support": {

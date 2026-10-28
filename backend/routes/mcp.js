@@ -27,7 +27,7 @@ router.use(async (req, res, next) => {
   if (!db) return res.status(503).json({ error: 'Error de configuración del servidor' });
   try {
     const session = await resolveAccessToken(db, token);
-    req.mcpUser = { id: session.userId };
+    req.mcpUser = { id: session.userId, clientId: session.clientId || null };
     return next();
   } catch (err) {
     res.set('WWW-Authenticate', wwwAuthenticate(req));
@@ -39,7 +39,7 @@ router.use(async (req, res, next) => {
 router.post('/', async (req, res) => {
   try {
     const { handleMcpHttp } = require('../mcp/createServer');
-    await handleMcpHttp(req, res, req.mcpUser.id);
+    await handleMcpHttp(req, res, req.mcpUser.id, { clientId: req.mcpUser.clientId });
   } catch (err) {
     console.error('[mcp]', err);
     if (!res.headersSent) {

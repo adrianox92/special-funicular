@@ -146,6 +146,7 @@ const DevelopersPage = () => {
               </p>
               <p>{t('mcp.claude')}</p>
               <p>{t('mcp.chatgpt')}</p>
+              <p>{t('mcp.catalog')}</p>
               <p>{t('mcp.revoke')}</p>
             </CardContent>
           </Card>

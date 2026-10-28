@@ -358,4 +358,20 @@ router.post('/link-garage-refs-to-catalog', async (req, res) => {
   }
 });
 
+router.get('/mcp-catalog-usage', async (req, res) => {
+  if (!assertLicenseAdmin(req, res)) return;
+  const supabaseAdmin = getServiceClient();
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada' });
+  }
+  try {
+    const { summarizeCatalogUsage } = require('../lib/mcpCatalogUsage');
+    const summary = await summarizeCatalogUsage(supabaseAdmin);
+    res.json(summary);
+  } catch (err) {
+    console.error('mcp-catalog-usage:', err);
+    res.status(err.statusCode || 500).json({ error: err.message || 'Error al leer el uso del catálogo' });
+  }
+});
+
 module.exports = router;

@@ -105,6 +105,9 @@ function mockGets({ refs = { total: 0, rows: [] } } = {}) {
         data: { suggestions: refs.suggestions ?? [] },
       });
     }
+    if (url === '/admin/mcp-catalog-usage') {
+      return Promise.resolve({ data: { ready: true, lookups_24h: 0, users: [], recent: [] } });
+    }
     if (url === '/admin/vehicle-refs-not-in-catalog') {
       const q = config?.params?.q;
       const manufacturer = config?.params?.manufacturer;

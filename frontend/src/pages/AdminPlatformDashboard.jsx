@@ -149,6 +149,18 @@ function formatEsPercent(value) {
   return `${n.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 }
 
+const MCP_CATALOG_OUTCOME = {
+  found: 'Encontrada',
+  not_found: 'No encontrada',
+  ambiguous: 'Ambigua',
+  rate_limited: 'Límite por minuto',
+  daily_limited: 'Límite diario',
+};
+
+function mcpCatalogOutcomeLabel(outcome) {
+  return MCP_CATALOG_OUTCOME[outcome] || outcome || '—';
+}
+
 const AdminPlatformDashboard = () => {
   const { user } = useAuth();
   const isAdmin = isLicenseAdminUser(user);
@@ -173,6 +185,10 @@ const AdminPlatformDashboard = () => {
   const [retention, setRetention] = useState(null);
   const [retentionLoading, setRetentionLoading] = useState(false);
   const [retentionError, setRetentionError] = useState(null);
+
+  const [mcpUsage, setMcpUsage] = useState(null);
+  const [mcpUsageLoading, setMcpUsageLoading] = useState(false);
+  const [mcpUsageError, setMcpUsageError] = useState(null);
 
   const [refsPage, setRefsPage] = useState(1);
   const [refsOnlyUnlinked, setRefsOnlyUnlinked] = useState(false);
@@ -243,6 +259,21 @@ const AdminPlatformDashboard = () => {
       setRetention(null);
     } finally {
       setRetentionLoading(false);
+    }
+  }, []);
+
+  const fetchMcpUsage = useCallback(async () => {
+    setMcpUsageLoading(true);
+    setMcpUsageError(null);
+    try {
+      const { data: res } = await api.get('/admin/mcp-catalog-usage');
+      setMcpUsage(res);
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al cargar el uso del MCP';
+      setMcpUsageError(msg);
+      setMcpUsage(null);
+    } finally {
+      setMcpUsageLoading(false);
     }
   }, []);
 
@@ -421,6 +452,10 @@ const AdminPlatformDashboard = () => {
   }, [isAdmin, fetchRetention]);
 
   useEffect(() => {
+    if (isAdmin) void fetchMcpUsage();
+  }, [isAdmin, fetchMcpUsage]);
+
+  useEffect(() => {
     if (isAdmin) void fetchRefsReport();
   }, [isAdmin, fetchRefsReport]);
 
@@ -493,10 +528,11 @@ const AdminPlatformDashboard = () => {
           onClick={() => {
             void fetchMetrics();
             void fetchRetention();
+            void fetchMcpUsage();
           }}
-          disabled={loading || retentionLoading || !range}
+          disabled={loading || retentionLoading || mcpUsageLoading || !range}
         >
-          <RefreshCw className={loading || retentionLoading ? 'size-4 animate-spin' : 'size-4'} />
+          <RefreshCw className={loading || retentionLoading || mcpUsageLoading ? 'size-4 animate-spin' : 'size-4'} />
           Actualizar
         </Button>
       </div>
@@ -589,6 +625,76 @@ const AdminPlatformDashboard = () => {
                 {formatEsPercent(retention.goal?.baseline_2026_09_15_pct)} (15/09/2026). Objetivo ≥{' '}
                 {retention.goal?.target_min_pct ?? 8}–{retention.goal?.target_max_pct ?? 10} %.
               </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Consultas MCP al catálogo</CardTitle>
+          <CardDescription>
+            Últimas 24 horas. Cada ficha pedida por un asistente queda registrada con la cuenta, la
+            referencia y la marca. Máximo 10 por minuto y 100 al día.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {mcpUsageError && (
+            <Alert variant="destructive">
+              <AlertDescription>{mcpUsageError}</AlertDescription>
+            </Alert>
+          )}
+          {mcpUsageLoading && !mcpUsage && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner className="size-4" />
+              Cargando consultas…
+            </div>
+          )}
+          {mcpUsage && !mcpUsage.ready && (
+            <p className="text-sm text-muted-foreground">
+              Falta la tabla de registro. Ejecuta{' '}
+              <span className="font-mono">backend/scripts/create-mcp-catalog-usage.sql</span> en
+              Supabase.
+            </p>
+          )}
+          {mcpUsage?.ready && (
+            <>
+              <p className="text-sm">
+                <span className="text-2xl font-semibold tabular-nums">{mcpUsage.lookups_24h ?? 0}</span>
+                <span className="ml-2 text-muted-foreground">consultas en 24 h</span>
+              </p>
+              {(mcpUsage.users || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nadie ha consultado el catálogo en las últimas 24 horas.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cuenta</TableHead>
+                      <TableHead className="text-right">Consultas</TableHead>
+                      <TableHead className="text-right">Referencias</TableHead>
+                      <TableHead>Última</TableHead>
+                      <TableHead>Resultado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mcpUsage.users.map((row) => (
+                      <TableRow key={row.user_id}>
+                        <TableCell className="max-w-[16rem] truncate">
+                          {row.email || row.user_id}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{row.lookups}</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.distinct_refs}</TableCell>
+                        <TableCell className="max-w-[14rem] truncate">
+                          {row.last_reference} · {row.last_manufacturer}
+                        </TableCell>
+                        <TableCell>{mcpCatalogOutcomeLabel(row.last_outcome)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </>
           )}
         </CardContent>

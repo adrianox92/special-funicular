@@ -76,7 +76,6 @@ describe('MCP HTTP', () => {
       'list_competitions',
       'list_timings',
       'list_vehicles',
-      'search_catalog',
       'search_collection',
     ]);
     for (const tool of res.body.result.tools) {

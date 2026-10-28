@@ -32,9 +32,9 @@ function wrap(fn) {
  * Servidor MCP nuevo por petición (transporte sin sesión).
  * @param {string} userId
  */
-function createSlotMcpServer(userId) {
+function createSlotMcpServer(userId, context = {}) {
   const server = new McpServer({ name: 'slot-database', version: '1.0.0' });
-  const call = (fn) => wrap((args) => fn(userId, args));
+  const call = (fn) => wrap((args) => fn(userId, args, context));
 
   server.registerTool('search_collection', {
     title: 'Buscar en la colección',
@@ -96,17 +96,13 @@ function createSlotMcpServer(userId) {
     annotations: READ_ONLY,
   }, call(tools.getCompetition));
 
-  server.registerTool('search_catalog', {
-    title: 'Buscar en el catálogo',
-    description: 'Busca en el catálogo público de Slot Database por modelo, referencia o fabricante. q tiene al menos 2 caracteres.',
-    inputSchema: { q: z.string().min(2).max(80) },
-    annotations: READ_ONLY,
-  }, call(tools.searchCatalog));
-
   server.registerTool('get_catalog_item', {
     title: 'Ficha de catálogo',
-    description: 'Detalle de un ítem del catálogo público. id es el UUID del ítem.',
-    inputSchema: { id: z.string().uuid() },
+    description: 'Una sola ficha del catálogo, por referencia y marca exactas. Ejemplo: reference "50402" y manufacturer "Avant Slot". No lista, no busca por modelo y no acepta comodines. Máximo 10 consultas por minuto y 100 al día.',
+    inputSchema: {
+      reference: z.string().min(2).max(80),
+      manufacturer: z.string().min(2).max(80),
+    },
     annotations: READ_ONLY,
   }, call(tools.getCatalogItem));
 
@@ -118,8 +114,8 @@ function createSlotMcpServer(userId) {
  * @param {import('express').Response} res
  * @param {string} userId
  */
-async function handleMcpHttp(req, res, userId) {
-  const server = createSlotMcpServer(userId);
+async function handleMcpHttp(req, res, userId, context = {}) {
+  const server = createSlotMcpServer(userId, context);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

@@ -100,10 +100,11 @@
   },
   "mcp": {
     "title": "Assistants (Claude and ChatGPT)",
-    "lead": "Any user can connect an assistant to look up their garage, circuits, timings, competitions, and the catalog. Access is read-only and is authorized with the Slot Database account.",
+    "lead": "Any user can connect an assistant to look up their garage, circuits, timings, and competitions, plus one exact catalog entry. Access is read-only and is authorized with the Slot Database account.",
     "urlLabel": "Connector URL",
     "claude": "In Claude: Settings, Connectors, custom connector, and paste the URL. The browser opens Slot Database so you can allow read access.",
     "chatgpt": "In ChatGPT: Settings, Apps or Connectors, remote server, and paste the same URL. The permission is the same.",
+    "catalog": "The catalog cannot be listed. The assistant can only request one exact entry, with its reference and brand. Catalog lookups are limited to 10 per minute and 100 per day, and each lookup is recorded.",
     "revoke": "You can revoke access in Profile, next to the API key."
   },
   "support": {

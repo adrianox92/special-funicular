@@ -366,7 +366,7 @@ async function resolveAccessToken(db, rawToken) {
   }
   const { data: row, error } = await db
     .from('mcp_oauth_tokens')
-    .select('id, user_id, scope, access_expires_at, revoked_at')
+    .select('id, user_id, client_id, scope, access_expires_at, revoked_at')
     .eq('access_token_hash', hash)
     .maybeSingle();
   if (error) throw dbError(error);
@@ -386,7 +386,7 @@ async function resolveAccessToken(db, rawToken) {
   if (touch && typeof touch.then === 'function') {
     touch.then(() => {}, () => {});
   }
-  return { userId: row.user_id, tokenId: row.id };
+  return { userId: row.user_id, tokenId: row.id, clientId: row.client_id || null };
 }
 
 /**

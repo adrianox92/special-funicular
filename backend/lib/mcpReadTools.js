@@ -2,6 +2,13 @@
 
 const { getServiceClient } = require('./supabaseClients');
 const { buildCompetitionProgress } = require('./competitionProgress');
+const { normalizeReference } = require('./catalogAliases');
+const { catalogSlugify } = require('./catalogSlug');
+const {
+  assertPersistedCatalogLimit,
+  recordCatalogLookup,
+  resetCatalogUsageState,
+} = require('./mcpCatalogUsage');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -10,7 +17,10 @@ const VEHICLE_LIST_FIELDS = 'id, model, manufacturer, type, traction, reference,
 const VEHICLE_DETAIL_FIELDS = `${VEHICLE_LIST_FIELDS}, price, purchase_date, purchase_place, modified, digital, anotaciones, dorsal, scale_factor`;
 const TIMING_FIELDS = 'id, vehicle_id, best_lap_time, best_lap_timestamp, total_time, average_time, laps, lane, circuit_id, circuit, timing_date';
 const COMP_FIELDS = 'id, name, status, rounds, num_slots, public_slug, circuit_name, organizer, club_id, is_multi_stage, created_at';
-const CATALOG_FIELDS = 'id, reference, manufacturer, model_name, vehicle_type, traction, commercial_release_year, image_url';
+const CATALOG_ITEM_FIELDS = 'reference, manufacturer, model_name, vehicle_type, traction, motor_position, commercial_release_year, dorsal, discontinued, image_url';
+const CATALOG_LOOKUPS_PER_MINUTE = 10;
+const CATALOG_WINDOW_MS = 60_000;
+const catalogLookups = new Map();
 
 function requireDb() {
   const db = getServiceClient();
@@ -307,39 +317,106 @@ async function getCompetition(userId, args = {}) {
   };
 }
 
-async function searchCatalog(userId, args = {}) {
-  assertUser(userId);
-  const raw = String(args.q ?? '').trim();
-  if (raw.length < 2) return { items: [] };
-  const pattern = `%${escapeIlikePattern(raw)}%`;
-  const db = requireDb();
-  const [byModel, byRef, byMaker] = await Promise.all([
-    db.from('slot_catalog_items_with_ratings').select(CATALOG_FIELDS).ilike('model_name', pattern).limit(15),
-    db.from('slot_catalog_items_with_ratings').select(CATALOG_FIELDS).ilike('reference', pattern).limit(15),
-    db.from('slot_catalog_items_with_ratings').select(CATALOG_FIELDS).ilike('manufacturer', pattern).limit(15),
-  ]);
-  assertNoError(byModel.error);
-  assertNoError(byRef.error);
-  assertNoError(byMaker.error);
-  const map = new Map();
-  for (const row of [...(byModel.data || []), ...(byRef.data || []), ...(byMaker.data || [])]) {
-    if (row?.id && !map.has(row.id)) map.set(row.id, row);
-  }
-  return { items: [...map.values()].slice(0, 15) };
+function resetCatalogLookupLimit() {
+  catalogLookups.clear();
+  resetCatalogUsageState();
 }
 
-async function getCatalogItem(userId, args = {}) {
-  assertUser(userId);
-  const id = assertUuid(args.id, 'id');
-  const db = requireDb();
+function assertCatalogLookupLimit(userId, now = Date.now()) {
+  const bucket = catalogLookups.get(userId);
+  if (!bucket || now - bucket.start >= CATALOG_WINDOW_MS) {
+    catalogLookups.set(userId, { start: now, count: 1 });
+    return;
+  }
+  bucket.count += 1;
+  if (bucket.count > CATALOG_LOOKUPS_PER_MINUTE) {
+    httpError(429, 'Demasiadas consultas al catálogo. Máximo 10 por minuto.');
+  }
+}
+
+function oneExactText(value, label) {
+  const text = String(value ?? '').trim().replace(/\s+/g, ' ');
+  if (text.length < 2 || text.length > 80) httpError(400, `${label} debe ser un texto concreto`);
+  return text;
+}
+
+async function exactBrand(db, manufacturer) {
+  const name = escapeIlikePattern(manufacturer);
+  const byName = await db
+    .from('slot_catalog_brands')
+    .select('id')
+    .ilike('name', name)
+    .limit(2);
+  assertNoError(byName.error);
+  const named = byName.data || [];
+  if (named.length > 1) httpError(404, 'No hay una marca con ese nombre exacto');
+  if (named.length === 1) return named[0].id;
+  const bySlug = await db
+    .from('slot_catalog_brands')
+    .select('id')
+    .eq('slug', catalogSlugify(manufacturer))
+    .limit(2);
+  assertNoError(bySlug.error);
+  const slugged = bySlug.data || [];
+  if (slugged.length !== 1) httpError(404, 'No hay una marca con ese nombre exacto');
+  return slugged[0].id;
+}
+
+async function oneItemId(db, table, column, reference, manufacturerId) {
   const { data, error } = await db
-    .from('slot_catalog_items_with_ratings')
-    .select(`${CATALOG_FIELDS}, motor_position, dorsal, discontinued`)
-    .eq('id', id)
-    .maybeSingle();
+    .from(table)
+    .select(column === 'reference' ? 'id' : 'catalog_item_id')
+    .eq(column, reference)
+    .eq('manufacturer_id', manufacturerId)
+    .limit(2);
   assertNoError(error);
-  if (!data) httpError(404, 'Ítem no encontrado');
-  return { item: data };
+  const rows = data || [];
+  if (rows.length > 1) httpError(409, 'Hay más de una ficha. No se devuelve un listado.');
+  if (rows.length === 0) return null;
+  return column === 'reference' ? rows[0].id : rows[0].catalog_item_id;
+}
+
+async function getCatalogItem(userId, args = {}, context = {}) {
+  assertUser(userId);
+  const reference = normalizeReference(oneExactText(args.reference, 'reference'));
+  const manufacturer = oneExactText(args.manufacturer, 'manufacturer');
+  if (!reference) httpError(400, 'reference debe ser un texto concreto');
+  const clientId = context.clientId || null;
+  const db = requireDb();
+  const blocked = await assertPersistedCatalogLimit(db, userId, reference, manufacturer, clientId);
+  if (blocked === 'day') httpError(429, 'Demasiadas consultas al catálogo. Máximo 100 al día.');
+  if (blocked === 'minute') httpError(429, 'Demasiadas consultas al catálogo. Máximo 10 por minuto.');
+  assertCatalogLookupLimit(userId);
+  let outcome = null;
+  try {
+    const manufacturerId = await exactBrand(db, manufacturer);
+    const itemId = await oneItemId(db, 'slot_catalog_items', 'reference', reference, manufacturerId)
+      || await oneItemId(db, 'slot_catalog_item_aliases', 'alias_reference', reference, manufacturerId);
+    if (!itemId) httpError(404, 'Ítem no encontrado');
+    const { data, error } = await db
+      .from('slot_catalog_items_with_ratings')
+      .select(CATALOG_ITEM_FIELDS)
+      .eq('id', itemId)
+      .maybeSingle();
+    assertNoError(error);
+    if (!data) httpError(404, 'Ítem no encontrado');
+    outcome = 'found';
+    return { item: data };
+  } catch (err) {
+    if (err.statusCode === 409) outcome = 'ambiguous';
+    else if (err.statusCode === 404) outcome = 'not_found';
+    throw err;
+  } finally {
+    if (outcome) {
+      await recordCatalogLookup(db, {
+        userId,
+        clientId,
+        reference,
+        manufacturer,
+        outcome,
+      });
+    }
+  }
 }
 
 module.exports = {
@@ -350,6 +427,6 @@ module.exports = {
   listTimings,
   listCompetitions,
   getCompetition,
-  searchCatalog,
   getCatalogItem,
+  resetCatalogLookupLimit,
 };

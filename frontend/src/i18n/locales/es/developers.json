@@ -100,10 +100,11 @@
   },
   "mcp": {
     "title": "Asistentes (Claude y ChatGPT)",
-    "lead": "Cualquier usuario puede conectar un asistente para consultar su garaje, circuitos, tiempos, competiciones y el catálogo. El acceso es solo de lectura y se autoriza con la cuenta de Slot Database.",
+    "lead": "Cualquier usuario puede conectar un asistente para consultar su garaje, circuitos, tiempos y competiciones, y una ficha concreta del catálogo. El acceso es solo de lectura y se autoriza con la cuenta de Slot Database.",
     "urlLabel": "URL del conector",
     "claude": "En Claude: Ajustes, Conectores, conector personalizado, y pega la URL. El navegador abre Slot Database para aceptar el acceso de lectura.",
     "chatgpt": "En ChatGPT: Ajustes, Aplicaciones o Conectores, servidor remoto, y pega la misma URL. El permiso es el mismo.",
+    "catalog": "El catálogo no se puede listar. El asistente solo pide una ficha concreta, con la referencia y la marca. Hay un máximo de 10 consultas de catálogo por minuto y 100 al día, y cada consulta queda registrada.",
     "revoke": "Puedes revocar el acceso en Perfil, junto a la API key."
   },
   "support": {
