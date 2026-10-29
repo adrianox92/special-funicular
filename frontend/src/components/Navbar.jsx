@@ -29,6 +29,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Smartphone,
+  LineChart,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { ChangelogBell } from './ChangelogBell';
@@ -224,6 +225,7 @@ const Navbar = () => {
 
   const licenseAdminMenuItems = [
     { to: '/admin/dashboard', label: t('metrics'), icon: LayoutDashboard },
+    { to: '/admin/slot-intelligence', label: t('slotIntelligence'), icon: LineChart },
     { to: '/admin/lap-timer-licenses', label: t('lapTimerLicenses'), icon: Smartphone },
     { to: '/admin/slot-race-licenses', label: t('srmLicenses'), icon: Shield },
     { to: '/admin/slot-catalog', label: t('slotCatalog'), icon: Database },

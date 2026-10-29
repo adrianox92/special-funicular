@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { LayoutDashboard, RefreshCw, Search, Users, UserCheck, Car, Trophy, Timer } from 'lucide-react';
 import api from '../lib/axios';
 import { cn } from '../lib/utils';
@@ -634,6 +634,12 @@ const AdminPlatformDashboard = () => {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Solo administradores. Intervalo semiabierto [inicio, fin): el fin es exclusivo.
+          </p>
+          <p className="text-sm mt-2">
+            <Link to="/admin/slot-intelligence" className="font-medium underline underline-offset-4">
+              Slot Database Intelligence
+            </Link>
+            <span className="text-muted-foreground"> — popularidad del catálogo y precios, sobre el histórico enlazado.</span>
           </p>
         </div>
         <Button

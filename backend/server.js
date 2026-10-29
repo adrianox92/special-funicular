@@ -267,6 +267,7 @@ const catalogRoute = require('./routes/catalog');
 const storeListingsRoute = require('./routes/storeListings');
 const changelogRoute = require('./routes/changelog');
 const adminPlatformMetricsRoute = require('./routes/adminPlatformMetrics');
+const adminSlotIntelligenceRoute = require('./routes/adminSlotIntelligence');
 const adminLapTimerLicensesRoute = require('./routes/adminLapTimerLicenses');
 
 app.use('/api/vehicles', vehiclesRoute);
@@ -295,6 +296,7 @@ app.use('/api/catalog', catalogRoute);
 app.use('/api/store-listings', storeListingsRoute);
 app.use('/api/changelog', changelogRoute);
 app.use('/api/admin', authMiddleware, adminPlatformMetricsRoute);
+app.use('/api/admin', authMiddleware, adminSlotIntelligenceRoute);
 app.use('/api/admin', authMiddleware, adminLapTimerLicensesRoute);
 app.use('/api/admin', authMiddleware, adminPromoCodesRoute);
 

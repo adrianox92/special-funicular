@@ -52,6 +52,7 @@ import AdminSlotCatalog from './pages/AdminSlotCatalog';
 import Changelog from './pages/Changelog';
 import AdminChangelog from './pages/AdminChangelog';
 import AdminPlatformDashboard from './pages/AdminPlatformDashboard';
+import AdminSlotIntelligence from './pages/AdminSlotIntelligence';
 import AdminLapTimerLicensesPage from './pages/AdminLapTimerLicensesPage';
 import SellerDashboard from './pages/SellerDashboard';
 import PublicCatalogList from './pages/PublicCatalogList';
@@ -411,6 +412,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <AdminPlatformDashboard />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin/slot-intelligence"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <AdminSlotIntelligence />
               </AuthedShell>
             </PrivateRoute>
           }
