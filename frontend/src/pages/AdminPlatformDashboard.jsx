@@ -307,6 +307,7 @@ const AdminPlatformDashboard = () => {
 
   const [refsPage, setRefsPage] = useState(1);
   const [refsOnlyUnlinked, setRefsOnlyUnlinked] = useState(false);
+  const [refsOnlyInCatalog, setRefsOnlyInCatalog] = useState(false);
   const [refsSearchInput, setRefsSearchInput] = useState(() =>
     readAdminRefsQueryFromSearch(typeof window !== 'undefined' ? window.location.search : ''),
   );
@@ -403,6 +404,7 @@ const AdminPlatformDashboard = () => {
           limit: REFS_PAGE_SIZE,
           offset,
           only_unlinked: refsOnlyUnlinked ? 'true' : 'false',
+          ...(refsOnlyInCatalog ? { only_in_catalog: 'true' } : {}),
           ...(refsQuery ? { q: refsQuery } : {}),
           ...(refsManufacturer ? { manufacturer: refsManufacturer } : {}),
         },
@@ -416,7 +418,7 @@ const AdminPlatformDashboard = () => {
     } finally {
       setRefsLoading(false);
     }
-  }, [isAdmin, refsPage, refsOnlyUnlinked, refsQuery, refsManufacturer]);
+  }, [isAdmin, refsPage, refsOnlyUnlinked, refsOnlyInCatalog, refsQuery, refsManufacturer]);
 
   const applyRefsSearch = ({ q = refsSearchInput, manufacturer = refsManufacturerInput } = {}) => {
     const nextQ = clipRefsFilter(q);
@@ -576,7 +578,7 @@ const AdminPlatformDashboard = () => {
 
   useEffect(() => {
     setRefsPage(1);
-  }, [refsOnlyUnlinked]);
+  }, [refsOnlyUnlinked, refsOnlyInCatalog]);
 
   useEffect(() => {
     if (!refsData || refsLoading) return;
@@ -939,7 +941,16 @@ const AdminPlatformDashboard = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="text-base">Referencias de garaje ausentes del catálogo</CardTitle>
           <CardDescription>
-            {refsQuery ? (
+            {refsOnlyInCatalog ? (
+              <>
+                Solo grupos cuya referencia ya existe en el catálogo (canónica o alias) y que aún tienen
+                vehículos sin enlazar. Así puedes localizarlos y usar Enlazar sin buscar uno a uno.
+                {refsQuery ? ' La búsqueda acota la referencia.' : null}
+                {refsManufacturer
+                  ? ' El fabricante filtra el texto de garaje y agrupa por marca.'
+                  : null}
+              </>
+            ) : refsQuery ? (
               <>
                 Búsqueda: contains sobre la referencia de garaje normalizada (espacios y
                 mayúsculas/minúsculas). Incluye grupos que ya existen en el catálogo para poder enlazar
@@ -961,8 +972,9 @@ const AdminPlatformDashboard = () => {
             ) : (
               <>
                 Agrupadas por referencia normalizada (espacios y mayúsculas/minúsculas). Si algún ítem del
-                catálogo público comparte la misma referencia normalizada, no aparece aquí — usa la búsqueda
-                para localizarlas y enlazar. Filtra por fabricante para agrupar por marca. Ejemplares y
+                catálogo público comparte la misma referencia normalizada, no aparece aquí — activa «Solo
+                enlazables» o usa la búsqueda para localizarlas y enlazar. Filtra por fabricante para agrupar
+                por marca. Ejemplares y
                 usuarios muestran solo vehículos sin enlace a catálogo (
                 <span className="font-mono">catalog_item_id</span> vacío), alineados con la acción Enlazar. No
                 depende del periodo de fechas de arriba.
@@ -1022,7 +1034,8 @@ const AdminPlatformDashboard = () => {
               Deep-link:{' '}
               <span className="font-mono">/admin/dashboard?ref=FOO&amp;manufacturer=Ninco</span>. Sin
               referencia se muestra el ranking de huecos; con referencia también salen refs ya presentes en el
-              catálogo. El fabricante es opcional y se combina con la referencia.
+              catálogo. «Solo enlazables» lista directamente las que ya tienen ficha. El fabricante es
+              opcional y se combina con la referencia.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
@@ -1034,6 +1047,16 @@ const AdminPlatformDashboard = () => {
                 <Label htmlFor="refs-only-unlinked" className="text-sm font-normal cursor-pointer">
                   Sólo vehículos sin enlace a catálogo (<span className="font-mono">catalog_item_id</span>{' '}
                   vacío)
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="refs-only-in-catalog"
+                  checked={refsOnlyInCatalog}
+                  onCheckedChange={(v) => setRefsOnlyInCatalog(!!v)}
+                />
+                <Label htmlFor="refs-only-in-catalog" className="text-sm font-normal cursor-pointer">
+                  Solo enlazables (la referencia ya existe en el catálogo)
                 </Label>
               </div>
               <Button
@@ -1069,10 +1092,12 @@ const AdminPlatformDashboard = () => {
             <>
               <p className="text-sm text-muted-foreground">
                 {refsData.total === 0
-                  ? refsQuery || refsManufacturer
-                    ? 'Ningún grupo de garaje coincide con esos filtros.'
-                    : 'Ningún grupo cumple los criterios.'
-                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables${refsQuery ? '; exactos primero' : ''}${refsManufacturer ? '; agrupados por marca' : ''}).`}
+                  ? refsOnlyInCatalog
+                    ? 'Ningún grupo de garaje coincide con una ficha del catálogo pendiente de enlace.'
+                    : refsQuery || refsManufacturer
+                      ? 'Ningún grupo de garaje coincide con esos filtros.'
+                      : 'Ningún grupo cumple los criterios.'
+                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables${refsOnlyInCatalog ? '; solo enlazables' : ''}${refsQuery ? '; exactos primero' : ''}${refsManufacturer ? '; agrupados por marca' : ''}).`}
               </p>
               {refsData.total > 0 && (
                 <div className="rounded-md border">
@@ -1081,7 +1106,9 @@ const AdminPlatformDashboard = () => {
                       <TableRow>
                         <TableHead className="text-right w-[110px]">Ejemplares</TableHead>
                         <TableHead>Referencia</TableHead>
-                        {refsQuery ? <TableHead className="w-[140px]">Catálogo</TableHead> : null}
+                        {refsQuery || refsOnlyInCatalog ? (
+                          <TableHead className="w-[140px]">Catálogo</TableHead>
+                        ) : null}
                         <TableHead className="text-right w-[100px]">Usuarios</TableHead>
                         <TableHead>Fabricante (ej.)</TableHead>
                         <TableHead>Modelo (ej.)</TableHead>
@@ -1110,7 +1137,7 @@ const AdminPlatformDashboard = () => {
                             )}
                           </TableCell>
                           <TableCell className="font-mono text-sm">{row.reference || '—'}</TableCell>
-                          {refsQuery ? (
+                          {refsQuery || refsOnlyInCatalog ? (
                             <TableCell>
                               {row.in_catalog ? (
                                 <Badge variant="secondary">

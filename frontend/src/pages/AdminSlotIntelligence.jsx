@@ -256,8 +256,8 @@ const AdminSlotIntelligence = () => {
               <CardHeader className="space-y-1">
                 <CardTitle className="text-base">Lugares de compra</CardTitle>
                 <CardDescription>
-                  Texto normalizado del garaje. Solo visible aquí: un lugar poco frecuente identifica a
-                  quien lo escribió.
+                  El mismo comercio cuenta una sola vez aunque el texto cambie: espacios, guiones, mayúsculas,
+                  «shop», «online» o el dominio. Solo visible aquí.
                   {selectedBrand ? ` Marca filtrada: ${selectedBrand.brand_name}.` : ' Top global.'}
                 </CardDescription>
               </CardHeader>
@@ -294,8 +294,8 @@ const AdminSlotIntelligence = () => {
             <CardHeader className="space-y-1">
               <CardTitle className="text-base">Marcas</CardTitle>
               <CardDescription>
-                Cobertura sobre las fichas de esa marca. La mediana de garaje y la de tienda (EUR, listados
-                activos) salen de los coches y los listados, no de las medianas por referencia.
+                Cobertura sobre las fichas de esa marca. La mediana de garaje sale de los precios declarados
+                en los coches de esa marca.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -312,7 +312,6 @@ const AdminSlotIntelligence = () => {
                         <TableHead className="text-right">Coches</TableHead>
                         <TableHead className="text-right">Usuarios</TableHead>
                         <TableHead className="text-right">Mediana garaje</TableHead>
-                        <TableHead className="text-right">Mediana tienda</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -340,9 +339,6 @@ const AdminSlotIntelligence = () => {
                           <TableCell className="text-right tabular-nums">{brand.user_count}</TableCell>
                           <TableCell className="text-right tabular-nums">
                             {formatEur(brand.garage_price_median)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatEur(brand.listing_price_median)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -428,7 +424,6 @@ const AdminSlotIntelligence = () => {
                         <TableHead className="text-right">Mediana garaje</TableHead>
                         <TableHead className="text-right">p25–p75</TableHead>
                         <TableHead className="text-right">n</TableHead>
-                        <TableHead className="text-right">Mediana tienda</TableHead>
                         <TableHead>Publicación</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -455,10 +450,6 @@ const AdminSlotIntelligence = () => {
                             {formatRange(row.garage_price_p25, row.garage_price_p75)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">{row.garage_price_n}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatEur(row.listing_price_median)}
-                            <span className="block text-xs text-muted-foreground">n {row.listing_price_n}</span>
-                          </TableCell>
                           <TableCell>
                             {row.publishable ? (
                               <span className="text-sm text-muted-foreground">Publicable</span>

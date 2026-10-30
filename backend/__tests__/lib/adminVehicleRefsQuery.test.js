@@ -68,4 +68,24 @@ describe('adminVehicleRefsQuery', () => {
   test('limit/offset inválidos', () => {
     expect(parseRefsGapQuery({ limit: 'x' }).error).toMatch(/enteros/);
   });
+
+  test('only_in_catalog true se pasa como p_only_in_catalog', () => {
+    const parsed = parseRefsGapQuery({ only_in_catalog: 'true', q: 'AV52802' });
+    expect(parsed.only_in_catalog).toBe(true);
+    expect(buildMissingCatalogRpcParams(parsed)).toEqual({
+      p_limit: 25,
+      p_offset: 0,
+      p_only_unlinked: false,
+      p_only_in_catalog: true,
+      p_q: 'AV52802',
+    });
+  });
+
+  test('only_in_catalog ausente o false no añade el parámetro', () => {
+    expect(parseRefsGapQuery({}).only_in_catalog).toBe(false);
+    expect(buildMissingCatalogRpcParams(parseRefsGapQuery({})).p_only_in_catalog).toBeUndefined();
+    expect(
+      buildMissingCatalogRpcParams(parseRefsGapQuery({ only_in_catalog: 'false' })).p_only_in_catalog,
+    ).toBeUndefined();
+  });
 });

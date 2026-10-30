@@ -211,6 +211,10 @@ router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
       limit: typeof payload.limit === 'number' ? payload.limit : parsed.limit,
       offset: typeof payload.offset === 'number' ? payload.offset : parsed.offset,
       only_unlinked: !!payload.only_unlinked,
+      only_in_catalog:
+        typeof payload.only_in_catalog === 'boolean'
+          ? payload.only_in_catalog
+          : !!parsed.only_in_catalog,
       q: typeof payload.q === 'string' ? payload.q : parsed.q || null,
       manufacturer:
         typeof payload.manufacturer === 'string'

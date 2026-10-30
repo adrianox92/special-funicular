@@ -19,6 +19,20 @@ jest.mock('../../lib/licenseAdmin', () => ({
   isLicenseAdminUser: () => true,
 }));
 
+jest.mock('../../components/ui/switch', () => ({
+  Switch: ({ id, checked, onCheckedChange, ...rest }) => (
+    <input
+      id={id}
+      type="checkbox"
+      role="switch"
+      aria-checked={!!checked}
+      checked={!!checked}
+      onChange={(e) => onCheckedChange(e.target.checked)}
+      {...rest}
+    />
+  ),
+}));
+
 jest.mock('../../components/charts/VehicleCatalogCoverageChart', () => ({
   __esModule: true,
   default: () => <div data-testid="catalog-coverage" />,
@@ -111,7 +125,8 @@ function mockGets({ refs = { total: 0, rows: [] } } = {}) {
     if (url === '/admin/vehicle-refs-not-in-catalog') {
       const q = config?.params?.q;
       const manufacturer = config?.params?.manufacturer;
-      if (q || manufacturer) {
+      const onlyInCatalog = config?.params?.only_in_catalog === 'true';
+      if (q || manufacturer || onlyInCatalog) {
         const rows = refs.rows ?? (q ? [IN_CATALOG_ROW] : [{ ...IN_CATALOG_ROW, in_catalog: false }]);
         return Promise.resolve({
           data: {
@@ -158,6 +173,31 @@ describe('AdminPlatformDashboard — búsqueda y enlace de refs de garaje', () =
     const last = refsGetCalls().at(-1);
     expect(last[1].params.q).toBeUndefined();
     expect(last[1].params.manufacturer).toBeUndefined();
+    expect(last[1].params.only_in_catalog).toBeUndefined();
+  });
+
+  it('el filtro solo enlazables pide grupos que ya están en el catálogo', async () => {
+    mockGets({ refs: { total: 1, rows: [IN_CATALOG_ROW] } });
+
+    render(
+      <MemoryRouter>
+        <AdminPlatformDashboard />
+      </MemoryRouter>,
+    );
+
+    const toggle = await screen.findByRole('switch', {
+      name: /solo enlazables/i,
+    });
+    await userEvent.click(toggle);
+
+    await waitFor(() => {
+      const calls = refsGetCalls().filter(([, cfg]) => cfg?.params?.only_in_catalog === 'true');
+      expect(calls.length).toBeGreaterThan(0);
+    });
+    expect(await screen.findByText('En catálogo')).toBeInTheDocument();
+    expect(
+      screen.getByText(/ordenados por nº de ejemplares enlazables; solo enlazables/i),
+    ).toBeInTheDocument();
   });
 
   it('deep-link ?ref= pide el API con q e incluye refs ya en catálogo', async () => {

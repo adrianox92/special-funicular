@@ -216,6 +216,7 @@ BEGIN
       THEN v.price
       ELSE NULL
     END AS garage_price,
+    public.slot_intelligence_place_key(v.purchase_place) AS place_key,
     CASE
       WHEN btrim(COALESCE(v.purchase_place, '')) = '' THEN NULL
       ELSE left(
@@ -462,10 +463,11 @@ BEGIN
     LIMIT 5
   ) top_brands;
 
-  DELETE FROM public.slot_intelligence_items;
-  DELETE FROM public.slot_intelligence_brands;
-  DELETE FROM public.slot_intelligence_purchase_places;
-  DELETE FROM public.slot_intelligence_summary;
+  -- safeupdate rechaza DELETE sin WHERE ("DELETE requires a WHERE clause").
+  DELETE FROM public.slot_intelligence_items WHERE catalog_item_id IS NOT NULL;
+  DELETE FROM public.slot_intelligence_brands WHERE manufacturer_id IS NOT NULL;
+  DELETE FROM public.slot_intelligence_purchase_places WHERE id IS NOT NULL;
+  DELETE FROM public.slot_intelligence_summary WHERE id IS NOT NULL;
 
   INSERT INTO public.slot_intelligence_items (
     catalog_item_id,
@@ -556,13 +558,29 @@ BEGIN
     'global',
     NULL,
     NULL,
-    place_label,
-    COUNT(*)::integer,
-    COUNT(DISTINCT user_id)::integer
-  FROM si_linked
-  WHERE place_label IS NOT NULL
-  GROUP BY place_label
-  ORDER BY COUNT(*) DESC, place_label
+    best.place_label,
+    agg.vehicle_count,
+    agg.user_count
+  FROM (
+    SELECT
+      place_key,
+      COUNT(*)::integer AS vehicle_count,
+      COUNT(DISTINCT user_id)::integer AS user_count
+    FROM si_linked
+    WHERE place_key IS NOT NULL
+    GROUP BY place_key
+  ) agg
+  JOIN (
+    SELECT DISTINCT ON (place_key) place_key, place_label
+    FROM (
+      SELECT place_key, place_label, COUNT(*) AS n
+      FROM si_linked
+      WHERE place_key IS NOT NULL AND place_label IS NOT NULL
+      GROUP BY place_key, place_label
+    ) label_counts
+    ORDER BY place_key, n DESC, length(place_label), place_label
+  ) best ON best.place_key = agg.place_key
+  ORDER BY agg.vehicle_count DESC, best.place_label
   LIMIT 20;
 
   INSERT INTO public.slot_intelligence_purchase_places (
@@ -577,27 +595,40 @@ BEGIN
     user_count
   FROM (
     SELECT
-      grouped.manufacturer_id,
-      grouped.brand_name,
-      grouped.place_label,
-      grouped.vehicle_count,
-      grouped.user_count,
+      ranked.manufacturer_id,
+      ranked.brand_name,
+      best.place_label,
+      ranked.vehicle_count,
+      ranked.user_count,
       ROW_NUMBER() OVER (
-        PARTITION BY grouped.manufacturer_id
-        ORDER BY grouped.vehicle_count DESC, grouped.place_label
+        PARTITION BY ranked.manufacturer_id
+        ORDER BY ranked.vehicle_count DESC, best.place_label
       ) AS rn
     FROM (
       SELECT
         manufacturer_id,
         brand_name,
-        place_label,
+        place_key,
         COUNT(*)::integer AS vehicle_count,
         COUNT(DISTINCT user_id)::integer AS user_count
       FROM si_linked
-      WHERE place_label IS NOT NULL
-      GROUP BY manufacturer_id, brand_name, place_label
-    ) grouped
-  ) ranked
+      WHERE place_key IS NOT NULL
+      GROUP BY manufacturer_id, brand_name, place_key
+    ) ranked
+    JOIN (
+      SELECT DISTINCT ON (manufacturer_id, place_key)
+        manufacturer_id, place_key, place_label
+      FROM (
+        SELECT manufacturer_id, place_key, place_label, COUNT(*) AS n
+        FROM si_linked
+        WHERE place_key IS NOT NULL AND place_label IS NOT NULL
+        GROUP BY manufacturer_id, place_key, place_label
+      ) label_counts
+      ORDER BY manufacturer_id, place_key, n DESC, length(place_label), place_label
+    ) best
+      ON best.manufacturer_id = ranked.manufacturer_id
+     AND best.place_key = ranked.place_key
+  ) topn
   WHERE rn <= 8;
 
   INSERT INTO public.slot_intelligence_summary (

@@ -145,6 +145,7 @@ describe('AdminSlotIntelligence', () => {
     expect(screen.getByText('C4032')).toBeInTheDocument();
     expect(screen.getByText('50612')).toBeInTheDocument();
     expect(screen.getByText('wallapop')).toBeInTheDocument();
+    expect(screen.queryByText('Mediana tienda')).not.toBeInTheDocument();
     expect(screen.getByText('Sin dueños')).toBeInTheDocument();
 
     const popular = screen.getByText('C4032').closest('tr');
