@@ -16,9 +16,6 @@ import deCommon from '../../i18n/locales/de/common.json';
 import esInventory from '../../i18n/locales/es/inventory.json';
 import enInventory from '../../i18n/locales/en/inventory.json';
 import deInventory from '../../i18n/locales/de/inventory.json';
-import esSeller from '../../i18n/locales/es/seller.json';
-import enSeller from '../../i18n/locales/en/seller.json';
-import deSeller from '../../i18n/locales/de/seller.json';
 import esHelp from '../../i18n/locales/es/help.json';
 import enHelp from '../../i18n/locales/en/help.json';
 import deHelp from '../../i18n/locales/de/help.json';
@@ -77,7 +74,6 @@ describe('i18n key parity es/en/de', () => {
     expect(fieldsJson).not.toMatch(/axleWidth|axle_width|Ancho de eje/i);
   });
   test('inventory', () => expectSameKeys(esInventory, enInventory, deInventory));
-  test('seller', () => expectSameKeys(esSeller, enSeller, deSeller));
   test('help', () => expectSameKeys(esHelp, enHelp, deHelp));
   test('profile', () => expectSameKeys(esProfile, enProfile, deProfile));
   test('competitions manage', () => {

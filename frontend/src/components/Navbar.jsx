@@ -21,7 +21,6 @@ import {
   CircleHelp,
   Search,
   Database,
-  Store,
   Building2,
   ScrollText,
   Megaphone,
@@ -33,12 +32,6 @@ import {
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { ChangelogBell } from './ChangelogBell';
-import api from '../lib/axios';
-import {
-  getCachedSellerProfile,
-  invalidateSellerProfileCache,
-  setCachedSellerProfile,
-} from '../lib/sellerProfileCache';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import {
@@ -151,46 +144,7 @@ const Navbar = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  /** Solo usuarios con fila en seller_profiles (pendiente, aprobada o rechazada). */
-  const [hasSellerProfile, setHasSellerProfile] = useState(false);
   const navbarRef = useRef(null);
-
-  useEffect(() => {
-    if (!user?.id) {
-      setHasSellerProfile(false);
-      return undefined;
-    }
-
-    const cached = getCachedSellerProfile(user.id);
-    if (cached !== null) {
-      setHasSellerProfile(cached);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { data } = await api.get('/store-listings/my/profile');
-        const hasProfile = data != null && typeof data === 'object';
-        setCachedSellerProfile(user.id, hasProfile);
-        if (!cancelled) setHasSellerProfile(hasProfile);
-      } catch {
-        setCachedSellerProfile(user.id, false);
-        if (!cancelled) setHasSellerProfile(false);
-      }
-    };
-    load();
-
-    const onSellerProfileChanged = () => {
-      invalidateSellerProfileCache();
-      load();
-    };
-    window.addEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
-    };
-  }, [user?.id]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -261,9 +215,6 @@ const Navbar = () => {
       ],
     },
     { path: '/clubs', label: t('clubs'), icon: Building2 },
-    ...(hasSellerProfile
-      ? [{ path: '/seller', label: t('myListings'), icon: Store }]
-      : []),
     { path: '/help', label: t('help'), icon: CircleHelp },
   ];
 
@@ -415,14 +366,6 @@ const Navbar = () => {
                       {t('changelog')}
                     </Link>
                   </DropdownMenuItem>
-                  {hasSellerProfile && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/seller" className="flex items-center gap-2 cursor-pointer">
-                        <Store className="size-4" />
-                        {t('myListings')}
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
                   {showLicenseAdmin && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger className="gap-2">

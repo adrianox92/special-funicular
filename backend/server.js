@@ -4,6 +4,10 @@ const helmet = require('helmet');
 const sharp = require('sharp');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
+const { registerAdapter } = require('./lib/shopAdapters');
+const { catalogShopAdapters } = require('./lib/shopAdapters/catalogShops');
+for (const shopAdapter of catalogShopAdapters) registerAdapter(shopAdapter);
+
 // Limitar concurrencia de Sharp a 1 hilo para evitar picos de RAM en subidas paralelas.
 // Desactivar la caché interna de tiles para liberar buffers en cuanto terminan.
 sharp.cache(false);
@@ -265,6 +269,7 @@ const adminPromoCodesRoute = require('./routes/adminPromoCodes');
 const helpRoute = require('./routes/help');
 const catalogRoute = require('./routes/catalog');
 const storeListingsRoute = require('./routes/storeListings');
+const goRoute = require('./routes/go');
 const changelogRoute = require('./routes/changelog');
 const adminPlatformMetricsRoute = require('./routes/adminPlatformMetrics');
 const adminSlotIntelligenceRoute = require('./routes/adminSlotIntelligence');
@@ -294,6 +299,7 @@ app.use('/api/pilot-profile', pilotProfileRoute);
 app.use('/api/help', helpRoute);
 app.use('/api/catalog', catalogRoute);
 app.use('/api/store-listings', storeListingsRoute);
+app.use('/api/go', goRoute);
 app.use('/api/changelog', changelogRoute);
 app.use('/api/admin', authMiddleware, adminPlatformMetricsRoute);
 app.use('/api/admin', authMiddleware, adminSlotIntelligenceRoute);

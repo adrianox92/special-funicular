@@ -57,7 +57,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Database, ExternalLink, LayoutDashboard, Upload, GitPullRequest, PlusCircle, Tag, Store, MousePointerClick, CheckCircle2, XCircle } from 'lucide-react';
+import { Database, ExternalLink, LayoutDashboard, Upload, GitPullRequest, PlusCircle, Tag, Store, MousePointerClick } from 'lucide-react';
 import { catalogSlugify } from '../utils/catalogSlug';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
 import CatalogTractionSelect from '../components/CatalogTractionSelect';
@@ -367,21 +367,27 @@ function AdminSlotCatalog() {
     ];
   }, [chgReq.length, insReq.length]);
 
-  // Tiendas
-  const [sellers, setSellers] = useState([]);
-  const [sellersLoading, setSellersLoading] = useState(false);
-  const [sellersFetchError, setSellersFetchError] = useState(null);
+  // Tiendas scrapeadas
+  const emptyShopForm = {
+    name: '',
+    country_code: 'ES',
+    logo_url: '',
+    site_url: '',
+    adapter_key: '',
+    currency: 'EUR',
+    active: true,
+  };
+  const [shops, setShops] = useState([]);
+  const [shopsLoading, setShopsLoading] = useState(false);
+  const [shopsFetchError, setShopsFetchError] = useState(null);
   const [clickStats, setClickStats] = useState([]);
+  const [shopClickTotals, setShopClickTotals] = useState([]);
   const [clickStatsLoading, setClickStatsLoading] = useState(false);
   const [clickStatsDays, setClickStatsDays] = useState(30);
-  const [sellerApproving, setSellerApproving] = useState(null);
-  const [createSellerOpen, setCreateSellerOpen] = useState(false);
-  const [createSellerForm, setCreateSellerForm] = useState({ email: '', store_name: '', store_description: '', store_url: '' });
-  const [createSellerSaving, setCreateSellerSaving] = useState(false);
-  // Diálogo de moderación (rechazo con motivo + notas admin)
-  const [moderationDialogOpen, setModerationDialogOpen] = useState(false);
-  const [moderationTarget, setModerationTarget] = useState(null); // { userId, action: 'approve'|'reject' }
-  const [moderationForm, setModerationForm] = useState({ rejection_reason: '', admin_notes: '' });
+  const [shopDialogOpen, setShopDialogOpen] = useState(false);
+  const [shopSaving, setShopSaving] = useState(false);
+  const [shopForm, setShopForm] = useState(emptyShopForm);
+  const [shopEditId, setShopEditId] = useState(null);
   // Políticas
   const [policies, setPolicies] = useState([]);
   const [policiesLoading, setPoliciesLoading] = useState(false);
@@ -488,20 +494,19 @@ function AdminSlotCatalog() {
     fetchQueues();
   }, [isAdmin, fetchQueues]);
 
-  const fetchSellers = useCallback(async () => {
-    setSellersLoading(true);
-    setSellersFetchError(null);
+  const fetchShops = useCallback(async () => {
+    setShopsLoading(true);
+    setShopsFetchError(null);
     try {
-      const { data } = await api.get('/store-listings/admin/sellers');
-      setSellers(data.sellers ?? []);
+      const { data } = await api.get('/store-listings/admin/shops');
+      setShops(data.shops ?? []);
     } catch (err) {
-      setSellers([]);
-      const msg =
-        err.response?.data?.error || err.message || 'No se pudieron cargar los perfiles de vendedor';
-      setSellersFetchError(msg);
+      setShops([]);
+      const msg = err.response?.data?.error || err.message || 'No se pudieron cargar las tiendas';
+      setShopsFetchError(msg);
       toast.error(msg);
     } finally {
-      setSellersLoading(false);
+      setShopsLoading(false);
     }
   }, []);
 
@@ -510,47 +515,63 @@ function AdminSlotCatalog() {
     try {
       const { data } = await api.get(`/store-listings/admin/clicks?days=${days}`);
       setClickStats(data.stats ?? []);
+      setShopClickTotals(data.shops ?? []);
     } catch {
       setClickStats([]);
+      setShopClickTotals([]);
     } finally {
       setClickStatsLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openModerationDialog = (userId, action) => {
-    const seller = sellers.find((s) => s.user_id === userId);
-    setModerationTarget({ userId, action });
-    setModerationForm({
-      rejection_reason: action === 'reject' ? (seller?.rejection_reason ?? '') : '',
-      admin_notes: seller?.admin_notes ?? '',
-    });
-    setModerationDialogOpen(true);
+  const openShopDialog = (shop) => {
+    if (shop) {
+      setShopEditId(shop.id);
+      setShopForm({
+        name: shop.name || '',
+        country_code: shop.country_code || 'ES',
+        logo_url: shop.logo_url || '',
+        site_url: shop.site_url || '',
+        adapter_key: shop.adapter_key || '',
+        currency: shop.currency || 'EUR',
+        active: shop.active !== false,
+      });
+    } else {
+      setShopEditId(null);
+      setShopForm({ ...emptyShopForm });
+    }
+    setShopDialogOpen(true);
   };
 
-  const submitModeration = async () => {
-    if (!moderationTarget) return;
-    const { userId, action } = moderationTarget;
-    const approved = action === 'approve';
-    setSellerApproving(userId);
+  const saveShop = async (e) => {
+    e.preventDefault();
+    setShopSaving(true);
     try {
-      const payload = {
-        approved,
-        admin_notes: moderationForm.admin_notes.trim() || null,
+      const body = {
+        ...shopForm,
+        country_code: shopForm.country_code.trim().toUpperCase(),
+        currency: (shopForm.currency || 'EUR').trim().toUpperCase(),
+        logo_url: shopForm.logo_url.trim(),
+        site_url: shopForm.site_url.trim(),
+        adapter_key: shopForm.adapter_key.trim(),
+        name: shopForm.name.trim(),
       };
-      if (!approved) {
-        payload.rejection_reason = moderationForm.rejection_reason.trim() || null;
+      if (shopEditId) {
+        const { data } = await api.put(`/store-listings/admin/shops/${shopEditId}`, body);
+        setShops((prev) => prev.map((row) => (row.id === shopEditId ? data : row)));
+      } else {
+        const { data } = await api.post('/store-listings/admin/shops', body);
+        setShops((prev) => [...prev, data].sort((a, b) => (
+          String(a.country_code).localeCompare(String(b.country_code))
+          || String(a.name).localeCompare(String(b.name), 'es')
+        )));
       }
-      const { data } = await api.post(`/store-listings/admin/sellers/${userId}/approve`, payload);
-      setSellers((prev) =>
-        prev.map((s) => (s.user_id === userId ? { ...s, ...data } : s)),
-      );
-      setModerationDialogOpen(false);
-      setModerationTarget(null);
+      setShopDialogOpen(false);
     } catch (err) {
-      alert(err.response?.data?.error || 'Error al actualizar el vendedor');
+      alert(err.response?.data?.error || 'Error al guardar la tienda');
     } finally {
-      setSellerApproving(null);
+      setShopSaving(false);
     }
   };
 
@@ -568,10 +589,10 @@ function AdminSlotCatalog() {
 
   useEffect(() => {
     if (!isAdmin || tab !== 'stores') return;
-    fetchSellers();
+    fetchShops();
     fetchClickStats(clickStatsDays);
     fetchPolicies();
-  }, [isAdmin, tab, fetchSellers, fetchClickStats, fetchPolicies, clickStatsDays]);
+  }, [isAdmin, tab, fetchShops, fetchClickStats, fetchPolicies, clickStatsDays]);
 
   const openPolicyEdit = (policy) => {
     setPolicyEditSlug(policy.slug);
@@ -589,28 +610,6 @@ function AdminSlotCatalog() {
       alert(err.response?.data?.error || 'Error al guardar la política');
     } finally {
       setPolicySaving(false);
-    }
-  };
-
-  const createSeller = async (e) => {
-    e.preventDefault();
-    if (!createSellerForm.email.trim()) return alert('El email es obligatorio');
-    if (!createSellerForm.store_name.trim()) return alert('El nombre de tienda es obligatorio');
-    setCreateSellerSaving(true);
-    try {
-      const { data } = await api.post('/store-listings/admin/sellers', {
-        email: createSellerForm.email.trim(),
-        store_name: createSellerForm.store_name.trim(),
-        store_description: createSellerForm.store_description.trim() || null,
-        store_url: createSellerForm.store_url.trim() || null,
-      });
-      setSellers((prev) => [data, ...prev]);
-      setCreateSellerOpen(false);
-      setCreateSellerForm({ email: '', store_name: '', store_description: '', store_url: '' });
-    } catch (err) {
-      alert(err.response?.data?.error || 'Error al crear la tienda');
-    } finally {
-      setCreateSellerSaving(false);
     }
   };
 
@@ -1595,18 +1594,18 @@ function AdminSlotCatalog() {
 
         {/* ==================== TIENDAS ==================== */}
         <TabsContent value="stores" className="space-y-6 mt-4">
-          {/* Vendedores */}
+          {/* Tiendas */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Store className="size-4" />
-                  Perfiles de vendedor
+                  Tiendas
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    onClick={() => setCreateSellerOpen(true)}
+                    onClick={() => openShopDialog(null)}
                   >
                     <PlusCircle className="size-4 mr-1.5" />
                     Crear tienda
@@ -1614,30 +1613,28 @@ function AdminSlotCatalog() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={fetchSellers}
-                    disabled={sellersLoading}
+                    onClick={fetchShops}
+                    disabled={shopsLoading}
                   >
-                    {sellersLoading ? 'Cargando…' : 'Actualizar'}
+                    {shopsLoading ? 'Cargando…' : 'Actualizar'}
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {sellersLoading ? (
+              {shopsLoading ? (
                 <div className="flex justify-center py-8">
                   <Spinner className="size-5" />
                 </div>
-              ) : sellers.length === 0 ? (
+              ) : shops.length === 0 ? (
                 <div className="py-8 px-4 space-y-3">
-                  {sellersFetchError ? (
+                  {shopsFetchError ? (
                     <Alert variant="destructive">
-                      <AlertDescription className="text-sm">{sellersFetchError}</AlertDescription>
+                      <AlertDescription className="text-sm">{shopsFetchError}</AlertDescription>
                     </Alert>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center">
-                      No hay perfiles de tienda registrados. Si esperabas ver tiendas aprobadas, revisa que el
-                      backend tenga <code className="text-xs">SUPABASE_SERVICE_ROLE_KEY</code> y que la migración{' '}
-                      <code className="text-xs">20260420120000_catalog_pro</code> esté aplicada en Supabase.
+                      No hay tiendas. El cron solo busca productos en las tiendas con un adaptador registrado.
                     </p>
                   )}
                 </div>
@@ -1647,95 +1644,56 @@ function AdminSlotCatalog() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Tienda</TableHead>
-                        <TableHead>URL</TableHead>
-                          <TableHead className="text-center">Estado</TableHead>
-                          <TableHead className="hidden md:table-cell">Notas admin</TableHead>
+                        <TableHead>País</TableHead>
+                        <TableHead>Adaptador</TableHead>
+                        <TableHead className="text-center">Activa</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sellers.map((s) => (
-                        <TableRow key={s.user_id}>
+                      {shops.map((s) => (
+                        <TableRow key={s.id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {s.logo_url ? (
                                 <img
-                                  src={cachedStorageImageUrl(s.logo_url)}
+                                  src={s.logo_url}
                                   alt=""
                                   className="h-8 w-12 shrink-0 rounded-md object-contain bg-muted border border-border"
                                 />
                               ) : (
                                 <div className="h-8 w-12 shrink-0 rounded-md bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground border border-border">
-                                  {(s.store_name || '?')[0].toUpperCase()}
+                                  {(s.name || '?')[0].toUpperCase()}
                                 </div>
                               )}
                               <div>
-                                <p className="text-sm font-medium">{s.store_name}</p>
-                                {s.store_description && (
-                                  <p className="text-xs text-muted-foreground truncate max-w-[16rem]">
-                                    {s.store_description}
-                                  </p>
-                                )}
-                                {s.rejection_reason && !s.approved && (
-                                  <p className="text-xs text-destructive mt-0.5 truncate max-w-[16rem]">
-                                    Motivo: {s.rejection_reason}
-                                  </p>
+                                <p className="text-sm font-medium">{s.name}</p>
+                                {s.site_url && (
+                                  <a
+                                    href={s.site_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-primary hover:underline"
+                                  >
+                                    Web
+                                  </a>
                                 )}
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            {s.store_url ? (
-                              <a
-                                href={s.store_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline flex items-center gap-1"
-                              >
-                                Visitar
-                                <ExternalLink className="size-3" />
-                              </a>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
+                          <TableCell className="text-sm font-mono">{s.country_code}</TableCell>
+                          <TableCell className="text-xs font-mono">{s.adapter_key}</TableCell>
                           <TableCell className="text-center">
-                            {s.approved ? (
-                              <Badge variant="default" className="text-xs">Aprobado</Badge>
-                            ) : s.reviewed_at ? (
-                              <Badge variant="destructive" className="text-xs">Rechazado</Badge>
+                            {s.active ? (
+                              <Badge variant="default" className="text-xs">Sí</Badge>
                             ) : (
-                              <Badge variant="outline" className="text-xs text-muted-foreground">
-                                Pendiente
-                              </Badge>
+                              <Badge variant="outline" className="text-xs text-muted-foreground">No</Badge>
                             )}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-[14rem]">
-                            <span className="line-clamp-2">{s.admin_notes || '—'}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {!s.approved ? (
-                                <Button
-                                  size="sm"
-                                  disabled={sellerApproving === s.user_id}
-                                  onClick={() => openModerationDialog(s.user_id, 'approve')}
-                                >
-                                  <CheckCircle2 className="size-3.5 mr-1.5" />
-                                  Aprobar
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={sellerApproving === s.user_id}
-                                  onClick={() => openModerationDialog(s.user_id, 'reject')}
-                                >
-                                  <XCircle className="size-3.5 mr-1.5" />
-                                  Revocar
-                                </Button>
-                              )}
-                            </div>
+                            <Button size="sm" variant="outline" onClick={() => openShopDialog(s)}>
+                              Editar
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1745,14 +1703,13 @@ function AdminSlotCatalog() {
               )}
             </CardContent>
           </Card>
-
           {/* Estadísticas de clics */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <MousePointerClick className="size-4" />
-                  Clics por listado
+                  Clics
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Select
@@ -1794,34 +1751,56 @@ function AdminSlotCatalog() {
                   Sin datos de clics en el período seleccionado.
                 </p>
               ) : (
+                <div className="space-y-4">
+                  {shopClickTotals.length > 0 && (
+                    <div className="overflow-x-auto border-b border-border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tienda</TableHead>
+                            <TableHead>País</TableHead>
+                            <TableHead className="text-right">Clics</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {shopClickTotals.map((s) => (
+                            <TableRow key={s.shop_id}>
+                              <TableCell className="text-sm">{s.shop_name}</TableCell>
+                              <TableCell className="font-mono text-xs">{s.country_code}</TableCell>
+                              <TableCell className="text-right tabular-nums font-semibold">{s.click_count}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Listado</TableHead>
+                        <TableHead>Enlace</TableHead>
                         <TableHead>Tienda</TableHead>
                         <TableHead>Ítem del catálogo</TableHead>
                         <TableHead className="text-right">
                           <MousePointerClick className="size-4 inline" aria-label="Clics" />
                         </TableHead>
-                        <TableHead className="text-center">Activo</TableHead>
+                        <TableHead className="text-center">En stock</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {clickStats.map((s) => (
-                        <TableRow key={s.listing_id}>
+                        <TableRow key={s.offer_id}>
                           <TableCell className="max-w-[12rem]">
                             <a
-                              href={s.url}
+                              href={process.env.NODE_ENV === 'production' ? `/go/${s.short_code}` : `${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/go/${s.short_code}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-sm hover:underline flex items-center gap-1 truncate"
+                              className="text-sm font-mono hover:underline"
                             >
-                              {s.title}
-                              <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                              /go/{s.short_code}
                             </a>
                           </TableCell>
-                          <TableCell className="text-sm">{s.store_name ?? '—'}</TableCell>
+                          <TableCell className="text-sm">{s.shop_name ?? '—'}</TableCell>
                           <TableCell className="text-sm">
                             {s.catalog_item ? (
                               <span>
@@ -1838,7 +1817,7 @@ function AdminSlotCatalog() {
                             {s.click_count}
                           </TableCell>
                           <TableCell className="text-center">
-                            {s.active ? (
+                            {s.in_stock ? (
                               <Badge variant="default" className="text-xs">Sí</Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs text-muted-foreground">No</Badge>
@@ -1848,6 +1827,7 @@ function AdminSlotCatalog() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
                 </div>
               )}
             </CardContent>
@@ -1903,50 +1883,6 @@ function AdminSlotCatalog() {
         </TabsContent>
       </Tabs>
 
-      {/* Diálogo: moderación de vendedor (aprobar/rechazar con motivo) */}
-      <Dialog open={moderationDialogOpen} onOpenChange={setModerationDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {moderationTarget?.action === 'approve' ? 'Aprobar tienda' : 'Rechazar / revocar tienda'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            {moderationTarget?.action === 'reject' && (
-              <div className="space-y-2">
-                <Label htmlFor="mod_reason">Motivo de rechazo (visible para el vendedor)</Label>
-                <Input
-                  id="mod_reason"
-                  placeholder="Describe el motivo brevemente…"
-                  value={moderationForm.rejection_reason}
-                  onChange={(e) => setModerationForm((f) => ({ ...f, rejection_reason: e.target.value }))}
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="mod_notes">Notas internas (solo admin)</Label>
-              <Input
-                id="mod_notes"
-                placeholder="Notas privadas sobre esta tienda…"
-                value={moderationForm.admin_notes}
-                onChange={(e) => setModerationForm((f) => ({ ...f, admin_notes: e.target.value }))}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModerationDialogOpen(false)}>Cancelar</Button>
-            <Button
-              variant={moderationTarget?.action === 'reject' ? 'destructive' : 'default'}
-              disabled={sellerApproving === moderationTarget?.userId}
-              onClick={submitModeration}
-            >
-              {sellerApproving === moderationTarget?.userId ? <Spinner className="size-4 mr-2" /> : null}
-              {moderationTarget?.action === 'approve' ? 'Aprobar' : 'Rechazar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Diálogo: editar política */}
       <Dialog open={policyDialogOpen} onOpenChange={setPolicyDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1982,61 +1918,91 @@ function AdminSlotCatalog() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo: crear tienda (admin) */}
-      <Dialog open={createSellerOpen} onOpenChange={setCreateSellerOpen}>
+      <Dialog open={shopDialogOpen} onOpenChange={setShopDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Crear tienda</DialogTitle>
+            <DialogTitle>{shopEditId ? 'Editar tienda' : 'Crear tienda'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={createSeller} className="space-y-3 py-2">
+          <form onSubmit={saveShop} className="space-y-3 py-2">
             <div className="space-y-2">
-              <Label htmlFor="cs_email">Email del usuario *</Label>
+              <Label htmlFor="shop_name">Nombre *</Label>
               <Input
-                id="cs_email"
-                type="email"
-                placeholder="vendedor@tienda.com"
-                value={createSellerForm.email}
-                onChange={(e) => setCreateSellerForm((f) => ({ ...f, email: e.target.value }))}
+                id="shop_name"
+                value={shopForm.name}
+                onChange={(e) => setShopForm((f) => ({ ...f, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="shop_country">País (ISO) *</Label>
+                <Input
+                  id="shop_country"
+                  maxLength={2}
+                  className="uppercase"
+                  value={shopForm.country_code}
+                  onChange={(e) => setShopForm((f) => ({ ...f, country_code: e.target.value.toUpperCase() }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="shop_currency">Moneda</Label>
+                <Input
+                  id="shop_currency"
+                  maxLength={3}
+                  className="uppercase"
+                  value={shopForm.currency}
+                  onChange={(e) => setShopForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shop_adapter">Adaptador *</Label>
+              <Input
+                id="shop_adapter"
+                value={shopForm.adapter_key}
+                onChange={(e) => setShopForm((f) => ({ ...f, adapter_key: e.target.value }))}
                 required
               />
               <p className="text-xs text-muted-foreground">
-                El usuario debe tener ya una cuenta registrada en la plataforma.
+                Clave del parser en el backend. Si aún no existe, el cron ignora la tienda.
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cs_store_name">Nombre de la tienda *</Label>
+              <Label htmlFor="shop_logo">URL del logo</Label>
               <Input
-                id="cs_store_name"
-                value={createSellerForm.store_name}
-                onChange={(e) => setCreateSellerForm((f) => ({ ...f, store_name: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cs_store_description">Descripción (opcional)</Label>
-              <Input
-                id="cs_store_description"
-                value={createSellerForm.store_description}
-                onChange={(e) => setCreateSellerForm((f) => ({ ...f, store_description: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cs_store_url">Web de la tienda (opcional)</Label>
-              <Input
-                id="cs_store_url"
+                id="shop_logo"
                 type="url"
                 placeholder="https://..."
-                value={createSellerForm.store_url}
-                onChange={(e) => setCreateSellerForm((f) => ({ ...f, store_url: e.target.value }))}
+                value={shopForm.logo_url}
+                onChange={(e) => setShopForm((f) => ({ ...f, logo_url: e.target.value }))}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="shop_site">Web</Label>
+              <Input
+                id="shop_site"
+                type="url"
+                placeholder="https://..."
+                value={shopForm.site_url}
+                onChange={(e) => setShopForm((f) => ({ ...f, site_url: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="shop_active"
+                checked={shopForm.active}
+                onCheckedChange={(checked) => setShopForm((f) => ({ ...f, active: checked }))}
+              />
+              <Label htmlFor="shop_active">Activa</Label>
+            </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateSellerOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setShopDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createSellerSaving}>
-                {createSellerSaving ? <Spinner className="size-4 mr-2" /> : null}
-                Crear tienda
+              <Button type="submit" disabled={shopSaving}>
+                {shopSaving ? <Spinner className="size-4 mr-2" /> : null}
+                Guardar
               </Button>
             </DialogFooter>
           </form>

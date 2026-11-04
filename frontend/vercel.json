@@ -4,6 +4,10 @@
   "outputDirectory": "build",
   "rewrites": [
     {
+      "source": "/go/:code",
+      "destination": "https://special-funicular-3q60.onrender.com/api/go/:code"
+    },
+    {
       "source": "/mcp",
       "destination": "https://special-funicular-3q60.onrender.com/mcp"
     },
