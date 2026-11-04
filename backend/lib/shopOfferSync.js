@@ -1,4 +1,5 @@
 const { createShortCode: defaultShortCode } = require('./shortCode');
+const { normalizeCode } = require('./shopAdapters/productParse');
 
 const STOCK_FRESH_MS = 8 * 24 * 60 * 60 * 1000;
 const RECHECK_LIMIT = 40;
@@ -35,11 +36,41 @@ function normalizeProductUrl(url) {
   return raw;
 }
 
-function offerPatchFromHit(hit, shop, nowIso, previousUrl) {
+/**
+ * previous_price solo se guarda si queda por encima del precio actual:
+ * la tarifa tachada de la tienda, o el último precio nuestro si ha bajado.
+ * Una subida borra el tachado. Si el precio no cambia, se conserva el tachado vigente.
+ */
+function nextOfferPrices({ price, regularPrice, existingPrice, existingPrevious }) {
+  const current = normalizePrice(price);
+  const regular = normalizePrice(regularPrice);
+  const stored = normalizePrice(existingPrice);
+  const storedPrevious = normalizePrice(existingPrevious);
+  let previous = null;
+  if (current != null && regular != null && regular > current) {
+    previous = regular;
+  } else if (current != null && stored != null && current < stored) {
+    previous = stored;
+  } else if (current != null && stored != null && current > stored) {
+    previous = null;
+  } else if (current != null && storedPrevious != null && storedPrevious > current) {
+    previous = storedPrevious;
+  }
+  return { price: current, previous_price: previous };
+}
+
+function offerPatchFromHit(hit, shop, nowIso, previousUrl, existing) {
   const productUrl = normalizeProductUrl(hit.productUrl) || previousUrl;
+  const prices = nextOfferPrices({
+    price: hit.price,
+    regularPrice: hit.regularPrice,
+    existingPrice: existing?.price,
+    existingPrevious: existing?.previous_price,
+  });
   return {
     product_url: productUrl,
-    price: normalizePrice(hit.price),
+    price: prices.price,
+    previous_price: prices.previous_price,
     currency: normalizeCurrency(hit.currency, shop?.currency),
     in_stock: Boolean(hit.inStock),
     last_checked_at: nowIso,
@@ -49,9 +80,103 @@ function offerPatchFromHit(hit, shop, nowIso, previousUrl) {
   };
 }
 
+function skuCode(raw) {
+  const text = String(raw || '').replace(/^referencia\s*:\s*/i, '');
+  const key = normalizeCode(text);
+  return key.length >= 4 ? key : '';
+}
+
+function indexCatalog(items) {
+  const byCode = new Map();
+  const put = (key, item) => {
+    if (key && !byCode.has(key)) byCode.set(key, item);
+  };
+  for (const item of items || []) {
+    const key = normalizeCode(item.reference);
+    put(key, item);
+    const sideways = key.match(/^RCSW0*(\d+)$/);
+    if (sideways) put(`RCSW${Number(sideways[1])}`, item);
+  }
+  return byCode;
+}
+
+function catalogItemForSku(byCode, sku) {
+  const key = skuCode(sku);
+  if (!key) return null;
+  if (byCode.has(key)) return byCode.get(key);
+  const sideways = key.match(/^RCSW0*(\d+)$/);
+  if (!sideways) return null;
+  return byCode.get(`RCSW${Number(sideways[1])}`) || null;
+}
+
+async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summary }) {
+  let products;
+  try {
+    products = await adapter.listProducts();
+  } catch {
+    summary.errors += 1;
+    return;
+  }
+  if (!Array.isArray(products) || products.length === 0 || !products.some((hit) => skuCode(hit && hit.sku))) {
+    summary.errors += 1;
+    return;
+  }
+
+  const byCode = indexCatalog(await io.listCatalogReferences());
+  const seen = new Set();
+  for (const hit of products) {
+    const item = catalogItemForSku(byCode, hit.sku);
+    if (!item || seen.has(item.id) || !normalizeProductUrl(hit.productUrl)) continue;
+    seen.add(item.id);
+    try {
+      const existing = await io.findOffer(shop.id, item.id);
+      const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl, existing);
+      if (existing) {
+        await io.updateOffer(existing.id, patch);
+      } else {
+        await io.insertOffer({
+          shop_id: shop.id,
+          catalog_item_id: item.id,
+          ...patch,
+          short_code: newShortCode(),
+        });
+      }
+      if (patch.in_stock) summary.discovered += 1;
+      else summary.out_of_stock += 1;
+    } catch {
+      summary.errors += 1;
+    }
+  }
+
+  let offers;
+  try {
+    offers = await io.listShopOffers(shop.id);
+  } catch {
+    summary.errors += 1;
+    return;
+  }
+  for (const offer of offers) {
+    if (seen.has(offer.catalog_item_id)) continue;
+    try {
+      await io.updateOffer(offer.id, {
+        in_stock: false,
+        last_checked_at: nowIso,
+        last_attempt_at: nowIso,
+        last_check_error: null,
+        updated_at: nowIso,
+      });
+      if (offer.in_stock !== false) summary.out_of_stock += 1;
+    } catch {
+      summary.errors += 1;
+    }
+  }
+}
+
 /**
  * Lote del cron. 40 rechecks de las ofertas más antiguas y 20 búsquedas nuevas por tienda.
+ * Una tienda con listProducts refresca su listado entero y no entra en ese cupo.
  * Un fallo de red no pone in_stock en true ni mueve last_checked_at.
+ * Si el listado WooCommerce falla a medias, no se marcan como agotadas las ofertas que faltan.
  */
 async function runShopOfferBatch({
   io,
@@ -81,8 +206,18 @@ async function runShopOfferBatch({
   summary.shops = runnable.length;
   if (runnable.length === 0) return summary;
 
-  const shopById = new Map(runnable.map((shop) => [shop.id, shop]));
-  const offers = await io.listOffersToRecheck([...shopById.keys()], recheckLimit);
+  const searchShops = [];
+  const listingShops = [];
+  for (const shop of runnable) {
+    const adapter = getAdapter(shop.adapter_key);
+    if (adapter && typeof adapter.listProducts === 'function') listingShops.push(shop);
+    else searchShops.push(shop);
+  }
+
+  const shopById = new Map(searchShops.map((shop) => [shop.id, shop]));
+  const offers = searchShops.length
+    ? await io.listOffersToRecheck([...shopById.keys()], recheckLimit)
+    : [];
   const nowIso = now.toISOString();
 
   for (const offer of offers) {
@@ -101,7 +236,7 @@ async function runShopOfferBatch({
         });
         summary.out_of_stock += 1;
       } else {
-        const patch = offerPatchFromHit(hit, shop, nowIso, offer.product_url);
+        const patch = offerPatchFromHit(hit, shop, nowIso, offer.product_url, offer);
         if (!patch.product_url) {
           throw new Error('URL de producto inválida');
         }
@@ -124,7 +259,18 @@ async function runShopOfferBatch({
     if (pauseMs > 0) await sleep(pauseMs);
   }
 
-  for (const shop of runnable) {
+  for (const shop of listingShops) {
+    await syncShopListing({
+      shop,
+      adapter: getAdapter(shop.adapter_key),
+      io,
+      nowIso,
+      newShortCode,
+      summary,
+    });
+  }
+
+  for (const shop of searchShops) {
     const adapter = getAdapter(shop.adapter_key);
     const items = await io.listCatalogItems(shop.discover_after_id || null, discoverPerShop);
     for (const item of items) {
@@ -135,8 +281,8 @@ async function runShopOfferBatch({
           brand: item.brand ?? null,
         });
         if (hit && normalizeProductUrl(hit.productUrl)) {
-          const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl);
           const existing = await io.findOffer(shop.id, item.id);
+          const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl, existing);
           if (existing) {
             await io.updateOffer(existing.id, patch);
           } else {
@@ -206,8 +352,8 @@ async function runShopOfferLookup({
         brand: item.brand ?? null,
       });
       if (!hit || !normalizeProductUrl(hit.productUrl)) continue;
-      const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl);
       const existing = await io.findOffer(shop.id, item.id);
+      const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl, existing);
       if (existing) {
         await io.updateOffer(existing.id, patch);
       } else {
@@ -243,7 +389,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       if (!shopIds.length) return [];
       const { data, error } = await admin
         .from('catalog_shop_offers')
-        .select('id, shop_id, catalog_item_id, product_url, price, currency, in_stock, slot_catalog_items!inner(discontinued)')
+        .select('id, shop_id, catalog_item_id, product_url, price, previous_price, currency, in_stock, slot_catalog_items!inner(discontinued)')
         .in('shop_id', shopIds)
         .eq('slot_catalog_items.discontinued', false)
         .order('last_attempt_at', { ascending: true, nullsFirst: true })
@@ -260,7 +406,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
     async findOffer(shopId, catalogItemId) {
       const { data, error } = await admin
         .from('catalog_shop_offers')
-        .select('id, short_code')
+        .select('id, short_code, price, previous_price')
         .eq('shop_id', shopId)
         .eq('catalog_item_id', catalogItemId)
         .maybeSingle();
@@ -344,6 +490,41 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       };
     },
 
+    async listCatalogReferences() {
+      const rows = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await admin
+          .from('slot_catalog_items')
+          .select('id, reference')
+          .eq('discontinued', false)
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw new Error(error.message);
+        rows.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+      return rows;
+    },
+
+    async listShopOffers(shopId) {
+      const rows = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await admin
+          .from('catalog_shop_offers')
+          .select('id, catalog_item_id, product_url, price, previous_price, in_stock, slot_catalog_items!inner(reference, discontinued)')
+          .eq('shop_id', shopId)
+          .eq('slot_catalog_items.discontinued', false)
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw new Error(error.message);
+        rows.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+      return rows;
+    },
+
     async setDiscoverCursor(shopId, discoverAfterId) {
       const { error } = await admin
         .from('catalog_shops')
@@ -366,6 +547,7 @@ module.exports = {
   normalizeCurrency,
   normalizePrice,
   normalizeProductUrl,
+  nextOfferPrices,
   runShopOfferBatch,
   runShopOfferLookup,
   createSupabaseShopOfferIo,

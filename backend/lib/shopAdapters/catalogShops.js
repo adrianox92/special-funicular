@@ -26,12 +26,14 @@ function hitMatches(hit, { reference, ean }) {
 }
 
 function toPublicHit(hit) {
-  return {
+  const publicHit = {
     productUrl: hit.productUrl,
     price: hit.price,
     currency: hit.currency || 'EUR',
     inStock: Boolean(hit.inStock),
   };
+  if (hit.regularPrice != null) publicHit.regularPrice = hit.regularPrice;
+  return publicHit;
 }
 
 function createShopAdapter(config, deps = {}) {
@@ -94,6 +96,14 @@ function createShopAdapter(config, deps = {}) {
   };
 }
 
+function withListProducts(adapter, listProducts) {
+  if (!listProducts) return adapter;
+  return {
+    ...adapter,
+    listProducts: () => listProducts(fetchShopPage),
+  };
+}
+
 function evotecCandidates(html, query) {
   const urls = [];
   for (const card of productListCards(html)) {
@@ -144,11 +154,61 @@ async function wooStoreLookup(origin, fetchPage, query) {
   return {
     productUrl: row.permalink,
     price: wooPrice(prices.price, prices.currency_minor_unit),
+    regularPrice: wooPrice(prices.regular_price, prices.currency_minor_unit),
     currency: prices.currency_code || 'EUR',
     inStock: Boolean(row.is_in_stock),
     sku: row.sku,
     gtin: null,
   };
+}
+
+const WOO_PAGE_SIZE = 100;
+const WOO_MAX_PAGES = 50;
+
+function wooProductHit(row) {
+  if (!row || typeof row.permalink !== 'string') return null;
+  const prices = row.prices || {};
+  return {
+    sku: row.sku || '',
+    productUrl: row.permalink,
+    price: wooPrice(prices.price, prices.currency_minor_unit),
+    regularPrice: wooPrice(prices.regular_price, prices.currency_minor_unit),
+    currency: prices.currency_code || 'EUR',
+    inStock: Boolean(row.is_in_stock),
+  };
+}
+
+/**
+ * Listado completo de la Store API. Sin stock_status ni on_sale:
+ * el stock sale de is_in_stock y el precio tachado de regular_price.
+ * category acota la tienda (coches en Model Hobby Red).
+ */
+async function listWooCatalog(origin, fetchPage, { category } = {}) {
+  const products = [];
+  for (let page = 1; page <= WOO_MAX_PAGES; page += 1) {
+    const params = new URLSearchParams({
+      per_page: String(WOO_PAGE_SIZE),
+      page: String(page),
+      orderby: 'date',
+      order: 'desc',
+    });
+    if (category) params.set('category', String(category));
+    const raw = await fetchPage(`${origin}/wp-json/wc/store/v1/products?${params}`);
+    if (!raw) throw new Error('Listado WooCommerce vacío');
+    let rows;
+    try {
+      rows = JSON.parse(raw);
+    } catch {
+      throw new Error('Listado WooCommerce no es JSON');
+    }
+    if (!Array.isArray(rows)) throw new Error('Listado WooCommerce no es una lista');
+    for (const row of rows) {
+      const hit = wooProductHit(row);
+      if (hit) products.push(hit);
+    }
+    if (rows.length < WOO_PAGE_SIZE) return products;
+  }
+  throw new Error('Listado WooCommerce incompleto');
 }
 
 const catalogShopAdapters = [
@@ -173,7 +233,7 @@ const catalogShopAdapters = [
     parse: parseJsonLdProduct,
     candidates: (html, query) => listedOrLinked(html, 'https://www.slotcar-union.com', query),
   }),
-  createShopAdapter({
+  withListProducts(createShopAdapter({
     key: 'model-hobbyred',
     origin: 'https://model-hobbyred.com',
     lookupOnly: true,
@@ -181,8 +241,8 @@ const catalogShopAdapters = [
     searchUrl: (query) => `https://model-hobbyred.com/wp-json/wc/store/v1/products?search=${encodeURIComponent(query)}`,
     parse: parseWooProduct,
     candidates: () => [],
-  }),
-  createShopAdapter({
+  }), (fetchPage) => listWooCatalog('https://model-hobbyred.com', fetchPage, { category: 22 })),
+  withListProducts(createShopAdapter({
     key: 'trofeslot',
     origin: 'https://trofeslot.com',
     lookupOnly: true,
@@ -190,11 +250,12 @@ const catalogShopAdapters = [
     searchUrl: (query) => `https://trofeslot.com/wp-json/wc/store/v1/products?search=${encodeURIComponent(query)}`,
     parse: parseWooProduct,
     candidates: () => [],
-  }),
+  }), (fetchPage) => listWooCatalog('https://trofeslot.com', fetchPage)),
 ];
 
 module.exports = {
   createShopAdapter,
   catalogShopAdapters,
   wooStoreLookup,
+  listWooCatalog,
 };

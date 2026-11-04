@@ -1,5 +1,5 @@
 const { createShortCode, ALPHABET } = require('../../lib/shortCode');
-const { isPublicOffer, runShopOfferBatch, runShopOfferLookup } = require('../../lib/shopOfferSync');
+const { isPublicOffer, nextOfferPrices, runShopOfferBatch, runShopOfferLookup } = require('../../lib/shopOfferSync');
 const { resolveGoTarget } = require('../../lib/goTarget');
 const { validateShopInput } = require('../../lib/shopInput');
 const { registerAdapter, clearAdapters, getAdapter } = require('../../lib/shopAdapters');
@@ -185,6 +185,156 @@ describe('runShopOfferBatch', () => {
     expect(cursors).toEqual([
       { shopId: 'shop-1', cursor: null },
     ]);
+  });
+});
+
+describe('nextOfferPrices', () => {
+  test('guarda el precio anterior solo cuando el nuevo es más bajo', () => {
+    expect(nextOfferPrices({
+      price: 67.5,
+      regularPrice: 75,
+      existingPrice: 80,
+      existingPrevious: null,
+    })).toEqual({ price: 67.5, previous_price: 75 });
+
+    expect(nextOfferPrices({
+      price: 70,
+      existingPrice: 80,
+      existingPrevious: null,
+    })).toEqual({ price: 70, previous_price: 80 });
+
+    expect(nextOfferPrices({
+      price: 90,
+      existingPrice: 80,
+      existingPrevious: 100,
+    })).toEqual({ price: 90, previous_price: null });
+
+    expect(nextOfferPrices({
+      price: 70,
+      existingPrice: 70,
+      existingPrevious: 80,
+    })).toEqual({ price: 70, previous_price: 80 });
+  });
+});
+
+describe('runShopOfferBatch listing', () => {
+  afterEach(() => clearAdapters());
+
+  test('lee el listado completo y marca ausentes como sin stock', async () => {
+    clearAdapters();
+    registerAdapter({
+      key: 'woo-test',
+      async listProducts() {
+        return [
+          {
+            sku: 'Referencia: C4034',
+            productUrl: 'https://shop.example/p/C4034',
+            price: 10,
+            regularPrice: 12,
+            currency: 'EUR',
+            inStock: true,
+          },
+          {
+            sku: 'OLD1',
+            productUrl: 'https://shop.example/p/old',
+            price: 8,
+            currency: 'EUR',
+            inStock: false,
+          },
+        ];
+      },
+      async findByReference() {
+        throw new Error('no buscar por referencia');
+      },
+      async checkProduct() {
+        throw new Error('no recheck html');
+      },
+    });
+
+    const updates = [];
+    const inserts = [];
+    const io = {
+      listActiveShops: async () => ([{
+        id: 'shop-woo',
+        adapter_key: 'woo-test',
+        currency: 'EUR',
+        active: true,
+        discover_after_id: null,
+      }]),
+      listOffersToRecheck: async () => {
+        throw new Error('el listado no recomprueba ficha a ficha');
+      },
+      listCatalogItems: async () => {
+        throw new Error('el listado no descubre de 20 en 20');
+      },
+      listCatalogReferences: async () => ([
+        { id: 'item-1', reference: 'C4034' },
+        { id: 'item-2', reference: 'OLD1' },
+        { id: 'item-3', reference: 'AUSENTE' },
+      ]),
+      listShopOffers: async () => ([
+        { id: 'off-1', catalog_item_id: 'item-1', price: 15, previous_price: null, in_stock: true },
+        { id: 'off-3', catalog_item_id: 'item-3', price: 20, previous_price: null, in_stock: true },
+      ]),
+      findOffer: async (_shopId, itemId) => (
+        itemId === 'item-1'
+          ? { id: 'off-1', price: 15, previous_price: null }
+          : null
+      ),
+      updateOffer: async (id, patch) => { updates.push({ id, patch }); },
+      insertOffer: async (row) => { inserts.push(row); },
+      setDiscoverCursor: async () => { throw new Error('no mueve el cursor'); },
+    };
+
+    const summary = await runShopOfferBatch({
+      io,
+      getAdapter,
+      now: new Date('2026-11-04T12:00:00.000Z'),
+      newShortCode: () => 'Ab3kX9p',
+    });
+
+    expect(summary).toMatchObject({ discovered: 1, out_of_stock: 2, errors: 0 });
+    const byId = Object.fromEntries(updates.map((row) => [row.id, row.patch]));
+    expect(byId['off-1']).toMatchObject({ price: 10, previous_price: 12, in_stock: true });
+    expect(byId['off-3']).toMatchObject({ in_stock: false });
+    expect(inserts[0]).toMatchObject({
+      catalog_item_id: 'item-2',
+      price: 8,
+      previous_price: null,
+      in_stock: false,
+    });
+  });
+
+  test('un listado vacío no da por agotado el resto', async () => {
+    clearAdapters();
+    registerAdapter({
+      key: 'woo-test',
+      async listProducts() {
+        return [];
+      },
+      async findByReference() {
+        return null;
+      },
+      async checkProduct() {
+        return null;
+      },
+    });
+    const io = {
+      listActiveShops: async () => ([{
+        id: 'shop-woo',
+        adapter_key: 'woo-test',
+        currency: 'EUR',
+        active: true,
+      }]),
+      listOffersToRecheck: async () => [],
+      listShopOffers: async () => {
+        throw new Error('no debe marcar ausencias');
+      },
+    };
+
+    const summary = await runShopOfferBatch({ io, getAdapter });
+    expect(summary.errors).toBe(1);
+    expect(summary.out_of_stock).toBe(0);
   });
 });
 

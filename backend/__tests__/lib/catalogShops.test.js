@@ -1,4 +1,4 @@
-const { createShopAdapter, wooStoreLookup } = require('../../lib/shopAdapters/catalogShops');
+const { createShopAdapter, wooStoreLookup, listWooCatalog } = require('../../lib/shopAdapters/catalogShops');
 const {
   sameSku,
   searchQueries,
@@ -210,6 +210,40 @@ describe('adaptadores de tienda', () => {
     });
     await expect(adapter.checkProduct(productUrl)).resolves.toMatchObject({ price: 71.96, inStock: true });
     await expect(adapter.checkProduct('https://trofeslot.com/producto/agotado/')).resolves.toMatchObject({
+      inStock: false,
+    });
+  });
+
+  test('listWooCatalog recorre todas las páginas sin filtrar por stock ni oferta', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, index) => ({
+      sku: `SKU${index}`,
+      permalink: `https://trofeslot.com/producto/${index}/`,
+      is_in_stock: true,
+      prices: { price: '1000', regular_price: '1000', currency_code: 'EUR', currency_minor_unit: 2 },
+    }));
+    const lastPage = [{
+      sku: 'Referencia: AV52310',
+      permalink: 'https://trofeslot.com/producto/296/',
+      is_in_stock: false,
+      prices: { price: '6750', regular_price: '7500', currency_code: 'EUR', currency_minor_unit: 2 },
+    }];
+    const fetchPage = jest.fn(async (url) => {
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('stock_status')).toBeNull();
+      expect(parsed.searchParams.get('on_sale')).toBeNull();
+      expect(parsed.searchParams.get('category')).toBe('22');
+      const page = Number(parsed.searchParams.get('page'));
+      return JSON.stringify(page === 1 ? fullPage : lastPage);
+    });
+
+    const products = await listWooCatalog('https://model-hobbyred.com', fetchPage, { category: 22 });
+
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+    expect(products).toHaveLength(101);
+    expect(products[100]).toMatchObject({
+      sku: 'Referencia: AV52310',
+      price: 67.5,
+      regularPrice: 75,
       inStock: false,
     });
   });

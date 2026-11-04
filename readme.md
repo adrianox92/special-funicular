@@ -102,7 +102,7 @@ Recomprueba las ofertas scrapeadas y busca referencias nuevas. La ficha solo ens
    Para probar una referencia concreta sin recorrer el catálogo:
    `POST /api/cron/shop-offers?reference=C4555`.
 
-Cada ejecución mira hasta 40 ofertas ya guardadas y 20 referencias nuevas por tienda. Las más antiguas van primero.
+Cada ejecución mira hasta 40 ofertas ya guardadas y 20 referencias nuevas por tienda. Las más antiguas van primero. Trofeslot y Model Hobby Red (y cualquier tienda WooCommerce con el mismo adaptador) leen el listado completo de la Store API en esa misma ejecución, sin el cupo de 20. Si el precio baja, la ficha muestra el anterior tachado y el nuevo al lado.
 
 ### Requisitos Técnicos PWA
 

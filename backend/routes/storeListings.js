@@ -53,10 +53,13 @@ function shopFromEmbed(row) {
 
 function toPublicOffer(row) {
   const shop = shopFromEmbed(row);
+  const price = row.price == null ? null : Number(row.price);
+  const previous = row.previous_price == null ? null : Number(row.previous_price);
   return {
     id: row.id,
     short_code: row.short_code,
     price: row.price,
+    previous_price: previous != null && price != null && previous > price ? row.previous_price : null,
     currency: row.currency,
     shop_name: shop?.name ?? null,
     country_code: shop?.country_code ?? null,
@@ -75,7 +78,7 @@ router.get('/catalog/:catalogItemId', async (req, res) => {
 
     const { data, error } = await db
       .from('catalog_shop_offers')
-      .select('id, price, currency, short_code, in_stock, last_checked_at, catalog_shops!inner(name, country_code, logo_url, active)')
+      .select('id, price, previous_price, currency, short_code, in_stock, last_checked_at, catalog_shops!inner(name, country_code, logo_url, active)')
       .eq('catalog_item_id', catalogItemId)
       .eq('in_stock', true)
       .gte('last_checked_at', publicOfferCutoff())

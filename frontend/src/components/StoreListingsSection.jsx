@@ -118,6 +118,15 @@ export default function StoreListingsSection({ catalogItemId }) {
             <ul className="divide-y divide-border border-y border-border">
               {group.offers.map((offer) => {
                 const priceStr = formatPrice(offer.price, offer.currency);
+                const previousValue = Number(offer.previous_price);
+                const currentValue = Number(offer.price);
+                const previousStr = offer.previous_price != null
+                  && offer.price != null
+                  && Number.isFinite(previousValue)
+                  && Number.isFinite(currentValue)
+                  && previousValue > currentValue
+                  ? formatPrice(offer.previous_price, offer.currency)
+                  : null;
                 const name = offer.shop_name || 'Tienda';
                 return (
                   <li key={offer.id} className="flex items-center gap-3 py-3">
@@ -131,8 +140,13 @@ export default function StoreListingsSection({ catalogItemId }) {
                       <StoreInitials name={name} />
                     )}
                     <p className="min-w-0 flex-1 font-medium truncate">{name}</p>
-                    <span className="shrink-0 font-semibold tabular-nums">
-                      {priceStr || '—'}
+                    <span className="shrink-0 tabular-nums text-right">
+                      {previousStr ? (
+                        <span className="mr-2 text-sm font-normal text-muted-foreground line-through">
+                          {previousStr}
+                        </span>
+                      ) : null}
+                      <span className="font-semibold">{priceStr || '—'}</span>
                     </span>
                     <Button size="sm" asChild>
                       <a

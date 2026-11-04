@@ -29,6 +29,7 @@ describe('StoreListingsSection', () => {
           id: 'a',
           short_code: 'Ab3kX9p',
           price: 42.5,
+          previous_price: 50,
           currency: 'EUR',
           shop_name: 'Slot Norte',
           country_code: 'ES',
@@ -59,5 +60,7 @@ describe('StoreListingsSection', () => {
     expect(link.getAttribute('href')).toMatch(/\/go\/Ab3kX9p$/);
     expect(link).toHaveAttribute('rel', expect.stringContaining('sponsored'));
     expect(spain).toHaveTextContent('42,50');
+    expect(spain.querySelector('.line-through')).toHaveTextContent('50,00');
+    expect(screen.getByRole('region', { name: 'Reino Unido' }).querySelector('.line-through')).toBeNull();
   });
 });
