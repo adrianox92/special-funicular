@@ -123,6 +123,7 @@ describe('runShopOfferBatch', () => {
       listActiveShops: async () => ([
         {
           id: 'shop-1',
+          name: 'Evotec',
           adapter_key: 'test',
           currency: 'EUR',
           active: true,
@@ -130,6 +131,7 @@ describe('runShopOfferBatch', () => {
         },
         {
           id: 'shop-2',
+          name: 'Slot Norte',
           adapter_key: 'desconocido',
           currency: 'EUR',
           active: true,
@@ -137,10 +139,31 @@ describe('runShopOfferBatch', () => {
         },
       ]),
       listOffersToRecheck: async () => ([
-        { id: 'off-ok', shop_id: 'shop-1', product_url: 'https://shop.example/p/live', in_stock: false },
-        { id: 'off-oos', shop_id: 'shop-1', product_url: 'https://shop.example/p/oos', in_stock: true },
+        {
+          id: 'off-ok',
+          shop_id: 'shop-1',
+          catalog_item_id: 'item-ok',
+          product_url: 'https://shop.example/p/live',
+          in_stock: false,
+          slot_catalog_items: { reference: 'LIVE1', model_name: 'Porsche', manufacturer: 'Scalextric' },
+        },
+        {
+          id: 'off-oos',
+          shop_id: 'shop-1',
+          catalog_item_id: 'item-oos',
+          product_url: 'https://shop.example/p/oos',
+          in_stock: true,
+          slot_catalog_items: { reference: 'OOS1', model_name: 'Audi', manufacturer: 'Slot.it' },
+        },
         { id: 'off-fail', shop_id: 'shop-1', product_url: 'https://shop.example/p/fail', in_stock: true },
-        { id: 'off-gone', shop_id: 'shop-1', product_url: 'https://shop.example/p/gone', in_stock: true },
+        {
+          id: 'off-gone',
+          shop_id: 'shop-1',
+          catalog_item_id: 'item-gone',
+          product_url: 'https://shop.example/p/gone',
+          in_stock: true,
+          slot_catalog_items: { reference: 'GONE1' },
+        },
       ]),
       updateOffer: async (id, patch) => { updates.push({ id, patch }); },
       listCatalogItems: async () => ([
@@ -185,6 +208,19 @@ describe('runShopOfferBatch', () => {
     expect(cursors).toEqual([
       { shopId: 'shop-1', cursor: null },
     ]);
+    expect(summary.skipped).toEqual([{
+      name: 'Slot Norte',
+      adapter_key: 'desconocido',
+      reason: 'No hay adaptador registrado para «desconocido»',
+    }]);
+    expect(summary.created).toEqual([expect.objectContaining({
+      shop: 'Evotec',
+      catalog_item_id: 'item-1',
+      reference: 'C4034',
+      manufacturer: 'Scalextric',
+      in_stock: true,
+    })]);
+    expect(summary.withdrawn.map((row) => row.reference).sort()).toEqual(['GONE1', 'OOS1']);
   });
 });
 

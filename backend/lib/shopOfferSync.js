@@ -86,6 +86,46 @@ function skuCode(raw) {
   return key.length >= 4 ? key : '';
 }
 
+function emptyOfferSummary() {
+  return {
+    shops: 0,
+    skipped_shops: 0,
+    skipped: [],
+    checked: 0,
+    discovered: 0,
+    out_of_stock: 0,
+    errors: 0,
+    created: [],
+    withdrawn: [],
+  };
+}
+
+function catalogIdentity(row) {
+  const nested = row && row.slot_catalog_items;
+  const item = Array.isArray(nested) ? nested[0] : nested;
+  return {
+    catalog_item_id: (row && (row.catalog_item_id || row.id)) || null,
+    reference: (row && row.reference) || (item && item.reference) || null,
+    model_name: (row && row.model_name) || (item && item.model_name) || null,
+    manufacturer: (row && (row.manufacturer || row.brand)) || (item && item.manufacturer) || null,
+  };
+}
+
+function pushCatalogEvent(list, shop, row, extra) {
+  list.push({
+    shop: shop?.name || null,
+    adapter_key: shop?.adapter_key || null,
+    ...catalogIdentity(row),
+    ...extra,
+  });
+}
+
+function skipReason(shop) {
+  const key = String(shop?.adapter_key || '').trim();
+  if (!key) return 'La tienda no tiene adaptador';
+  return `No hay adaptador registrado para «${key}»`;
+}
+
 function indexCatalog(items) {
   const byCode = new Map();
   const put = (key, item) => {
@@ -133,12 +173,19 @@ async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summar
       const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl, existing);
       if (existing) {
         await io.updateOffer(existing.id, patch);
+        if (existing.in_stock !== false && !patch.in_stock) {
+          pushCatalogEvent(summary.withdrawn, shop, item, { product_url: patch.product_url });
+        }
       } else {
         await io.insertOffer({
           shop_id: shop.id,
           catalog_item_id: item.id,
           ...patch,
           short_code: newShortCode(),
+        });
+        pushCatalogEvent(summary.created, shop, item, {
+          product_url: patch.product_url,
+          in_stock: Boolean(patch.in_stock),
         });
       }
       if (patch.in_stock) summary.discovered += 1;
@@ -165,7 +212,10 @@ async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summar
         last_check_error: null,
         updated_at: nowIso,
       });
-      if (offer.in_stock !== false) summary.out_of_stock += 1;
+      if (offer.in_stock !== false) {
+        summary.out_of_stock += 1;
+        pushCatalogEvent(summary.withdrawn, shop, offer, { product_url: offer.product_url });
+      }
     } catch {
       summary.errors += 1;
     }
@@ -188,21 +238,21 @@ async function runShopOfferBatch({
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   newShortCode = defaultShortCode,
 }) {
-  const summary = {
-    shops: 0,
-    skipped_shops: 0,
-    checked: 0,
-    discovered: 0,
-    out_of_stock: 0,
-    errors: 0,
-  };
+  const summary = emptyOfferSummary();
 
   const shops = await io.listActiveShops();
   const runnable = [];
   for (const shop of shops) {
     if (getAdapter(shop.adapter_key)) runnable.push(shop);
-    else summary.skipped_shops += 1;
+    else {
+      summary.skipped.push({
+        name: shop.name || null,
+        adapter_key: shop.adapter_key || null,
+        reason: skipReason(shop),
+      });
+    }
   }
+  summary.skipped_shops = summary.skipped.length;
   summary.shops = runnable.length;
   if (runnable.length === 0) return summary;
 
@@ -235,6 +285,9 @@ async function runShopOfferBatch({
           updated_at: nowIso,
         });
         summary.out_of_stock += 1;
+        if (offer.in_stock !== false) {
+          pushCatalogEvent(summary.withdrawn, shop, offer, { product_url: offer.product_url });
+        }
       } else {
         const patch = offerPatchFromHit(hit, shop, nowIso, offer.product_url, offer);
         if (!patch.product_url) {
@@ -242,7 +295,12 @@ async function runShopOfferBatch({
         }
         await io.updateOffer(offer.id, patch);
         if (patch.in_stock) summary.checked += 1;
-        else summary.out_of_stock += 1;
+        else {
+          summary.out_of_stock += 1;
+          if (offer.in_stock !== false) {
+            pushCatalogEvent(summary.withdrawn, shop, offer, { product_url: offer.product_url });
+          }
+        }
       }
     } catch (err) {
       summary.errors += 1;
@@ -285,12 +343,19 @@ async function runShopOfferBatch({
           const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl, existing);
           if (existing) {
             await io.updateOffer(existing.id, patch);
+            if (existing.in_stock !== false && !patch.in_stock) {
+              pushCatalogEvent(summary.withdrawn, shop, item, { product_url: patch.product_url });
+            }
           } else {
             await io.insertOffer({
               shop_id: shop.id,
               catalog_item_id: item.id,
               ...patch,
               short_code: newShortCode(),
+            });
+            pushCatalogEvent(summary.created, shop, item, {
+              product_url: patch.product_url,
+              in_stock: Boolean(patch.in_stock),
             });
           }
           summary.discovered += 1;
@@ -389,7 +454,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       if (!shopIds.length) return [];
       const { data, error } = await admin
         .from('catalog_shop_offers')
-        .select('id, shop_id, catalog_item_id, product_url, price, previous_price, currency, in_stock, slot_catalog_items!inner(discontinued)')
+        .select('id, shop_id, catalog_item_id, product_url, price, previous_price, currency, in_stock, slot_catalog_items!inner(discontinued, reference, model_name, manufacturer)')
         .in('shop_id', shopIds)
         .eq('slot_catalog_items.discontinued', false)
         .order('last_attempt_at', { ascending: true, nullsFirst: true })
@@ -406,7 +471,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
     async findOffer(shopId, catalogItemId) {
       const { data, error } = await admin
         .from('catalog_shop_offers')
-        .select('id, short_code, price, previous_price')
+        .select('id, short_code, price, previous_price, in_stock')
         .eq('shop_id', shopId)
         .eq('catalog_item_id', catalogItemId)
         .maybeSingle();
@@ -496,7 +561,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await admin
           .from('slot_catalog_items')
-          .select('id, reference')
+          .select('id, reference, model_name, manufacturer')
           .eq('discontinued', false)
           .order('id', { ascending: true })
           .range(from, from + pageSize - 1);
@@ -513,7 +578,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await admin
           .from('catalog_shop_offers')
-          .select('id, catalog_item_id, product_url, price, previous_price, in_stock, slot_catalog_items!inner(reference, discontinued)')
+          .select('id, catalog_item_id, product_url, price, previous_price, in_stock, slot_catalog_items!inner(reference, model_name, manufacturer, discontinued)')
           .eq('shop_id', shopId)
           .eq('slot_catalog_items.discontinued', false)
           .order('id', { ascending: true })
@@ -551,4 +616,5 @@ module.exports = {
   runShopOfferBatch,
   runShopOfferLookup,
   createSupabaseShopOfferIo,
+  emptyOfferSummary,
 };

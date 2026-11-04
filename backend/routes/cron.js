@@ -5,6 +5,7 @@ const { runWeeklyDigest, buildWeeklyDigestForUser } = require('../lib/weeklyDige
 const { runCatalogGapReport } = require('../lib/catalogGapReport');
 const { getAdapter } = require('../lib/shopAdapters');
 const { runShopOfferBatch, runShopOfferLookup, createSupabaseShopOfferIo } = require('../lib/shopOfferSync');
+const { sendShopOfferReport, publicShopOfferResult } = require('../lib/shopOfferReport');
 const { createShortCode } = require('../lib/shortCode');
 const { getServiceClient } = require('../lib/supabaseClients');
 const { sendWeeklyDigestNotification } = require('../lib/notifier');
@@ -93,13 +94,16 @@ router.post('/shop-offers', cronAuth, async (req, res) => {
       }
       return res.json({ ok: true, ...result });
     }
+    const now = new Date();
     const result = await runShopOfferBatch({
       io: createSupabaseShopOfferIo(admin, { createShortCode }),
       getAdapter,
+      now,
       newShortCode: createShortCode,
       pauseMs: 200,
     });
-    res.json({ ok: true, ...result });
+    const email = await sendShopOfferReport({ summary: result, now });
+    res.json({ ok: true, ...publicShopOfferResult(result, email) });
   } catch (e) {
     console.error('[cron] shop-offers:', e);
     res.status(500).json({ error: e.message || 'Error al revisar ofertas de tienda' });

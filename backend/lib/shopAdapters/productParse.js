@@ -230,6 +230,165 @@ function parseDataProduct(html, pageUrl) {
   };
 }
 
+/**
+ * Piezas sueltas. La misma referencia puede ser un coche en una marca y un
+ * recambio en otra (RS0139 es un Escort y también un chasis). El segmento de
+ * categoría de la ficha, las categorías Woo y las primeras palabras del nombre
+ * tienen que delatar el recambio.
+ * `body`, `light` o `track` sí valen como categoría, pero no como título:
+ * hay coches «white body kit» o «light blue» archivados como coche.
+ */
+const SPARE_TOKENS = new Set([
+  'chasis', 'chassis', 'accchasis',
+  'carroceria', 'carrocerias', 'carrosserie', 'carrosseries', 'body', 'bodies', 'bodyes',
+  'motor', 'motores', 'motors', 'moteur', 'moteurs',
+  'neumatico', 'neumaticos', 'neum', 'tyre', 'tyres', 'tire', 'tires', 'pneu', 'pneus', 'reifen',
+  'llanta', 'llantas', 'rim', 'rims', 'jante', 'jantes', 'felge', 'felgen', 'tapacubos',
+  'wheel', 'wheels',
+  'pinon', 'pinones', 'pinion', 'pinions',
+  'corona', 'coronas', 'gear', 'gears',
+  'eje', 'ejes', 'axle', 'axles', 'axe', 'axes',
+  'guia', 'guias', 'guide', 'guides', 'pickup', 'pickups',
+  'trencilla', 'trencillas', 'braid', 'braids',
+  'tornillo', 'tornillos', 'tornilleria', 'screw', 'screws',
+  'cojinete', 'cojinetes', 'rodamiento', 'rodamientos', 'bearing', 'bearings', 'bushing', 'bushings',
+  'calca', 'calcas', 'decal', 'decals',
+  'recambio', 'recambios', 'spare', 'spares', 'part', 'parts',
+  'soporte', 'soportes', 'mount', 'mounts',
+  'cable', 'cables',
+  'aceite', 'aceites', 'aditivo', 'aditivos', 'lubricant', 'lubricants',
+  'fluide', 'fluides', 'fluid', 'fluids', 'grasa', 'grasas',
+  'herramienta', 'herramientas', 'tool', 'tools',
+  'mando', 'mandos', 'controller', 'controllers',
+  'pintura', 'pinturas', 'paint', 'paints', 'painting',
+  'pista', 'pistas', 'track', 'tracks', 'circuito', 'circuitos', 'circuit', 'circuits',
+  'accesorio', 'accesorios', 'accessory', 'accessories',
+  'polea', 'poleas', 'pulley', 'pulleys',
+  'correa', 'correas', 'belt', 'belts',
+  'stopper', 'stoppers', 'separador', 'separadores', 'spacer', 'spacers',
+  'suspension', 'suspensiones', 'suspensions', 'muelle', 'muelles', 'spring', 'springs',
+  'iman', 'imanes', 'magnet', 'magnets',
+  'aleron', 'alerones', 'spoiler', 'spoilers', 'wing', 'wings',
+  'interior', 'interiores', 'lexan', 'cockpit', 'cockpits',
+  'luz', 'luces', 'light', 'lights',
+  'electronica', 'electronics',
+  'terminal', 'terminales',
+  'trofeo', 'trofeos', 'trophy', 'trophies',
+  'diorama', 'dioramas', 'figura', 'figuras',
+  'maqueta', 'maquetas',
+  'adhesive', 'adhesives', 'glue', 'glues',
+  'airbrush', 'airbrushes',
+  'decoration', 'decorations', 'decoracion',
+  'display', 'case', 'cases', 'supply', 'supplies',
+]);
+
+const NAME_EXEMPT = new Set([
+  'body', 'bodies', 'bodyes',
+  'light', 'lights', 'wing', 'wings',
+  'track', 'tracks', 'wheel', 'wheels',
+  'part', 'parts', 'guide', 'guides',
+  'kit', 'kits', 'set', 'sets',
+  'circuit', 'circuits', 'circuito', 'circuitos',
+  'paint', 'paints', 'painting', 'pintura', 'pinturas',
+  'display', 'case', 'cases', 'supply', 'supplies',
+]);
+
+function plainText(value) {
+  return decodeHtml(String(value || ''))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/<[^>]+>/g, ' ');
+}
+
+function spareTokens(value) {
+  return plainText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function tokenIsSpare(token, { name = false } = {}) {
+  if (!token || (name && NAME_EXEMPT.has(token))) return false;
+  if (SPARE_TOKENS.has(token)) return true;
+  return token.startsWith('acc') && SPARE_TOKENS.has(token.slice(3));
+}
+
+/** /en/chasis/15812-nombre.html → chasis. En Woo la categoría no va en la ficha. */
+function categorySlugFromProductUrl(url) {
+  try {
+    const parts = new URL(url).pathname.split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    if (parts.length >= 3 && /^\d+-/.test(last) && /\.html$/i.test(last)) {
+      return decodeURIComponent(parts[parts.length - 2]).toLowerCase();
+    }
+  } catch {
+    /* una URL rara no aporta categoría */
+  }
+  return '';
+}
+
+function breadcrumbCategorySlugs(html) {
+  const block = String(html || '').match(/<div class="breadcrumb">([\s\S]*?)<\/div>/i);
+  if (!block) return [];
+  const slugs = [];
+  for (const match of block[1].matchAll(/\/\d+-([a-z0-9-]+)/gi)) {
+    slugs.push(match[1].toLowerCase());
+  }
+  return slugs;
+}
+
+function wooCategorySlugs(html) {
+  const block = String(html || '').match(/class="posted_in"[^>]*>[\s\S]*?<\/span>/i);
+  if (!block || !/categoria-producto/i.test(block[0])) return [];
+  const slugs = [];
+  for (const match of block[0].matchAll(/\/categoria-producto\/([^"'#?]+)/gi)) {
+    for (const part of match[1].split('/')) {
+      const slug = decodeURIComponent(part).trim().toLowerCase();
+      if (slug) slugs.push(slug);
+    }
+  }
+  return slugs;
+}
+
+function productTitle(html) {
+  const source = String(html || '');
+  const h1 = source.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1) return plainText(h1[1]).replace(/\s+/g, ' ').trim();
+  const title = source.match(/<title>([^<]+)/i);
+  if (!title) return '';
+  return plainText(title[1]).replace(/\s+[-|].*$/, '').replace(/\s+/g, ' ').trim();
+}
+
+function enrichShopProduct(hit, html) {
+  if (!hit) return hit;
+  const categorySlugs = [];
+  const push = (slug) => {
+    const text = String(slug || '').trim().toLowerCase();
+    if (text && !categorySlugs.includes(text)) categorySlugs.push(text);
+  };
+  for (const slug of hit.categorySlugs || []) push(slug);
+  for (const slug of breadcrumbCategorySlugs(html)) push(slug);
+  for (const slug of wooCategorySlugs(html)) push(slug);
+  return {
+    ...hit,
+    categorySlugs,
+    name: hit.name || productTitle(html),
+  };
+}
+
+function slugIsSpare(slug) {
+  return spareTokens(slug).some((token) => tokenIsSpare(token));
+}
+
+/** true si la ficha es un recambio y no debe guardarse como oferta de un coche. */
+function isSpareProduct(hit) {
+  if (!hit) return false;
+  if (slugIsSpare(categorySlugFromProductUrl(hit.productUrl || hit.url))) return true;
+  if ((hit.categorySlugs || []).some(slugIsSpare)) return true;
+  return spareTokens(hit.name).slice(0, 3).some((token) => tokenIsSpare(token, { name: true }));
+}
+
 function searchQueries(reference, ean) {
   const queries = [];
   const add = (value) => {
@@ -262,4 +421,6 @@ module.exports = {
   parseEvotecProduct,
   parseDataProduct,
   searchQueries,
+  isSpareProduct,
+  enrichShopProduct,
 };
