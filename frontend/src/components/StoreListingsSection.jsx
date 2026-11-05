@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../lib/axios';
 import { Card, CardContent, CardHeader } from './ui/card';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { ExternalLink, ShoppingCart } from 'lucide-react';
 
@@ -27,6 +28,14 @@ function countryLabel(code, names) {
   } catch {
     return key;
   }
+}
+
+function discountPercent(previous, current) {
+  if (!Number.isFinite(previous) || !Number.isFinite(current) || previous <= 0 || current >= previous) {
+    return null;
+  }
+  const percent = Math.round(((previous - current) / previous) * 100);
+  return percent >= 1 ? percent : null;
 }
 
 function offerHref(shortCode) {
@@ -123,13 +132,13 @@ export default function StoreListingsSection({ catalogItemId }) {
                 const priceStr = formatPrice(offer.price, offer.currency);
                 const previousValue = Number(offer.previous_price);
                 const currentValue = Number(offer.price);
-                const previousStr = offer.previous_price != null
+                const hasDrop = offer.previous_price != null
                   && offer.price != null
                   && Number.isFinite(previousValue)
                   && Number.isFinite(currentValue)
-                  && previousValue > currentValue
-                  ? formatPrice(offer.previous_price, offer.currency)
-                  : null;
+                  && previousValue > currentValue;
+                const discount = hasDrop ? discountPercent(previousValue, currentValue) : null;
+                const previousStr = hasDrop ? formatPrice(offer.previous_price, offer.currency) : null;
                 const name = offer.shop_name || 'Tienda';
                 return (
                   <li key={offer.id} className="flex items-center gap-3 py-3">
@@ -148,6 +157,14 @@ export default function StoreListingsSection({ catalogItemId }) {
                         <span className="mr-2 text-sm font-normal text-muted-foreground line-through">
                           {previousStr}
                         </span>
+                      ) : null}
+                      {discount != null ? (
+                        <Badge
+                          variant="destructive"
+                          className="mr-2 px-1.5 py-0 text-[10px] leading-4 shadow-none"
+                        >
+                          -{discount}%
+                        </Badge>
                       ) : null}
                       <span className="font-semibold">{priceStr || '—'}</span>
                     </span>

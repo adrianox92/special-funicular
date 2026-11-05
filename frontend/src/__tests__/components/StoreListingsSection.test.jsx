@@ -62,6 +62,8 @@ describe('StoreListingsSection', () => {
     expect(spain).toHaveTextContent('42,50');
     expect(screen.getByText('Precio y disponibilidad sujetos a confirmación en tienda')).toBeInTheDocument();
     expect(spain.querySelector('.line-through')).toHaveTextContent('50,00');
+    expect(spain).toHaveTextContent('-15%');
     expect(screen.getByRole('region', { name: 'Reino Unido' }).querySelector('.line-through')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Reino Unido' })).not.toHaveTextContent('%');
   });
 });
