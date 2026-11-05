@@ -416,6 +416,121 @@ describe('runShopOfferBatch listing', () => {
     expect(summary.errors).toBe(1);
     expect(summary.out_of_stock).toBe(0);
   });
+
+  test('una referencia en stock se busca en las demás tiendas', async () => {
+    clearAdapters();
+    const calls = [];
+    registerAdapter({
+      key: 'list-a',
+      async listProducts() {
+        return [{
+          sku: 'E2055',
+          productUrl: 'https://a.example/e2055',
+          price: 50,
+          currency: 'EUR',
+          inStock: true,
+        }];
+      },
+      async findByReference() {
+        throw new Error('el listado no busca');
+      },
+      async checkProduct() {
+        return null;
+      },
+    });
+    registerAdapter({
+      key: 'search-b',
+      async findByReference(query) {
+        calls.push(query.reference);
+        return {
+          productUrl: 'https://b.example/e2055',
+          price: 48,
+          currency: 'EUR',
+          inStock: true,
+        };
+      },
+      async checkProduct() {
+        return null;
+      },
+    });
+    const inserts = [];
+    const io = {
+      listActiveShops: async () => ([
+        { id: 'a', name: 'A', adapter_key: 'list-a', currency: 'EUR', active: true },
+        { id: 'b', name: 'B', adapter_key: 'search-b', currency: 'EUR', active: true },
+      ]),
+      listOffersToRecheck: async () => [],
+      listCatalogReferences: async () => [{ id: 'item-1', reference: 'E2055', manufacturer: 'Fly' }],
+      listShopOffers: async () => [],
+      listCatalogItems: async () => [],
+      findOffer: async () => null,
+      insertOffer: async (row) => { inserts.push(row); },
+      updateOffer: async () => {},
+      setDiscoverCursor: async () => {},
+    };
+
+    const summary = await runShopOfferBatch({
+      io,
+      getAdapter,
+      fanoutCalls: 5,
+      pauseMs: 0,
+      newShortCode: () => 'Ab3kX9p',
+    });
+
+    expect(calls).toEqual(['E2055']);
+    expect(inserts.map((row) => row.shop_id).sort()).toEqual(['a', 'b']);
+    expect(summary.discovered).toBe(2);
+  });
+
+  test('no repite la búsqueda si la otra tienda ya tiene oferta', async () => {
+    clearAdapters();
+    const calls = [];
+    registerAdapter({
+      key: 'list-a',
+      async listProducts() {
+        return [{
+          sku: 'E2055',
+          productUrl: 'https://a.example/e2055',
+          price: 50,
+          currency: 'EUR',
+          inStock: true,
+        }];
+      },
+      async findByReference() {
+        return null;
+      },
+      async checkProduct() {
+        return null;
+      },
+    });
+    registerAdapter({
+      key: 'search-b',
+      async findByReference(query) {
+        calls.push(query.reference);
+        return null;
+      },
+      async checkProduct() {
+        return null;
+      },
+    });
+    const io = {
+      listActiveShops: async () => ([
+        { id: 'a', name: 'A', adapter_key: 'list-a', currency: 'EUR', active: true },
+        { id: 'b', name: 'B', adapter_key: 'search-b', currency: 'EUR', active: true },
+      ]),
+      listOffersToRecheck: async () => [],
+      listCatalogReferences: async () => [{ id: 'item-1', reference: 'E2055' }],
+      listShopOffers: async () => [],
+      listCatalogItems: async () => [],
+      findOffer: async (shopId) => (shopId === 'b' ? { id: 'off-b' } : null),
+      insertOffer: async () => {},
+      updateOffer: async () => {},
+      setDiscoverCursor: async () => {},
+    };
+
+    await runShopOfferBatch({ io, getAdapter, pauseMs: 0 });
+    expect(calls).toEqual([]);
+  });
 });
 
 describe('runShopOfferLookup', () => {

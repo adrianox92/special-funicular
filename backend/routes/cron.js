@@ -71,10 +71,10 @@ router.post('/catalog-gap-report', cronAuth, async (req, res) => {
  * POST /api/cron/shop-offers
  * Header: Authorization: Bearer ${CRON_SECRET}
  *
- * Render Cron diario `0 6 * * *` (06:00 UTC). Cada ejecución recomprueba
- * las 40 ofertas con el intento más antiguo y busca 20 referencias nuevas
- * por tienda. Las más antiguas van primero, así que no se queda atascado
- * en un fallo de red. No recorre el catálogo entero en un solo request.
+ * Render Cron diario `0 6 * * *` (06:00 UTC). Recomprueba primero las ofertas
+ * en stock y busca 20 referencias nuevas por tienda. Las tiendas con listado
+ * completo se sincronizan enteras. Una referencia encontrada en stock se
+ * busca también en las demás tiendas, con un tope de peticiones.
  */
 router.post('/shop-offers', cronAuth, async (req, res) => {
   try {

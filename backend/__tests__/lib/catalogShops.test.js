@@ -1,4 +1,14 @@
-const { createShopAdapter, wooStoreLookup, listWooCatalog } = require('../../lib/shopAdapters/catalogShops');
+const {
+  createShopAdapter,
+  wooStoreLookup,
+  listWooCatalog,
+  parseJoaquiProduct,
+  joaquiCandidates,
+  parseCricProduct,
+  criccracLookup,
+  htycProductHit,
+  listHtycProducts,
+} = require('../../lib/shopAdapters/catalogShops');
 const {
   sameSku,
   searchQueries,
@@ -246,5 +256,95 @@ describe('adaptadores de tienda', () => {
       regularPrice: 75,
       inStock: false,
     });
+  });
+});
+
+describe('joaquimoslot', () => {
+  const search = `
+    <div class="product-card"><a href="https://www.joaquimoslot.com/rally/otro-coche">otro</a></div>
+    <div class="product-card"><a href="https://www.joaquimoslot.com/rally/superslot-h4555-subaru">H4555</a></div>
+  `;
+  const product = `
+    <span class="text-precio">27,00€</span>
+    <span class="key">Ref</span><span class="value">H4555</span>
+    88 Unidades en stock
+    <form class="add2cart"></form>
+  `;
+
+  test('elige la ficha que contiene la referencia y lee precio y stock', () => {
+    expect(joaquiCandidates(search, 'H4555')).toEqual([
+      'https://www.joaquimoslot.com/rally/superslot-h4555-subaru',
+    ]);
+    expect(parseJoaquiProduct(product, 'https://www.joaquimoslot.com/rally/superslot-h4555-subaru')).toMatchObject({
+      price: 27,
+      sku: 'H4555',
+      inStock: true,
+    });
+  });
+});
+
+describe('criccrac', () => {
+  test('el precio publicado es el de la ficha con IVA y el stock sale de is_salable', async () => {
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        results: {
+          1: {
+            product_code: 'SC-6224RS',
+            is_salable: '1',
+            custom_slots: {
+              thumbnail_link: '<a href="/tienda/product/21082-sc-6224rs">foto</a>',
+              item_add_to_cart_and_price: '<span class="price_with_vat">89,52€</span>',
+            },
+          },
+        },
+      }),
+    }));
+
+    await expect(criccracLookup('SC-6224RS', fetchImpl)).resolves.toMatchObject({
+      productUrl: 'https://www.criccrac.com/tienda/product/21082-sc-6224rs',
+      price: 89.52,
+      sku: 'SC-6224RS',
+      inStock: true,
+    });
+    expect(parseCricProduct(
+      '<span itemprop="price" content="89.52">89,52 €</span><meta itemprop="availability" content="http://schema.org/InStock" />',
+      'https://www.criccrac.com/tienda/product/21082-sc-6224rs',
+    )).toMatchObject({ price: 89.52, inStock: true });
+  });
+});
+
+describe('htyc-slotshop', () => {
+  const row = (sku, id) => ({
+    identifier: { productId: id },
+    slugs: { forRouteWithId: `coche-${sku}` },
+    seo: {
+      jsonLD: JSON.stringify({
+        '@type': 'Product',
+        sku,
+        offers: { price: '54.99', priceCurrency: 'EUR', availability: 'http://schema.org/InStock' },
+      }),
+    },
+  });
+
+  test('lee el sku del JSON-LD y pagina el catálogo', async () => {
+    expect(htycProductHit(row('A2130', 874))).toMatchObject({
+      sku: 'A2130',
+      price: 54.99,
+      inStock: true,
+      productUrl: 'https://www.htyc-slotshop.es/buscador/coche-A2130-p874',
+    });
+    const fetchImpl = jest.fn(async (_url, init) => {
+      const { offset } = JSON.parse(init.body).pagination;
+      const products = offset === 0
+        ? Array.from({ length: 100 }, (_, index) => row(`S${index}`, index))
+        : [row('A2130', 874)];
+      return { ok: true, json: async () => ({ products }) };
+    });
+
+    const products = await listHtycProducts(fetchImpl);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(products).toHaveLength(101);
+    expect(products[100].sku).toBe('A2130');
   });
 });

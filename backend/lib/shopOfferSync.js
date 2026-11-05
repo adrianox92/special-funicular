@@ -4,6 +4,7 @@ const { normalizeCode } = require('./shopAdapters/productParse');
 const STOCK_FRESH_MS = 8 * 24 * 60 * 60 * 1000;
 const RECHECK_LIMIT = 40;
 const DISCOVER_PER_SHOP = 20;
+const FANOUT_CALLS = 24;
 
 function isPublicOffer(offer, shop, now = new Date()) {
   if (!offer || !offer.in_stock) return false;
@@ -149,7 +150,7 @@ function catalogItemForSku(byCode, sku) {
   return byCode.get(`RCSW${Number(sideways[1])}`) || null;
 }
 
-async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summary }) {
+async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summary, onInStock }) {
   let products;
   try {
     products = await adapter.listProducts();
@@ -195,8 +196,10 @@ async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summar
           in_stock: Boolean(patch.in_stock),
         });
       }
-      if (patch.in_stock) summary.discovered += 1;
-      else summary.out_of_stock += 1;
+      if (patch.in_stock) {
+        summary.discovered += 1;
+        if (onInStock) onInStock(item);
+      } else summary.out_of_stock += 1;
     } catch {
       summary.errors += 1;
     }
@@ -230,8 +233,9 @@ async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summar
 }
 
 /**
- * Lote del cron. 40 rechecks de las ofertas más antiguas y 20 búsquedas nuevas por tienda.
+ * Lote del cron. 40 rechecks, primero las que están en stock, y 20 búsquedas nuevas por tienda.
  * Una tienda con listProducts refresca su listado entero y no entra en ese cupo.
+ * Cada referencia encontrada en stock se busca también en las demás tiendas, con un tope de peticiones.
  * Un fallo de red no pone in_stock en true ni mueve last_checked_at.
  * Si el listado WooCommerce falla a medias, no se marcan como agotadas las ofertas que faltan.
  */
@@ -241,6 +245,7 @@ async function runShopOfferBatch({
   now = new Date(),
   recheckLimit = RECHECK_LIMIT,
   discoverPerShop = DISCOVER_PER_SHOP,
+  fanoutCalls = FANOUT_CALLS,
   pauseMs = 0,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   newShortCode = defaultShortCode,
@@ -271,6 +276,7 @@ async function runShopOfferBatch({
     else searchShops.push(shop);
   }
 
+  const stocked = [];
   const shopById = new Map(searchShops.map((shop) => [shop.id, shop]));
   let offers = [];
   if (searchShops.length) {
@@ -338,6 +344,7 @@ async function runShopOfferBatch({
       nowIso,
       newShortCode,
       summary,
+      onInStock: (item) => stocked.push({ shopId: shop.id, item }),
     });
   }
 
@@ -372,6 +379,7 @@ async function runShopOfferBatch({
             });
           }
           summary.discovered += 1;
+          if (patch.in_stock) stocked.push({ shopId: shop.id, item });
         }
       } catch (err) {
         summary.errors += 1;
@@ -382,6 +390,47 @@ async function runShopOfferBatch({
       ? null
       : items[items.length - 1].id;
     await io.setDiscoverCursor(shop.id, nextCursor);
+  }
+
+  const seenFanout = new Set();
+  let calls = 0;
+  for (const found of stocked) {
+    if (calls >= fanoutCalls) break;
+    for (const shop of searchShops) {
+      if (calls >= fanoutCalls) break;
+      if (shop.id === found.shopId) continue;
+      const key = `${shop.id}:${found.item.id}`;
+      if (seenFanout.has(key)) continue;
+      seenFanout.add(key);
+      try {
+        const existing = await io.findOffer(shop.id, found.item.id);
+        if (existing) continue;
+        calls += 1;
+        const adapter = getAdapter(shop.adapter_key);
+        const hit = await adapter.findByReference({
+          reference: found.item.reference,
+          ean: found.item.ean ?? null,
+          brand: found.item.brand ?? found.item.manufacturer ?? null,
+        });
+        if (hit && normalizeProductUrl(hit.productUrl)) {
+          const patch = offerPatchFromHit(hit, shop, nowIso, hit.productUrl, null);
+          await io.insertOffer({
+            shop_id: shop.id,
+            catalog_item_id: found.item.id,
+            ...patch,
+            short_code: newShortCode(),
+          });
+          pushCatalogEvent(summary.created, shop, found.item, {
+            product_url: patch.product_url,
+            in_stock: Boolean(patch.in_stock),
+          });
+          summary.discovered += 1;
+        }
+      } catch {
+        summary.errors += 1;
+      }
+      if (pauseMs > 0) await sleep(pauseMs);
+    }
   }
 
   return summary;
@@ -490,6 +539,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
         .select('id, shop_id, catalog_item_id, product_url, price, previous_price, currency, in_stock, slot_catalog_items!inner(discontinued, reference, model_name, manufacturer_id)')
         .in('shop_id', shopIds)
         .eq('slot_catalog_items.discontinued', false)
+        .order('in_stock', { ascending: false })
         .order('last_attempt_at', { ascending: true, nullsFirst: true })
         .limit(limit);
       if (error) throw new Error(error.message);
@@ -666,6 +716,7 @@ module.exports = {
   STOCK_FRESH_MS,
   RECHECK_LIMIT,
   DISCOVER_PER_SHOP,
+  FANOUT_CALLS,
   isPublicOffer,
   publicOfferCutoff,
   normalizeCurrency,

@@ -9,6 +9,7 @@ const {
   anchorsWithCode,
   productAnchors,
   parseJsonLdProduct,
+  parseEuroAmount,
   parseWooProduct,
   parseEvotecProduct,
   parseDataProduct,
@@ -211,6 +212,137 @@ async function listWooCatalog(origin, fetchPage, { category } = {}) {
   throw new Error('Listado WooCommerce incompleto');
 }
 
+function parseJoaquiProduct(html, pageUrl) {
+  const ld = parseJsonLdProduct(html, pageUrl);
+  const price = String(html || '').match(/text-precio[^>]*>([^<]+)/i);
+  const ref = String(html || '').match(/<span class="key[^"]*"[^>]*>\s*Ref\s*<\/span>\s*<span class="value">([^<]+)/i);
+  const units = String(html || '').match(/(\d+)\s+Unidades en stock/i);
+  const soldOut = Boolean(units && Number(units[1]) === 0);
+  const addable = /add2cart/i.test(html || '');
+  return {
+    productUrl: String(pageUrl || '').split('?')[0],
+    price: parseEuroAmount(price && price[1]) ?? (ld && ld.price),
+    currency: 'EUR',
+    inStock: addable ? !soldOut : Boolean(ld && ld.inStock),
+    sku: (ref && ref[1].trim()) || (ld && ld.sku) || null,
+    gtin: (ld && ld.gtin) || null,
+  };
+}
+
+function joaquiCandidates(html, query) {
+  const urls = [];
+  for (const card of String(html || '').split('product-card').slice(1)) {
+    if (!textHasCode(card, query)) continue;
+    const href = card.match(/href="(https:\/\/www\.joaquimoslot\.com\/[^"?#]+)/i);
+    if (href) urls.push(href[1]);
+  }
+  return [...new Set(urls)];
+}
+
+function parseCricProduct(html, pageUrl) {
+  const price = String(html || '').match(/itemprop="price"\s+content="([0-9.]+)"/i);
+  const availability = String(html || '').match(/itemprop="availability"\s+content="([^"]+)"/i);
+  return {
+    productUrl: pageUrl,
+    price: price ? parseEuroAmount(price[1]) : null,
+    currency: 'EUR',
+    inStock: /schema\.org\/InStock/i.test(availability ? availability[1] : ''),
+    sku: null,
+    gtin: null,
+  };
+}
+
+async function criccracLookup(query, fetchImpl = fetch) {
+  const body = new URLSearchParams({
+    'menu_data[parameter_id]': 'criccrac_website_list',
+    'menu_data[session_variable]': 'lista-de-productos',
+    'menu_data[limit]': '20',
+    'menu_data[specific][Itemid]': '1891',
+    mode: 'ajax',
+    reset_form: 'false',
+    userid: '0',
+    'form_data[referencia]': query,
+    'form_data[start]': '0',
+    'form_data[action_type]': 'filter',
+    'form_data[action_subtype]': 'referencia',
+    'form_data[dual_system_module]': 'slot',
+  });
+  const res = await fetchImpl('https://www.criccrac.com/index.php?option=com_paracom&task=tablerender.get_tablerender_data', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'user-agent': 'SlotDatabaseCatalogBot/1.0 (+https://www.slotdatabase.es)',
+      accept: 'application/json',
+    },
+    body,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const row = Object.values(json.results || {}).find((item) => sameSku(item && item.product_code, query));
+  if (!row) return null;
+  const slots = row.custom_slots || {};
+  const href = String(slots.thumbnail_link || '').match(/href="([^"]+)"/);
+  const shown = String(slots.item_add_to_cart_and_price || '').match(/price_with_vat[^>]*>([^<]+)/i);
+  return {
+    productUrl: href ? absoluteUrl(href[1], 'https://www.criccrac.com') : null,
+    price: parseEuroAmount(shown && shown[1]),
+    currency: 'EUR',
+    inStock: String(row.is_salable) === '1',
+    sku: row.product_code,
+    gtin: null,
+  };
+}
+
+const HTYC_SEARCH = 'https://eu-fra4-storefront-api.ecwid.com/storefront/api/v1/32502256/catalog/search';
+
+function htycProductHit(row) {
+  const raw = row && row.seo && row.seo.jsonLD;
+  if (!raw) return null;
+  const parsed = parseJsonLdProduct(
+    `<script type="application/ld+json">${raw}</script>`,
+    'https://www.htyc-slotshop.es/',
+  );
+  if (!parsed || !parsed.sku) return null;
+  const slug = row.slugs && row.slugs.forRouteWithId;
+  const id = row.identifier && row.identifier.productId;
+  if (slug && id) parsed.productUrl = `https://www.htyc-slotshop.es/buscador/${slug}-p${id}`;
+  return parsed;
+}
+
+async function htycPage(offset, fetchImpl) {
+  const res = await fetchImpl(HTYC_SEARCH, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json',
+      origin: 'https://www.htyc-slotshop.es',
+      referer: 'https://www.htyc-slotshop.es/',
+    },
+    body: JSON.stringify({ pagination: { limit: 100, offset } }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  return Array.isArray(json.products) ? json.products : [];
+}
+
+async function listHtycProducts(fetchImpl = fetch) {
+  const products = [];
+  for (let offset = 0; offset < 1000; offset += 100) {
+    const rows = await htycPage(offset, fetchImpl);
+    for (const row of rows) {
+      const hit = htycProductHit(row);
+      if (hit) products.push(hit);
+    }
+    if (rows.length < 100) break;
+  }
+  return products;
+}
+
+async function htycLookup(query, fetchImpl = fetch) {
+  const products = await listHtycProducts(fetchImpl);
+  return products.find((hit) => sameSku(hit.sku, query)) || null;
+}
+
 const catalogShopAdapters = [
   createShopAdapter({
     key: 'evotec',
@@ -242,6 +374,31 @@ const catalogShopAdapters = [
     parse: parseWooProduct,
     candidates: () => [],
   }), (fetchPage) => listWooCatalog('https://model-hobbyred.com', fetchPage, { category: 22 })),
+  createShopAdapter({
+    key: 'joaquimoslot',
+    origin: 'https://www.joaquimoslot.com',
+    searchUrl: (query) => `https://www.joaquimoslot.com/index.php?main_page=advanced_search_result&keyword=${encodeURIComponent(query)}`,
+    parse: parseJoaquiProduct,
+    candidates: joaquiCandidates,
+  }),
+  createShopAdapter({
+    key: 'criccrac',
+    origin: 'https://www.criccrac.com',
+    lookupOnly: true,
+    lookup: (_fetchPage, query) => criccracLookup(query),
+    searchUrl: () => 'https://www.criccrac.com/',
+    parse: parseCricProduct,
+    candidates: () => [],
+  }),
+  withListProducts(createShopAdapter({
+    key: 'htyc-slotshop',
+    origin: 'https://www.htyc-slotshop.es',
+    lookupOnly: true,
+    lookup: (_fetchPage, query) => htycLookup(query),
+    searchUrl: () => 'https://www.htyc-slotshop.es/',
+    parse: parseJsonLdProduct,
+    candidates: () => [],
+  }), () => listHtycProducts()),
   withListProducts(createShopAdapter({
     key: 'trofeslot',
     origin: 'https://trofeslot.com',
@@ -258,4 +415,10 @@ module.exports = {
   catalogShopAdapters,
   wooStoreLookup,
   listWooCatalog,
+  parseJoaquiProduct,
+  joaquiCandidates,
+  parseCricProduct,
+  criccracLookup,
+  htycProductHit,
+  listHtycProducts,
 };
