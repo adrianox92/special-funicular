@@ -162,7 +162,14 @@ async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summar
     return;
   }
 
-  const byCode = indexCatalog(await io.listCatalogReferences());
+  let catalogRows;
+  try {
+    catalogRows = await io.listCatalogReferences();
+  } catch {
+    summary.errors += 1;
+    return;
+  }
+  const byCode = indexCatalog(catalogRows);
   const seen = new Set();
   for (const hit of products) {
     const item = catalogItemForSku(byCode, hit.sku);
@@ -265,9 +272,15 @@ async function runShopOfferBatch({
   }
 
   const shopById = new Map(searchShops.map((shop) => [shop.id, shop]));
-  const offers = searchShops.length
-    ? await io.listOffersToRecheck([...shopById.keys()], recheckLimit)
-    : [];
+  let offers = [];
+  if (searchShops.length) {
+    try {
+      offers = await io.listOffersToRecheck([...shopById.keys()], recheckLimit);
+    } catch {
+      summary.errors += 1;
+      offers = [];
+    }
+  }
   const nowIso = now.toISOString();
 
   for (const offer of offers) {
@@ -440,6 +453,26 @@ async function runShopOfferLookup({
 }
 
 function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
+  async function brandNames(ids) {
+    const brandIds = [...new Set((ids || []).filter(Boolean))];
+    const brands = new Map();
+    for (let index = 0; index < brandIds.length; index += 200) {
+      const chunk = brandIds.slice(index, index + 200);
+      const { data, error } = await admin
+        .from('slot_catalog_brands')
+        .select('id, name')
+        .in('id', chunk);
+      if (error) throw new Error(error.message);
+      for (const brand of data || []) brands.set(brand.id, brand.name);
+    }
+    return brands;
+  }
+
+  function itemOf(row) {
+    const nested = row && row.slot_catalog_items;
+    return Array.isArray(nested) ? nested[0] : nested;
+  }
+
   return {
     async listActiveShops() {
       const { data, error } = await admin
@@ -454,13 +487,24 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       if (!shopIds.length) return [];
       const { data, error } = await admin
         .from('catalog_shop_offers')
-        .select('id, shop_id, catalog_item_id, product_url, price, previous_price, currency, in_stock, slot_catalog_items!inner(discontinued, reference, model_name, manufacturer)')
+        .select('id, shop_id, catalog_item_id, product_url, price, previous_price, currency, in_stock, slot_catalog_items!inner(discontinued, reference, model_name, manufacturer_id)')
         .in('shop_id', shopIds)
         .eq('slot_catalog_items.discontinued', false)
         .order('last_attempt_at', { ascending: true, nullsFirst: true })
         .limit(limit);
       if (error) throw new Error(error.message);
-      return data || [];
+      const brands = await brandNames((data || []).map((row) => itemOf(row)?.manufacturer_id));
+      return (data || []).map((row) => {
+        const item = itemOf(row);
+        if (!item) return row;
+        return {
+          ...row,
+          slot_catalog_items: {
+            ...item,
+            manufacturer: brands.get(item.manufacturer_id) || null,
+          },
+        };
+      });
     },
 
     async updateOffer(id, patch) {
@@ -561,7 +605,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await admin
           .from('slot_catalog_items')
-          .select('id, reference, model_name, manufacturer')
+          .select('id, reference, model_name, manufacturer_id')
           .eq('discontinued', false)
           .order('id', { ascending: true })
           .range(from, from + pageSize - 1);
@@ -569,7 +613,11 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
         rows.push(...(data || []));
         if (!data || data.length < pageSize) break;
       }
-      return rows;
+      const brands = await brandNames(rows.map((row) => row.manufacturer_id));
+      return rows.map((row) => ({
+        ...row,
+        manufacturer: brands.get(row.manufacturer_id) || null,
+      }));
     },
 
     async listShopOffers(shopId) {
@@ -578,7 +626,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await admin
           .from('catalog_shop_offers')
-          .select('id, catalog_item_id, product_url, price, previous_price, in_stock, slot_catalog_items!inner(reference, model_name, manufacturer, discontinued)')
+          .select('id, catalog_item_id, product_url, price, previous_price, in_stock, slot_catalog_items!inner(reference, model_name, manufacturer_id, discontinued)')
           .eq('shop_id', shopId)
           .eq('slot_catalog_items.discontinued', false)
           .order('id', { ascending: true })
@@ -587,7 +635,18 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
         rows.push(...(data || []));
         if (!data || data.length < pageSize) break;
       }
-      return rows;
+      const brands = await brandNames(rows.map((row) => itemOf(row)?.manufacturer_id));
+      return rows.map((row) => {
+        const item = itemOf(row);
+        if (!item) return row;
+        return {
+          ...row,
+          slot_catalog_items: {
+            ...item,
+            manufacturer: brands.get(item.manufacturer_id) || null,
+          },
+        };
+      });
     },
 
     async setDiscoverCursor(shopId, discoverAfterId) {
