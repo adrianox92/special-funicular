@@ -66,4 +66,52 @@ function validateShopInput(body, { partial = false } = {}) {
   return { ok: errors.length === 0, errors, value };
 }
 
-module.exports = { validateShopInput };
+function parseManualPrice(value) {
+  if (value == null || String(value).trim() === '') return { value: null };
+  const raw = String(value).trim().replace(/\s/g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(raw)) return { error: 'El precio no es válido' };
+  const n = Math.round(Number(raw) * 100) / 100;
+  if (!Number.isFinite(n) || n < 0 || n > 99999.99) return { error: 'El precio no es válido' };
+  return { value: n };
+}
+
+/**
+ * Alta manual de una oferta: tienda, referencia, URL y precio.
+ * in_stock por defecto es true para publicar primero lo que se puede comprar.
+ */
+function validateManualOffer(body) {
+  const src = body && typeof body === 'object' ? body : {};
+  const errors = [];
+  const shopId = String(src.shop_id ?? '').trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(shopId)) {
+    errors.push('shop_id no es un UUID válido');
+  }
+  const reference = String(src.reference ?? '').trim();
+  if (reference.length < 2 || reference.length > 80) errors.push('La referencia no es válida');
+
+  const url = cleanOptionalUrl(src.product_url, 'La URL del producto');
+  if (url.error) errors.push(url.error);
+  else if (!url.value) errors.push('La URL del producto es obligatoria');
+
+  const price = parseManualPrice(src.price);
+  if (price.error) errors.push(price.error);
+
+  const inStock = src.in_stock !== false && src.in_stock !== 'false';
+  if (inStock && price.value == null && !price.error) {
+    errors.push('El precio es obligatorio si hay stock');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: {
+      shop_id: shopId,
+      reference,
+      product_url: url.value || null,
+      price: price.value,
+      in_stock: inStock,
+    },
+  };
+}
+
+module.exports = { validateShopInput, validateManualOffer };

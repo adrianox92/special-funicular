@@ -1,7 +1,7 @@
 const { createShortCode, ALPHABET } = require('../../lib/shortCode');
 const { isPublicOffer, nextOfferPrices, runShopOfferBatch, runShopOfferLookup } = require('../../lib/shopOfferSync');
 const { resolveGoTarget } = require('../../lib/goTarget');
-const { validateShopInput } = require('../../lib/shopInput');
+const { validateShopInput, validateManualOffer } = require('../../lib/shopInput');
 const { registerAdapter, clearAdapters, getAdapter } = require('../../lib/shopAdapters');
 const testAdapter = require('../../lib/shopAdapters/testAdapter');
 const { fetchShopPage, SHOP_USER_AGENT } = require('../../lib/shopAdapters/fetchShopPage');
@@ -104,6 +104,50 @@ describe('validateShopInput', () => {
       currency: 'EUR',
       active: true,
     });
+  });
+});
+
+describe('validateManualOffer', () => {
+  const shopId = '11111111-1111-4111-8111-111111111111';
+
+  test('acepta una coma decimal y deja el stock marcado por defecto', () => {
+    const ok = validateManualOffer({
+      shop_id: shopId,
+      reference: ' E2065 ',
+      product_url: 'https://trofeslot.com/producto/porsche/',
+      price: '53,90',
+    });
+    expect(ok.ok).toBe(true);
+    expect(ok.value).toMatchObject({
+      reference: 'E2065',
+      price: 53.9,
+      in_stock: true,
+    });
+  });
+
+  test('sin stock el precio puede quedar vacío', () => {
+    const ok = validateManualOffer({
+      shop_id: shopId,
+      reference: 'E2065',
+      product_url: 'https://trofeslot.com/producto/porsche/',
+      price: '',
+      in_stock: false,
+    });
+    expect(ok.ok).toBe(true);
+    expect(ok.value.price).toBeNull();
+    expect(ok.value.in_stock).toBe(false);
+  });
+
+  test('con stock exige precio', () => {
+    const bad = validateManualOffer({
+      shop_id: shopId,
+      reference: 'E2065',
+      product_url: 'https://trofeslot.com/producto/porsche/',
+      price: '',
+      in_stock: true,
+    });
+    expect(bad.ok).toBe(false);
+    expect(bad.errors[0]).toMatch(/precio/i);
   });
 });
 

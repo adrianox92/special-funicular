@@ -108,6 +108,9 @@ export default function StoreListingsSection({ catalogItemId }) {
           <ShoppingCart className="size-4 text-muted-foreground" aria-hidden />
           Dónde comprar
         </h2>
+        <p className="text-xs text-muted-foreground pt-2">
+          Precio y disponibilidad sujetos a confirmación en tienda
+        </p>
       </CardHeader>
       <CardContent className="px-4 sm:px-6 pb-4 pt-0 space-y-4">
         {groups.map((group) => (

@@ -384,6 +384,15 @@ function AdminSlotCatalog() {
   const [shopClickTotals, setShopClickTotals] = useState([]);
   const [clickStatsLoading, setClickStatsLoading] = useState(false);
   const [clickStatsDays, setClickStatsDays] = useState(30);
+  const [offerShopId, setOfferShopId] = useState('');
+  const [offerReference, setOfferReference] = useState('');
+  const [offerUrl, setOfferUrl] = useState('');
+  const [offerPrice, setOfferPrice] = useState('');
+  const [offerInStock, setOfferInStock] = useState(true);
+  const [offerSaving, setOfferSaving] = useState(false);
+  const [offerStockFilter, setOfferStockFilter] = useState('in');
+  const [manualOffers, setManualOffers] = useState([]);
+  const [manualOffersLoading, setManualOffersLoading] = useState(false);
   const [shopDialogOpen, setShopDialogOpen] = useState(false);
   const [shopSaving, setShopSaving] = useState(false);
   const [shopForm, setShopForm] = useState(emptyShopForm);
@@ -509,6 +518,61 @@ function AdminSlotCatalog() {
       setShopsLoading(false);
     }
   }, []);
+
+  const fetchManualOffers = useCallback(async () => {
+    if (!offerShopId) {
+      setManualOffers([]);
+      return;
+    }
+    setManualOffersLoading(true);
+    try {
+      const { data } = await api.get('/store-listings/admin/offers', {
+        params: { shop_id: offerShopId, stock: offerStockFilter },
+      });
+      setManualOffers(data.offers ?? []);
+    } catch (err) {
+      setManualOffers([]);
+      toast.error(err.response?.data?.error || 'No se pudieron cargar las ofertas');
+    } finally {
+      setManualOffersLoading(false);
+    }
+  }, [offerShopId, offerStockFilter]);
+
+  useEffect(() => {
+    if (!offerShopId && shops.length > 0) setOfferShopId(shops[0].id);
+  }, [shops, offerShopId]);
+
+  useEffect(() => {
+    if (!isAdmin || tab !== 'stores' || !offerShopId) return;
+    fetchManualOffers();
+  }, [isAdmin, tab, offerShopId, fetchManualOffers]);
+
+  const saveManualOffer = async (e) => {
+    e.preventDefault();
+    if (!offerShopId) return;
+    setOfferSaving(true);
+    try {
+      await api.post('/store-listings/admin/offers', {
+        shop_id: offerShopId,
+        reference: offerReference.trim(),
+        product_url: offerUrl.trim(),
+        price: offerPrice.trim(),
+        in_stock: offerInStock,
+      });
+      toast.success(offerInStock
+        ? 'Precio publicado en la ficha'
+        : 'Guardado sin stock. No aparece en la ficha.');
+      setOfferReference('');
+      setOfferUrl('');
+      setOfferPrice('');
+      setOfferInStock(true);
+      fetchManualOffers();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'No se pudo guardar el precio');
+    } finally {
+      setOfferSaving(false);
+    }
+  };
 
   const fetchClickStats = useCallback(async (days = clickStatsDays) => {
     setClickStatsLoading(true);
@@ -1703,6 +1767,133 @@ function AdminSlotCatalog() {
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Precios a mano</CardTitle>
+              <CardDescription>
+                Publica un precio ahora mismo, sin esperar al cron. Por defecto se listan las que están en stock, que son las que salen en la ficha.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form onSubmit={saveManualOffer} className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="offer-shop">Tienda</Label>
+                  <Select value={offerShopId} onValueChange={setOfferShopId}>
+                    <SelectTrigger id="offer-shop">
+                      <SelectValue placeholder="Elige una tienda" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shops.map((shop) => (
+                        <SelectItem key={shop.id} value={shop.id}>{shop.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="offer-reference">Referencia</Label>
+                  <Input
+                    id="offer-reference"
+                    value={offerReference}
+                    onChange={(e) => setOfferReference(e.target.value)}
+                    placeholder="E2065"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="offer-url">URL del producto</Label>
+                  <Input
+                    id="offer-url"
+                    value={offerUrl}
+                    onChange={(e) => setOfferUrl(e.target.value)}
+                    placeholder="https://"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="offer-price">Precio</Label>
+                  <Input
+                    id="offer-price"
+                    inputMode="decimal"
+                    value={offerPrice}
+                    onChange={(e) => setOfferPrice(e.target.value)}
+                    placeholder="53,90"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="flex items-end gap-3 pb-1">
+                  <Switch
+                    id="offer-stock"
+                    checked={offerInStock}
+                    onCheckedChange={setOfferInStock}
+                  />
+                  <Label htmlFor="offer-stock">En stock</Label>
+                </div>
+                <div className="sm:col-span-2">
+                  <Button type="submit" disabled={offerSaving || !offerShopId}>
+                    {offerSaving ? 'Guardando…' : 'Publicar precio'}
+                  </Button>
+                </div>
+              </form>
+
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-sm font-medium">Ya cargadas</p>
+                <Select value={offerStockFilter} onValueChange={setOfferStockFilter}>
+                  <SelectTrigger className="w-36" aria-label="Filtrar por stock">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in">En stock</SelectItem>
+                    <SelectItem value="out">Sin stock</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {manualOffersLoading ? (
+                <div className="flex justify-center py-6">
+                  <Spinner className="size-5" />
+                </div>
+              ) : manualOffers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay ofertas en este filtro.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Referencia</TableHead>
+                        <TableHead>Modelo</TableHead>
+                        <TableHead className="text-right">Precio</TableHead>
+                        <TableHead>Enlace</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {manualOffers.map((offer) => (
+                        <TableRow key={offer.id}>
+                          <TableCell className="font-mono text-xs">{offer.reference}</TableCell>
+                          <TableCell className="text-sm max-w-[16rem] truncate">{offer.model_name || '—'}</TableCell>
+                          <TableCell className="text-right tabular-nums text-sm">
+                            {offer.price != null ? `${Number(offer.price).toFixed(2)} ${offer.currency || 'EUR'}` : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <a
+                              href={offer.product_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline"
+                            >
+                              Ficha
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Estadísticas de clics */}
           <Card>
             <CardHeader className="pb-3">

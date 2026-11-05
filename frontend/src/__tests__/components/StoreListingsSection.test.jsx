@@ -60,6 +60,7 @@ describe('StoreListingsSection', () => {
     expect(link.getAttribute('href')).toMatch(/\/go\/Ab3kX9p$/);
     expect(link).toHaveAttribute('rel', expect.stringContaining('sponsored'));
     expect(spain).toHaveTextContent('42,50');
+    expect(screen.getByText('Precio y disponibilidad sujetos a confirmación en tienda')).toBeInTheDocument();
     expect(spain.querySelector('.line-through')).toHaveTextContent('50,00');
     expect(screen.getByRole('region', { name: 'Reino Unido' }).querySelector('.line-through')).toBeNull();
   });

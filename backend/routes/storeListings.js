@@ -8,6 +8,7 @@
  * Admin:
  *   GET/POST /admin/shops
  *   PUT  /admin/shops/:id
+ *   GET/POST /admin/offers
  *   GET  /admin/clicks
  *   GET/PUT /admin/policies
  *
@@ -18,8 +19,9 @@ const express = require('express');
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
-const { validateShopInput } = require('../lib/shopInput');
-const { isPublicOffer, publicOfferCutoff } = require('../lib/shopOfferSync');
+const { validateShopInput, validateManualOffer } = require('../lib/shopInput');
+const { isPublicOffer, publicOfferCutoff, nextOfferPrices } = require('../lib/shopOfferSync');
+const { createShortCode } = require('../lib/shortCode');
 
 const router = express.Router();
 
@@ -149,6 +151,156 @@ router.put('/admin/shops/:id', authMiddleware, adminGuard, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Tienda no encontrada' });
     res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+function offerAdminRow(row) {
+  const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+  return {
+    id: row.id,
+    catalog_item_id: row.catalog_item_id,
+    reference: item?.reference ?? null,
+    model_name: item?.model_name ?? null,
+    price: row.price,
+    previous_price: row.previous_price,
+    currency: row.currency,
+    in_stock: row.in_stock,
+    product_url: row.product_url,
+    short_code: row.short_code,
+    updated_at: row.updated_at,
+  };
+}
+
+router.get('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const shopId = String(req.query.shop_id || '').trim();
+    if (!isUuid(shopId)) return res.status(400).json({ error: 'shop_id no es un UUID válido' });
+    const stock = String(req.query.stock || 'all');
+    if (!['all', 'in', 'out'].includes(stock)) {
+      return res.status(400).json({ error: 'stock debe ser all, in o out' });
+    }
+
+    let query = db
+      .from('catalog_shop_offers')
+      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at, slot_catalog_items!inner(reference, model_name, discontinued)')
+      .eq('shop_id', shopId)
+      .eq('slot_catalog_items.discontinued', false)
+      .order('in_stock', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .limit(40);
+    if (stock === 'in') query = query.eq('in_stock', true);
+    if (stock === 'out') query = query.eq('in_stock', false);
+
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ offers: (data || []).map(offerAdminRow) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const parsed = validateManualOffer(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.errors[0], errors: parsed.errors });
+
+    const { data: shop, error: shopError } = await db
+      .from('catalog_shops')
+      .select('id, currency')
+      .eq('id', parsed.value.shop_id)
+      .maybeSingle();
+    if (shopError) return res.status(500).json({ error: shopError.message });
+    if (!shop) return res.status(404).json({ error: 'Tienda no encontrada' });
+
+    const { data: items, error: itemError } = await db
+      .from('slot_catalog_items')
+      .select('id, reference, model_name, discontinued')
+      .ilike('reference', parsed.value.reference)
+      .limit(2);
+    if (itemError) return res.status(500).json({ error: itemError.message });
+    if (!items || items.length === 0) {
+      return res.status(404).json({ error: 'La referencia no está en el catálogo' });
+    }
+    if (items.length > 1) {
+      return res.status(400).json({ error: 'Hay varias referencias con ese texto. Escribe la referencia exacta.' });
+    }
+    const item = items[0];
+    if (item.discontinued) {
+      return res.status(400).json({ error: 'Esta referencia está descatalogada' });
+    }
+
+    const { data: existing, error: existingError } = await db
+      .from('catalog_shop_offers')
+      .select('id, price, previous_price, short_code')
+      .eq('shop_id', shop.id)
+      .eq('catalog_item_id', item.id)
+      .maybeSingle();
+    if (existingError) return res.status(500).json({ error: existingError.message });
+
+    const now = new Date().toISOString();
+    const prices = nextOfferPrices({
+      price: parsed.value.price != null ? parsed.value.price : existing?.price,
+      existingPrice: existing?.price,
+      existingPrevious: existing?.previous_price,
+    });
+    const patch = {
+      product_url: parsed.value.product_url,
+      price: prices.price,
+      previous_price: prices.previous_price,
+      currency: shop.currency || 'EUR',
+      in_stock: parsed.value.in_stock,
+      last_checked_at: now,
+      last_attempt_at: now,
+      last_check_error: null,
+      updated_at: now,
+    };
+
+    let saved;
+    if (existing) {
+      const { data, error } = await db
+        .from('catalog_shop_offers')
+        .update(patch)
+        .eq('id', existing.id)
+        .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      saved = data;
+    } else {
+      let lastError = null;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const { data, error } = await db
+          .from('catalog_shop_offers')
+          .insert({
+            shop_id: shop.id,
+            catalog_item_id: item.id,
+            ...patch,
+            short_code: createShortCode(),
+          })
+          .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at')
+          .single();
+        if (!error) {
+          saved = data;
+          break;
+        }
+        lastError = error;
+        const msg = `${error.message || ''} ${error.details || ''}`;
+        if (!(error.code === '23505' && /short_code/i.test(msg))) {
+          return res.status(500).json({ error: error.message });
+        }
+      }
+      if (!saved) return res.status(500).json({ error: lastError?.message || 'No se pudo guardar la oferta' });
+    }
+
+    res.status(existing ? 200 : 201).json(offerAdminRow({
+      ...saved,
+      slot_catalog_items: item,
+    }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
