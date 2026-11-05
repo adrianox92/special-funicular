@@ -132,11 +132,15 @@ function indexCatalog(items) {
   const put = (key, item) => {
     if (key && !byCode.has(key)) byCode.set(key, item);
   };
-  for (const item of items || []) {
-    const key = normalizeCode(item.reference);
+  const putCode = (raw, item) => {
+    const key = normalizeCode(raw);
     put(key, item);
     const sideways = key.match(/^RCSW0*(\d+)$/);
     if (sideways) put(`RCSW${Number(sideways[1])}`, item);
+  };
+  for (const item of items || []) putCode(item.reference, item);
+  for (const item of items || []) {
+    for (const alias of item.aliases || []) putCode(alias, item);
   }
   return byCode;
 }
@@ -664,9 +668,26 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
         if (!data || data.length < pageSize) break;
       }
       const brands = await brandNames(rows.map((row) => row.manufacturer_id));
+      const aliasByItem = new Map();
+      const aliasPageSize = 1000;
+      for (let from = 0; ; from += aliasPageSize) {
+        const { data: aliasRows, error: aliasError } = await admin
+          .from('slot_catalog_item_aliases')
+          .select('id, catalog_item_id, alias_reference')
+          .order('id', { ascending: true })
+          .range(from, from + aliasPageSize - 1);
+        if (aliasError) throw new Error(aliasError.message);
+        for (const alias of aliasRows || []) {
+          const list = aliasByItem.get(alias.catalog_item_id) || [];
+          list.push(alias.alias_reference);
+          aliasByItem.set(alias.catalog_item_id, list);
+        }
+        if (!aliasRows || aliasRows.length < aliasPageSize) break;
+      }
       return rows.map((row) => ({
         ...row,
         manufacturer: brands.get(row.manufacturer_id) || null,
+        aliases: aliasByItem.get(row.id) || [],
       }));
     },
 
@@ -723,6 +744,7 @@ module.exports = {
   normalizePrice,
   normalizeProductUrl,
   nextOfferPrices,
+  indexCatalog,
   runShopOfferBatch,
   runShopOfferLookup,
   createSupabaseShopOfferIo,

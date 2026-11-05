@@ -9,6 +9,8 @@
  *   GET/POST /admin/shops
  *   PUT  /admin/shops/:id
  *   GET/POST /admin/offers
+ *   PATCH /admin/offers/:id
+ *   GET  /admin/catalog-matches
  *   GET  /admin/clicks
  *   GET/PUT /admin/policies
  *
@@ -19,7 +21,7 @@ const express = require('express');
 const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
-const { validateShopInput, validateManualOffer } = require('../lib/shopInput');
+const { validateShopInput, validateManualOffer, validateOfferPatch } = require('../lib/shopInput');
 const { isPublicOffer, publicOfferCutoff, nextOfferPrices } = require('../lib/shopOfferSync');
 const { createShortCode } = require('../lib/shortCode');
 
@@ -163,6 +165,7 @@ function offerAdminRow(row) {
     catalog_item_id: row.catalog_item_id,
     reference: item?.reference ?? null,
     model_name: item?.model_name ?? null,
+    manufacturer: row.manufacturer ?? item?.manufacturer ?? null,
     price: row.price,
     previous_price: row.previous_price,
     currency: row.currency,
@@ -171,6 +174,76 @@ function offerAdminRow(row) {
     short_code: row.short_code,
     updated_at: row.updated_at,
   };
+}
+
+async function brandNameMap(db, ids) {
+  const unique = [...new Set((ids || []).filter(Boolean))];
+  const brands = new Map();
+  if (unique.length === 0) return brands;
+  const { data, error } = await db.from('slot_catalog_brands').select('id, name').in('id', unique);
+  if (error) throw new Error(error.message);
+  for (const brand of data || []) brands.set(brand.id, brand.name);
+  return brands;
+}
+
+function sameReference(left, right) {
+  return String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase();
+}
+
+async function findCatalogMatches(db, reference) {
+  const needle = String(reference || '').trim();
+  if (needle.length < 2 || needle.length > 80) return [];
+
+  const { data: items, error } = await db
+    .from('slot_catalog_items')
+    .select('id, reference, model_name, discontinued, manufacturer_id')
+    .ilike('reference', needle)
+    .eq('discontinued', false)
+    .limit(20);
+  if (error) throw new Error(error.message);
+
+  const { data: aliasRows, error: aliasError } = await db
+    .from('slot_catalog_item_aliases')
+    .select('alias_reference, slot_catalog_items!inner(id, reference, model_name, discontinued, manufacturer_id)')
+    .ilike('alias_reference', needle)
+    .limit(20);
+  if (aliasError) throw new Error(aliasError.message);
+
+  const byId = new Map();
+  for (const item of items || []) {
+    if (!sameReference(item.reference, needle) || item.discontinued) continue;
+    byId.set(item.id, {
+      id: item.id,
+      reference: item.reference,
+      model_name: item.model_name,
+      manufacturer_id: item.manufacturer_id,
+      matched_via: 'reference',
+      alias_reference: null,
+    });
+  }
+  for (const row of aliasRows || []) {
+    if (!sameReference(row.alias_reference, needle)) continue;
+    const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+    if (!item || item.discontinued || byId.has(item.id)) continue;
+    byId.set(item.id, {
+      id: item.id,
+      reference: item.reference,
+      model_name: item.model_name,
+      manufacturer_id: item.manufacturer_id,
+      matched_via: 'alias',
+      alias_reference: row.alias_reference,
+    });
+  }
+
+  const brands = await brandNameMap(db, [...byId.values()].map((row) => row.manufacturer_id));
+  return [...byId.values()].map((row) => ({
+    id: row.id,
+    reference: row.reference,
+    model_name: row.model_name,
+    manufacturer: brands.get(row.manufacturer_id) || null,
+    matched_via: row.matched_via,
+    alias_reference: row.alias_reference,
+  }));
 }
 
 router.get('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
@@ -186,7 +259,7 @@ router.get('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
 
     let query = db
       .from('catalog_shop_offers')
-      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at, slot_catalog_items!inner(reference, model_name, discontinued)')
+      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at, slot_catalog_items!inner(reference, model_name, discontinued, manufacturer_id)')
       .eq('shop_id', shopId)
       .eq('slot_catalog_items.discontinued', false)
       .order('in_stock', { ascending: false })
@@ -197,7 +270,19 @@ router.get('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ offers: (data || []).map(offerAdminRow) });
+    const brands = await brandNameMap(db, (data || []).map((row) => {
+      const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+      return item?.manufacturer_id;
+    }));
+    res.json({
+      offers: (data || []).map((row) => {
+        const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+        return offerAdminRow({
+          ...row,
+          manufacturer: brands.get(item?.manufacturer_id) || null,
+        });
+      }),
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -218,21 +303,46 @@ router.post('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
     if (shopError) return res.status(500).json({ error: shopError.message });
     if (!shop) return res.status(404).json({ error: 'Tienda no encontrada' });
 
-    const { data: items, error: itemError } = await db
-      .from('slot_catalog_items')
-      .select('id, reference, model_name, discontinued')
-      .ilike('reference', parsed.value.reference)
-      .limit(2);
-    if (itemError) return res.status(500).json({ error: itemError.message });
-    if (!items || items.length === 0) {
-      return res.status(404).json({ error: 'La referencia no está en el catálogo' });
+    let item;
+    if (parsed.value.catalog_item_id) {
+      const { data, error: itemError } = await db
+        .from('slot_catalog_items')
+        .select('id, reference, model_name, discontinued, manufacturer_id')
+        .eq('id', parsed.value.catalog_item_id)
+        .maybeSingle();
+      if (itemError) return res.status(500).json({ error: itemError.message });
+      if (!data) return res.status(404).json({ error: 'La referencia no está en el catálogo' });
+      item = data;
+    } else {
+      let matches;
+      try {
+        matches = await findCatalogMatches(db, parsed.value.reference);
+      } catch (matchError) {
+        return res.status(500).json({ error: matchError.message });
+      }
+      if (matches.length === 0) {
+        return res.status(404).json({ error: 'La referencia no está en el catálogo' });
+      }
+      if (matches.length > 1) {
+        return res.status(409).json({
+          error: 'Hay varias fichas con esa referencia. Elige la marca.',
+          matches,
+        });
+      }
+      item = {
+        id: matches[0].id,
+        reference: matches[0].reference,
+        model_name: matches[0].model_name,
+        manufacturer: matches[0].manufacturer,
+        discontinued: false,
+      };
     }
-    if (items.length > 1) {
-      return res.status(400).json({ error: 'Hay varias referencias con ese texto. Escribe la referencia exacta.' });
-    }
-    const item = items[0];
     if (item.discontinued) {
       return res.status(400).json({ error: 'Esta referencia está descatalogada' });
+    }
+    if (!item.manufacturer && item.manufacturer_id) {
+      const brands = await brandNameMap(db, [item.manufacturer_id]);
+      item = { ...item, manufacturer: brands.get(item.manufacturer_id) || null };
     }
 
     const { data: existing, error: existingError } = await db
@@ -299,6 +409,76 @@ router.post('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
 
     res.status(existing ? 200 : 201).json(offerAdminRow({
       ...saved,
+      manufacturer: item.manufacturer || null,
+      slot_catalog_items: item,
+    }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/admin/catalog-matches', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const matches = await findCatalogMatches(db, req.query.reference);
+    res.json({ matches });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.patch('/admin/offers/:id', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'id no es un UUID válido' });
+    const parsed = validateOfferPatch(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.errors[0], errors: parsed.errors });
+
+    const { data: existing, error: existingError } = await db
+      .from('catalog_shop_offers')
+      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at, slot_catalog_items!inner(reference, model_name, discontinued, manufacturer_id)')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (existingError) return res.status(500).json({ error: existingError.message });
+    if (!existing) return res.status(404).json({ error: 'Oferta no encontrada' });
+
+    const now = new Date().toISOString();
+    const patch = {
+      last_checked_at: now,
+      last_attempt_at: now,
+      last_check_error: null,
+      updated_at: now,
+    };
+    if (Object.prototype.hasOwnProperty.call(parsed.value, 'in_stock')) {
+      patch.in_stock = parsed.value.in_stock;
+    }
+    if (Object.prototype.hasOwnProperty.call(parsed.value, 'price')) {
+      const prices = nextOfferPrices({
+        price: parsed.value.price,
+        existingPrice: existing.price,
+        existingPrevious: existing.previous_price,
+      });
+      patch.price = prices.price;
+      patch.previous_price = prices.previous_price;
+    }
+
+    const { data: saved, error } = await db
+      .from('catalog_shop_offers')
+      .update(patch)
+      .eq('id', existing.id)
+      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at')
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const item = Array.isArray(existing.slot_catalog_items)
+      ? existing.slot_catalog_items[0]
+      : existing.slot_catalog_items;
+    const brands = await brandNameMap(db, [item?.manufacturer_id]);
+    res.json(offerAdminRow({
+      ...saved,
+      manufacturer: brands.get(item?.manufacturer_id) || null,
       slot_catalog_items: item,
     }));
   } catch (e) {

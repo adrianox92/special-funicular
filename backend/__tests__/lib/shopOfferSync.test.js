@@ -1,7 +1,7 @@
 const { createShortCode, ALPHABET } = require('../../lib/shortCode');
-const { isPublicOffer, nextOfferPrices, runShopOfferBatch, runShopOfferLookup } = require('../../lib/shopOfferSync');
+const { isPublicOffer, nextOfferPrices, indexCatalog, runShopOfferBatch, runShopOfferLookup } = require('../../lib/shopOfferSync');
 const { resolveGoTarget } = require('../../lib/goTarget');
-const { validateShopInput, validateManualOffer } = require('../../lib/shopInput');
+const { validateShopInput, validateManualOffer, validateOfferPatch } = require('../../lib/shopInput');
 const { registerAdapter, clearAdapters, getAdapter } = require('../../lib/shopAdapters');
 const testAdapter = require('../../lib/shopAdapters/testAdapter');
 const { fetchShopPage, SHOP_USER_AGENT } = require('../../lib/shopAdapters/fetchShopPage');
@@ -148,6 +148,48 @@ describe('validateManualOffer', () => {
     });
     expect(bad.ok).toBe(false);
     expect(bad.errors[0]).toMatch(/precio/i);
+  });
+
+  test('acepta la ficha elegida cuando hay varias marcas', () => {
+    const itemId = '22222222-2222-4222-8222-222222222222';
+    const ok = validateManualOffer({
+      shop_id: shopId,
+      reference: 'E2065',
+      catalog_item_id: itemId,
+      product_url: 'https://trofeslot.com/producto/porsche/',
+      price: '53.90',
+    });
+    expect(ok.ok).toBe(true);
+    expect(ok.value.catalog_item_id).toBe(itemId);
+  });
+});
+
+describe('validateOfferPatch', () => {
+  test('cambia el precio y el stock por separado', () => {
+    expect(validateOfferPatch({ price: '42,50' }).value).toEqual({ price: 42.5 });
+    expect(validateOfferPatch({ in_stock: false }).value).toEqual({ in_stock: false });
+    expect(validateOfferPatch({}).ok).toBe(false);
+  });
+
+  test('un precio más bajo conserva el anterior para mostrar el descuento', () => {
+    const parsed = validateOfferPatch({ price: '42,50' });
+    expect(nextOfferPrices({
+      price: parsed.value.price,
+      existingPrice: 53.9,
+      existingPrevious: null,
+    })).toEqual({ price: 42.5, previous_price: 53.9 });
+  });
+});
+
+describe('indexCatalog', () => {
+  test('un alias apunta a la ficha canónica y no pisa otra referencia', () => {
+    const byCode = indexCatalog([
+      { id: 'item-a', reference: 'C4034', aliases: ['SC-6224RS', '27131'] },
+      { id: 'item-b', reference: '27131', aliases: [] },
+    ]);
+    expect(byCode.get('C4034').id).toBe('item-a');
+    expect(byCode.get('SC6224RS').id).toBe('item-a');
+    expect(byCode.get('27131').id).toBe('item-b');
   });
 });
 
@@ -415,6 +457,65 @@ describe('runShopOfferBatch listing', () => {
     const summary = await runShopOfferBatch({ io, getAdapter });
     expect(summary.errors).toBe(1);
     expect(summary.out_of_stock).toBe(0);
+  });
+
+  test('un alias del listado mantiene la oferta en stock', async () => {
+    clearAdapters();
+    registerAdapter({
+      key: 'woo-test',
+      async listProducts() {
+        return [{
+          sku: 'SC-6224RS',
+          productUrl: 'https://shop.example/p/sc',
+          price: 80,
+          currency: 'EUR',
+          inStock: true,
+        }];
+      },
+      async findByReference() {
+        return null;
+      },
+      async checkProduct() {
+        return null;
+      },
+    });
+    const updates = [];
+    const io = {
+      listActiveShops: async () => ([{
+        id: 'shop-woo',
+        adapter_key: 'woo-test',
+        currency: 'EUR',
+        active: true,
+      }]),
+      listOffersToRecheck: async () => [],
+      listCatalogReferences: async () => ([{
+        id: 'item-1',
+        reference: 'C4034',
+        aliases: ['SC-6224RS'],
+      }]),
+      listShopOffers: async () => ([{
+        id: 'off-1',
+        catalog_item_id: 'item-1',
+        product_url: 'https://shop.example/p/old',
+        price: 90,
+        previous_price: null,
+        in_stock: true,
+      }]),
+      findOffer: async () => ({ id: 'off-1', price: 90, previous_price: null, in_stock: true }),
+      updateOffer: async (id, patch) => { updates.push({ id, patch }); },
+      insertOffer: async () => { throw new Error('no inserta otra'); },
+      setDiscoverCursor: async () => {},
+      listCatalogItems: async () => [],
+    };
+
+    const summary = await runShopOfferBatch({ io, getAdapter, pauseMs: 0 });
+
+    expect(summary.withdrawn).toEqual([]);
+    expect(updates.find((row) => row.id === 'off-1').patch).toMatchObject({
+      in_stock: true,
+      price: 80,
+      previous_price: 90,
+    });
   });
 
   test('una referencia en stock se busca en las demás tiendas', async () => {

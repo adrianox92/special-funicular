@@ -66,6 +66,10 @@ function validateShopInput(body, { partial = false } = {}) {
   return { ok: errors.length === 0, errors, value };
 }
 
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+}
+
 function parseManualPrice(value) {
   if (value == null || String(value).trim() === '') return { value: null };
   const raw = String(value).trim().replace(/\s/g, '').replace(',', '.');
@@ -88,6 +92,8 @@ function validateManualOffer(body) {
   }
   const reference = String(src.reference ?? '').trim();
   if (reference.length < 2 || reference.length > 80) errors.push('La referencia no es válida');
+  const catalogItemId = String(src.catalog_item_id ?? '').trim();
+  if (catalogItemId && !isUuid(catalogItemId)) errors.push('catalog_item_id no es un UUID válido');
 
   const url = cleanOptionalUrl(src.product_url, 'La URL del producto');
   if (url.error) errors.push(url.error);
@@ -107,6 +113,7 @@ function validateManualOffer(body) {
     value: {
       shop_id: shopId,
       reference,
+      catalog_item_id: catalogItemId || null,
       product_url: url.value || null,
       price: price.value,
       in_stock: inStock,
@@ -114,4 +121,24 @@ function validateManualOffer(body) {
   };
 }
 
-module.exports = { validateShopInput, validateManualOffer };
+/**
+ * Parche de un anuncio ya cargado: reactivar, desactivar o cambiar el precio.
+ */
+function validateOfferPatch(body) {
+  const src = body && typeof body === 'object' ? body : {};
+  const errors = [];
+  const value = {};
+  const hasStock = Object.prototype.hasOwnProperty.call(src, 'in_stock');
+  const hasPrice = Object.prototype.hasOwnProperty.call(src, 'price');
+  if (!hasStock && !hasPrice) errors.push('Indica el stock o el precio');
+  if (hasStock) value.in_stock = src.in_stock !== false && src.in_stock !== 'false';
+  if (hasPrice) {
+    const price = parseManualPrice(src.price);
+    if (price.error) errors.push(price.error);
+    else if (price.value == null) errors.push('El precio es obligatorio');
+    else value.price = price.value;
+  }
+  return { ok: errors.length === 0, errors, value };
+}
+
+module.exports = { validateShopInput, validateManualOffer, validateOfferPatch };

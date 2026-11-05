@@ -393,6 +393,11 @@ function AdminSlotCatalog() {
   const [offerStockFilter, setOfferStockFilter] = useState('in');
   const [manualOffers, setManualOffers] = useState([]);
   const [manualOffersLoading, setManualOffersLoading] = useState(false);
+  const [offerMatches, setOfferMatches] = useState([]);
+  const [offerMatchId, setOfferMatchId] = useState('');
+  const [offerMatchState, setOfferMatchState] = useState('idle');
+  const [offerPriceDrafts, setOfferPriceDrafts] = useState({});
+  const [offerRowSaving, setOfferRowSaving] = useState(null);
   const [shopDialogOpen, setShopDialogOpen] = useState(false);
   const [shopSaving, setShopSaving] = useState(false);
   const [shopForm, setShopForm] = useState(emptyShopForm);
@@ -547,6 +552,48 @@ function AdminSlotCatalog() {
     fetchManualOffers();
   }, [isAdmin, tab, offerShopId, fetchManualOffers]);
 
+  useEffect(() => {
+    const reference = offerReference.trim();
+    if (reference.length < 2) {
+      setOfferMatches([]);
+      setOfferMatchId('');
+      setOfferMatchState('idle');
+      return undefined;
+    }
+    let cancelled = false;
+    setOfferMatchState('loading');
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/store-listings/admin/catalog-matches', {
+          params: { reference },
+        });
+        if (cancelled) return;
+        const matches = data.matches ?? [];
+        setOfferMatches(matches);
+        if (matches.length === 1) {
+          setOfferMatchId(matches[0].id);
+          setOfferMatchState('one');
+        } else if (matches.length === 0) {
+          setOfferMatchId('');
+          setOfferMatchState('none');
+        } else {
+          setOfferMatchId('');
+          setOfferMatchState('many');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setOfferMatches([]);
+        setOfferMatchId('');
+        setOfferMatchState('error');
+        toast.error(err.response?.data?.error || 'No se pudo comprobar la referencia');
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [offerReference]);
+
   const saveManualOffer = async (e) => {
     e.preventDefault();
     if (!offerShopId) return;
@@ -555,6 +602,7 @@ function AdminSlotCatalog() {
       await api.post('/store-listings/admin/offers', {
         shop_id: offerShopId,
         reference: offerReference.trim(),
+        catalog_item_id: offerMatchId,
         product_url: offerUrl.trim(),
         price: offerPrice.trim(),
         in_stock: offerInStock,
@@ -571,6 +619,29 @@ function AdminSlotCatalog() {
       toast.error(err.response?.data?.error || 'No se pudo guardar el precio');
     } finally {
       setOfferSaving(false);
+    }
+  };
+
+  const catalogMatchLabel = (match) => {
+    const via = match.matched_via === 'alias' && match.alias_reference
+      ? ` · alias ${match.alias_reference}`
+      : '';
+    return `${match.manufacturer || 'Sin marca'} · ${match.reference} · ${match.model_name || 'Sin modelo'}${via}`;
+  };
+
+  const patchManualOffer = async (offerId, body, success) => {
+    setOfferRowSaving(offerId);
+    try {
+      await api.patch(`/store-listings/admin/offers/${offerId}`, body);
+      toast.success(success);
+      if (body.price != null) {
+        setOfferPriceDrafts((prev) => ({ ...prev, [offerId]: '' }));
+      }
+      fetchManualOffers();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'No se pudo actualizar el anuncio');
+    } finally {
+      setOfferRowSaving(null);
     }
   };
 
@@ -1799,6 +1870,27 @@ function AdminSlotCatalog() {
                     placeholder="E2065"
                     autoComplete="off"
                   />
+                  {offerMatchState === 'loading' && (
+                    <p className="text-xs text-muted-foreground">Buscando en el catálogo…</p>
+                  )}
+                  {offerMatchState === 'none' && (
+                    <p className="text-xs text-destructive">No está en el catálogo</p>
+                  )}
+                  {offerMatchState === 'one' && offerMatches[0] && (
+                    <p className="text-xs text-muted-foreground">{catalogMatchLabel(offerMatches[0])}</p>
+                  )}
+                  {offerMatchState === 'many' && (
+                    <Select value={offerMatchId || undefined} onValueChange={setOfferMatchId}>
+                      <SelectTrigger aria-label="Elegir ficha">
+                        <SelectValue placeholder="Hay varias marcas. Elige la ficha" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {offerMatches.map((match) => (
+                          <SelectItem key={match.id} value={match.id}>{catalogMatchLabel(match)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="offer-url">URL del producto</Label>
@@ -1830,7 +1922,10 @@ function AdminSlotCatalog() {
                   <Label htmlFor="offer-stock">En stock</Label>
                 </div>
                 <div className="sm:col-span-2">
-                  <Button type="submit" disabled={offerSaving || !offerShopId}>
+                  <Button
+                    type="submit"
+                    disabled={offerSaving || !offerShopId || !offerMatchId}
+                  >
                     {offerSaving ? 'Guardando…' : 'Publicar precio'}
                   </Button>
                 </div>
@@ -1862,17 +1957,34 @@ function AdminSlotCatalog() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Referencia</TableHead>
+                        <TableHead>Marca</TableHead>
                         <TableHead>Modelo</TableHead>
                         <TableHead className="text-right">Precio</TableHead>
                         <TableHead>Enlace</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {manualOffers.map((offer) => (
                         <TableRow key={offer.id}>
-                          <TableCell className="font-mono text-xs">{offer.reference}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            <Link
+                              to={`/catalogo/${offer.catalog_item_id}/${catalogSlugify(offer.model_name || offer.reference)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              {offer.reference}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-sm">{offer.manufacturer || '—'}</TableCell>
                           <TableCell className="text-sm max-w-[16rem] truncate">{offer.model_name || '—'}</TableCell>
                           <TableCell className="text-right tabular-nums text-sm">
+                            {offer.previous_price != null && Number(offer.previous_price) > Number(offer.price) && (
+                              <span className="mr-1 text-muted-foreground line-through">
+                                {Number(offer.previous_price).toFixed(2)}
+                              </span>
+                            )}
                             {offer.price != null ? `${Number(offer.price).toFixed(2)} ${offer.currency || 'EUR'}` : '—'}
                           </TableCell>
                           <TableCell>
@@ -1882,8 +1994,56 @@ function AdminSlotCatalog() {
                               rel="noopener noreferrer"
                               className="text-xs text-primary hover:underline"
                             >
-                              Ficha
+                              Tienda
                             </a>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-2">
+                              {offer.in_stock ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={offerRowSaving === offer.id}
+                                  onClick={() => patchManualOffer(offer.id, { in_stock: false }, 'Anuncio desactivado')}
+                                >
+                                  Desactivar
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={offerRowSaving === offer.id}
+                                  onClick={() => patchManualOffer(offer.id, { in_stock: true }, 'Anuncio reactivado')}
+                                >
+                                  Reactivar
+                                </Button>
+                              )}
+                              <Input
+                                inputMode="decimal"
+                                value={offerPriceDrafts[offer.id] ?? ''}
+                                onChange={(e) => setOfferPriceDrafts((prev) => ({
+                                  ...prev,
+                                  [offer.id]: e.target.value,
+                                }))}
+                                placeholder="53,90"
+                                aria-label={`Nuevo precio de ${offer.reference}`}
+                                className="h-8 w-24"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={offerRowSaving === offer.id || !(offerPriceDrafts[offer.id] || '').trim()}
+                                onClick={() => patchManualOffer(
+                                  offer.id,
+                                  { price: offerPriceDrafts[offer.id] },
+                                  'Precio actualizado',
+                                )}
+                              >
+                                Precio
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
