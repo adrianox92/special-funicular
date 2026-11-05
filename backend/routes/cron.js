@@ -75,10 +75,16 @@ router.post('/catalog-gap-report', cronAuth, async (req, res) => {
  * en stock y busca 20 referencias nuevas por tienda. Las tiendas con listado
  * completo se sincronizan enteras. Una referencia encontrada en stock se
  * busca también en las demás tiendas, con un tope de peticiones.
+ *
+ * El lote responde 202 enseguida. El proxy de Render corta a los 100 segundos
+ * y, con varias tiendas, el trabajo pasa de ese límite. El resumen llega por correo.
  */
+let shopOfferBatchRunning = false;
+
 router.post('/shop-offers', cronAuth, async (req, res) => {
+  const admin = getServiceClient();
+  let startedHere = false;
   try {
-    const admin = getServiceClient();
     if (!admin) return res.status(503).json({ error: 'Service role no disponible' });
     const reference = String(req.query.reference || '').trim();
     if (reference) {
@@ -94,7 +100,23 @@ router.post('/shop-offers', cronAuth, async (req, res) => {
       }
       return res.json({ ok: true, ...result });
     }
-    const now = new Date();
+    if (shopOfferBatchRunning) {
+      return res.status(202).json({ ok: true, started: false, reason: 'already_running' });
+    }
+    startedHere = true;
+    shopOfferBatchRunning = true;
+    res.status(202).json({ ok: true, started: true });
+  } catch (e) {
+    if (startedHere) shopOfferBatchRunning = false;
+    console.error('[cron] shop-offers:', e);
+    if (!res.headersSent) {
+      res.status(500).json({ error: e.message || 'Error al revisar ofertas de tienda' });
+    }
+    return;
+  }
+
+  const now = new Date();
+  try {
     const result = await runShopOfferBatch({
       io: createSupabaseShopOfferIo(admin, { createShortCode }),
       getAdapter,
@@ -103,10 +125,11 @@ router.post('/shop-offers', cronAuth, async (req, res) => {
       pauseMs: 200,
     });
     const email = await sendShopOfferReport({ summary: result, now });
-    res.json({ ok: true, ...publicShopOfferResult(result, email) });
+    console.log('[cron] shop-offers done', publicShopOfferResult(result, email));
   } catch (e) {
     console.error('[cron] shop-offers:', e);
-    res.status(500).json({ error: e.message || 'Error al revisar ofertas de tienda' });
+  } finally {
+    shopOfferBatchRunning = false;
   }
 });
 
