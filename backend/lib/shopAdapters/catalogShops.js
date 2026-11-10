@@ -338,6 +338,74 @@ async function listHtycProducts(fetchImpl = fetch) {
   return products;
 }
 
+function parseSlotmaniaProduct(html, pageUrl) {
+  const hit = parseJsonLdProduct(html, pageUrl);
+  if (!hit) return null;
+  const regular = String(html || '').match(/regular-price[^>]*>([^<]+)/i);
+  const regularPrice = parseEuroAmount(regular && regular[1]);
+  if (regularPrice != null && hit.price != null && regularPrice > hit.price) {
+    hit.regularPrice = regularPrice;
+  }
+  const availability = String(html || '').match(/class="([^"]*\bjs-product-availability\b[^"]*)"/i);
+  if (availability) {
+    if (/product-unavailable|out-of-stock/i.test(availability[1])) hit.inStock = false;
+    else if (/\bproduct-available\b/i.test(availability[1])) hit.inStock = true;
+  }
+  return hit;
+}
+
+function parseAloyProduct(html, pageUrl) {
+  const sku = String(html || '').match(/itemprop="sku"[^>]*>\s*([^<]+)/i);
+  if (!sku || !sku[1].trim()) return null;
+  const price = String(html || '').match(/id="our_price_display"[^>]*>\s*([^<]+)/i);
+  const oldPrice = String(html || '').match(/id="old_price_display"[^>]*>\s*([^<]+)/i);
+  const availability = String(html || '').match(/itemprop="availability"\s+href="([^"]+)"/i);
+  const availabilityText = String(html || '').match(/id="availability_value"[^>]*>([^<]+)/i);
+  const text = (availabilityText ? availabilityText[1] : '').replace(/&aacute;/gi, 'á');
+  const soldOut = /no est[aá] en stock|agotado|fuera de stock/i.test(text);
+  const onSale = /schema\.org\/(?:InStock|LimitedAvailability)/i.test(availability ? availability[1] : '')
+    || (/en stock/i.test(text) && !soldOut);
+  const current = parseEuroAmount(price && price[1]);
+  const regular = parseEuroAmount(oldPrice && oldPrice[1]);
+  const hit = {
+    productUrl: String(pageUrl || '').split('?')[0],
+    price: current,
+    currency: 'EUR',
+    inStock: onSale && !soldOut,
+    sku: sku[1].trim(),
+    gtin: null,
+  };
+  if (regular != null && current != null && regular > current) hit.regularPrice = regular;
+  return hit;
+}
+
+function aloyCandidates(html, query) {
+  const source = String(html || '');
+  const start = source.search(/class="product_list/i);
+  if (start < 0) return [];
+  const end = source.indexOf('</ul>', start);
+  const list = source.slice(start, end > start ? end : undefined);
+  const urls = [];
+  for (const card of list.split('<li class="ajax_block_product').slice(1)) {
+    const reference = card.match(/itemprop="reference"[^>]*>\s*([^<]+)/i);
+    if (!reference || !textHasCode(reference[1], query)) continue;
+    const href = card.match(/href="(https:\/\/www\.aloyshop\.com\/es\/[^"?]+\.html)/i);
+    if (!href || /\/descatalogados\//i.test(href[1])) continue;
+    urls.push(href[1]);
+  }
+  return [...new Set(urls)];
+}
+
+function slotmaniaCandidates(html, query) {
+  const urls = [];
+  for (const card of String(html || '').split('product-miniature').slice(1)) {
+    if (!textHasCode(card, query)) continue;
+    const href = card.match(/href="(https:\/\/slotmania\.es\/es\/[^"?#]+\.html)"/i);
+    if (href) urls.push(href[1]);
+  }
+  return [...new Set(urls)];
+}
+
 async function htycLookup(query, fetchImpl = fetch) {
   const products = await listHtycProducts(fetchImpl);
   return products.find((hit) => sameSku(hit.sku, query)) || null;
@@ -399,6 +467,20 @@ const catalogShopAdapters = [
     parse: parseJsonLdProduct,
     candidates: () => [],
   }), () => listHtycProducts()),
+  createShopAdapter({
+    key: 'aloyshop',
+    origin: 'https://www.aloyshop.com',
+    searchUrl: (query) => `https://www.aloyshop.com/es/buscar?controller=search&orderby=quantity&orderway=desc&search_query=${encodeURIComponent(query)}`,
+    parse: parseAloyProduct,
+    candidates: aloyCandidates,
+  }),
+  createShopAdapter({
+    key: 'slotmania',
+    origin: 'https://slotmania.es',
+    searchUrl: (query) => `https://slotmania.es/es/busqueda?search_query=${encodeURIComponent(query)}`,
+    parse: parseSlotmaniaProduct,
+    candidates: slotmaniaCandidates,
+  }),
   withListProducts(createShopAdapter({
     key: 'trofeslot',
     origin: 'https://trofeslot.com',
@@ -421,4 +503,8 @@ module.exports = {
   criccracLookup,
   htycProductHit,
   listHtycProducts,
+  parseSlotmaniaProduct,
+  slotmaniaCandidates,
+  parseAloyProduct,
+  aloyCandidates,
 };

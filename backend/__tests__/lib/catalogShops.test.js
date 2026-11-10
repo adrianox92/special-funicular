@@ -8,6 +8,10 @@ const {
   criccracLookup,
   htycProductHit,
   listHtycProducts,
+  parseSlotmaniaProduct,
+  slotmaniaCandidates,
+  parseAloyProduct,
+  aloyCandidates,
 } = require('../../lib/shopAdapters/catalogShops');
 const {
   sameSku,
@@ -346,5 +350,89 @@ describe('htyc-slotshop', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(products).toHaveLength(101);
     expect(products[100].sku).toBe('A2130');
+  });
+});
+
+describe('slotmania', () => {
+  const search = `
+    <article class="product-miniature">
+      <a href="https://slotmania.es/es/coches/1-otro.html">Otro</a>
+    </article>
+    <article class="product-miniature">
+      <a href="https://slotmania.es/es/coches/11632-ford-rs200.html">SC6455</a>
+    </article>
+  `;
+  const product = `
+    <script type="application/ld+json">
+      { "@type": "Product", "sku": "SC6455",
+        "offers": { "price": "60.8", "priceCurrency": "EUR",
+          "availability": "https://schema.org/InStock",
+          "url": "https://slotmania.es/es/coches/11632-ford-rs200.html" } }
+    </script>
+    <span class="regular-price text-muted">74,95 €</span>
+    <span class="js-product-availability badge product-available">Disponible</span>
+  `;
+
+  test('elige la ficha de la referencia y guarda el precio tachado', () => {
+    expect(slotmaniaCandidates(search, 'SC6455')).toEqual([
+      'https://slotmania.es/es/coches/11632-ford-rs200.html',
+    ]);
+    expect(parseSlotmaniaProduct(product, 'https://slotmania.es/es/coches/11632-ford-rs200.html')).toMatchObject({
+      sku: 'SC6455',
+      price: 60.8,
+      regularPrice: 74.95,
+      inStock: true,
+    });
+  });
+
+  test('una ficha agotada no queda en stock', () => {
+    const html = product.replace('product-available', 'product-unavailable').replace('InStock', 'OutOfStock');
+    expect(parseSlotmaniaProduct(html, 'https://slotmania.es/es/coches/11632-ford-rs200.html').inStock).toBe(false);
+  });
+});
+
+describe('aloyshop', () => {
+  const search = `
+    <ul class="product_list grid row">
+      <li class="ajax_block_product">
+        <a href="https://www.aloyshop.com/es/descatalogados/9671-corvette.html?search_query=NSR0006">viejo</a>
+        <p itemprop="reference">DESCATALOGADO NSR0006 AW</p>
+      </li>
+      <li class="ajax_block_product">
+        <a href="https://www.aloyshop.com/es/precio-neto/8942-corvette.html?search_query=NSR0006&results=2">coche</a>
+        <p itemprop="reference">NSR0006</p>
+      </li>
+      <li class="ajax_block_product">
+        <a href="https://www.aloyshop.com/es/precio-neto/1-otro.html?search_query=NSR0006">otro</a>
+        <p itemprop="reference">OTRO1</p>
+      </li>
+    </ul>
+  `;
+  const product = `
+    <span class="editable" itemprop="sku">NSR0006</span>
+    <link itemprop="availability" href="http://schema.org/InStock">
+    <span id="availability_value">En Stock. Envío inmediato.</span>
+    <span id="our_price_display" itemprop="price">62,05 €</span>
+    <span id="old_price_display">68,95 €</span>
+  `;
+
+  test('ignora descatalogados y el precio de búsqueda pegado en el enlace', () => {
+    expect(aloyCandidates(search, 'NSR0006')).toEqual([
+      'https://www.aloyshop.com/es/precio-neto/8942-corvette.html',
+    ]);
+    expect(parseAloyProduct(product, 'https://www.aloyshop.com/es/precio-neto/8942-corvette.html?search_query=NSR0006')).toMatchObject({
+      productUrl: 'https://www.aloyshop.com/es/precio-neto/8942-corvette.html',
+      sku: 'NSR0006',
+      price: 62.05,
+      regularPrice: 68.95,
+      inStock: true,
+    });
+  });
+
+  test('un texto de sin stock no se publica como disponible', () => {
+    const html = product
+      .replace('InStock', 'OutOfStock')
+      .replace('En Stock. Envío inmediato.', 'Este producto ya no est&aacute; en stock');
+    expect(parseAloyProduct(html, 'https://www.aloyshop.com/es/precio-neto/8942-corvette.html').inStock).toBe(false);
   });
 });
