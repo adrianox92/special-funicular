@@ -330,6 +330,11 @@ describe('robots.txt del catálogo', () => {
     expect(google).toContain('Allow: /en/catalog');
     expect(google).toContain('Allow: /de/katalog');
     expect(google).toContain('Allow: /sitemap-catalog-');
+    expect(google).toContain('Allow: /api/img/');
+
+    const imageBot = robots.split('User-agent: Googlebot-Image')[1].split('User-agent: Googlebot-Video')[0];
+    expect(imageBot).toContain('Allow: /api/img/');
+    expect(imageBot).toContain('Allow: /catalogo');
   });
 
   test('abre el catálogo a crawlers de vista previa social', () => {

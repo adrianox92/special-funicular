@@ -76,6 +76,36 @@ describe('catalogSeoCopy locale', () => {
     expect(crumbs[1].name).toBe('Slot car reference catalog');
     expect(crumbs[0].item).toBe('https://www.slotdatabase.es/en');
     expect(json['@graph'][1].description).toBe('Slot car listing');
+    expect(json['@graph'].some((node) => node['@type'] === 'WebPage')).toBe(false);
+    expect(json['@graph'][1].image).toBeUndefined();
+  });
+
+  test('JSON-LD marca la foto como imagen principal sin inventar tamaño', () => {
+    const imageUrl = 'https://www.slotdatabase.es/api/img/catalog-images/catalog/1710000000-ab12cd.webp';
+    const canonicalUrl =
+      'https://www.slotdatabase.es/catalogo/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/porsche-911-gt3';
+    const json = buildItemJsonLd({
+      item,
+      origin: 'https://www.slotdatabase.es',
+      canonicalUrl,
+      description: 'Ficha',
+      imageUrl,
+      locale: 'es',
+    });
+    const product = json['@graph'][1];
+    const page = json['@graph'].find((node) => node['@type'] === 'WebPage');
+    expect(product.image).toEqual({
+      '@type': 'ImageObject',
+      url: imageUrl,
+      caption: buildCatalogItemImageAlt(item, 'es'),
+    });
+    expect(product.image.width).toBeUndefined();
+    expect(product.image.height).toBeUndefined();
+    expect(page).toMatchObject({
+      '@type': 'WebPage',
+      url: canonicalUrl,
+      primaryImageOfPage: product.image,
+    });
   });
 
   const similar = [

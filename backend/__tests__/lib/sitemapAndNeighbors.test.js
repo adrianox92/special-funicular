@@ -115,6 +115,47 @@ describe('sitemapBuilder', () => {
       `hreflang="x-default" href="${origin}/catalogo/11111111-1111-4111-8111-111111111111/porsche-911"`,
     );
     expect((xml.match(/<url>/g) || []).length).toBe(1);
+    expect(xml).not.toContain('<image:image>');
+  });
+
+  test('chunk de catálogo anuncia la foto solo si hay image_url', () => {
+    const withPhoto = buildCatalogChunkXml({
+      origin,
+      rows: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          manufacturer: 'N.S.R.',
+          model_name: 'Hypercar',
+          reference: 'NSR0648SW',
+          image_url:
+            'https://abcdxyz.supabase.co/storage/v1/object/public/catalog-images/catalog/1710000000-ab12cd.webp',
+          updated_at: '2024-06-01T12:00:00.000Z',
+        },
+      ],
+    });
+    expect(withPhoto).toContain('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"');
+    expect(withPhoto).toContain(
+      `<image:loc>${origin}/api/img/catalog-images/catalog/1710000000-ab12cd.webp</image:loc>`,
+    );
+    expect(withPhoto).toContain('<image:title>N.S.R. · NSR0648SW · Hypercar</image:title>');
+    expect(withPhoto).not.toContain('abcdxyz.supabase.co');
+    expect((withPhoto.match(/<image:image>/g) || []).length).toBe(1);
+
+    const withoutPhoto = buildCatalogChunkXml({
+      origin,
+      rows: [
+        {
+          id: '33333333-3333-4333-8333-333333333333',
+          manufacturer: 'Scalextric',
+          model_name: 'Porsche 911',
+          reference: 'A100',
+          image_url: null,
+          updated_at: '2024-06-01T12:00:00.000Z',
+        },
+      ],
+    });
+    expect(withoutPhoto).not.toContain('<image:image>');
+    expect(withoutPhoto).not.toContain('logo512');
   });
 
   test('parseSitemapRequestPath', () => {

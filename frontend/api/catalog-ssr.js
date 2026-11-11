@@ -234,6 +234,7 @@ async function renderItem(req, res, parsed, spaHtml) {
     hreflangs: hreflangForItem(origin, item.id, slug),
     imageUrl: imageUrl || `${origin}/logo512.png`,
     imageAlt: imageUrl ? imageAlt : t.ogImageAlt,
+    imageIsPhoto: Boolean(imageUrl),
     jsonLd,
   });
   const rootHtml = renderItemBody({ item, locale, origin, slug, neighbors });

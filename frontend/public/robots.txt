@@ -32,6 +32,7 @@ Allow: /catalogo
 Allow: /en/catalog
 Allow: /de/katalog
 Allow: /api/public/catalog
+Allow: /api/img/
 Allow: /sitemap-catalog-
 Disallow: /dashboard
 Disallow: /login
@@ -52,6 +53,7 @@ Allow: /catalogo
 Allow: /en/catalog
 Allow: /de/katalog
 Allow: /api/public/catalog
+Allow: /api/img/
 Allow: /sitemap-catalog-
 Disallow: /dashboard
 Disallow: /login
