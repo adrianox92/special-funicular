@@ -22,6 +22,8 @@ import {
 } from './ui/select';
 import CatalogListingImage from './CatalogListingImage';
 import CatalogTechSpecsFields from './CatalogTechSpecsFields';
+import VehicleCatalogAssist from './VehicleCatalogSuggestions';
+import { applyCatalogItemToVehicleForm } from '../utils/catalogVehiclePrefill';
 import {
   appendTechSpecsToFormData,
   CATALOG_TECH_SPEC_KEYS,
@@ -284,6 +286,21 @@ const AddVehicle = () => {
                 className={error && !vehicle.manufacturer?.trim() ? 'border-destructive' : ''}
               />
             </div>
+            <VehicleCatalogAssist
+              manufacturer={vehicle.manufacturer}
+              model={vehicle.model}
+              reference={vehicle.reference}
+              catalogItemId={catalogItemId}
+              onSwapFields={({ model, reference }) =>
+                setVehicle((prev) => ({ ...prev, model, reference }))
+              }
+              onSelect={(item) => {
+                setVehicle((prev) => applyCatalogItemToVehicleForm(prev, item));
+                setCatalogItemId(item.id);
+                setCatalogThumb(item.image_url || null);
+                if (error) setError(null);
+              }}
+            />
             <div className="space-y-2">
               <Label>{t('addPage.commercialReleaseYear')}</Label>
               <Input
