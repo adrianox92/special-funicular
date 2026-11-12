@@ -19,6 +19,7 @@ import {
   CATALOG_TECH_SPEC_KEYS,
   techSpecFormFromRow,
 } from '../data/catalogTechSpecs';
+import { appendCatalogItemIdOnce } from '../utils/vehicleCatalogItemId';
 
 function normalizeReference(ref) {
   if (ref == null || ref === '' || String(ref) === 'null') return '';
@@ -114,15 +115,12 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
       const specKeySet = new Set(CATALOG_TECH_SPEC_KEYS);
       Object.entries(record).forEach(([key, value]) => {
         if (specKeySet.has(key)) return;
+        if (key === 'catalog_item_id') return;
         if (value === undefined || value === null) return;
         formData.append(key, value);
       });
       appendTechSpecsToFormData(formData, techSpecFormFromRow(record));
-
-      const cid = vehicle.catalog_item_id;
-      if (cid != null && cid !== '' && String(cid) !== 'null') {
-        formData.append('catalog_item_id', String(cid).trim());
-      }
+      appendCatalogItemIdOnce(formData, vehicle.catalog_item_id, record.catalog_item_id);
 
       await api.post('/vehicles', formData);
       toast.success(t('duplicateModal.success'));
