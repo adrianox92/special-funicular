@@ -11,6 +11,20 @@
     "description": "Grunddaten deines Kontos",
     "email": "E-Mail"
   },
+  "marketing": {
+    "title": "Neuigkeiten per E-Mail",
+    "description": "Erhalte kommerzielle Nachrichten von SlotDatabase. Es ist optional und jederzeit widerrufbar. Allein das Aktivieren sendet noch keine Kampagnen.",
+    "optInLabel": "Ich möchte Neuigkeiten von SlotDatabase per E-Mail erhalten",
+    "loading": "Einstellung wird geladen…",
+    "saving": "Speichern…",
+    "savedOn": "Einwilligung erfasst am {{date}}",
+    "withdrawnOn": "Widerruf erfasst am {{date}}",
+    "saveError": "Einstellung konnte nicht gespeichert werden",
+    "unsubscribeTitle": "Abmeldung von Neuigkeiten",
+    "unsubscribeOk": "Du hast die Einwilligung widerrufen. Wir senden dir keine Neuigkeiten per E-Mail.",
+    "unsubscribeMissing": "Der Link ist ungültig oder nicht mehr aktiv.",
+    "unsubscribeHint": "Du kannst das jederzeit wieder in deinem Profil aktivieren."
+  },
   "danger": {
     "title": "Gefahrenzone",
     "description": "Lösche dein Konto und alle zugehörigen Daten dauerhaft.",

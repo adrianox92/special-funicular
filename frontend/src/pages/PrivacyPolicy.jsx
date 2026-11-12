@@ -53,6 +53,11 @@ const PrivacyPolicy = () => {
       </Section>
 
       <Section>
+        <h2 className="text-xl font-semibold text-foreground">{t('privacy.marketingTitle')}</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">{t('privacy.marketing')}</p>
+      </Section>
+
+      <Section>
         <h2 className="text-xl font-semibold text-foreground">{t('privacy.cookiesTitle')}</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">{t('privacy.cookiesLead')}</p>
         <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground leading-relaxed">

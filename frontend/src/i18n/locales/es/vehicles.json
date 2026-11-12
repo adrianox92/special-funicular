@@ -360,6 +360,20 @@
     "createError": "Error al crear el vehículo",
     "createButton": "Crear Vehículo"
   },
+  "catalogSuggest": {
+    "title": "¿Es alguno de estos?",
+    "hint": "Sugerencias del catálogo mientras escribes. Puedes guardar sin elegir ninguna.",
+    "useThis": "Es este",
+    "linked": "Enlazado al catálogo. Los campos vacíos se rellenan al elegir un ítem; no se pisa lo que ya escribiste.",
+    "searching": "Buscando coincidencias…",
+    "variantsTitle": "Variantes parecidas — elige la correcta",
+    "noImage": "Sin foto"
+  },
+  "fieldSwap": {
+    "title": "¿Has intercambiado modelo y referencia?",
+    "body": "El modelo parece un código ({{model}}) y la referencia un nombre ({{reference}}).",
+    "action": "Intercambiar"
+  },
   "maintenance": {
     "title": "Historial de mantenimiento",
     "description": "Registra limpieza, escobillas, engrase u otras intervenciones. Se pueden visualizar junto a la evolución de tiempos en el gráfico superior cuando hay sesiones el mismo día.",

@@ -22,6 +22,7 @@ import {
 } from '../components/ui/select';
 import { SlidersHorizontal, Bell, CircleHelp, KeyRound } from 'lucide-react';
 import LanguageSelector from '../components/LanguageSelector';
+import MarketingConsentCard from '../components/MarketingConsentCard';
 
 const STALE_DAYS_MIN = 1;
 const STALE_DAYS_MAX = 365;
@@ -449,6 +450,7 @@ const SettingsPage = () => {
         </TabsContent>
 
         <TabsContent value="cuenta" className="mt-6 space-y-6">
+          <MarketingConsentCard />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

@@ -21,6 +21,7 @@ import {
 import { Switch } from '../components/ui/switch';
 import { Key, Copy, RefreshCw, Eye, EyeOff, User, KeyRound, Globe, Trash2, BookOpen, ExternalLink, Link2 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
+import MarketingConsentCard from '../components/MarketingConsentCard';
 import { PARTNER_SWAGGER_PRODUCTION_URL } from '../utils/partnerApiUrls';
 import { toIntlLocale } from '../i18n/localeUtils';
 
@@ -375,6 +376,8 @@ const Profile = () => {
           </div>
         </CardContent>
       </Card>
+
+      <MarketingConsentCard />
 
       <Card className="border-destructive/40">
         <CardHeader>

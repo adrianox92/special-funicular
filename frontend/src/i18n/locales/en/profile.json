@@ -11,6 +11,20 @@
     "description": "Basic details of your account",
     "email": "Email"
   },
+  "marketing": {
+    "title": "Email news",
+    "description": "Receive SlotDatabase marketing emails. It is optional and you can withdraw it at any time. We will not send campaigns just because this setting exists.",
+    "optInLabel": "I want to receive SlotDatabase news by email",
+    "loading": "Loading preference…",
+    "saving": "Saving…",
+    "savedOn": "Consent recorded on {{date}}",
+    "withdrawnOn": "Withdrawal recorded on {{date}}",
+    "saveError": "Could not save the preference",
+    "unsubscribeTitle": "Unsubscribe from news",
+    "unsubscribeOk": "You have withdrawn consent. We will not send you news emails.",
+    "unsubscribeMissing": "This link is invalid or no longer active.",
+    "unsubscribeHint": "You can turn it back on in your profile whenever you like."
+  },
   "danger": {
     "title": "Danger zone",
     "description": "Permanently delete your account and all associated data.",

@@ -38,6 +38,7 @@ const {
   findCatalogItemIdByReferenceOrAlias,
   normalizeEan,
 } = require('../lib/catalogAliases');
+const { suggestCatalogItemsForVehicle } = require('../lib/catalogVehicleSuggest');
 
 const router = express.Router();
 
@@ -730,6 +731,24 @@ router.get('/search', async (req, res) => {
     }
     const items = Array.from(byId.values()).slice(0, 20);
     res.json({ items });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /suggest-for-vehicle?manufacturer=&model=&reference=
+ * Sugerencias para enlazar un coche del garaje mientras se escribe el formulario.
+ * No es bloqueante: sin coincidencias se devuelve la lista vacía.
+ */
+router.get('/suggest-for-vehicle', async (req, res) => {
+  try {
+    const result = await suggestCatalogItemsForVehicle(req.supabase, {
+      manufacturer: req.query.manufacturer,
+      model: req.query.model,
+      reference: req.query.reference,
+    });
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
