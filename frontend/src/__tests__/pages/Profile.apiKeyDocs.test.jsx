@@ -8,7 +8,7 @@ import i18n from '../../i18n';
 
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn() },
+  default: { get: jest.fn(), post: jest.fn(), patch: jest.fn(), put: jest.fn(), delete: jest.fn() },
   invalidateApiAccessTokenCache: jest.fn(),
 }));
 
@@ -41,6 +41,11 @@ describe('Profile API key docs links', () => {
       }
       if (url === '/license-account/me') {
         return Promise.resolve({ data: { is_paid: false } });
+      }
+      if (url === '/marketing-consent') {
+        return Promise.resolve({
+          data: { consented: false, given_at: null, withdrawn_at: null, source: null },
+        });
       }
       return Promise.reject(new Error(`unexpected GET ${url}`));
     });

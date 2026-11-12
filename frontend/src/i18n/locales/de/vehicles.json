@@ -360,6 +360,20 @@
     "createError": "Fahrzeug konnte nicht erstellt werden",
     "createButton": "Fahrzeug erstellen"
   },
+  "catalogSuggest": {
+    "title": "Ist es eines davon?",
+    "hint": "Katalogvorschläge während du tippst. Du kannst ohne Auswahl speichern.",
+    "useThis": "Das ist es",
+    "linked": "Mit dem Katalog verknüpft. Leere Felder werden beim Auswählen gefüllt; bereits Eingegebenes bleibt.",
+    "searching": "Suche nach Treffern…",
+    "variantsTitle": "Ähnliche Varianten — bitte die richtige wählen",
+    "noImage": "Kein Foto"
+  },
+  "fieldSwap": {
+    "title": "Modell und Referenz vertauscht?",
+    "body": "Das Modell sieht wie ein Code aus ({{model}}) und die Referenz wie ein Name ({{reference}}).",
+    "action": "Tauschen"
+  },
   "maintenance": {
     "title": "Wartungsverlauf",
     "description": "Reinigung, Bürsten, Schmierung oder andere Arbeiten erfassen. Wird im Diagramm oben neben der Rundenentwicklung angezeigt, wenn Sessions am selben Tag stattfinden.",

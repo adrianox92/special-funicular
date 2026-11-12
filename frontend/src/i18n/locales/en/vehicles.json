@@ -360,6 +360,20 @@
     "createError": "Failed to create vehicle",
     "createButton": "Create Vehicle"
   },
+  "catalogSuggest": {
+    "title": "Is it one of these?",
+    "hint": "Catalogue matches as you type. You can save without picking any.",
+    "useThis": "This is it",
+    "linked": "Linked to the catalogue. Empty fields are filled when you pick an item; we never overwrite what you typed.",
+    "searching": "Looking for matches…",
+    "variantsTitle": "Close variants — pick the right one",
+    "noImage": "No photo"
+  },
+  "fieldSwap": {
+    "title": "Did you swap model and reference?",
+    "body": "The model looks like a code ({{model}}) and the reference looks like a name ({{reference}}).",
+    "action": "Swap"
+  },
   "maintenance": {
     "title": "Maintenance history",
     "description": "Log cleaning, brushes, lubrication or other work. Shown alongside lap evolution in the chart above when sessions fall on the same day.",

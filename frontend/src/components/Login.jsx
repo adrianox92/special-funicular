@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -15,6 +15,7 @@ import {
   persistReturnUrl,
   resolveReturnUrl,
 } from '../utils/authReturnUrl';
+import { stashPendingMarketingConsent } from '../utils/marketingConsentStorage';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const Login = () => {
     password: '',
     confirmPassword: '',
   });
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('register') === 'true') {
@@ -79,9 +81,13 @@ const Login = () => {
         if (formData.password !== formData.confirmPassword) {
           throw new Error(t('passwordMismatch'));
         }
+        if (marketingOptIn) stashPendingMarketingConsent(true);
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
+          options: {
+            data: { marketing_email_opt_in: marketingOptIn },
+          },
         });
         if (signUpError) throw signUpError;
         if (data?.user) {
@@ -99,6 +105,9 @@ const Login = () => {
     setError(null);
     setGoogleLoading(true);
     try {
+      if (activeTab === 'register' && marketingOptIn) {
+        stashPendingMarketingConsent(true);
+      }
       const dest = afterAuthPath();
       await loginWithGoogle(`/login?returnUrl=${encodeURIComponent(dest)}`);
     } catch (err) {
@@ -248,6 +257,27 @@ const Login = () => {
 
             <TabsContent value="register">
               <div className="space-y-4">
+                <label
+                  htmlFor="reg-marketing"
+                  className="flex items-start gap-2 rounded-md border p-3 text-sm leading-snug cursor-pointer"
+                >
+                  <input
+                    id="reg-marketing"
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
+                    checked={marketingOptIn}
+                    onChange={(e) => setMarketingOptIn(e.target.checked)}
+                  />
+                  <span>
+                    {t('marketingOptIn')}
+                    <span className="block text-xs text-muted-foreground mt-1">
+                      {t('marketingOptInHint')}{' '}
+                      <Link to="/privacidad" className="underline underline-offset-2">
+                        {t('privacyLink')}
+                      </Link>
+                    </span>
+                  </span>
+                </label>
                 <Button
                   type="button"
                   variant="outline"

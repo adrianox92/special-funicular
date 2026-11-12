@@ -21,6 +21,8 @@ import { VEHICLE_TYPES as vehicleTypes } from '../../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS } from '../../data/motorPosition';
 import { useEditVehicle } from './EditVehicleContext';
 import { cachedStorageImageUrl } from '../../utils/cachedStorageImageUrl';
+import VehicleCatalogAssist from '../VehicleCatalogSuggestions';
+import { applyCatalogItemToVehicleForm } from '../../utils/catalogVehiclePrefill';
 
 export default function VehicleGeneralTab() {
   const { t } = useTranslation('vehicles');
@@ -70,6 +72,16 @@ export default function VehicleGeneralTab() {
                   <Label htmlFor="manufacturer">{t('edit.fields.manufacturer')}</Label>
                   <Input id="manufacturer" name="manufacturer" value={vehicle.manufacturer || ''} onChange={handleChange} required />
                 </div>
+                <VehicleCatalogAssist
+                  manufacturer={vehicle.manufacturer}
+                  model={vehicle.model}
+                  reference={vehicle.reference}
+                  catalogItemId={vehicle.catalog_item_id}
+                  onSwapFields={({ model, reference }) =>
+                    setVehicle((prev) => ({ ...prev, model, reference }))
+                  }
+                  onSelect={(item) => setVehicle((prev) => applyCatalogItemToVehicleForm(prev, item))}
+                />
                 <div className="space-y-2">
                   <Label htmlFor="type">{t('edit.fields.type')}</Label>
                   <Select
