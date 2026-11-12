@@ -24,6 +24,7 @@ import CatalogListingImage from './CatalogListingImage';
 import CatalogTechSpecsFields from './CatalogTechSpecsFields';
 import VehicleCatalogAssist from './VehicleCatalogSuggestions';
 import { applyCatalogItemToVehicleForm } from '../utils/catalogVehiclePrefill';
+import { appendCatalogItemIdOnce } from '../utils/vehicleCatalogItemId';
 import {
   appendTechSpecsToFormData,
   CATALOG_TECH_SPEC_KEYS,
@@ -222,6 +223,7 @@ const AddVehicle = () => {
       const specKeySet = new Set(CATALOG_TECH_SPEC_KEYS);
       Object.entries(vehicle).forEach(([key, value]) => {
         if (specKeySet.has(key)) return;
+        if (key === 'catalog_item_id') return;
         if (key === 'dorsal' || key === 'limited_edition' || key === 'limited_edition_unit_number') return;
         if (value === undefined || value === null) return;
         if (typeof value === 'object') return;
@@ -236,7 +238,7 @@ const AddVehicle = () => {
           : '',
       );
       appendTechSpecsToFormData(formData, techSpecFormFromRow(vehicle));
-      if (catalogItemId) formData.append('catalog_item_id', catalogItemId);
+      appendCatalogItemIdOnce(formData, catalogItemId, vehicle.catalog_item_id);
       IMAGE_FIELD_NAMES.forEach((name) => {
         if (images[name]) formData.append('images', images[name], name);
       });
