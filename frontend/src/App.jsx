@@ -77,6 +77,8 @@ import { useTranslation } from 'react-i18next';
 import { stripLocalePrefix } from './i18n/localeUtils';
 import LocalePrefixRedirect from './components/LocalePrefixRedirect';
 import OnboardingChecklistBanner from './components/OnboardingChecklistBanner';
+import MarketingConsentSync from './components/MarketingConsentSync';
+import MarketingUnsubscribe from './pages/MarketingUnsubscribe';
 
 const PageLayout = ({ children }) => (
   <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-20">
@@ -169,6 +171,7 @@ const AppContent = () => {
         <Route path="/login" element={<LoginOrRedirect />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacidad" element={<PrivacyPolicy />} />
+        <Route path="/baja-novedades" element={<MarketingUnsubscribe />} />
         <Route path="/terminos" element={<TermsOfService />} />
         <Route path="/contacto" element={<Contact />} />
         <Route path="/developers" element={<DevelopersPage />} />
@@ -588,6 +591,7 @@ function App() {
             <div>
               <CookieBanner />
               <CookieSettingsDialog />
+              <MarketingConsentSync />
               <InstallPWAButton />
               <AppContent />
               <Toaster richColors position="top-right" />

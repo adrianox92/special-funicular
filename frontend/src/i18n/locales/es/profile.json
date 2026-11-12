@@ -11,6 +11,20 @@
     "description": "Datos básicos de tu cuenta",
     "email": "Email"
   },
+  "marketing": {
+    "title": "Novedades por email",
+    "description": "Recibe comunicaciones comerciales de SlotDatabase. No es obligatorio y puedes retirarlo cuando quieras. No enviamos correos solo por activar esta opción hasta que exista una campaña.",
+    "optInLabel": "Quiero recibir novedades de SlotDatabase por email",
+    "loading": "Cargando preferencia…",
+    "saving": "Guardando…",
+    "savedOn": "Consentimiento registrado el {{date}}",
+    "withdrawnOn": "Baja registrada el {{date}}",
+    "saveError": "No se pudo guardar la preferencia",
+    "unsubscribeTitle": "Baja de novedades",
+    "unsubscribeOk": "Has cancelado el consentimiento. No te enviaremos novedades por email.",
+    "unsubscribeMissing": "El enlace no es válido o ya no está activo.",
+    "unsubscribeHint": "Puedes volver a activarlo en tu perfil cuando quieras."
+  },
   "danger": {
     "title": "Zona peligrosa",
     "description": "Eliminar tu cuenta y todos los datos asociados de forma permanente.",
