@@ -55,12 +55,6 @@ jest.mock('../../lib/licenseAdmin', () => ({
   isLicenseAdminUser: () => false,
 }));
 
-jest.mock('../../lib/sellerProfileCache', () => ({
-  getCachedSellerProfile: () => false,
-  setCachedSellerProfile: jest.fn(),
-  invalidateSellerProfileCache: jest.fn(),
-}));
-
 jest.mock('../../lib/axios', () => ({
   __esModule: true,
   default: { get: jest.fn() },

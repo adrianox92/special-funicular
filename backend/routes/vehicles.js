@@ -11,9 +11,9 @@ const multer = require('multer');
 const authMiddleware = require('../middleware/auth');
 const { removeObjectByPublicUrl, removeAllObjectsInVehicleFolder } = require('../lib/vehicleImageStorage');
 const { saveVehicleImagesFromMultipart } = require('../lib/vehicleImageUpload');
-const { tryCopyCatalogImageToVehicleFront } = require('../lib/copyCatalogToVehicleImage');
 const { buildVehicleSpecsPdfBuffer, safeFilenamePart } = require('../lib/vehicleSpecsPdfBuilder');
-const { pickPreferredVehicleImageUrl } = require('../lib/vehicleImagePick');
+const { resolvePublicVehicleCardImage } = require('../lib/publicVehicleCardImage');
+const { fetchCatalogImageUrlsByIds } = require('../lib/fetchCatalogImageUrls');
 const { generateCollectionVehiclesPDF } = require('../src/utils/collectionPdfGenerator');
 const { updatePositionsAfterNewTiming } = require('../lib/positionTracker');
 const { calculateDistanceAndSpeed, updateVehicleOdometer, DEFAULT_SCALE_FACTOR } = require('../lib/distanceCalculator');
@@ -212,12 +212,6 @@ async function insertVehicleFromImportValues(supabaseClient, userId, v) {
     .single();
 
   if (error) throw error;
-
-  try {
-    await tryCopyCatalogImageToVehicleFront(supabaseClient, data.id, catalogRow, null);
-  } catch (e) {
-    console.warn('[vehicles import] tryCopyCatalogImageToVehicleFront', e.message);
-  }
   return data;
 }
 
@@ -288,33 +282,37 @@ async function updateVehicleFromImportValues(supabaseClient, userId, vehicleId, 
     throw err;
   }
 
+  const updatePayload = {
+    model: v.model,
+    manufacturer: v.manufacturer,
+    type: v.type,
+    traction: traction_val,
+    motor_position: motor_position_val,
+    price: priceNum,
+    total_price,
+    purchase_date: v.purchase_date || null,
+    purchase_place: v.purchase_place || null,
+    modified: Boolean(v.modified),
+    digital: Boolean(v.digital),
+    museo: Boolean(v.museo),
+    taller: Boolean(v.taller),
+    anotaciones: v.anotaciones ?? null,
+    reference: v.reference ?? null,
+    dorsal,
+    limited_edition,
+    limited_edition_unit_number,
+    scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
+    commercial_release_year: yearOk ? commercial_release_year_val : null,
+    ...techSpecsParsed.specs,
+    updated_at: new Date().toISOString(),
+  };
+  if (catalog_item_id_val) {
+    updatePayload.catalog_item_id = catalog_item_id_val;
+  }
+
   const { data, error } = await supabaseClient
     .from('vehicles')
-    .update({
-      model: v.model,
-      manufacturer: v.manufacturer,
-      type: v.type,
-      traction: traction_val,
-      motor_position: motor_position_val,
-      price: priceNum,
-      total_price,
-      purchase_date: v.purchase_date || null,
-      purchase_place: v.purchase_place || null,
-      modified: Boolean(v.modified),
-      digital: Boolean(v.digital),
-      museo: Boolean(v.museo),
-      taller: Boolean(v.taller),
-      anotaciones: v.anotaciones ?? null,
-      reference: v.reference ?? null,
-      dorsal,
-      limited_edition,
-      limited_edition_unit_number,
-      scale_factor: !isNaN(scaleFactor) ? scaleFactor : DEFAULT_SCALE_FACTOR,
-      commercial_release_year: yearOk ? commercial_release_year_val : null,
-      catalog_item_id: catalog_item_id_val,
-      ...techSpecsParsed.specs,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', vehicleId)
     .eq('user_id', userId)
     .select()
@@ -769,9 +767,24 @@ router.get('/export-pdf', async (req, res) => {
         if (!grouped.has(img.vehicle_id)) grouped.set(img.vehicle_id, []);
         grouped.get(img.vehicle_id).push(img);
       }
-      for (const [vehicleId, imgs] of grouped) {
-        const url = pickPreferredVehicleImageUrl(imgs);
-        if (url) urlByVehicleId.set(vehicleId, url);
+
+      const { map: catalogImageById, error: catalogImageError } = await fetchCatalogImageUrlsByIds(
+        req.supabase,
+        vehicles.map((v) => v.catalog_item_id),
+      );
+      if (catalogImageError) {
+        logDbError('GET /api/vehicles/export-pdf catalog images', catalogImageError, {
+          userId: req.user.id,
+        });
+        throw catalogImageError;
+      }
+
+      for (const v of vehicles) {
+        const url = resolvePublicVehicleCardImage({
+          vehicleImages: grouped.get(v.id) || [],
+          catalogImageUrl: catalogImageById.get(v.catalog_item_id) || null,
+        });
+        if (url) urlByVehicleId.set(v.id, url);
       }
     }
 
@@ -985,6 +998,7 @@ router.post('/import', runVehicleImportUpload, async (req, res) => {
       updated: 0,
       skipped: 0,
       failed: 0,
+      catalogLinked: 0,
       errors: [],
     };
 
@@ -1004,39 +1018,31 @@ router.post('/import', runVehicleImportUpload, async (req, res) => {
       }
 
       const dupId = await findDuplicateVehicleId(req.supabase, req.user.id, values);
-      if (dupId) {
-        if (duplicateMode === 'skip') {
-          results.skipped += 1;
-          continue;
-        }
-        if (duplicateMode === 'import') {
-          try {
-            await insertVehicleFromImportValues(req.supabase, req.user.id, values);
-            results.inserted += 1;
-          } catch (e) {
-            results.failed += 1;
-            results.errors.push({ sheetRow, message: e.message || String(e) });
-          }
-          continue;
-        }
-        if (duplicateMode === 'update') {
-          try {
-            await updateVehicleFromImportValues(req.supabase, req.user.id, dupId, values);
-            results.updated += 1;
-          } catch (e) {
-            results.failed += 1;
-            results.errors.push({ sheetRow, message: e.message || String(e) });
-          }
-          continue;
-        }
-      } else {
-        try {
-          await insertVehicleFromImportValues(req.supabase, req.user.id, values);
+      if (dupId && duplicateMode === 'skip') {
+        results.skipped += 1;
+        continue;
+      }
+
+      const catalogItemId = await resolveCatalogItemIdFromGarageRef(
+        req.supabase,
+        values.manufacturer,
+        values.reference,
+      );
+      const rowValues = { ...values, catalog_item_id: catalogItemId || null };
+      const linked = Boolean(catalogItemId);
+
+      try {
+        if (dupId && duplicateMode === 'update') {
+          await updateVehicleFromImportValues(req.supabase, req.user.id, dupId, rowValues);
+          results.updated += 1;
+        } else {
+          await insertVehicleFromImportValues(req.supabase, req.user.id, rowValues);
           results.inserted += 1;
-        } catch (e) {
-          results.failed += 1;
-          results.errors.push({ sheetRow, message: e.message || String(e) });
         }
+        if (linked) results.catalogLinked += 1;
+      } catch (e) {
+        results.failed += 1;
+        results.errors.push({ sheetRow, message: e.message || String(e) });
       }
     }
 
@@ -1234,15 +1240,26 @@ router.get('/', async (req, res) => {
       imagesByVehicle.get(img.vehicle_id).push(img);
     }
 
-    const imagesMap = new Map();
-    for (const [vehicleId, imgs] of imagesByVehicle) {
-      const url = pickPreferredVehicleImageUrl(imgs);
-      if (url) imagesMap.set(vehicleId, url);
+    const { map: catalogImageById, error: catalogImageError } = await fetchCatalogImageUrlsByIds(
+      req.supabase,
+      rows.map((v) => v.catalog_item_id),
+    );
+    if (catalogImageError) {
+      logDbError('GET /api/vehicles catalog images', catalogImageError, {
+        userId: req.user.id,
+        page,
+        limit,
+      });
+      catalogImageError._dbErrorLogged = true;
+      throw catalogImageError;
     }
 
     const result = rows.map((v) => ({
       ...v,
-      image: imagesMap.get(v.id) || null,
+      image: resolvePublicVehicleCardImage({
+        vehicleImages: imagesByVehicle.get(v.id) || [],
+        catalogImageUrl: catalogImageById.get(v.catalog_item_id) || null,
+      }),
     }));
 
     res.json({
@@ -1268,7 +1285,7 @@ router.get('/:id', async (req, res) => {
   const { data, error } = await req.supabase
     .from('vehicles')
     .select(
-      '*, catalog_item:slot_catalog_items!catalog_item_id ( limited_edition_total )',
+      '*, catalog_item:slot_catalog_items!catalog_item_id ( limited_edition_total, image_url )',
     )
     .eq('id', id)
     .eq('user_id', req.user.id)
@@ -1549,12 +1566,6 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
         console.error('saveVehicleImagesFromMultipart (POST)', e);
         return res.status(500).json({ error: e.message || 'Error al subir imágenes' });
       }
-    }
-
-    try {
-      await tryCopyCatalogImageToVehicleFront(req.supabase, data.id, catalogRow, req.files);
-    } catch (e) {
-      console.warn('[vehicles POST] tryCopyCatalogImageToVehicleFront', e.message);
     }
 
     res.status(201).json(data);

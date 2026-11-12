@@ -21,7 +21,6 @@ import {
   CircleHelp,
   Search,
   Database,
-  Store,
   Building2,
   ScrollText,
   Megaphone,
@@ -29,15 +28,10 @@ import {
   ChevronDown,
   LayoutDashboard,
   Smartphone,
+  LineChart,
 } from 'lucide-react';
 import { isLicenseAdminUser } from '../lib/licenseAdmin';
 import { ChangelogBell } from './ChangelogBell';
-import api from '../lib/axios';
-import {
-  getCachedSellerProfile,
-  invalidateSellerProfileCache,
-  setCachedSellerProfile,
-} from '../lib/sellerProfileCache';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import {
@@ -150,46 +144,7 @@ const Navbar = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  /** Solo usuarios con fila en seller_profiles (pendiente, aprobada o rechazada). */
-  const [hasSellerProfile, setHasSellerProfile] = useState(false);
   const navbarRef = useRef(null);
-
-  useEffect(() => {
-    if (!user?.id) {
-      setHasSellerProfile(false);
-      return undefined;
-    }
-
-    const cached = getCachedSellerProfile(user.id);
-    if (cached !== null) {
-      setHasSellerProfile(cached);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { data } = await api.get('/store-listings/my/profile');
-        const hasProfile = data != null && typeof data === 'object';
-        setCachedSellerProfile(user.id, hasProfile);
-        if (!cancelled) setHasSellerProfile(hasProfile);
-      } catch {
-        setCachedSellerProfile(user.id, false);
-        if (!cancelled) setHasSellerProfile(false);
-      }
-    };
-    load();
-
-    const onSellerProfileChanged = () => {
-      invalidateSellerProfileCache();
-      load();
-    };
-    window.addEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('slotdb-seller-profile-updated', onSellerProfileChanged);
-    };
-  }, [user?.id]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -224,6 +179,7 @@ const Navbar = () => {
 
   const licenseAdminMenuItems = [
     { to: '/admin/dashboard', label: t('metrics'), icon: LayoutDashboard },
+    { to: '/admin/slot-intelligence', label: t('slotIntelligence'), icon: LineChart },
     { to: '/admin/lap-timer-licenses', label: t('lapTimerLicenses'), icon: Smartphone },
     { to: '/admin/slot-race-licenses', label: t('srmLicenses'), icon: Shield },
     { to: '/admin/slot-catalog', label: t('slotCatalog'), icon: Database },
@@ -259,9 +215,6 @@ const Navbar = () => {
       ],
     },
     { path: '/clubs', label: t('clubs'), icon: Building2 },
-    ...(hasSellerProfile
-      ? [{ path: '/seller', label: t('myListings'), icon: Store }]
-      : []),
     { path: '/help', label: t('help'), icon: CircleHelp },
   ];
 
@@ -413,14 +366,6 @@ const Navbar = () => {
                       {t('changelog')}
                     </Link>
                   </DropdownMenuItem>
-                  {hasSellerProfile && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/seller" className="flex items-center gap-2 cursor-pointer">
-                        <Store className="size-4" />
-                        {t('myListings')}
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
                   {showLicenseAdmin && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger className="gap-2">
@@ -464,14 +409,17 @@ const Navbar = () => {
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px]">
-              <SheetHeader>
+            <SheetContent
+              side="right"
+              className="flex w-[min(100vw-1.5rem,280px)] flex-col gap-0 overflow-hidden p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+            >
+              <SheetHeader className="shrink-0 px-6 pb-2 pt-6 pr-12">
                 <SheetTitle>{t('menu')}</SheetTitle>
               </SheetHeader>
-              <div className="mt-4 px-1">
+              <div className="shrink-0 px-6">
                 <LanguageSelector size="compact" />
               </div>
-              <nav className="flex flex-col gap-2 mt-6">
+              <nav className="mt-4 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-6 pb-6 [-webkit-overflow-scrolling:touch]">
                 {navItems.map((item) => (
                   <MobileNavItem
                     key={item.path}

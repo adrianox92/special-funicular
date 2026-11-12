@@ -47,6 +47,9 @@ describe('Profile API key docs links', () => {
           data: { consented: false, given_at: null, withdrawn_at: null, source: null },
         });
       }
+      if (url === '/oauth/connections') {
+        return Promise.resolve({ data: { connections: [] } });
+      }
       return Promise.reject(new Error(`unexpected GET ${url}`));
     });
   });

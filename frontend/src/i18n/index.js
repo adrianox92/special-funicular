@@ -38,7 +38,6 @@ export const NAMESPACES = [
   'leagues',
   'slotRaceManager',
   'inventory',
-  'seller',
   'help',
   'profile',
 ];

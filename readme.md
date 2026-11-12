@@ -90,6 +90,20 @@ Destinatario por defecto: `adrianpalomera17@gmail.com` (`CATALOG_GAP_REPORT_TO`)
 
 El listado usa el RPC `admin_vehicle_refs_missing_catalog` (`only_unlinked=true`). El dashboard de plataforma (`/admin/dashboard`) muestra la misma tabla.
 
+### Stock de tiendas del catálogo (Render Cron, diario)
+
+Recomprueba las ofertas scrapeadas y busca referencias nuevas. La ficha solo enseña las que siguen en stock.
+
+1. Mismo `CRON_SECRET` que el resto de crons.
+2. Cron Job con schedule **`0 6 * * *`** (06:00 UTC, cada día).
+3. Comando:
+   `POST https://special-funicular-3q60.onrender.com/api/cron/shop-offers`
+   con header `Authorization: Bearer <CRON_SECRET>`.
+   Para probar una referencia concreta sin recorrer el catálogo:
+   `POST /api/cron/shop-offers?reference=C4555`.
+
+Cada ejecución mira hasta 40 ofertas ya guardadas y 20 referencias nuevas por tienda. Las más antiguas van primero. Trofeslot y Model Hobby Red (y cualquier tienda WooCommerce con el mismo adaptador) leen el listado completo de la Store API en esa misma ejecución, sin el cupo de 20. Si el precio baja, la ficha muestra el anterior tachado y el nuevo al lado.
+
 ### Requisitos Técnicos PWA
 
 - **HTTPS obligatorio**: La PWA requiere conexión segura en producción

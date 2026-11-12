@@ -179,6 +179,35 @@ describe('GET /api/admin/vehicle-refs-not-in-catalog', () => {
     expect(response.body.rows[0].sample_manufacturer).toBe('Ninco');
   });
 
+  test('only_in_catalog pasa p_only_in_catalog y reenvía el flag', async () => {
+    mockSupabase.rpc.mockResolvedValue({
+      data: {
+        total: 1,
+        limit: 25,
+        offset: 0,
+        only_unlinked: false,
+        only_in_catalog: true,
+        q: null,
+        rows: [IN_CATALOG_ROW],
+      },
+      error: null,
+    });
+
+    const response = await request(app)
+      .get('/api/admin/vehicle-refs-not-in-catalog?only_in_catalog=true')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(response.status).toBe(200);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('admin_vehicle_refs_missing_catalog', {
+      p_limit: 25,
+      p_offset: 0,
+      p_only_unlinked: false,
+      p_only_in_catalog: true,
+    });
+    expect(response.body.only_in_catalog).toBe(true);
+    expect(response.body.rows[0].in_catalog).toBe(true);
+  });
+
   test('alias ?mfg= se envía como p_manufacturer', async () => {
     await request(app)
       .get('/api/admin/vehicle-refs-not-in-catalog?mfg=Slot.it')

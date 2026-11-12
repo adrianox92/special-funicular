@@ -4,6 +4,10 @@ const helmet = require('helmet');
 const sharp = require('sharp');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
+const { registerAdapter } = require('./lib/shopAdapters');
+const { catalogShopAdapters } = require('./lib/shopAdapters/catalogShops');
+for (const shopAdapter of catalogShopAdapters) registerAdapter(shopAdapter);
+
 // Limitar concurrencia de Sharp a 1 hilo para evitar picos de RAM en subidas paralelas.
 // Desactivar la caché interna de tiles para liberar buffers en cuanto terminan.
 sharp.cache(false);
@@ -46,6 +50,8 @@ const {
   authSoftLimiter,
   contactLimiter,
   syncApiKeyLimiter,
+  mcpReadLimiter,
+  mcpOauthLimiter,
 } = require('./middleware/rateLimits');
 
 const app = express();
@@ -120,6 +126,10 @@ function pickCorsOptions(path) {
   if (path.startsWith('/api/lap-timer/license')) return corsSyncOptions;
   if (path.startsWith('/api/lap-timer/promo')) return corsSyncOptions;
   if (
+    path.startsWith('/mcp') ||
+    path.startsWith('/oauth') ||
+    path.startsWith('/.well-known') ||
+    path.startsWith('/api/oauth') ||
     path.startsWith('/api/docs') ||
     path.startsWith('/api/sync') ||
     path === '/api/auth/api-key' ||
@@ -229,6 +239,14 @@ app.use('/api/public-leagues', publicSignupLimiter, publicLeaguesRoute);
 const partnerDocsRoute = require('./routes/partnerDocs');
 app.use('/api/docs', partnerDocsRoute);
 
+const oauthRoute = require('./routes/oauth');
+const mcpRoute = require('./routes/mcp');
+app.get('/.well-known/oauth-protected-resource', mcpOauthLimiter, oauthRoute.resourceMetadata);
+app.get('/.well-known/oauth-protected-resource/mcp', mcpOauthLimiter, oauthRoute.resourceMetadata);
+app.get('/.well-known/oauth-authorization-server', mcpOauthLimiter, oauthRoute.authorizationServerMetadata);
+app.use(['/oauth', '/api/oauth'], mcpOauthLimiter, oauthRoute);
+app.use('/mcp', mcpReadLimiter, mcpRoute);
+
 // ==================== RUTAS PROTEGIDAS ====================
 const vehiclesRoute = require('./routes/vehicles');
 const timingsRoute = require('./routes/timings');
@@ -253,8 +271,10 @@ const adminPromoCodesRoute = require('./routes/adminPromoCodes');
 const helpRoute = require('./routes/help');
 const catalogRoute = require('./routes/catalog');
 const storeListingsRoute = require('./routes/storeListings');
+const goRoute = require('./routes/go');
 const changelogRoute = require('./routes/changelog');
 const adminPlatformMetricsRoute = require('./routes/adminPlatformMetrics');
+const adminSlotIntelligenceRoute = require('./routes/adminSlotIntelligence');
 const adminLapTimerLicensesRoute = require('./routes/adminLapTimerLicenses');
 
 app.use('/api/vehicles', vehiclesRoute);
@@ -282,8 +302,10 @@ app.use('/api/marketing-consent', marketingConsentRoute);
 app.use('/api/help', helpRoute);
 app.use('/api/catalog', catalogRoute);
 app.use('/api/store-listings', storeListingsRoute);
+app.use('/api/go', goRoute);
 app.use('/api/changelog', changelogRoute);
 app.use('/api/admin', authMiddleware, adminPlatformMetricsRoute);
+app.use('/api/admin', authMiddleware, adminSlotIntelligenceRoute);
 app.use('/api/admin', authMiddleware, adminLapTimerLicensesRoute);
 app.use('/api/admin', authMiddleware, adminPromoCodesRoute);
 

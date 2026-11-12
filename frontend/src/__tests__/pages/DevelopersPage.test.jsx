@@ -5,6 +5,7 @@ import DevelopersPage from '../../pages/DevelopersPage';
 import i18n from '../../i18n';
 import {
   CONTACT_PATH,
+  MCP_CONNECTOR_URL,
   PARTNER_OPENAPI_PRODUCTION_URL,
   PARTNER_SWAGGER_PRODUCTION_URL,
 } from '../../utils/partnerApiUrls';
@@ -47,6 +48,7 @@ describe('DevelopersPage', () => {
 
     expect(screen.getByRole('link', { name: /obtener api key/i })).toHaveAttribute('href', expect.stringContaining('/login'));
     expect(screen.getByRole('link', { name: /formulario de contacto/i })).toHaveAttribute('href', CONTACT_PATH);
+    expect(document.body.textContent).toContain(MCP_CONNECTOR_URL);
 
     expect(document.body.textContent).not.toMatch(FORBIDDEN);
   });

@@ -189,10 +189,22 @@ html.presentation-mode-overlay body {
     background-color: var(--background);
     color: var(--foreground);
   }
+  /* El catálogo público lleva su propia cabecera; el hueco del Navbar fijo no aplica. */
+  body.public-catalog-shell {
+    padding-top: 0;
+  }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+}
+
+/* Paneles laterales (menú móvil / PWA): el alto sigue la pantalla visible y el contenido hace scroll. */
+.sheet-viewport {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
 }
 
 /* Scrollbar */

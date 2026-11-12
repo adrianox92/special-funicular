@@ -20,10 +20,11 @@ function normalizeRefsQuery(raw) {
  * `q` canónico; `reference` y `ref` se aceptan como alias (p. ej. deep-link ?ref=FOO).
  * Vacío → informe ranking «solo ausentes del catálogo».
  * Informado → contains (trim+lower) e incluye refs que ya existen en catálogo.
+ * `only_in_catalog`: solo grupos cuya referencia ya existe en el catálogo y aún tienen vehículos sin enlazar.
  * `manufacturer` (alias `mfg` / `brand`): contains sobre fabricante de garaje.
  *
  * @param {Record<string, unknown>} query
- * @returns {{ error: string } | { limit: number, offset: number, only_unlinked: boolean, q: string, manufacturer: string }}
+ * @returns {{ error: string } | { limit: number, offset: number, only_unlinked: boolean, only_in_catalog: boolean, q: string, manufacturer: string }}
  */
 function parseRefsGapQuery(query = {}) {
   const limRaw = query.limit;
@@ -45,18 +46,22 @@ function parseRefsGapQuery(query = {}) {
     query.only_unlinked === true ||
     query.only_unlinked === 'true' ||
     query.only_unlinked === '1';
+  const onlyInCatalog =
+    query.only_in_catalog === true ||
+    query.only_in_catalog === 'true' ||
+    query.only_in_catalog === '1';
   const q = normalizeRefsQuery(query.q ?? query.reference ?? query.ref);
   const manufacturer = normalizeRefsQuery(
     query.manufacturer ?? query.mfg ?? query.brand,
   );
-  return { limit, offset, only_unlinked: only, q, manufacturer };
+  return { limit, offset, only_unlinked: only, only_in_catalog: onlyInCatalog, q, manufacturer };
 }
 
 /**
  * Parámetros nombrados de `admin_vehicle_refs_missing_catalog`.
  * `p_q` / `p_manufacturer` vacíos se omiten para no romper firmas RPC anteriores.
  * Con p_q el RPC incluye matches en catálogo; con p_manufacturer filtra y agrupa por marca.
- * @param {{ limit: number, offset: number, only_unlinked: boolean, q: string, manufacturer: string }} parsed
+ * @param {{ limit: number, offset: number, only_unlinked: boolean, only_in_catalog?: boolean, q: string, manufacturer: string }} parsed
  */
 function buildMissingCatalogRpcParams(parsed) {
   const params = {
@@ -64,9 +69,10 @@ function buildMissingCatalogRpcParams(parsed) {
     p_offset: parsed.offset,
     p_only_unlinked: parsed.only_unlinked,
   };
-  // Omitir vacíos: el RPC 3-arg / 4-arg (pre-migración) sigue sirviendo el ranking.
+  // Omitir vacíos y el flag en false: el ranking por defecto no cambia de firma.
   if (parsed.q) params.p_q = parsed.q;
   if (parsed.manufacturer) params.p_manufacturer = parsed.manufacturer;
+  if (parsed.only_in_catalog) params.p_only_in_catalog = true;
   return params;
 }
 

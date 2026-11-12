@@ -45,14 +45,15 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
 import DevelopersPage from './pages/DevelopersPage';
+import OauthConsentPage from './pages/OauthConsentPage';
 import SlotRaceManagerPage from './pages/SlotRaceManagerPage';
 import AdminSlotRaceLicenses from './pages/AdminSlotRaceLicenses';
 import AdminSlotCatalog from './pages/AdminSlotCatalog';
 import Changelog from './pages/Changelog';
 import AdminChangelog from './pages/AdminChangelog';
 import AdminPlatformDashboard from './pages/AdminPlatformDashboard';
+import AdminSlotIntelligence from './pages/AdminSlotIntelligence';
 import AdminLapTimerLicensesPage from './pages/AdminLapTimerLicensesPage';
-import SellerDashboard from './pages/SellerDashboard';
 import PublicCatalogList from './pages/PublicCatalogList';
 import PublicCatalogEntry from './pages/PublicCatalogEntry';
 import CatalogMySuggestions from './pages/CatalogMySuggestions';
@@ -174,6 +175,14 @@ const AppContent = () => {
         <Route path="/terminos" element={<TermsOfService />} />
         <Route path="/contacto" element={<Contact />} />
         <Route path="/developers" element={<DevelopersPage />} />
+        <Route
+          path="/oauth/consent"
+          element={(
+            <PrivateRoute>
+              <OauthConsentPage />
+            </PrivateRoute>
+          )}
+        />
         <Route path="/politicas/:slug" element={<PoliciesPage />} />
         <Route path="/slot-race-manager" element={<SlotRaceManagerPage />} />
         <Route path="/competitions/signup/:slug" element={<CompetitionSignup />} />
@@ -411,22 +420,22 @@ const AppContent = () => {
         />
 
         <Route
-          path="/admin/lap-timer-licenses"
+          path="/admin/slot-intelligence"
           element={
             <PrivateRoute>
               <AuthedShell>
-                <AdminLapTimerLicensesPage />
+                <AdminSlotIntelligence />
               </AuthedShell>
             </PrivateRoute>
           }
         />
 
         <Route
-          path="/seller"
+          path="/admin/lap-timer-licenses"
           element={
             <PrivateRoute>
               <AuthedShell>
-                <SellerDashboard />
+                <AdminLapTimerLicensesPage />
               </AuthedShell>
             </PrivateRoute>
           }
