@@ -109,6 +109,9 @@ describe('catalogSeoHtml', () => {
     expect(html).toContain('C1234');
     expect(html).toContain('GT');
     expect(html).toContain('<img src="https://cdn.example/p911.jpg"');
+    expect(html).toContain('fetchpriority="high"');
+    expect(html).not.toContain('width="640"');
+    expect(html).not.toContain('height="480"');
     const supabaseItem = {
       ...item,
       image_url:
@@ -129,6 +132,21 @@ describe('catalogSeoHtml', () => {
     expect(html).toContain(`href="/catalogo/${item.neighbors.next.id}/audi-r8"`);
     expect(html).toContain('Anterior');
     expect(html).toContain('Siguiente');
+  });
+
+  test('ficha sin foto propia muestra el placeholder y no el texto suelto', () => {
+    const html = renderItemBody({
+      item: { ...item, image_url: null },
+      locale: 'es',
+      origin: 'https://www.slotdatabase.es',
+      slug: 'porsche-911-gt3',
+      neighbors: item.neighbors,
+    });
+    expect(html).toContain('src="https://www.slotdatabase.es/catalog-placeholder.png"');
+    expect(html).toContain('width="1024" height="614"');
+    expect(html).not.toContain('fetchpriority="high"');
+    expect(html).toContain('alt="Sin imagen en catálogo"');
+    expect(html).not.toContain('cdn.example');
   });
 
   test('injectIntoSpaHtml sustituye title y rellena #root', () => {
@@ -170,6 +188,36 @@ describe('catalogSeoHtml', () => {
     expect(out).toContain(`rel="canonical" href="${canonical}"`);
     expect(out).toContain(`property="og:url" content="${canonical}"`);
     expect(canonical).toMatch(/^https:\/\/www\.slotdatabase\.es\//);
+  });
+
+  test('head de ficha con foto declara tipo y preload, sin tamaño inventado', () => {
+    const photo = 'https://www.slotdatabase.es/api/img/catalog-images/catalog/1710000000-ab12cd.webp';
+    const head = buildHeadTags({
+      locale: 'es',
+      title: 'N.S.R. · NSR0648SW · Hypercar | Slot Database',
+      description: 'Ficha',
+      canonicalUrl: 'https://www.slotdatabase.es/catalogo/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/hypercar',
+      imageUrl: photo,
+      imageAlt: 'Coche slot, N.S.R., ref. NSR0648SW, Hypercar',
+      imageIsPhoto: true,
+    });
+    expect(head).toContain(`property="og:image" content="${photo}"`);
+    expect(head).toContain('property="og:image:type" content="image/webp"');
+    expect(head).toContain(`rel="preload" as="image" href="${photo}"`);
+    expect(head).not.toContain('og:image:width');
+    expect(head).not.toContain('og:image:height');
+
+    const logo = buildHeadTags({
+      locale: 'es',
+      title: 'Catálogo',
+      description: 'Listado',
+      canonicalUrl: 'https://www.slotdatabase.es/catalogo',
+      imageUrl: 'https://www.slotdatabase.es/logo512.png',
+      imageAlt: 'Slot Database',
+    });
+    expect(logo).toContain('property="og:image" content="https://www.slotdatabase.es/logo512.png"');
+    expect(logo).not.toContain('og:image:type');
+    expect(logo).not.toContain('rel="preload"');
   });
 
   const similar = [

@@ -18,6 +18,7 @@ const {
   buildCatalogItemKeywords: buildCatalogItemKeywordsLocalized,
   buildPublicCatalogListMeta,
   buildItemJsonLd,
+  imageContentTypeFromUrl,
   seoFor,
   interpolate,
   toIsoDateModified,
@@ -140,6 +141,8 @@ export function applyPublicCatalogListSeo(filters = {}) {
     setMeta('og:image:height', '512', true);
     setMeta('og:image:alt', interpolate(seo.ogImageAlt, { brand: BRAND }), true);
   }
+  removeMeta('og:image:type', true);
+  setCatalogImagePreload('');
   setMeta('twitter:card', 'summary_large_image', false);
   setMeta('twitter:title', listTitle, false);
   setMeta('twitter:description', listDescription, false);
@@ -154,6 +157,20 @@ export function applyPublicCatalogListSeo(filters = {}) {
     }
     linkCanonical.setAttribute('href', canonicalUrl);
   }
+}
+
+function setCatalogImagePreload(href) {
+  const existing = document.getElementById('catalog-item-image-preload');
+  if (!href) {
+    if (existing) existing.remove();
+    return;
+  }
+  const el = existing || document.createElement('link');
+  el.id = 'catalog-item-image-preload';
+  el.rel = 'preload';
+  el.as = 'image';
+  el.setAttribute('href', href);
+  if (!existing) document.head.appendChild(el);
 }
 
 function removeHreflangLinks() {
@@ -215,6 +232,12 @@ export function applyCatalogItemPageSeo(item) {
   if (imageUrl) {
     setMeta('og:image', imageUrl, true);
     setMeta('og:image:alt', imageAlt, true);
+    removeMeta('og:image:width', true);
+    removeMeta('og:image:height', true);
+    const imageType = imageContentTypeFromUrl(imageUrl);
+    if (imageType) setMeta('og:image:type', imageType, true);
+    else removeMeta('og:image:type', true);
+    setCatalogImagePreload(imageUrl);
   } else {
     const logoUrl = origin ? `${origin}/logo512.png` : '';
     if (logoUrl) {
@@ -223,6 +246,8 @@ export function applyCatalogItemPageSeo(item) {
       setMeta('og:image:height', '512', true);
       setMeta('og:image:alt', interpolate(seo.ogImageAlt, { brand: BRAND }), true);
     }
+    removeMeta('og:image:type', true);
+    setCatalogImagePreload('');
   }
 
   setMeta('twitter:card', imageUrl ? 'summary_large_image' : 'summary', false);
@@ -280,6 +305,8 @@ export function applyCatalogItemPageSeo(item) {
 export function clearCatalogItemPageSeo() {
   removeMeta('article:modified_time', true);
   removeMeta('og:image:alt', true);
+  removeMeta('og:image:type', true);
+  setCatalogImagePreload('');
   removeMeta('og:site_name', true);
   removeMeta('og:locale', true);
   const locale = currentLocale();

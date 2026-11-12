@@ -3,6 +3,10 @@ const cronAuth = require('../middleware/cronAuth');
 const authMiddleware = require('../middleware/auth');
 const { runWeeklyDigest, buildWeeklyDigestForUser } = require('../lib/weeklyDigest');
 const { runCatalogGapReport } = require('../lib/catalogGapReport');
+const { getAdapter } = require('../lib/shopAdapters');
+const { runShopOfferBatch, runShopOfferLookup, createSupabaseShopOfferIo } = require('../lib/shopOfferSync');
+const { sendShopOfferReport, publicShopOfferResult } = require('../lib/shopOfferReport');
+const { createShortCode } = require('../lib/shortCode');
 const { getServiceClient } = require('../lib/supabaseClients');
 const { sendWeeklyDigestNotification } = require('../lib/notifier');
 
@@ -60,6 +64,72 @@ router.post('/catalog-gap-report', cronAuth, async (req, res) => {
   } catch (e) {
     console.error('[cron] catalog-gap-report:', e);
     res.status(500).json({ error: e.message || 'Error al enviar informe de catálogo' });
+  }
+});
+
+/**
+ * POST /api/cron/shop-offers
+ * Header: Authorization: Bearer ${CRON_SECRET}
+ *
+ * Render Cron diario `0 6 * * *` (06:00 UTC). Recomprueba primero las ofertas
+ * en stock y busca 20 referencias nuevas por tienda. Las tiendas con listado
+ * completo se sincronizan enteras. Una referencia encontrada en stock se
+ * busca también en las demás tiendas, con un tope de peticiones.
+ *
+ * El lote responde 202 enseguida. El proxy de Render corta a los 100 segundos
+ * y, con varias tiendas, el trabajo pasa de ese límite. El resumen llega por correo.
+ */
+let shopOfferBatchRunning = false;
+
+router.post('/shop-offers', cronAuth, async (req, res) => {
+  const admin = getServiceClient();
+  let startedHere = false;
+  try {
+    if (!admin) return res.status(503).json({ error: 'Service role no disponible' });
+    const reference = String(req.query.reference || '').trim();
+    if (reference) {
+      const result = await runShopOfferLookup({
+        io: createSupabaseShopOfferIo(admin, { createShortCode }),
+        getAdapter,
+        reference,
+        pauseMs: 200,
+        newShortCode: createShortCode,
+      });
+      if (!result.found) {
+        return res.status(404).json({ error: 'La referencia no está en el catálogo', reference });
+      }
+      return res.json({ ok: true, ...result });
+    }
+    if (shopOfferBatchRunning) {
+      return res.status(202).json({ ok: true, started: false, reason: 'already_running' });
+    }
+    startedHere = true;
+    shopOfferBatchRunning = true;
+    res.status(202).json({ ok: true, started: true });
+  } catch (e) {
+    if (startedHere) shopOfferBatchRunning = false;
+    console.error('[cron] shop-offers:', e);
+    if (!res.headersSent) {
+      res.status(500).json({ error: e.message || 'Error al revisar ofertas de tienda' });
+    }
+    return;
+  }
+
+  const now = new Date();
+  try {
+    const result = await runShopOfferBatch({
+      io: createSupabaseShopOfferIo(admin, { createShortCode }),
+      getAdapter,
+      now,
+      newShortCode: createShortCode,
+      pauseMs: 200,
+    });
+    const email = await sendShopOfferReport({ summary: result, now });
+    console.log('[cron] shop-offers done', publicShopOfferResult(result, email));
+  } catch (e) {
+    console.error('[cron] shop-offers:', e);
+  } finally {
+    shopOfferBatchRunning = false;
   }
 });
 

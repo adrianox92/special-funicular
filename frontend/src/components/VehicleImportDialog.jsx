@@ -203,6 +203,7 @@ export default function VehicleImportDialog({ open, onOpenChange, onImported }) 
         `Actualizados: ${data.updated}`,
         `Omitidos: ${data.skipped}`,
         `Fallidos: ${data.failed}`,
+        `Enlazados al catálogo: ${data.catalogLinked ?? 0}`,
       ];
       toast.success(parts.join(' · '));
       if (data.errors?.length) {

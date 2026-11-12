@@ -269,41 +269,51 @@ const VehicleDetail = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {imageFields.map(({ name, label }) => (
+                {imageFields.map(({ name, label }) => {
+                  const ownUrl = images[name] || '';
+                  const catalogFrontUrl =
+                    name === 'front' && !ownUrl
+                      ? String(vehicle.catalog_item?.image_url || '').trim()
+                      : '';
+                  const src = ownUrl || catalogFrontUrl;
+                  return (
                   <div key={name} className="space-y-2 min-w-0">
                     <Label className="text-xs sm:text-sm leading-snug">{label}</Label>
                     <div className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-2 sm:p-4 relative min-h-[100px] sm:min-h-[120px] bg-muted/30">
-                      {images[name] ? (
+                      {src ? (
                         <>
                           <img
-                            src={cachedStorageImageUrl(images[name])}
+                            src={cachedStorageImageUrl(src)}
                             alt={label}
                             className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setLightboxImage({ url: images[name], label });
+                              setLightboxImage({ url: src, label });
                             }}
                           />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-7 w-7 sm:h-8 sm:w-8 shrink-0"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleDeleteImage(name);
-                            }}
-                            disabled={deletingImage === name}
-                          >
-                            {deletingImage === name ? <Spinner className="size-3.5 sm:size-4" /> : '×'}
-                          </Button>
+                          {ownUrl ? (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-7 w-7 sm:h-8 sm:w-8 shrink-0"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteImage(name);
+                              }}
+                              disabled={deletingImage === name}
+                            >
+                              {deletingImage === name ? <Spinner className="size-3.5 sm:size-4" /> : '×'}
+                            </Button>
+                          ) : null}
                         </>
                       ) : (
                         <span className="text-muted-foreground text-xs sm:text-sm text-center px-1">Sin imagen</span>
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

@@ -63,6 +63,7 @@ export function getDocumentTitle(pathname) {
   if (normalized === '/admin/slot-catalog') return withBrand(i18n.t('adminCatalog', { ns: 'meta' }));
   if (normalized === '/admin/changelog') return withBrand(i18n.t('adminChangelog', { ns: 'meta' }));
   if (normalized === '/admin/dashboard') return withBrand(i18n.t('adminMetrics', { ns: 'meta' }));
+  if (normalized === '/admin/slot-intelligence') return withBrand(i18n.t('adminIntelligence', { ns: 'meta' }));
   if (normalized === '/changelog') return withBrand(i18n.t('changelog', { ns: 'meta' }));
   if (normalized === '/privacidad') return withBrand(i18n.t('privacy', { ns: 'meta' }));
   if (normalized === '/terminos') return withBrand(i18n.t('terms', { ns: 'meta' }));

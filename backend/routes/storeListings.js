@@ -1,757 +1,134 @@
 /**
- * Store listings — monetización del catálogo.
+ * Ofertas de tienda en la ficha pública y alta admin.
  *
- * Rutas públicas (sin auth):
- *   GET  /catalog/:catalogItemId          — listados activos de un ítem
- *   POST /:id/click                       — registrar clic
+ * Públicas:
+ *   GET /catalog/:catalogItemId — ofertas en stock (últimos 8 días)
+ *   GET /public/policies/:slug
  *
- * Rutas de vendedor aprobado (authMiddleware + sellerGuard):
- *   GET  /my                              — mis listados con click_count
- *   GET  /my/profile                      — mi perfil de tienda
- *   POST /my/profile                      — solicitar alta como vendedor
- *   PUT  /my/profile                      — actualizar perfil
- *   POST /my/profile/logo                 — subir logo
- *   POST /                                — crear listado
- *   PUT  /:id                             — editar propio
- *   DELETE /:id                           — borrar propio
+ * Admin:
+ *   GET/POST /admin/shops
+ *   PUT  /admin/shops/:id
+ *   GET/POST /admin/offers
+ *   PATCH /admin/offers/:id
+ *   GET  /admin/catalog-matches
+ *   GET  /admin/clicks
+ *   GET/PUT /admin/policies
  *
- * Rutas de admin (authMiddleware + assertLicenseAdmin):
- *   GET  /admin/sellers                   — todos los perfiles de vendedor
- *   POST /admin/sellers/:userId/approve   — aprobar/rechazar
- *   GET  /admin/all                       — todos los listados
- *   GET  /admin/clicks                    — stats de clics por listado
+ * El redirect con clic vive en GET /api/go/:code.
  */
 
-const crypto = require('crypto');
 const express = require('express');
-const multer = require('multer');
-const {
-  getAnonClient,
-  getServiceClient,
-  createUserScopedClient,
-} = require('../lib/supabaseClients');
+const { getAnonClient, getServiceClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { assertLicenseAdmin } = require('../lib/licenseAdminAuth');
-const { processVehicleImageBuffer } = require('../lib/processVehicleImageBuffer');
-const { STORAGE_UPLOAD_CACHE } = require('../lib/storageCacheControl');
-const { buildTrackedUrl } = require('../lib/affiliateUrl');
-
-/** Anon, sin sesión: lecturas/escrituras que RLS permite al rol anon (p. ej. listados públicos, INSERT de clics). */
-const supabasePublic = getAnonClient();
-
-/** Service role: bypass RLS. Necesario para el panel admin de tiendas (ver todos los perfiles, notas internas, etc.). */
-const supabaseService = getServiceClient();
-
-/**
- * Cliente Supabase con el JWT del usuario que llama a la API.
- * Sin esto, las políticas RLS con auth.uid() no ven al usuario y ocultan filas
- * (p. ej. perfil de tienda pendiente de aprobación).
- */
-function supabaseForUser(req) {
-  return createUserScopedClient(req.headers.authorization);
-}
-
-/** Operaciones de vendedor: preferir service role si está configurado; si no, JWT del usuario. */
-function dbSeller(req) {
-  return supabaseService || supabaseForUser(req);
-}
-
-function requireAdminDb(res) {
-  if (!supabaseService) {
-    res.status(503).json({
-      error:
-        'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor. '
-        + 'Es obligatoria para listar y moderar tiendas (RLS no expone todos los perfiles al rol anon).',
-    });
-    return null;
-  }
-  return supabaseService;
-}
+const { validateShopInput, validateManualOffer, validateOfferPatch } = require('../lib/shopInput');
+const { isPublicOffer, publicOfferCutoff, nextOfferPrices } = require('../lib/shopOfferSync');
+const { createShortCode } = require('../lib/shortCode');
 
 const router = express.Router();
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 4 * 1024 * 1024 },
-});
-
-const STORE_LOGOS_BUCKET = 'catalog-images';
-const STORE_LOGOS_FOLDER = 'store-logos';
-
-// ----------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------
-
 function isUuid(id) {
   return (
-    typeof id === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+    typeof id === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
   );
 }
 
-async function uploadStoreLogoBuffer(buffer, mimetype, storageClient) {
-  const client = storageClient || supabaseService || supabasePublic;
-  const processed = await processVehicleImageBuffer(buffer, mimetype);
-  const filePath = `${STORE_LOGOS_FOLDER}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${processed.ext}`;
-  const { error: storageError } = await client.storage
-    .from(STORE_LOGOS_BUCKET)
-    .upload(filePath, processed.buffer, {
-      contentType: processed.contentType,
-      upsert: false,
-      ...STORAGE_UPLOAD_CACHE,
+function requireAdminDb(res) {
+  const db = getServiceClient();
+  if (!db) {
+    res.status(503).json({
+      error: 'SUPABASE_SERVICE_ROLE_KEY no está configurada en el servidor.',
     });
-  if (storageError) throw new Error(storageError.message);
-  const { data: publicUrlData } = client.storage
-    .from(STORE_LOGOS_BUCKET)
-    .getPublicUrl(filePath);
-  return publicUrlData.publicUrl;
+    return null;
+  }
+  return db;
 }
-
-function storeLogoPathFromUrl(publicUrl) {
-  if (!publicUrl || typeof publicUrl !== 'string') return null;
-  const marker = `/${STORE_LOGOS_BUCKET}/`;
-  const idx = publicUrl.indexOf(marker);
-  if (idx === -1) return null;
-  let path = publicUrl.slice(idx + marker.length);
-  const q = path.indexOf('?');
-  if (q !== -1) path = path.slice(0, q);
-  return path || null;
-}
-
-async function removeStoreLogo(publicUrl, storageClient) {
-  const client = storageClient || supabaseService || supabasePublic;
-  const storagePath = storeLogoPathFromUrl(publicUrl);
-  if (!storagePath) return;
-  await client.storage.from(STORE_LOGOS_BUCKET).remove([storagePath]);
-}
-
-/** Verifica que el usuario autenticado tiene un perfil de vendedor aprobado. */
-async function sellerGuard(req, res, next) {
-  const { data: profile, error } = await dbSeller(req)
-    .from('seller_profiles')
-    .select('approved')
-    .eq('user_id', req.user.id)
-    .maybeSingle();
-
-  if (error) return res.status(500).json({ error: error.message });
-  if (!profile || !profile.approved) {
-    return res.status(403).json({ error: 'Acceso restringido a vendedores aprobados' });
-  }
-  next();
-}
-
-// ----------------------------------------------------------------
-// Rutas públicas (sin autenticación requerida)
-// ----------------------------------------------------------------
-
-/**
- * GET /catalog/:catalogItemId
- * Devuelve los listados activos de un ítem del catálogo, incluyendo datos del perfil de tienda.
- */
-router.get('/catalog/:catalogItemId', async (req, res) => {
-  try {
-    const { catalogItemId } = req.params;
-    if (!isUuid(catalogItemId)) {
-      return res.status(400).json({ error: 'ID de ítem inválido' });
-    }
-
-    const { data: listings, error } = await supabasePublic
-      .from('store_listings')
-      .select('id, user_id, title, url, price, currency, notes, condition, created_at')
-      .eq('catalog_item_id', catalogItemId)
-      .eq('active', true)
-      .order('created_at', { ascending: true });
-
-    if (error) return res.status(500).json({ error: error.message });
-
-    if (!listings || listings.length === 0) {
-      return res.json([]);
-    }
-
-    // Enriquecer con datos del perfil de tienda (nombre y logo)
-    const userIds = [...new Set(listings.map((l) => l.user_id).filter(Boolean))];
-    let profilesByUserId = new Map();
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabasePublic
-        .from('seller_profiles')
-        .select('user_id, store_name, logo_url')
-        .in('user_id', userIds)
-        .eq('approved', true);
-      profilesByUserId = new Map((profiles || []).map((p) => [p.user_id, p]));
-    }
-
-    const result = listings.map((l) => {
-      const profile = profilesByUserId.get(l.user_id);
-      return {
-        id: l.id,
-        title: l.title,
-        url: l.url,
-        price: l.price,
-        currency: l.currency,
-        notes: l.notes,
-        condition: l.condition ?? null,
-        created_at: l.created_at,
-        store_name: profile?.store_name ?? null,
-        store_logo_url: profile?.logo_url ?? null,
-      };
-    });
-
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * GET /go/:id
- * Registra el clic con tracking enriquecido y redirige 302 a la URL destino con UTM/afiliado.
- * Si el listado no existe o está inactivo, redirige a la home del catálogo.
- */
-router.get('/go/:id', async (req, res) => {
-  const frontendBase = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const fallbackUrl  = `${frontendBase}/catalogo`;
-
-  try {
-    const { id } = req.params;
-    if (!isUuid(id)) return res.redirect(302, fallbackUrl);
-
-    // Obtener listado + perfil de vendedor en paralelo
-    const { data: listing, error: lErr } = await supabasePublic
-      .from('store_listings')
-      .select('id, catalog_item_id, user_id, url, active, custom_utm_campaign')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (lErr || !listing || !listing.active) {
-      return res.redirect(302, fallbackUrl);
-    }
-
-    const { data: seller } = await supabasePublic
-      .from('seller_profiles')
-      .select('user_id, default_utm_source, default_utm_medium, affiliate_param_template')
-      .eq('user_id', listing.user_id)
-      .maybeSingle();
-
-    const trackedUrl = buildTrackedUrl(listing, seller);
-
-    // Registrar clic con datos enriquecidos (fire-and-forget, no bloquea redirect)
-    const rawIp   = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
-    const salt    = process.env.IP_HASH_SALT || 'slotdb-salt';
-    const ipHash  = rawIp
-      ? crypto.createHash('sha256').update(rawIp + salt).digest('hex')
-      : null;
-
-    // Obtener user_id del token si existe (opcional)
-    let userId = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token) {
-        try {
-          const { data: { user } } = await supabasePublic.auth.getUser(token);
-          userId = user?.id ?? null;
-        } catch { /* ignorar */ }
-      }
-    }
-
-    supabasePublic.from('store_listing_clicks').insert([{
-      listing_id:  id,
-      user_id:     userId,
-      session_id:  req.query?.session_id ? String(req.query.session_id).slice(0, 128) : null,
-      referer:     req.headers.referer ? String(req.headers.referer).slice(0, 512) : null,
-      user_agent:  req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 512) : null,
-      ip_hash:     ipHash,
-      redirected:  true,
-    }]).then(({ error }) => {
-      if (error) console.warn('[store-listings/go] click insert error:', error.message);
-    });
-
-    return res.redirect(302, trackedUrl);
-  } catch (e) {
-    console.error('[store-listings/go] error:', e.message);
-    return res.redirect(302, fallbackUrl);
-  }
-});
-
-/**
- * POST /:id/click
- * Registra un clic en un listado. body: { session_id? }
- */
-router.post('/:id/click', async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!isUuid(id)) return res.status(400).json({ error: 'ID inválido' });
-
-    // Obtener user_id del token si viene (no es obligatorio)
-    let userId = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token) {
-        const { data: { user } } = await supabasePublic.auth.getUser(token);
-        userId = user?.id ?? null;
-      }
-    }
-
-    const { data: listing, error: lErr } = await supabasePublic
-      .from('store_listings')
-      .select('id')
-      .eq('id', id)
-      .eq('active', true)
-      .maybeSingle();
-
-    if (lErr) return res.status(500).json({ error: lErr.message });
-    if (!listing) return res.status(404).json({ error: 'Listado no encontrado' });
-
-    const { error } = await supabasePublic.from('store_listing_clicks').insert([
-      {
-        listing_id: id,
-        user_id: userId,
-        session_id: req.body?.session_id ? String(req.body.session_id).slice(0, 128) : null,
-      },
-    ]);
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ----------------------------------------------------------------
-// Rutas de perfil de tienda (auth requerida, no necesita ser aprobado)
-// ----------------------------------------------------------------
-
-/**
- * GET /my/profile — obtener el perfil propio (o null si no existe).
- * Devuelve rejection_reason pero NUNCA admin_notes.
- */
-router.get('/my/profile', authMiddleware, async (req, res) => {
-  try {
-    const { data: profile, error } = await dbSeller(req)
-      .from('seller_profiles')
-      .select('user_id, store_name, store_description, store_url, logo_url, approved, rejection_reason, default_utm_source, default_utm_medium, affiliate_param_template, created_at, updated_at')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(profile ?? null);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * POST /my/profile — solicitar alta como vendedor (crea el perfil con approved=false)
- * body: { store_name, store_description?, store_url? }
- */
-router.post('/my/profile', authMiddleware, async (req, res) => {
-  try {
-    const store_name = String(req.body?.store_name ?? '').trim();
-    if (!store_name) {
-      return res.status(400).json({ error: 'store_name es obligatorio' });
-    }
-
-    const { data: existing } = await dbSeller(req)
-      .from('seller_profiles')
-      .select('user_id')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
-
-    if (existing) {
-      return res.status(409).json({ error: 'Ya tienes un perfil de tienda. Usa PUT /my/profile para actualizarlo.' });
-    }
-
-    const { data, error } = await dbSeller(req)
-      .from('seller_profiles')
-      .insert([
-        {
-          user_id: req.user.id,
-          store_name,
-          store_description: String(req.body?.store_description ?? '').trim() || null,
-          store_url: String(req.body?.store_url ?? '').trim() || null,
-          approved: false,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.status(201).json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * PUT /my/profile — actualizar perfil de tienda (solo el propietario)
- * body: { store_name?, store_description?, store_url?, default_utm_source?, default_utm_medium?, affiliate_param_template? }
- */
-router.put('/my/profile', authMiddleware, sellerGuard, async (req, res) => {
-  try {
-    const updates = {};
-    if (req.body?.store_name !== undefined) {
-      const s = String(req.body.store_name).trim();
-      if (!s) return res.status(400).json({ error: 'store_name no puede estar vacío' });
-      updates.store_name = s;
-    }
-    if (req.body?.store_description !== undefined) {
-      updates.store_description = String(req.body.store_description).trim() || null;
-    }
-    if (req.body?.store_url !== undefined) {
-      updates.store_url = String(req.body.store_url).trim() || null;
-    }
-    if (req.body?.default_utm_source !== undefined) {
-      updates.default_utm_source = String(req.body.default_utm_source).trim() || 'slotdb';
-    }
-    if (req.body?.default_utm_medium !== undefined) {
-      updates.default_utm_medium = String(req.body.default_utm_medium).trim() || 'catalog';
-    }
-    if (req.body?.affiliate_param_template !== undefined) {
-      updates.affiliate_param_template = String(req.body.affiliate_param_template).trim() || null;
-    }
-    updates.updated_at = new Date().toISOString();
-
-    const { data, error } = await dbSeller(req)
-      .from('seller_profiles')
-      .update(updates)
-      .eq('user_id', req.user.id)
-      .select()
-      .single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * POST /my/profile/logo — subir/reemplazar logo de la tienda
- * multipart: logo (imagen)
- */
-router.post(
-  '/my/profile/logo',
-  authMiddleware,
-  sellerGuard,
-  upload.single('logo'),
-  async (req, res) => {
-    try {
-      const file = req.file;
-      if (!file) return res.status(400).json({ error: 'Archivo de logo requerido (field: logo)' });
-
-      const db = dbSeller(req);
-
-      const { data: existing } = await db
-        .from('seller_profiles')
-        .select('logo_url')
-        .eq('user_id', req.user.id)
-        .maybeSingle();
-
-      let logo_url;
-      try {
-        logo_url = await uploadStoreLogoBuffer(file.buffer, file.mimetype, db);
-      } catch (e) {
-        return res.status(400).json({ error: e.message || 'No se pudo procesar el logo' });
-      }
-
-      // Borrar logo anterior si existía
-      if (existing?.logo_url) {
-        await removeStoreLogo(existing.logo_url, db);
-      }
-
-      const { data, error } = await db
-        .from('seller_profiles')
-        .update({ logo_url, updated_at: new Date().toISOString() })
-        .eq('user_id', req.user.id)
-        .select()
-        .single();
-
-      if (error) return res.status(500).json({ error: error.message });
-      res.json(data);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  },
-);
-
-// ----------------------------------------------------------------
-// Rutas de listados (auth + vendedor aprobado)
-// ----------------------------------------------------------------
-
-/**
- * GET /my — mis listados con total de clics por listado
- */
-router.get('/my', authMiddleware, sellerGuard, async (req, res) => {
-  try {
-    const db = dbSeller(req);
-    const { data: listings, error } = await db
-      .from('store_listings')
-      .select('id, catalog_item_id, title, url, price, currency, notes, active, created_at, updated_at')
-      .eq('user_id', req.user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) return res.status(500).json({ error: error.message });
-    if (!listings || listings.length === 0) return res.json([]);
-
-    // Contar clics para cada listado del vendedor
-    const listingIds = listings.map((l) => l.id);
-    const { data: clicks, error: cErr } = await db
-      .from('store_listing_clicks')
-      .select('listing_id')
-      .in('listing_id', listingIds);
-
-    if (cErr) return res.status(500).json({ error: cErr.message });
-
-    const clickCountById = {};
-    for (const c of clicks || []) {
-      clickCountById[c.listing_id] = (clickCountById[c.listing_id] || 0) + 1;
-    }
-
-    // Enriquecer con nombre del ítem del catálogo
-    const itemIds = [...new Set(listings.map((l) => l.catalog_item_id).filter(Boolean))];
-    let itemsById = new Map();
-    if (itemIds.length > 0) {
-      const { data: items } = await supabasePublic
-        .from('slot_catalog_items_with_ratings')
-        .select('id, reference, manufacturer, model_name')
-        .in('id', itemIds);
-      itemsById = new Map((items || []).map((it) => [it.id, it]));
-    }
-
-    const result = listings.map((l) => ({
-      ...l,
-      click_count: clickCountById[l.id] || 0,
-      catalog_item: itemsById.get(l.catalog_item_id) ?? null,
-    }));
-
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * POST / — crear listado
- * body: { catalog_item_id, title, url, price?, currency?, notes?, active? }
- */
-router.post('/', authMiddleware, sellerGuard, async (req, res) => {
-  try {
-    const db = dbSeller(req);
-    const catalog_item_id = String(req.body?.catalog_item_id ?? '').trim();
-    const title = String(req.body?.title ?? '').trim();
-    const url = String(req.body?.url ?? '').trim();
-
-    if (!catalog_item_id || !isUuid(catalog_item_id)) {
-      return res.status(400).json({ error: 'catalog_item_id es obligatorio y debe ser un UUID válido' });
-    }
-    if (!title) return res.status(400).json({ error: 'title es obligatorio' });
-    if (!url) return res.status(400).json({ error: 'url es obligatorio' });
-
-    // Verificar que el ítem existe
-    const { data: item, error: iErr } = await supabasePublic
-      .from('slot_catalog_items')
-      .select('id')
-      .eq('id', catalog_item_id)
-      .maybeSingle();
-    if (iErr) return res.status(500).json({ error: iErr.message });
-    if (!item) return res.status(404).json({ error: 'Ítem del catálogo no encontrado' });
-
-    const priceRaw = req.body?.price;
-    const price = priceRaw != null && priceRaw !== '' ? parseFloat(String(priceRaw)) : null;
-    const currency = String(req.body?.currency ?? 'EUR').trim().toUpperCase() || 'EUR';
-    const notes = String(req.body?.notes ?? '').trim() || null;
-    const active = req.body?.active !== undefined ? Boolean(req.body.active) : true;
-    const custom_utm_campaign = String(req.body?.custom_utm_campaign ?? '').trim() || null;
-    const conditionRaw = String(req.body?.condition ?? '').trim() || null;
-    const condition = ['new', 'used', 'preorder'].includes(conditionRaw) ? conditionRaw : null;
-
-    const { data, error } = await db
-      .from('store_listings')
-      .insert([
-        {
-          catalog_item_id,
-          user_id: req.user.id,
-          title,
-          url,
-          price: Number.isFinite(price) ? price : null,
-          currency,
-          notes,
-          active,
-          custom_utm_campaign,
-          condition,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.status(201).json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * PUT /:id — editar listado propio
- */
-router.put('/:id', authMiddleware, sellerGuard, async (req, res) => {
-  try {
-    const db = dbSeller(req);
-    const { id } = req.params;
-    if (!isUuid(id)) return res.status(400).json({ error: 'ID inválido' });
-
-    const { data: existing, error: eErr } = await db
-      .from('store_listings')
-      .select('id, user_id')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (eErr) return res.status(500).json({ error: eErr.message });
-    if (!existing) return res.status(404).json({ error: 'Listado no encontrado' });
-    if (existing.user_id !== req.user.id) return res.status(403).json({ error: 'No autorizado' });
-
-    const updates = { updated_at: new Date().toISOString() };
-    if (req.body?.title !== undefined) {
-      const t = String(req.body.title).trim();
-      if (!t) return res.status(400).json({ error: 'title no puede estar vacío' });
-      updates.title = t;
-    }
-    if (req.body?.url !== undefined) {
-      const u = String(req.body.url).trim();
-      if (!u) return res.status(400).json({ error: 'url no puede estar vacío' });
-      updates.url = u;
-    }
-    if (req.body?.price !== undefined) {
-      const p = req.body.price != null && req.body.price !== '' ? parseFloat(String(req.body.price)) : null;
-      updates.price = Number.isFinite(p) ? p : null;
-    }
-    if (req.body?.currency !== undefined) {
-      updates.currency = String(req.body.currency).trim().toUpperCase() || 'EUR';
-    }
-    if (req.body?.notes !== undefined) {
-      updates.notes = String(req.body.notes).trim() || null;
-    }
-    if (req.body?.active !== undefined) {
-      updates.active = Boolean(req.body.active);
-    }
-    if (req.body?.custom_utm_campaign !== undefined) {
-      updates.custom_utm_campaign = String(req.body.custom_utm_campaign).trim() || null;
-    }
-    if (req.body?.condition !== undefined) {
-      const c = String(req.body.condition ?? '').trim() || null;
-      updates.condition = ['new', 'used', 'preorder'].includes(c) ? c : null;
-    }
-
-    const { data, error } = await db
-      .from('store_listings')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * DELETE /:id — borrar listado propio
- */
-router.delete('/:id', authMiddleware, sellerGuard, async (req, res) => {
-  try {
-    const db = dbSeller(req);
-    const { id } = req.params;
-    if (!isUuid(id)) return res.status(400).json({ error: 'ID inválido' });
-
-    const { data: existing, error: eErr } = await db
-      .from('store_listings')
-      .select('id, user_id')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (eErr) return res.status(500).json({ error: eErr.message });
-    if (!existing) return res.status(404).json({ error: 'Listado no encontrado' });
-    if (existing.user_id !== req.user.id) return res.status(403).json({ error: 'No autorizado' });
-
-    const { error } = await db.from('store_listings').delete().eq('id', id);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ----------------------------------------------------------------
-// Rutas de administrador
-// ----------------------------------------------------------------
 
 function adminGuard(req, res, next) {
   if (!assertLicenseAdmin(req, res)) return;
   next();
 }
 
-/**
- * POST /admin/sellers — el admin crea una tienda directamente (ya aprobada) para un usuario
- * body: { email, store_name, store_description?, store_url? }
- * Busca al usuario por email usando la service role key y crea su perfil aprobado.
- */
-router.post('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
+function shopFromEmbed(row) {
+  const shop = Array.isArray(row?.catalog_shops) ? row.catalog_shops[0] : row?.catalog_shops;
+  return shop || null;
+}
+
+function toPublicOffer(row) {
+  const shop = shopFromEmbed(row);
+  const price = row.price == null ? null : Number(row.price);
+  const previous = row.previous_price == null ? null : Number(row.previous_price);
+  return {
+    id: row.id,
+    short_code: row.short_code,
+    price: row.price,
+    previous_price: previous != null && price != null && previous > price ? row.previous_price : null,
+    currency: row.currency,
+    shop_name: shop?.name ?? null,
+    country_code: shop?.country_code ?? null,
+    logo_url: shop?.logo_url ?? null,
+  };
+}
+
+router.get('/catalog/:catalogItemId', async (req, res) => {
   try {
-    const email = String(req.body?.email ?? '').trim().toLowerCase();
-    const store_name = String(req.body?.store_name ?? '').trim();
-
-    if (!email) return res.status(400).json({ error: 'email es obligatorio' });
-    if (!store_name) return res.status(400).json({ error: 'store_name es obligatorio' });
-
-    // Necesita la service role key para buscar usuarios por email
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceKey) {
-      return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada' });
+    const { catalogItemId } = req.params;
+    if (!isUuid(catalogItemId)) {
+      return res.status(400).json({ error: 'ID de ítem inválido' });
     }
-    const adminClient = getServiceClient();
-    if (!adminClient) {
-      return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada' });
-    }
+    const db = requireAdminDb(res);
+    if (!db) return;
 
-    const { data: userList, error: userErr } = await adminClient.auth.admin.listUsers();
-    if (userErr) return res.status(500).json({ error: userErr.message });
+    const { data, error } = await db
+      .from('catalog_shop_offers')
+      .select('id, price, previous_price, currency, short_code, in_stock, last_checked_at, catalog_shops!inner(name, country_code, logo_url, active)')
+      .eq('catalog_item_id', catalogItemId)
+      .eq('in_stock', true)
+      .gte('last_checked_at', publicOfferCutoff())
+      .eq('catalog_shops.active', true);
 
-    const targetUser = (userList?.users ?? []).find(
-      (u) => u.email?.toLowerCase() === email,
-    );
-    if (!targetUser) {
-      return res.status(404).json({ error: `No se encontró ningún usuario con el email: ${email}` });
-    }
+    if (error) return res.status(500).json({ error: error.message });
 
-    const { data: existing } = await adminClient
-      .from('seller_profiles')
-      .select('user_id')
-      .eq('user_id', targetUser.id)
-      .maybeSingle();
+    const now = new Date();
+    const offers = (data || [])
+      .filter((row) => isPublicOffer(row, shopFromEmbed(row), now))
+      .map(toPublicOffer);
+    res.json(offers);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
-    if (existing) {
-      return res.status(409).json({
-        error: 'Este usuario ya tiene un perfil de tienda. Usa el botón de aprobar/revocar para cambiar su estado.',
-      });
-    }
+router.get('/admin/shops', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const { data, error } = await db
+      .from('catalog_shops')
+      .select('id, name, country_code, logo_url, site_url, adapter_key, currency, active, created_at, updated_at')
+      .order('country_code', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ shops: data ?? [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
-    const { data, error } = await adminClient
-      .from('seller_profiles')
-      .insert([
-        {
-          user_id: targetUser.id,
-          store_name,
-          store_description: String(req.body?.store_description ?? '').trim() || null,
-          store_url: String(req.body?.store_url ?? '').trim() || null,
-          approved: true,
-        },
-      ])
+router.post('/admin/shops', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const parsed = validateShopInput(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.errors[0], errors: parsed.errors });
+
+    const now = new Date().toISOString();
+    const { data, error } = await db
+      .from('catalog_shops')
+      .insert({ ...parsed.value, created_at: now, updated_at: now })
       .select()
       .single();
-
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
   } catch (e) {
@@ -759,256 +136,454 @@ router.post('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
   }
 });
 
-/**
- * GET /admin/sellers — todos los perfiles de vendedor (incluye rejection_reason y admin_notes)
- */
-router.get('/admin/sellers', authMiddleware, adminGuard, async (req, res) => {
+router.put('/admin/shops/:id', authMiddleware, adminGuard, async (req, res) => {
   try {
-    const adminDb = requireAdminDb(res);
-    if (!adminDb) return;
+    const db = requireAdminDb(res);
+    if (!db) return;
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'ID inválido' });
+    const parsed = validateShopInput(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.errors[0], errors: parsed.errors });
 
-    const { data, error } = await adminDb
-      .from('seller_profiles')
-      .select('user_id, store_name, store_description, store_url, logo_url, approved, rejection_reason, admin_notes, reviewed_at, reviewed_by, created_at, updated_at')
-      .order('created_at', { ascending: false });
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ sellers: data ?? [] });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * POST /admin/sellers/:userId/approve — aprobar o rechazar un vendedor
- * body: { approved: true|false, rejection_reason?: string, admin_notes?: string }
- */
-router.post('/admin/sellers/:userId/approve', authMiddleware, adminGuard, async (req, res) => {
-  try {
-    const adminDb = requireAdminDb(res);
-    if (!adminDb) return;
-
-    const { userId } = req.params;
-    if (!isUuid(userId)) return res.status(400).json({ error: 'userId inválido' });
-
-    const approved = Boolean(req.body?.approved);
-
-    const { data: existing, error: eErr } = await adminDb
-      .from('seller_profiles')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (eErr) return res.status(500).json({ error: eErr.message });
-    if (!existing) return res.status(404).json({ error: 'Perfil de vendedor no encontrado' });
-
-    const updates = {
-      approved,
-      updated_at:  new Date().toISOString(),
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: req.user.id,
-    };
-
-    if (req.body?.rejection_reason !== undefined) {
-      updates.rejection_reason = approved
-        ? null
-        : (String(req.body.rejection_reason ?? '').trim() || null);
-    }
-    if (req.body?.admin_notes !== undefined) {
-      updates.admin_notes = String(req.body.admin_notes ?? '').trim() || null;
-    }
-
-    const { data, error } = await adminDb
-      .from('seller_profiles')
-      .update(updates)
-      .eq('user_id', userId)
+    const { data, error } = await db
+      .from('catalog_shops')
+      .update({ ...parsed.value, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
       .select()
-      .single();
-
+      .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Tienda no encontrada' });
     res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-/**
- * GET /admin/all — todos los listados (con info del ítem)
- */
-router.get('/admin/all', authMiddleware, adminGuard, async (req, res) => {
+function offerAdminRow(row) {
+  const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+  return {
+    id: row.id,
+    catalog_item_id: row.catalog_item_id,
+    reference: item?.reference ?? null,
+    model_name: item?.model_name ?? null,
+    manufacturer: row.manufacturer ?? item?.manufacturer ?? null,
+    price: row.price,
+    previous_price: row.previous_price,
+    currency: row.currency,
+    in_stock: row.in_stock,
+    product_url: row.product_url,
+    short_code: row.short_code,
+    updated_at: row.updated_at,
+  };
+}
+
+async function brandNameMap(db, ids) {
+  const unique = [...new Set((ids || []).filter(Boolean))];
+  const brands = new Map();
+  if (unique.length === 0) return brands;
+  const { data, error } = await db.from('slot_catalog_brands').select('id, name').in('id', unique);
+  if (error) throw new Error(error.message);
+  for (const brand of data || []) brands.set(brand.id, brand.name);
+  return brands;
+}
+
+function sameReference(left, right) {
+  return String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase();
+}
+
+async function findCatalogMatches(db, reference) {
+  const needle = String(reference || '').trim();
+  if (needle.length < 2 || needle.length > 80) return [];
+
+  const { data: items, error } = await db
+    .from('slot_catalog_items')
+    .select('id, reference, model_name, discontinued, manufacturer_id')
+    .ilike('reference', needle)
+    .eq('discontinued', false)
+    .limit(20);
+  if (error) throw new Error(error.message);
+
+  const { data: aliasRows, error: aliasError } = await db
+    .from('slot_catalog_item_aliases')
+    .select('alias_reference, slot_catalog_items!inner(id, reference, model_name, discontinued, manufacturer_id)')
+    .ilike('alias_reference', needle)
+    .limit(20);
+  if (aliasError) throw new Error(aliasError.message);
+
+  const byId = new Map();
+  for (const item of items || []) {
+    if (!sameReference(item.reference, needle) || item.discontinued) continue;
+    byId.set(item.id, {
+      id: item.id,
+      reference: item.reference,
+      model_name: item.model_name,
+      manufacturer_id: item.manufacturer_id,
+      matched_via: 'reference',
+      alias_reference: null,
+    });
+  }
+  for (const row of aliasRows || []) {
+    if (!sameReference(row.alias_reference, needle)) continue;
+    const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+    if (!item || item.discontinued || byId.has(item.id)) continue;
+    byId.set(item.id, {
+      id: item.id,
+      reference: item.reference,
+      model_name: item.model_name,
+      manufacturer_id: item.manufacturer_id,
+      matched_via: 'alias',
+      alias_reference: row.alias_reference,
+    });
+  }
+
+  const brands = await brandNameMap(db, [...byId.values()].map((row) => row.manufacturer_id));
+  return [...byId.values()].map((row) => ({
+    id: row.id,
+    reference: row.reference,
+    model_name: row.model_name,
+    manufacturer: brands.get(row.manufacturer_id) || null,
+    matched_via: row.matched_via,
+    alias_reference: row.alias_reference,
+  }));
+}
+
+router.get('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
   try {
-    const adminDb = requireAdminDb(res);
-    if (!adminDb) return;
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const shopId = String(req.query.shop_id || '').trim();
+    if (!isUuid(shopId)) return res.status(400).json({ error: 'shop_id no es un UUID válido' });
+    const stock = String(req.query.stock || 'all');
+    if (!['all', 'in', 'out'].includes(stock)) {
+      return res.status(400).json({ error: 'stock debe ser all, in o out' });
+    }
 
-    const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '50'), 10) || 50));
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+    let query = db
+      .from('catalog_shop_offers')
+      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at, slot_catalog_items!inner(reference, model_name, discontinued, manufacturer_id)')
+      .eq('shop_id', shopId)
+      .eq('slot_catalog_items.discontinued', false)
+      .order('in_stock', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .limit(40);
+    if (stock === 'in') query = query.eq('in_stock', true);
+    if (stock === 'out') query = query.eq('in_stock', false);
 
-    const { data, error, count } = await adminDb
-      .from('store_listings')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-
-    // Enriquecer con nombre de tienda
-    const userIds = [...new Set((data || []).map((l) => l.user_id).filter(Boolean))];
-    let profilesById = new Map();
-    if (userIds.length > 0) {
-      const { data: profiles } = await adminDb
-        .from('seller_profiles')
-        .select('user_id, store_name')
-        .in('user_id', userIds);
-      profilesById = new Map((profiles || []).map((p) => [p.user_id, p]));
-    }
-
-    // Enriquecer con nombre del ítem
-    const itemIds = [...new Set((data || []).map((l) => l.catalog_item_id).filter(Boolean))];
-    let itemsById = new Map();
-    if (itemIds.length > 0) {
-      const { data: items } = await supabasePublic
-        .from('slot_catalog_items_with_ratings')
-        .select('id, reference, manufacturer, model_name')
-        .in('id', itemIds);
-      itemsById = new Map((items || []).map((it) => [it.id, it]));
-    }
-
-    const result = (data || []).map((l) => ({
-      ...l,
-      store_name: profilesById.get(l.user_id)?.store_name ?? null,
-      catalog_item: itemsById.get(l.catalog_item_id) ?? null,
+    const brands = await brandNameMap(db, (data || []).map((row) => {
+      const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+      return item?.manufacturer_id;
     }));
-
     res.json({
-      listings: result,
-      total: count ?? 0,
-      page,
-      limit,
-      totalPages: count != null ? Math.ceil(count / limit) : 0,
+      offers: (data || []).map((row) => {
+        const item = Array.isArray(row.slot_catalog_items) ? row.slot_catalog_items[0] : row.slot_catalog_items;
+        return offerAdminRow({
+          ...row,
+          manufacturer: brands.get(item?.manufacturer_id) || null,
+        });
+      }),
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-/**
- * GET /admin/clicks — clics agrupados por listado (últimos N días o todos)
- * query: days=30 (por defecto), catalog_item_id (opcional)
- */
-router.get('/admin/clicks', authMiddleware, adminGuard, async (req, res) => {
+router.post('/admin/offers', authMiddleware, adminGuard, async (req, res) => {
   try {
-    const adminDb = requireAdminDb(res);
-    if (!adminDb) return;
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const parsed = validateManualOffer(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.errors[0], errors: parsed.errors });
 
-    const days = parseInt(String(req.query.days || '30'), 10) || 30;
-    const catalogItemId = String(req.query.catalog_item_id || '').trim();
+    const { data: shop, error: shopError } = await db
+      .from('catalog_shops')
+      .select('id, currency')
+      .eq('id', parsed.value.shop_id)
+      .maybeSingle();
+    if (shopError) return res.status(500).json({ error: shopError.message });
+    if (!shop) return res.status(404).json({ error: 'Tienda no encontrada' });
 
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-
-    let q = adminDb
-      .from('store_listing_clicks')
-      .select('listing_id, clicked_at')
-      .gte('clicked_at', since);
-
-    const { data: clicks, error: cErr } = await q;
-    if (cErr) return res.status(500).json({ error: cErr.message });
-
-    // Agrupar por listing_id
-    const countById = {};
-    for (const c of clicks || []) {
-      countById[c.listing_id] = (countById[c.listing_id] || 0) + 1;
+    let item;
+    if (parsed.value.catalog_item_id) {
+      const { data, error: itemError } = await db
+        .from('slot_catalog_items')
+        .select('id, reference, model_name, discontinued, manufacturer_id')
+        .eq('id', parsed.value.catalog_item_id)
+        .maybeSingle();
+      if (itemError) return res.status(500).json({ error: itemError.message });
+      if (!data) return res.status(404).json({ error: 'La referencia no está en el catálogo' });
+      item = data;
+    } else {
+      let matches;
+      try {
+        matches = await findCatalogMatches(db, parsed.value.reference);
+      } catch (matchError) {
+        return res.status(500).json({ error: matchError.message });
+      }
+      if (matches.length === 0) {
+        return res.status(404).json({ error: 'La referencia no está en el catálogo' });
+      }
+      if (matches.length > 1) {
+        return res.status(409).json({
+          error: 'Hay varias fichas con esa referencia. Elige la marca.',
+          matches,
+        });
+      }
+      item = {
+        id: matches[0].id,
+        reference: matches[0].reference,
+        model_name: matches[0].model_name,
+        manufacturer: matches[0].manufacturer,
+        discontinued: false,
+      };
+    }
+    if (item.discontinued) {
+      return res.status(400).json({ error: 'Esta referencia está descatalogada' });
+    }
+    if (!item.manufacturer && item.manufacturer_id) {
+      const brands = await brandNameMap(db, [item.manufacturer_id]);
+      item = { ...item, manufacturer: brands.get(item.manufacturer_id) || null };
     }
 
-    // Recuperar listados correspondientes
-    const listingIds = Object.keys(countById);
-    if (listingIds.length === 0) return res.json({ stats: [] });
+    const { data: existing, error: existingError } = await db
+      .from('catalog_shop_offers')
+      .select('id, price, previous_price, short_code')
+      .eq('shop_id', shop.id)
+      .eq('catalog_item_id', item.id)
+      .maybeSingle();
+    if (existingError) return res.status(500).json({ error: existingError.message });
 
-    let lq = adminDb
-      .from('store_listings')
-      .select('id, catalog_item_id, user_id, title, url, active')
-      .in('id', listingIds);
+    const now = new Date().toISOString();
+    const prices = nextOfferPrices({
+      price: parsed.value.price != null ? parsed.value.price : existing?.price,
+      existingPrice: existing?.price,
+      existingPrevious: existing?.previous_price,
+    });
+    const patch = {
+      product_url: parsed.value.product_url,
+      price: prices.price,
+      previous_price: prices.previous_price,
+      currency: shop.currency || 'EUR',
+      in_stock: parsed.value.in_stock,
+      last_checked_at: now,
+      last_attempt_at: now,
+      last_check_error: null,
+      updated_at: now,
+    };
 
-    if (catalogItemId && isUuid(catalogItemId)) {
-      lq = lq.eq('catalog_item_id', catalogItemId);
+    let saved;
+    if (existing) {
+      const { data, error } = await db
+        .from('catalog_shop_offers')
+        .update(patch)
+        .eq('id', existing.id)
+        .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      saved = data;
+    } else {
+      let lastError = null;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const { data, error } = await db
+          .from('catalog_shop_offers')
+          .insert({
+            shop_id: shop.id,
+            catalog_item_id: item.id,
+            ...patch,
+            short_code: createShortCode(),
+          })
+          .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at')
+          .single();
+        if (!error) {
+          saved = data;
+          break;
+        }
+        lastError = error;
+        const msg = `${error.message || ''} ${error.details || ''}`;
+        if (!(error.code === '23505' && /short_code/i.test(msg))) {
+          return res.status(500).json({ error: error.message });
+        }
+      }
+      if (!saved) return res.status(500).json({ error: lastError?.message || 'No se pudo guardar la oferta' });
     }
 
-    const { data: listings, error: lErr } = await lq;
-    if (lErr) return res.status(500).json({ error: lErr.message });
-
-    // Enriquecer con nombre de tienda e ítem
-    const userIds = [...new Set((listings || []).map((l) => l.user_id).filter(Boolean))];
-    const itemIds = [...new Set((listings || []).map((l) => l.catalog_item_id).filter(Boolean))];
-
-    const [profilesRes, itemsRes] = await Promise.all([
-      userIds.length > 0
-        ? adminDb.from('seller_profiles').select('user_id, store_name').in('user_id', userIds)
-        : Promise.resolve({ data: [] }),
-      itemIds.length > 0
-        ? supabasePublic
-            .from('slot_catalog_items_with_ratings')
-            .select('id, reference, manufacturer, model_name')
-            .in('id', itemIds)
-        : Promise.resolve({ data: [] }),
-    ]);
-
-    const profilesById = new Map((profilesRes.data || []).map((p) => [p.user_id, p]));
-    const itemsById = new Map((itemsRes.data || []).map((it) => [it.id, it]));
-
-    const stats = (listings || []).map((l) => ({
-      listing_id: l.id,
-      title: l.title,
-      url: l.url,
-      active: l.active,
-      click_count: countById[l.id] || 0,
-      store_name: profilesById.get(l.user_id)?.store_name ?? null,
-      catalog_item: itemsById.get(l.catalog_item_id) ?? null,
+    res.status(existing ? 200 : 201).json(offerAdminRow({
+      ...saved,
+      manufacturer: item.manufacturer || null,
+      slot_catalog_items: item,
     }));
-
-    stats.sort((a, b) => b.click_count - a.click_count);
-
-    res.json({ stats, days, since });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// ----------------------------------------------------------------
-// Rutas de políticas públicas
-// ----------------------------------------------------------------
+router.get('/admin/catalog-matches', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const matches = await findCatalogMatches(db, req.query.reference);
+    res.json({ matches });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
-/**
- * GET /public/policies/:slug — obtener texto legal por slug (sin auth)
- */
+router.patch('/admin/offers/:id', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'id no es un UUID válido' });
+    const parsed = validateOfferPatch(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.errors[0], errors: parsed.errors });
+
+    const { data: existing, error: existingError } = await db
+      .from('catalog_shop_offers')
+      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at, slot_catalog_items!inner(reference, model_name, discontinued, manufacturer_id)')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (existingError) return res.status(500).json({ error: existingError.message });
+    if (!existing) return res.status(404).json({ error: 'Oferta no encontrada' });
+
+    const now = new Date().toISOString();
+    const patch = {
+      last_checked_at: now,
+      last_attempt_at: now,
+      last_check_error: null,
+      updated_at: now,
+    };
+    if (Object.prototype.hasOwnProperty.call(parsed.value, 'in_stock')) {
+      patch.in_stock = parsed.value.in_stock;
+    }
+    if (Object.prototype.hasOwnProperty.call(parsed.value, 'price')) {
+      const prices = nextOfferPrices({
+        price: parsed.value.price,
+        existingPrice: existing.price,
+        existingPrevious: existing.previous_price,
+      });
+      patch.price = prices.price;
+      patch.previous_price = prices.previous_price;
+    }
+
+    const { data: saved, error } = await db
+      .from('catalog_shop_offers')
+      .update(patch)
+      .eq('id', existing.id)
+      .select('id, catalog_item_id, price, previous_price, currency, in_stock, product_url, short_code, updated_at')
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const item = Array.isArray(existing.slot_catalog_items)
+      ? existing.slot_catalog_items[0]
+      : existing.slot_catalog_items;
+    const brands = await brandNameMap(db, [item?.manufacturer_id]);
+    res.json(offerAdminRow({
+      ...saved,
+      manufacturer: brands.get(item?.manufacturer_id) || null,
+      slot_catalog_items: item,
+    }));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/admin/clicks', authMiddleware, adminGuard, async (req, res) => {
+  try {
+    const db = requireAdminDb(res);
+    if (!db) return;
+
+    const days = parseInt(String(req.query.days || '30'), 10) || 30;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: clicks, error: clickError } = await db
+      .from('catalog_shop_offer_clicks')
+      .select('offer_id, clicked_at')
+      .gte('clicked_at', since);
+    if (clickError) return res.status(500).json({ error: clickError.message });
+
+    const countByOffer = {};
+    for (const click of clicks || []) {
+      countByOffer[click.offer_id] = (countByOffer[click.offer_id] || 0) + 1;
+    }
+    const offerIds = Object.keys(countByOffer);
+    if (offerIds.length === 0) return res.json({ stats: [], shops: [], days, since });
+
+    const { data: offers, error: offerError } = await db
+      .from('catalog_shop_offers')
+      .select('id, shop_id, catalog_item_id, product_url, short_code, in_stock, catalog_shops(id, name, country_code)')
+      .in('id', offerIds);
+    if (offerError) return res.status(500).json({ error: offerError.message });
+
+    const itemIds = [...new Set((offers || []).map((row) => row.catalog_item_id).filter(Boolean))];
+    let itemsById = new Map();
+    if (itemIds.length > 0) {
+      const { data: items, error: itemError } = await db
+        .from('slot_catalog_items')
+        .select('id, reference, model_name')
+        .in('id', itemIds);
+      if (itemError) return res.status(500).json({ error: itemError.message });
+      itemsById = new Map((items || []).map((item) => [item.id, item]));
+    }
+
+    const shopTotals = new Map();
+    const stats = (offers || []).map((row) => {
+      const shop = shopFromEmbed(row);
+      const clickCount = countByOffer[row.id] || 0;
+      if (shop?.id) {
+        const prev = shopTotals.get(shop.id) || {
+          shop_id: shop.id,
+          shop_name: shop.name,
+          country_code: shop.country_code,
+          click_count: 0,
+        };
+        prev.click_count += clickCount;
+        shopTotals.set(shop.id, prev);
+      }
+      return {
+        offer_id: row.id,
+        short_code: row.short_code,
+        product_url: row.product_url,
+        in_stock: row.in_stock,
+        click_count: clickCount,
+        shop_id: shop?.id ?? row.shop_id,
+        shop_name: shop?.name ?? null,
+        country_code: shop?.country_code ?? null,
+        catalog_item: itemsById.get(row.catalog_item_id) ?? null,
+      };
+    });
+    stats.sort((a, b) => b.click_count - a.click_count);
+    const shops = [...shopTotals.values()].sort((a, b) => b.click_count - a.click_count);
+
+    res.json({ stats, shops, days, since });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.get('/public/policies/:slug', async (req, res) => {
   try {
+    const db = getAnonClient();
     const slug = String(req.params.slug || '').trim();
     if (!slug) return res.status(400).json({ error: 'slug requerido' });
 
-    const { data, error } = await supabasePublic
+    const { data, error } = await db
       .from('site_policies')
       .select('slug, title, content_md, updated_at')
       .eq('slug', slug)
       .maybeSingle();
 
     if (error) return res.status(500).json({ error: error.message });
-    if (!data)  return res.status(404).json({ error: 'Política no encontrada' });
+    if (!data) return res.status(404).json({ error: 'Política no encontrada' });
     res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-/**
- * GET /admin/policies — listar todas las políticas (solo admin)
- */
 router.get('/admin/policies', authMiddleware, adminGuard, async (req, res) => {
   try {
-    const adminDb = requireAdminDb(res);
-    if (!adminDb) return;
-
-    const { data, error } = await adminDb
+    const db = requireAdminDb(res);
+    if (!db) return;
+    const { data, error } = await db
       .from('site_policies')
       .select('slug, title, content_md, updated_at')
       .order('slug');
@@ -1019,28 +594,22 @@ router.get('/admin/policies', authMiddleware, adminGuard, async (req, res) => {
   }
 });
 
-/**
- * PUT /admin/policies/:slug — crear o actualizar una política (solo admin)
- * body: { title?, content_md? }
- */
 router.put('/admin/policies/:slug', authMiddleware, adminGuard, async (req, res) => {
   try {
-    const adminDb = requireAdminDb(res);
-    if (!adminDb) return;
-
+    const db = requireAdminDb(res);
+    if (!db) return;
     const slug = String(req.params.slug || '').trim();
     if (!slug) return res.status(400).json({ error: 'slug requerido' });
 
     const updates = { slug, updated_at: new Date().toISOString() };
-    if (req.body?.title !== undefined)      updates.title      = String(req.body.title      ?? '').trim();
+    if (req.body?.title !== undefined) updates.title = String(req.body.title ?? '').trim();
     if (req.body?.content_md !== undefined) updates.content_md = String(req.body.content_md ?? '').trim();
 
-    const { data, error } = await adminDb
+    const { data, error } = await db
       .from('site_policies')
       .upsert(updates, { onConflict: 'slug' })
       .select()
       .single();
-
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
   } catch (e) {

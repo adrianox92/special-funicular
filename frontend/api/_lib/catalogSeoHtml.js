@@ -11,9 +11,11 @@ const {
   buildCatalogItemMetaDescription,
   buildCatalogItemImageAlt,
   buildItemJsonLd: buildItemJsonLdShared,
+  imageContentTypeFromUrl,
   homePathForLocale,
 } = require('../../src/utils/catalogSeoCopy');
 const { cachedStorageImageUrl } = require('../../src/utils/cachedStorageImageUrl');
+const { catalogPlaceholderUrl } = require('../../src/constants/catalogPlaceholder');
 
 function copyFor(locale) {
   return copyChrome(locale);
@@ -76,8 +78,8 @@ function renderItemBody({ item, locale, origin, slug, neighbors }) {
   const nextSlug = next ? catalogSlugify(next.model_name || next.reference) : '';
 
   const img = imageUrl
-    ? `<p><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(alt)}" width="640" height="480" /></p>`
-    : `<p>${escapeHtml(t.imageFallback)}</p>`;
+    ? `<p><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(alt)}" fetchpriority="high" /></p>`
+    : `<p><img src="${escapeHtml(catalogPlaceholderUrl(origin))}" alt="${escapeHtml(t.imageFallback)}" width="1024" height="614" /></p>`;
 
   const prevLink = prev
     ? `<a href="${escapeHtml(catalogItemPath(locale, prev.id, prevSlug))}">${escapeHtml(t.prev)}: ${escapeHtml(prev.model_name || prev.reference || prev.id)}</a>`
@@ -206,6 +208,7 @@ function buildHeadTags({
   hreflangs,
   imageUrl,
   imageAlt,
+  imageIsPhoto,
   jsonLd,
   robots,
 }) {
@@ -229,6 +232,13 @@ function buildHeadTags({
   if (imageUrl) {
     parts.push(`<meta property="og:image" content="${escapeHtml(imageUrl)}" />`);
     if (imageAlt) parts.push(`<meta property="og:image:alt" content="${escapeHtml(imageAlt)}" />`);
+    if (imageIsPhoto) {
+      const imageType = imageContentTypeFromUrl(imageUrl);
+      if (imageType) {
+        parts.push(`<meta property="og:image:type" content="${escapeHtml(imageType)}" />`);
+      }
+      parts.push(`<link rel="preload" as="image" href="${escapeHtml(imageUrl)}" />`);
+    }
   }
   parts.push(`<meta name="twitter:card" content="${imageUrl ? 'summary_large_image' : 'summary'}" />`);
   parts.push(`<meta name="twitter:title" content="${escapeHtml(title)}" />`);

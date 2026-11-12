@@ -3,6 +3,9 @@
 export const PARTNER_API_PRODUCTION_ORIGIN = 'https://api.slotdatabase.es';
 export const PARTNER_API_LOCAL_ORIGIN = 'http://localhost:5001';
 
+/** URL que el usuario pega en Claude o ChatGPT. La web hace de proxy. */
+export const MCP_CONNECTOR_URL = 'https://www.slotdatabase.es/mcp';
+
 export const PARTNER_SWAGGER_PATH = '/api/docs';
 export const PARTNER_OPENAPI_PATH = '/api/docs/openapi.yaml';
 

@@ -10,7 +10,9 @@
     "propose": "Propose listing",
     "login": "Log in",
     "register": "Create account",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "menu": "Menu",
+    "openMenu": "Open menu"
   },
   "list": {
     "heading": "Reference catalog",

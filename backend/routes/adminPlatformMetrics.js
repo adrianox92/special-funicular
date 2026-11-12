@@ -21,6 +21,10 @@ function parseIsoDate(s) {
   return new Date(t);
 }
 
+function asMetricArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function isUuid(s) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     String(s || '').trim(),
@@ -129,9 +133,11 @@ router.get('/platform-metrics', async (req, res) => {
       users_active: payload.users_active ?? 0,
       competitions_created: payload.competitions_created ?? 0,
       vehicles_in_period: payload.vehicles_in_period ?? 0,
-      vehicles_by_user: Array.isArray(payload.vehicles_by_user)
-        ? payload.vehicles_by_user
-        : [],
+      vehicles_by_user: asMetricArray(payload.vehicles_by_user),
+      catalog_brands_period: asMetricArray(payload.catalog_brands_period),
+      catalog_brands_all: asMetricArray(payload.catalog_brands_all),
+      catalog_refs_period: asMetricArray(payload.catalog_refs_period),
+      catalog_refs_all: asMetricArray(payload.catalog_refs_all),
     });
   } catch (err) {
     console.error('adminPlatformMetrics:', err);
@@ -205,6 +211,10 @@ router.get('/vehicle-refs-not-in-catalog', async (req, res) => {
       limit: typeof payload.limit === 'number' ? payload.limit : parsed.limit,
       offset: typeof payload.offset === 'number' ? payload.offset : parsed.offset,
       only_unlinked: !!payload.only_unlinked,
+      only_in_catalog:
+        typeof payload.only_in_catalog === 'boolean'
+          ? payload.only_in_catalog
+          : !!parsed.only_in_catalog,
       q: typeof payload.q === 'string' ? payload.q : parsed.q || null,
       manufacturer:
         typeof payload.manufacturer === 'string'
@@ -355,6 +365,22 @@ router.post('/link-garage-refs-to-catalog', async (req, res) => {
   } catch (err) {
     console.error('link-garage-refs-to-catalog:', err);
     res.status(500).json({ error: err?.message || 'Error interno' });
+  }
+});
+
+router.get('/mcp-catalog-usage', async (req, res) => {
+  if (!assertLicenseAdmin(req, res)) return;
+  const supabaseAdmin = getServiceClient();
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada' });
+  }
+  try {
+    const { summarizeCatalogUsage } = require('../lib/mcpCatalogUsage');
+    const summary = await summarizeCatalogUsage(supabaseAdmin);
+    res.json(summary);
+  } catch (err) {
+    console.error('mcp-catalog-usage:', err);
+    res.status(err.statusCode || 500).json({ error: err.message || 'Error al leer el uso del catálogo' });
   }
 });
 

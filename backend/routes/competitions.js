@@ -59,6 +59,8 @@ const {
   REGULATION_MAX_BYTES,
 } = require('../lib/competitionRegulationUpload');
 const { logDbError } = require('../lib/logDbError');
+const { resolvePublicVehicleCardImage } = require('../lib/publicVehicleCardImage');
+const { fetchCatalogImageUrlsByIds } = require('../lib/fetchCatalogImageUrls');
 
 /** Cliente que usa service role si existe (omite RLS; el API valida permisos). Igual que clubs/sync. */
 const supabase = getServiceOrAnonClient();
@@ -240,7 +242,8 @@ router.get('/vehicles', async (req, res) => {
         model,
         manufacturer,
         type,
-        traction
+        traction,
+        catalog_item_id
       `)
       .eq('user_id', garageUserId)
       .order('model', { ascending: true });
@@ -250,28 +253,36 @@ router.get('/vehicles', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    // Obtener la imagen principal de cada vehículo (si existe)
-    const vehicleIds = vehicles.map(v => v.id);
-    let imagesMap = {};
+    const vehicleIds = (vehicles || []).map((v) => v.id);
+    const imagesByVehicle = new Map();
     if (vehicleIds.length > 0) {
       const { data: images, error: imgError } = await supabase
         .from('vehicle_images')
-        .select('vehicle_id, image_url')
+        .select('vehicle_id, image_url, view_type')
         .in('vehicle_id', vehicleIds);
       if (!imgError && images) {
-        images.forEach(img => {
-          if (!imagesMap[img.vehicle_id]) {
-            imagesMap[img.vehicle_id] = img.image_url;
-          }
-        });
+        for (const img of images) {
+          if (!imagesByVehicle.has(img.vehicle_id)) imagesByVehicle.set(img.vehicle_id, []);
+          imagesByVehicle.get(img.vehicle_id).push(img);
+        }
       }
     }
 
-    // Añadir la imagen principal al resultado
-    const result = vehicles.map(v => ({
-      ...v,
-      image: imagesMap[v.id] || null
-    }));
+    const { map: catalogImageById } = await fetchCatalogImageUrlsByIds(
+      supabase,
+      (vehicles || []).map((v) => v.catalog_item_id),
+    );
+
+    const result = (vehicles || []).map((v) => {
+      const { catalog_item_id, ...rest } = v;
+      return {
+        ...rest,
+        image: resolvePublicVehicleCardImage({
+          vehicleImages: imagesByVehicle.get(v.id) || [],
+          catalogImageUrl: catalogImageById.get(catalog_item_id) || null,
+        }),
+      };
+    });
 
     res.json(result);
   } catch (error) {

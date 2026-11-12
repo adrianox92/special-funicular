@@ -81,6 +81,9 @@ describe('AdminPlatformDashboard — retención timings 30d', () => {
       if (url === '/admin/vehicle-refs-not-in-catalog') {
         return Promise.resolve({ data: { total: 0, rows: [] } });
       }
+      if (url === '/admin/mcp-catalog-usage') {
+        return Promise.resolve({ data: { ready: true, lookups_24h: 0, users: [], recent: [] } });
+      }
       return Promise.reject(new Error(`unexpected url: ${url}`));
     });
   });

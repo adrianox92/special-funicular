@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { LayoutDashboard, RefreshCw, Search, Users, UserCheck, Car, Trophy, Timer } from 'lucide-react';
 import api from '../lib/axios';
 import { cn } from '../lib/utils';
@@ -149,6 +149,132 @@ function formatEsPercent(value) {
   return `${n.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 }
 
+const MCP_CATALOG_OUTCOME = {
+  found: 'Encontrada',
+  not_found: 'No encontrada',
+  ambiguous: 'Ambigua',
+  rate_limited: 'Límite por minuto',
+  daily_limited: 'Límite diario',
+};
+
+function mcpCatalogOutcomeLabel(outcome) {
+  return MCP_CATALOG_OUTCOME[outcome] || outcome || '—';
+}
+
+function catalogTopRows(data, historic, periodKey, allKey) {
+  const rows = historic ? data?.[allKey] : data?.[periodKey];
+  return Array.isArray(rows) ? rows : [];
+}
+
+function formatCatalogDelta(count, historic) {
+  const n = Number(count) || 0;
+  return historic ? String(n) : `+${n}`;
+}
+
+function CatalogAssignmentTops({ data, historic, onHistoricChange }) {
+  const brands = catalogTopRows(data, historic, 'catalog_brands_period', 'catalog_brands_all');
+  const refs = catalogTopRows(data, historic, 'catalog_refs_period', 'catalog_refs_all');
+  const emptyLabel = historic
+    ? 'Sin vehículos enlazados al catálogo.'
+    : 'Sin asignaciones en este periodo.';
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {historic
+            ? 'Total histórico de vehículos con enlace a catálogo, sin filtro de fechas.'
+            : 'Variación del periodo: vehículos creados en el intervalo de arriba que ya tienen ficha de catálogo.'}
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Variación del periodo</span>
+          <Switch
+            id="catalog-tops-historic"
+            checked={historic}
+            onCheckedChange={(v) => onHistoricChange(!!v)}
+          />
+          <Label htmlFor="catalog-tops-historic" className="text-sm font-normal cursor-pointer">
+            Total histórico
+          </Label>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="space-y-1 pb-3">
+            <CardTitle className="text-base">Marcas en el catálogo</CardTitle>
+            <CardDescription>
+              Top 10 por vehículos asignados. Entre paréntesis, usuarios distintos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {brands.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Marca</TableHead>
+                      <TableHead className="text-right w-[140px]">Vehículos</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {brands.map((row) => (
+                      <TableRow key={row.brand_name}>
+                        <TableCell>{row.brand_name}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCatalogDelta(row.vehicle_count, historic)} ({Number(row.user_count) || 0})
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="space-y-1 pb-3">
+            <CardTitle className="text-base">Referencias en el catálogo</CardTitle>
+            <CardDescription>Top 10 por usuarios que tienen ese coche.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {refs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead className="text-right w-[120px]">Usuarios</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {refs.map((row) => (
+                      <TableRow key={`${row.brand_name}:${row.reference}`}>
+                        <TableCell>
+                          <span className="font-mono">{row.reference}</span>
+                          <span className="block text-xs text-muted-foreground truncate">
+                            {[row.model_name, row.brand_name].filter(Boolean).join(' · ')}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCatalogDelta(row.user_count, historic)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 const AdminPlatformDashboard = () => {
   const { user } = useAuth();
   const isAdmin = isLicenseAdminUser(user);
@@ -174,8 +300,14 @@ const AdminPlatformDashboard = () => {
   const [retentionLoading, setRetentionLoading] = useState(false);
   const [retentionError, setRetentionError] = useState(null);
 
+  const [mcpUsage, setMcpUsage] = useState(null);
+  const [mcpUsageLoading, setMcpUsageLoading] = useState(false);
+  const [mcpUsageError, setMcpUsageError] = useState(null);
+  const [catalogTopsHistoric, setCatalogTopsHistoric] = useState(false);
+
   const [refsPage, setRefsPage] = useState(1);
   const [refsOnlyUnlinked, setRefsOnlyUnlinked] = useState(false);
+  const [refsOnlyInCatalog, setRefsOnlyInCatalog] = useState(false);
   const [refsSearchInput, setRefsSearchInput] = useState(() =>
     readAdminRefsQueryFromSearch(typeof window !== 'undefined' ? window.location.search : ''),
   );
@@ -246,6 +378,21 @@ const AdminPlatformDashboard = () => {
     }
   }, []);
 
+  const fetchMcpUsage = useCallback(async () => {
+    setMcpUsageLoading(true);
+    setMcpUsageError(null);
+    try {
+      const { data: res } = await api.get('/admin/mcp-catalog-usage');
+      setMcpUsage(res);
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al cargar el uso del MCP';
+      setMcpUsageError(msg);
+      setMcpUsage(null);
+    } finally {
+      setMcpUsageLoading(false);
+    }
+  }, []);
+
   const fetchRefsReport = useCallback(async () => {
     if (!isAdmin) return;
     setRefsLoading(true);
@@ -257,6 +404,7 @@ const AdminPlatformDashboard = () => {
           limit: REFS_PAGE_SIZE,
           offset,
           only_unlinked: refsOnlyUnlinked ? 'true' : 'false',
+          ...(refsOnlyInCatalog ? { only_in_catalog: 'true' } : {}),
           ...(refsQuery ? { q: refsQuery } : {}),
           ...(refsManufacturer ? { manufacturer: refsManufacturer } : {}),
         },
@@ -270,7 +418,7 @@ const AdminPlatformDashboard = () => {
     } finally {
       setRefsLoading(false);
     }
-  }, [isAdmin, refsPage, refsOnlyUnlinked, refsQuery, refsManufacturer]);
+  }, [isAdmin, refsPage, refsOnlyUnlinked, refsOnlyInCatalog, refsQuery, refsManufacturer]);
 
   const applyRefsSearch = ({ q = refsSearchInput, manufacturer = refsManufacturerInput } = {}) => {
     const nextQ = clipRefsFilter(q);
@@ -421,12 +569,16 @@ const AdminPlatformDashboard = () => {
   }, [isAdmin, fetchRetention]);
 
   useEffect(() => {
+    if (isAdmin) void fetchMcpUsage();
+  }, [isAdmin, fetchMcpUsage]);
+
+  useEffect(() => {
     if (isAdmin) void fetchRefsReport();
   }, [isAdmin, fetchRefsReport]);
 
   useEffect(() => {
     setRefsPage(1);
-  }, [refsOnlyUnlinked]);
+  }, [refsOnlyUnlinked, refsOnlyInCatalog]);
 
   useEffect(() => {
     if (!refsData || refsLoading) return;
@@ -485,6 +637,12 @@ const AdminPlatformDashboard = () => {
           <p className="text-sm text-muted-foreground mt-1">
             Solo administradores. Intervalo semiabierto [inicio, fin): el fin es exclusivo.
           </p>
+          <p className="text-sm mt-2">
+            <Link to="/admin/slot-intelligence" className="font-medium underline underline-offset-4">
+              Slot Database Intelligence
+            </Link>
+            <span className="text-muted-foreground"> — popularidad del catálogo y precios, sobre el histórico enlazado.</span>
+          </p>
         </div>
         <Button
           type="button"
@@ -493,10 +651,11 @@ const AdminPlatformDashboard = () => {
           onClick={() => {
             void fetchMetrics();
             void fetchRetention();
+            void fetchMcpUsage();
           }}
-          disabled={loading || retentionLoading || !range}
+          disabled={loading || retentionLoading || mcpUsageLoading || !range}
         >
-          <RefreshCw className={loading || retentionLoading ? 'size-4 animate-spin' : 'size-4'} />
+          <RefreshCw className={loading || retentionLoading || mcpUsageLoading ? 'size-4 animate-spin' : 'size-4'} />
           Actualizar
         </Button>
       </div>
@@ -589,6 +748,76 @@ const AdminPlatformDashboard = () => {
                 {formatEsPercent(retention.goal?.baseline_2026_09_15_pct)} (15/09/2026). Objetivo ≥{' '}
                 {retention.goal?.target_min_pct ?? 8}–{retention.goal?.target_max_pct ?? 10} %.
               </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Consultas MCP al catálogo</CardTitle>
+          <CardDescription>
+            Últimas 24 horas. Cada ficha pedida por un asistente queda registrada con la cuenta, la
+            referencia y la marca. Máximo 10 por minuto y 100 al día.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {mcpUsageError && (
+            <Alert variant="destructive">
+              <AlertDescription>{mcpUsageError}</AlertDescription>
+            </Alert>
+          )}
+          {mcpUsageLoading && !mcpUsage && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner className="size-4" />
+              Cargando consultas…
+            </div>
+          )}
+          {mcpUsage && !mcpUsage.ready && (
+            <p className="text-sm text-muted-foreground">
+              Falta la tabla de registro. Ejecuta{' '}
+              <span className="font-mono">backend/scripts/create-mcp-catalog-usage.sql</span> en
+              Supabase.
+            </p>
+          )}
+          {mcpUsage?.ready && (
+            <>
+              <p className="text-sm">
+                <span className="text-2xl font-semibold tabular-nums">{mcpUsage.lookups_24h ?? 0}</span>
+                <span className="ml-2 text-muted-foreground">consultas en 24 h</span>
+              </p>
+              {(mcpUsage.users || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nadie ha consultado el catálogo en las últimas 24 horas.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cuenta</TableHead>
+                      <TableHead className="text-right">Consultas</TableHead>
+                      <TableHead className="text-right">Referencias</TableHead>
+                      <TableHead>Última</TableHead>
+                      <TableHead>Resultado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mcpUsage.users.map((row) => (
+                      <TableRow key={row.user_id}>
+                        <TableCell className="max-w-[16rem] truncate">
+                          {row.email || row.user_id}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{row.lookups}</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.distinct_refs}</TableCell>
+                        <TableCell className="max-w-[14rem] truncate">
+                          {row.last_reference} · {row.last_manufacturer}
+                        </TableCell>
+                        <TableCell>{mcpCatalogOutcomeLabel(row.last_outcome)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </>
           )}
         </CardContent>
@@ -695,17 +924,33 @@ const AdminPlatformDashboard = () => {
       </div>
 
       {data && !loading && (
-        <VehicleCatalogCoverageChart
-          vehiclesTotal={data.vehicles_total ?? 0}
-          withCatalogItemId={data.vehicles_with_catalog_item_id ?? 0}
-        />
+        <>
+          <VehicleCatalogCoverageChart
+            vehiclesTotal={data.vehicles_total ?? 0}
+            withCatalogItemId={data.vehicles_with_catalog_item_id ?? 0}
+          />
+          <CatalogAssignmentTops
+            data={data}
+            historic={catalogTopsHistoric}
+            onHistoricChange={setCatalogTopsHistoric}
+          />
+        </>
       )}
 
       <Card>
         <CardHeader className="space-y-1">
           <CardTitle className="text-base">Referencias de garaje ausentes del catálogo</CardTitle>
           <CardDescription>
-            {refsQuery ? (
+            {refsOnlyInCatalog ? (
+              <>
+                Solo grupos cuya referencia ya existe en el catálogo (canónica o alias) y que aún tienen
+                vehículos sin enlazar. Así puedes localizarlos y usar Enlazar sin buscar uno a uno.
+                {refsQuery ? ' La búsqueda acota la referencia.' : null}
+                {refsManufacturer
+                  ? ' El fabricante filtra el texto de garaje y agrupa por marca.'
+                  : null}
+              </>
+            ) : refsQuery ? (
               <>
                 Búsqueda: contains sobre la referencia de garaje normalizada (espacios y
                 mayúsculas/minúsculas). Incluye grupos que ya existen en el catálogo para poder enlazar
@@ -727,8 +972,9 @@ const AdminPlatformDashboard = () => {
             ) : (
               <>
                 Agrupadas por referencia normalizada (espacios y mayúsculas/minúsculas). Si algún ítem del
-                catálogo público comparte la misma referencia normalizada, no aparece aquí — usa la búsqueda
-                para localizarlas y enlazar. Filtra por fabricante para agrupar por marca. Ejemplares y
+                catálogo público comparte la misma referencia normalizada, no aparece aquí — activa «Solo
+                enlazables» o usa la búsqueda para localizarlas y enlazar. Filtra por fabricante para agrupar
+                por marca. Ejemplares y
                 usuarios muestran solo vehículos sin enlace a catálogo (
                 <span className="font-mono">catalog_item_id</span> vacío), alineados con la acción Enlazar. No
                 depende del periodo de fechas de arriba.
@@ -788,7 +1034,8 @@ const AdminPlatformDashboard = () => {
               Deep-link:{' '}
               <span className="font-mono">/admin/dashboard?ref=FOO&amp;manufacturer=Ninco</span>. Sin
               referencia se muestra el ranking de huecos; con referencia también salen refs ya presentes en el
-              catálogo. El fabricante es opcional y se combina con la referencia.
+              catálogo. «Solo enlazables» lista directamente las que ya tienen ficha. El fabricante es
+              opcional y se combina con la referencia.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
@@ -800,6 +1047,16 @@ const AdminPlatformDashboard = () => {
                 <Label htmlFor="refs-only-unlinked" className="text-sm font-normal cursor-pointer">
                   Sólo vehículos sin enlace a catálogo (<span className="font-mono">catalog_item_id</span>{' '}
                   vacío)
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="refs-only-in-catalog"
+                  checked={refsOnlyInCatalog}
+                  onCheckedChange={(v) => setRefsOnlyInCatalog(!!v)}
+                />
+                <Label htmlFor="refs-only-in-catalog" className="text-sm font-normal cursor-pointer">
+                  Solo enlazables (la referencia ya existe en el catálogo)
                 </Label>
               </div>
               <Button
@@ -835,10 +1092,12 @@ const AdminPlatformDashboard = () => {
             <>
               <p className="text-sm text-muted-foreground">
                 {refsData.total === 0
-                  ? refsQuery || refsManufacturer
-                    ? 'Ningún grupo de garaje coincide con esos filtros.'
-                    : 'Ningún grupo cumple los criterios.'
-                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables${refsQuery ? '; exactos primero' : ''}${refsManufacturer ? '; agrupados por marca' : ''}).`}
+                  ? refsOnlyInCatalog
+                    ? 'Ningún grupo de garaje coincide con una ficha del catálogo pendiente de enlace.'
+                    : refsQuery || refsManufacturer
+                      ? 'Ningún grupo de garaje coincide con esos filtros.'
+                      : 'Ningún grupo cumple los criterios.'
+                  : `Mostrando ${refsData.rows?.length ?? 0} grupo(s) de ${refsData.total} (ordenados por nº de ejemplares enlazables${refsOnlyInCatalog ? '; solo enlazables' : ''}${refsQuery ? '; exactos primero' : ''}${refsManufacturer ? '; agrupados por marca' : ''}).`}
               </p>
               {refsData.total > 0 && (
                 <div className="rounded-md border">
@@ -847,7 +1106,9 @@ const AdminPlatformDashboard = () => {
                       <TableRow>
                         <TableHead className="text-right w-[110px]">Ejemplares</TableHead>
                         <TableHead>Referencia</TableHead>
-                        {refsQuery ? <TableHead className="w-[140px]">Catálogo</TableHead> : null}
+                        {refsQuery || refsOnlyInCatalog ? (
+                          <TableHead className="w-[140px]">Catálogo</TableHead>
+                        ) : null}
                         <TableHead className="text-right w-[100px]">Usuarios</TableHead>
                         <TableHead>Fabricante (ej.)</TableHead>
                         <TableHead>Modelo (ej.)</TableHead>
@@ -876,7 +1137,7 @@ const AdminPlatformDashboard = () => {
                             )}
                           </TableCell>
                           <TableCell className="font-mono text-sm">{row.reference || '—'}</TableCell>
-                          {refsQuery ? (
+                          {refsQuery || refsOnlyInCatalog ? (
                             <TableCell>
                               {row.in_catalog ? (
                                 <Badge variant="secondary">

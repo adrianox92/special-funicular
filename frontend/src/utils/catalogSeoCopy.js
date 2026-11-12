@@ -278,6 +278,22 @@ function similarCatalogEntries(item, origin, locale) {
   return entries.length >= 2 ? entries : [];
 }
 
+/**
+ * Content-Type de una URL de imagen a partir de la extensión.
+ * Vacío si no se reconoce: no se declara og:image:type a ciegas.
+ * @param {unknown} url
+ * @returns {string}
+ */
+function imageContentTypeFromUrl(url) {
+  const path = String(url || '').split('?')[0].split('#')[0].toLowerCase();
+  if (path.endsWith('.webp')) return 'image/webp';
+  if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
+  if (path.endsWith('.png')) return 'image/png';
+  if (path.endsWith('.gif')) return 'image/gif';
+  if (path.endsWith('.avif')) return 'image/avif';
+  return '';
+}
+
 function toIsoDateModified(iso) {
   if (iso == null || iso === '') return '';
   try {
@@ -352,8 +368,14 @@ function buildItemJsonLd({
   if (item.vehicle_type) {
     product.category = labelCatalogValue(packFor(locale), 'vehicleTypes', item.vehicle_type);
   }
+  let imageObject = null;
   if (imageUrl) {
-    product.image = [imageUrl];
+    imageObject = {
+      '@type': 'ImageObject',
+      url: imageUrl,
+      caption: buildCatalogItemImageAlt(item, locale),
+    };
+    product.image = imageObject;
   }
   if (modifiedIso) {
     product.dateModified = modifiedIso;
@@ -372,6 +394,13 @@ function buildItemJsonLd({
 
   const similarEntries = similarCatalogEntries(item, origin, locale);
   const graph = [breadcrumb, product];
+  if (imageObject) {
+    graph.push({
+      '@type': 'WebPage',
+      url: canonicalUrl,
+      primaryImageOfPage: imageObject,
+    });
+  }
   if (similarEntries.length >= 2) {
     product.isSimilarTo = similarEntries.map((entry) => entry.url);
     graph.push({
@@ -407,6 +436,7 @@ module.exports = {
   buildCatalogItemKeywords,
   buildPublicCatalogListMeta,
   buildItemJsonLd,
+  imageContentTypeFromUrl,
   homePathForLocale,
   toIsoDateModified,
 };

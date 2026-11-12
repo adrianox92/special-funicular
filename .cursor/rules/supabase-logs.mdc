@@ -1,0 +1,14 @@
+---
+description: Límites al consultar logs de Supabase para no gastar el cupo de Logs Query
+alwaysApply: true
+---
+
+# Logs de Supabase
+
+El plan gratuito incluye 1 GB de ingest y 100 GB de Logs Query. Cada lectura vuelve a escanear el intervalo; no hay caché.
+
+- No consultes logs de Supabase salvo que la pregunta no se pueda responder con el código o con SQL de Postgres.
+- La ventana máxima es 15 minutos. Amplíala solo si en esa ventana no está el dato, y nunca pases de 24 horas.
+- Filtra en la consulta (`source` y ruta o código). Un `select` sin filtro escanea todo el intervalo.
+- Una consulta y se acaba. No refresques, no hagas polling y no repitas la misma consulta.
+- No compruebes un cambio leyendo logs. Usa tests o una petición a la API.

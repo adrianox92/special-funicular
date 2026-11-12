@@ -100,7 +100,7 @@ function sitemapHandler(req, res) {
       const pageTo = Math.min(pageFrom + PAGE_SIZE - 1, to);
       const { data, error } = await supabase
         .from('slot_catalog_items_with_ratings')
-        .select('id, model_name, reference, updated_at')
+        .select('id, model_name, reference, manufacturer, image_url, updated_at')
         .order('id', { ascending: true })
         .range(pageFrom, pageTo);
 

@@ -7,6 +7,7 @@
  */
 
 const { catalogSlugify } = require('./catalogSlug');
+const { cachedStorageImageUrl } = require('../../frontend/src/utils/cachedStorageImageUrl');
 
 const LOCALES = [
   { code: 'es', home: '/', catalog: '/catalogo' },
@@ -83,7 +84,7 @@ function hreflangAlternates(origin, paths) {
 function renderUrlset(urls) {
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' +
     urls
       .map((u) => {
         const lm = u.lastmod ? `\n    <lastmod>${escapeXml(u.lastmod)}</lastmod>` : '';
@@ -94,11 +95,33 @@ function renderUrlset(urls) {
                 `\n    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" href="${escapeXml(a.href)}" />`,
             )
             .join('') || '';
-        return `  <url>\n    <loc>${escapeXml(u.loc)}</loc>${lm}${alt}\n  </url>`;
+        const image =
+          u.image && u.image.loc
+            ? `\n    <image:image>\n      <image:loc>${escapeXml(u.image.loc)}</image:loc>${
+                u.image.title ? `\n      <image:title>${escapeXml(u.image.title)}</image:title>` : ''
+              }\n    </image:image>`
+            : '';
+        return `  <url>\n    <loc>${escapeXml(u.loc)}</loc>${lm}${alt}${image}\n  </url>`;
       })
       .join('\n') +
     '\n</urlset>'
   );
+}
+
+/**
+ * Foto de ficha para el sitemap de imágenes. Vacío si no hay image_url:
+ * no se anuncia el logo, que sería la misma imagen en miles de URLs.
+ * @param {{ image_url?: string|null, manufacturer?: string|null, reference?: string|null, model_name?: string|null }} row
+ * @param {string} origin
+ * @returns {{ loc: string, title: string }|null}
+ */
+function catalogImageForSitemap(row, origin) {
+  const loc = cachedStorageImageUrl(row && row.image_url, { origin });
+  if (!loc || !/^https?:\/\//i.test(loc)) return null;
+  const title = [row.manufacturer, row.reference, row.model_name]
+    .filter((part) => part != null && String(part).trim() !== '')
+    .join(' · ');
+  return { loc, title };
 }
 
 function catalogChunkCount(itemCount, chunkSize = CATALOG_CHUNK_SIZE) {
@@ -157,17 +180,19 @@ function buildStaticSitemapXml({ origin, brands = [] }) {
 }
 
 /**
- * @param {{ origin: string, rows: { id: string, model_name?: string, reference?: string, updated_at?: string }[] }} opts
+ * @param {{ origin: string, rows: { id: string, model_name?: string, reference?: string, manufacturer?: string, image_url?: string, updated_at?: string }[] }} opts
  */
 function buildCatalogChunkXml({ origin, rows }) {
   const urls = [];
   for (const row of rows) {
     const slug = catalogSlugify(row.model_name || row.reference);
     const paths = catalogItemPaths(row.id, slug);
+    const image = catalogImageForSitemap(row, origin);
     urls.push({
       loc: `${origin}${paths[0]}`,
       lastmod: toLastmodW3cDate(row.updated_at),
       alternates: hreflangAlternates(origin, paths),
+      ...(image ? { image } : {}),
     });
   }
   return renderUrlset(urls);
