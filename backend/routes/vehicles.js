@@ -35,6 +35,7 @@ const { applyVehicleListFilters } = require('../lib/vehicleListFilters');
 const { fetchDistinctVehicleManufacturers } = require('../lib/vehicleManufacturers');
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
+const { parseCatalogItemId, loadCatalogItemForVehicleLink } = require('../lib/parseCatalogItemId');
 const {
   CATALOG_TECH_SPEC_SELECT,
   parseVehicleTechSpecsFromBody,
@@ -1361,18 +1362,16 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
         ? updateData.manufacturer
         : existingVehicle.manufacturer;
 
+    let catalogRowForLink = null;
     if (Object.prototype.hasOwnProperty.call(req.body, 'catalog_item_id')) {
-      const rawCat = normalizeFormScalar(req.body.catalog_item_id);
-      if (rawCat != null && String(rawCat).trim() !== '') {
-        const catalog_item_id_explicit = String(rawCat).trim();
-        const { data: catOk, error: catErr } = await req.supabase
-          .from('slot_catalog_items_with_ratings')
-          .select('*')
-          .eq('id', catalog_item_id_explicit)
-          .maybeSingle();
-        if (catErr) return res.status(500).json({ error: catErr.message });
-        if (!catOk) return res.status(400).json({ error: 'catalog_item_id no existe en el catálogo' });
-        updateData.catalog_item_id = catalog_item_id_explicit;
+      const parsedCat = parseCatalogItemId(req.body.catalog_item_id);
+      if (parsedCat.error) return res.status(400).json({ error: parsedCat.error });
+      if (parsedCat.value) {
+        const loaded = await loadCatalogItemForVehicleLink(req.supabase, parsedCat.value);
+        if (loaded.error) return res.status(500).json({ error: loaded.error.message });
+        if (loaded.missing) return res.status(400).json({ error: 'catalog_item_id no existe en el catálogo' });
+        updateData.catalog_item_id = loaded.row.id;
+        catalogRowForLink = loaded.row;
       } else {
         updateData.catalog_item_id = await resolveCatalogItemIdFromGarageRef(req.supabase, mergedMfg, mergedRef);
       }
@@ -1389,13 +1388,13 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
 
     let catalogRowForSpecs = null;
     if (isNewCatalogLink) {
-      const { data: cr, error: crErr } = await req.supabase
-        .from('slot_catalog_items_with_ratings')
-        .select('*')
-        .eq('id', nextCatalogId)
-        .maybeSingle();
-      if (crErr) return res.status(500).json({ error: crErr.message });
-      catalogRowForSpecs = cr;
+      if (catalogRowForLink && catalogRowForLink.id === nextCatalogId) {
+        catalogRowForSpecs = catalogRowForLink;
+      } else {
+        const loaded = await loadCatalogItemForVehicleLink(req.supabase, nextCatalogId);
+        if (loaded.error) return res.status(500).json({ error: loaded.error.message });
+        catalogRowForSpecs = loaded.row || null;
+      }
     }
 
     const techSpecsParsed = parseVehicleTechSpecsFromBody(
@@ -1469,10 +1468,12 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
       commercial_release_year,
       commercial_release_date,
     });
-    const explicitCatalog =
-      catalog_item_id != null && catalog_item_id !== '' && String(catalog_item_id).trim() !== '';
+    const parsedCatalog = parseCatalogItemId(catalog_item_id);
+    if (parsedCatalog.error) {
+      return res.status(400).json({ error: parsedCatalog.error });
+    }
 
-    let catalog_item_id_val = explicitCatalog ? String(catalog_item_id).trim() : null;
+    let catalog_item_id_val = parsedCatalog.value;
 
     if (!catalog_item_id_val && reference && manufacturer) {
       catalog_item_id_val = await resolveCatalogItemIdFromGarageRef(
@@ -1484,15 +1485,13 @@ router.post('/', runVehicleImageUpload, async (req, res) => {
 
     let catalogRow = null;
     if (catalog_item_id_val) {
-      const { data: cr } = await req.supabase
-        .from('slot_catalog_items_with_ratings')
-        .select('*')
-        .eq('id', catalog_item_id_val)
-        .maybeSingle();
-      catalogRow = cr;
-    }
-    if (catalog_item_id_val && !catalogRow) {
-      return res.status(400).json({ error: 'catalog_item_id no existe en el catálogo' });
+      const loaded = await loadCatalogItemForVehicleLink(req.supabase, catalog_item_id_val);
+      if (loaded.error) return res.status(500).json({ error: loaded.error.message });
+      if (loaded.missing) {
+        return res.status(400).json({ error: 'catalog_item_id no existe en el catálogo' });
+      }
+      catalogRow = loaded.row;
+      catalog_item_id_val = loaded.row.id;
     }
 
     const traction_val =
