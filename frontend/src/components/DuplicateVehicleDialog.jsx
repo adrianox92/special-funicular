@@ -121,6 +121,7 @@ const DuplicateVehicleDialog = ({ vehicle, open, onOpenChange, onSuccess }) => {
       });
       appendTechSpecsToFormData(formData, techSpecFormFromRow(record));
       appendCatalogItemIdOnce(formData, vehicle.catalog_item_id, record.catalog_item_id);
+      formData.append('vehicle_save_source', 'duplicate');
 
       await api.post('/vehicles', formData);
       toast.success(t('duplicateModal.success'));

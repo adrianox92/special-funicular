@@ -273,6 +273,7 @@ export function useVehicleCore(id) {
         }
       });
       appendTechSpecsToFormData(formData, techSpecFormFromRow(vehicle));
+      formData.append('vehicle_save_source', 'edit');
 
       imageFields.forEach(({ name }) => {
         if (images[name]) {
