@@ -35,6 +35,7 @@ function createQueryBuilder(resolveValue = { data: null, error: null, count: 0 }
   const builder = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    in: jest.fn().mockReturnThis(),
     insert: jest.fn().mockReturnThis(),
     delete: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
@@ -55,6 +56,16 @@ function createQueryBuilder(resolveValue = { data: null, error: null, count: 0 }
     }
     return builder;
   });
+  return builder;
+}
+
+function createVehiclesQueryBuilder(vehicleRow) {
+  const builder = createQueryBuilder({
+    data: vehicleRow ? [vehicleRow] : [],
+    error: null,
+  });
+  builder.single.mockResolvedValue({ data: vehicleRow || null, error: null });
+  builder.maybeSingle.mockResolvedValue({ data: vehicleRow || null, error: null });
   return builder;
 }
 
@@ -92,14 +103,11 @@ describe('Inscripción con coches de colección', () => {
           return createQueryBuilder({ data: { id: CATEGORY_ID }, error: null });
         }
         if (table === 'vehicles') {
-          return createQueryBuilder({
-            data: {
-              id: VEHICLE_ID,
-              manufacturer: 'Scalextric',
-              model: 'Ferrari',
-              user_id: MEMBER_ID,
-            },
-            error: null,
+          return createVehiclesQueryBuilder({
+            id: VEHICLE_ID,
+            manufacturer: 'Scalextric',
+            model: 'Ferrari',
+            user_id: MEMBER_ID,
           });
         }
         if (table === 'competition_participants') {
@@ -201,14 +209,11 @@ describe('Inscripción con coches de colección', () => {
           return createQueryBuilder({ data: { id: CATEGORY_ID }, error: null });
         }
         if (table === 'vehicles') {
-          return createQueryBuilder({
-            data: {
-              id: OTHER_VEHICLE_ID,
-              manufacturer: 'Carrera',
-              model: 'Porsche',
-              user_id: OTHER_USER_ID,
-            },
-            error: null,
+          return createVehiclesQueryBuilder({
+            id: OTHER_VEHICLE_ID,
+            manufacturer: 'Carrera',
+            model: 'Porsche',
+            user_id: OTHER_USER_ID,
           });
         }
         if (table === 'club_members') {
