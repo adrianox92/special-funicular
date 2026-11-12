@@ -67,6 +67,9 @@ function scriptFrom(steps) {
   const queue = [...steps];
   const builders = [];
   mockSupabase.from.mockImplementation((table) => {
+    if (table === 'vehicle_save_errors') {
+      return chain({ data: null, error: null });
+    }
     const step = queue.shift();
     if (!step) throw new Error(`from(${table}) inesperado`);
     if (step.table !== table) {
@@ -191,7 +194,7 @@ describe('importación y foto de catálogo', () => {
   test('el alta manual no sube una copia de la foto del catálogo', async () => {
     mockSupabase.rpc.mockResolvedValue({ data: ITEM_ID, error: null });
     const builders = scriptFrom([
-      { table: 'slot_catalog_items_with_ratings', result: { data: { id: ITEM_ID, image_url: CATALOG_IMAGE }, error: null } },
+      { table: 'slot_catalog_items', result: { data: { id: ITEM_ID, image_url: CATALOG_IMAGE }, error: null } },
       { table: 'vehicles', result: { data: { id: VEHICLE_ID }, error: null } },
     ]);
 

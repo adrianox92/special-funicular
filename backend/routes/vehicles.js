@@ -36,6 +36,7 @@ const { fetchDistinctVehicleManufacturers } = require('../lib/vehicleManufacture
 const vehicleImport = require('../lib/vehicleImport');
 const { resolveCatalogItemIdFromGarageRef } = require('../lib/resolveVehicleCatalogItem');
 const { parseCatalogItemId, loadCatalogItemForVehicleLink } = require('../lib/parseCatalogItemId');
+const { logVehicleSaveFailures } = require('../lib/logVehicleSaveError');
 const {
   CATALOG_TECH_SPEC_SELECT,
   parseVehicleTechSpecsFromBody,
@@ -1310,7 +1311,7 @@ router.get('/:id/images', async (req, res) => {
 });
 
 // Actualizar un vehículo por ID y sus imágenes
-router.put('/:id', runVehicleImageUpload, async (req, res) => {
+router.put('/:id', runVehicleImageUpload, logVehicleSaveFailures('PUT /api/vehicles/:id'), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -1436,7 +1437,7 @@ router.put('/:id', runVehicleImageUpload, async (req, res) => {
 });
 
 // Crear un vehículo
-router.post('/', runVehicleImageUpload, async (req, res) => {
+router.post('/', runVehicleImageUpload, logVehicleSaveFailures('POST /api/vehicles'), async (req, res) => {
   try {
     const {
       model,
