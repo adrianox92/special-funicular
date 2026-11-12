@@ -25,6 +25,12 @@ import deHelp from '../../i18n/locales/de/help.json';
 import esProfile from '../../i18n/locales/es/profile.json';
 import enProfile from '../../i18n/locales/en/profile.json';
 import deProfile from '../../i18n/locales/de/profile.json';
+import esAuth from '../../i18n/locales/es/auth.json';
+import enAuth from '../../i18n/locales/en/auth.json';
+import deAuth from '../../i18n/locales/de/auth.json';
+import esVehicles from '../../i18n/locales/es/vehicles.json';
+import enVehicles from '../../i18n/locales/en/vehicles.json';
+import deVehicles from '../../i18n/locales/de/vehicles.json';
 import esCompetitions from '../../i18n/locales/es/competitions.json';
 import enCompetitions from '../../i18n/locales/en/competitions.json';
 import deCompetitions from '../../i18n/locales/de/competitions.json';
@@ -80,6 +86,8 @@ describe('i18n key parity es/en/de', () => {
   test('seller', () => expectSameKeys(esSeller, enSeller, deSeller));
   test('help', () => expectSameKeys(esHelp, enHelp, deHelp));
   test('profile', () => expectSameKeys(esProfile, enProfile, deProfile));
+  test('auth', () => expectSameKeys(esAuth, enAuth, deAuth));
+  test('vehicles', () => expectSameKeys(esVehicles, enVehicles, deVehicles));
   test('competitions manage', () => {
     expectSameKeys(esCompetitions.manage, enCompetitions.manage, deCompetitions.manage);
   });
