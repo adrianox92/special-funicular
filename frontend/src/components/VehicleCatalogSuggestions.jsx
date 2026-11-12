@@ -10,42 +10,39 @@ import { swapModelAndReference } from '../utils/vehicleFieldSwap';
 function SuggestionCard({ item, onSelect, t }) {
   const bits = Array.isArray(item.variant_bits) ? item.variant_bits : [];
   return (
-    <div className="flex gap-3 rounded-md border bg-background p-2 text-left">
-      <div className="h-16 w-16 shrink-0 overflow-hidden rounded bg-muted/50 flex items-center justify-center">
-        {item.image_url ? (
-          <CatalogListingImage
-            imageUrl={item.image_url}
-            alt=""
-            className="h-16 w-16 object-contain"
-            sizes="64px"
-          />
-        ) : (
-          <span className="text-[10px] text-muted-foreground px-1 text-center leading-tight">
-            {t('catalogSuggest.noImage')}
-          </span>
-        )}
+    <div className="flex flex-col gap-2 rounded-md border bg-background p-2 text-left">
+      <div className="flex gap-3 min-w-0">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded bg-muted/50 flex items-center justify-center">
+          {item.image_url ? (
+            <CatalogListingImage
+              imageUrl={item.image_url}
+              alt=""
+              className="h-16 w-16 object-contain"
+              sizes="64px"
+            />
+          ) : (
+            <span className="text-[10px] text-muted-foreground px-1 text-center leading-tight">
+              {t('catalogSuggest.noImage')}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-sm font-medium leading-snug break-words">{item.model_name}</p>
+          <p className="text-xs font-mono text-muted-foreground break-all">{item.reference}</p>
+          {bits.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {bits.map((bit) => (
+                <Badge key={bit} variant="secondary" className="font-normal">
+                  {bit}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-xs text-muted-foreground truncate">{item.manufacturer}</p>
-        <p className="text-sm font-medium leading-tight">
-          <span className="font-mono">{item.reference}</span>
-        </p>
-        <p className="text-sm leading-snug line-clamp-2">{item.model_name}</p>
-        {bits.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {bits.map((bit) => (
-              <Badge key={bit} variant="secondary" className="font-normal">
-                {bit}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="shrink-0 self-center">
-        <Button type="button" size="sm" onClick={() => onSelect(item)}>
-          {t('catalogSuggest.useThis')}
-        </Button>
-      </div>
+      <Button type="button" size="sm" className="w-full" onClick={() => onSelect(item)}>
+        {t('catalogSuggest.useThis')}
+      </Button>
     </div>
   );
 }

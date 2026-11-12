@@ -102,6 +102,8 @@ describe('VehicleCatalogAssist', () => {
     await waitFor(() => {
       expect(screen.getByText('Variantes parecidas — elige la correcta')).toBeInTheDocument();
     });
+    expect(screen.getByText('Audi R8 LMS AW')).toBeInTheDocument();
+    expect(screen.getByText('Audi R8 LMS SW')).toBeInTheDocument();
     expect(screen.getByText('0135AW')).toBeInTheDocument();
     expect(screen.getByText('0135SW')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: 'Es este' })[0]);
