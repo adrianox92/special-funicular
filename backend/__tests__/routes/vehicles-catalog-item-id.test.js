@@ -51,6 +51,11 @@ function mockPostLookups({ catalogRow, vehicleRow }) {
       };
       return builder;
     }
+    if (table === 'vehicle_save_errors') {
+      return {
+        insert: jest.fn(() => Promise.resolve({ data: null, error: null })),
+      };
+    }
     throw new Error(`from(${table}) inesperado en POST /vehicles`);
   });
   return { catalogEq, inserts };

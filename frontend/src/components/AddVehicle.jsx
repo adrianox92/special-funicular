@@ -24,10 +24,8 @@ import CatalogListingImage from './CatalogListingImage';
 import CatalogTechSpecsFields from './CatalogTechSpecsFields';
 import VehicleCatalogAssist from './VehicleCatalogSuggestions';
 import { applyCatalogItemToVehicleForm } from '../utils/catalogVehiclePrefill';
-import { appendCatalogItemIdOnce } from '../utils/vehicleCatalogItemId';
+import { buildCreateVehicleFormData, resolveVehicleSaveSource } from '../utils/buildCreateVehicleFormData';
 import {
-  appendTechSpecsToFormData,
-  CATALOG_TECH_SPEC_KEYS,
   emptyTechSpecForm,
   mergeEmptyTechSpecsFromCatalog,
   techSpecFormFromRow,
@@ -52,6 +50,7 @@ const AddVehicle = () => {
   const [catalogResults, setCatalogResults] = useState([]);
   const [catalogItemId, setCatalogItemId] = useState(null);
   const [catalogThumb, setCatalogThumb] = useState(null);
+  const [catalogLinkSource, setCatalogLinkSource] = useState(null);
 
   const [vehicle, setVehicle] = useState({
     model: '',
@@ -107,6 +106,7 @@ const AddVehicle = () => {
 
   const applyCatalogItem = (item) => {
     setCatalogItemId(item.id);
+    setCatalogLinkSource('catalog_tab');
     setCatalogThumb(item.image_url || null);
     setVehicle((prev) => ({
       ...prev,
@@ -219,28 +219,15 @@ const AddVehicle = () => {
 
     setSaving(true);
     try {
-      const formData = new FormData();
-      const specKeySet = new Set(CATALOG_TECH_SPEC_KEYS);
-      Object.entries(vehicle).forEach(([key, value]) => {
-        if (specKeySet.has(key)) return;
-        if (key === 'catalog_item_id') return;
-        if (key === 'dorsal' || key === 'limited_edition' || key === 'limited_edition_unit_number') return;
-        if (value === undefined || value === null) return;
-        if (typeof value === 'object') return;
-        formData.append(key, value);
-      });
-      formData.append('dorsal', vehicle.dorsal ?? '');
-      formData.append('limited_edition', vehicle.limited_edition ? 'true' : 'false');
-      formData.append(
-        'limited_edition_unit_number',
-        vehicle.limited_edition && vehicle.limited_edition_unit_number !== '' && vehicle.limited_edition_unit_number != null
-          ? String(vehicle.limited_edition_unit_number)
-          : '',
-      );
-      appendTechSpecsToFormData(formData, techSpecFormFromRow(vehicle));
-      appendCatalogItemIdOnce(formData, catalogItemId, vehicle.catalog_item_id);
-      IMAGE_FIELD_NAMES.forEach((name) => {
-        if (images[name]) formData.append('images', images[name], name);
+      const formData = buildCreateVehicleFormData(vehicle, {
+        catalogItemId,
+        images,
+        imageFieldNames: IMAGE_FIELD_NAMES,
+        source: resolveVehicleSaveSource({
+          catalogItemId,
+          entryMode,
+          explicit: catalogLinkSource,
+        }),
       });
       await api.post('/vehicles', formData);
       navigate('/vehicles');
@@ -299,6 +286,7 @@ const AddVehicle = () => {
               onSelect={(item) => {
                 setVehicle((prev) => applyCatalogItemToVehicleForm(prev, item));
                 setCatalogItemId(item.id);
+                setCatalogLinkSource('suggest');
                 setCatalogThumb(item.image_url || null);
                 if (error) setError(null);
               }}
