@@ -1,5 +1,5 @@
 const { createShortCode: defaultShortCode } = require('./shortCode');
-const { normalizeCode } = require('./shopAdapters/productParse');
+const { normalizeCode, isSpareProduct } = require('./shopAdapters/productParse');
 
 const STOCK_FRESH_MS = 8 * 24 * 60 * 60 * 1000;
 const RECHECK_LIMIT = 40;
@@ -177,6 +177,7 @@ async function syncShopListing({ shop, adapter, io, nowIso, newShortCode, summar
   const byCode = indexCatalog(catalogRows);
   const seen = new Set();
   for (const hit of products) {
+    if (isSpareProduct(hit)) continue;
     const item = catalogItemForSku(byCode, hit.sku);
     if (!item || seen.has(item.id) || !normalizeProductUrl(hit.productUrl)) continue;
     seen.add(item.id);

@@ -14,6 +14,8 @@ const {
   parseEvotecProduct,
   parseDataProduct,
   searchQueries,
+  enrichShopProduct,
+  isSpareProduct,
 } = require('./productParse');
 
 const MAX_CANDIDATES = 3;
@@ -43,10 +45,12 @@ function createShopAdapter(config, deps = {}) {
   async function readProduct(url) {
     const html = await fetchPage(url);
     if (!html) return null;
-    const hit = config.parse(html, url);
-    if (!hit || !hit.productUrl) {
+    const parsed = config.parse(html, url);
+    if (!parsed || !parsed.productUrl) {
       throw new Error('No se ha podido leer la ficha');
     }
+    const hit = enrichShopProduct(parsed, html);
+    if (isSpareProduct(hit)) return null;
     return hit;
   }
 
@@ -61,7 +65,7 @@ function createShopAdapter(config, deps = {}) {
           try {
             const hit = await config.lookup(fetchPage, query);
             lookupOk = true;
-            if (hit && hitMatches(hit, { reference, ean })) return toPublicHit(hit);
+            if (hit && !isSpareProduct(hit) && hitMatches(hit, { reference, ean })) return toPublicHit(hit);
           } catch (err) {
             lastError = err;
           }
@@ -149,18 +153,11 @@ async function wooStoreLookup(origin, fetchPage, query) {
     return null;
   }
   if (!Array.isArray(rows)) return null;
-  const row = rows.find((item) => sameSku(item && item.sku, query));
-  if (!row || typeof row.permalink !== 'string') return null;
-  const prices = row.prices || {};
-  return {
-    productUrl: row.permalink,
-    price: wooPrice(prices.price, prices.currency_minor_unit),
-    regularPrice: wooPrice(prices.regular_price, prices.currency_minor_unit),
-    currency: prices.currency_code || 'EUR',
-    inStock: Boolean(row.is_in_stock),
-    sku: row.sku,
-    gtin: null,
-  };
+  const row = rows.find((item) => {
+    const hit = wooProductHit(item);
+    return hit && sameSku(hit.sku, query) && !isSpareProduct(hit);
+  });
+  return row ? wooProductHit(row) : null;
 }
 
 const WOO_PAGE_SIZE = 100;
@@ -169,6 +166,7 @@ const WOO_MAX_PAGES = 50;
 function wooProductHit(row) {
   if (!row || typeof row.permalink !== 'string') return null;
   const prices = row.prices || {};
+  const categories = Array.isArray(row.categories) ? row.categories : [];
   return {
     sku: row.sku || '',
     productUrl: row.permalink,
@@ -176,6 +174,8 @@ function wooProductHit(row) {
     regularPrice: wooPrice(prices.regular_price, prices.currency_minor_unit),
     currency: prices.currency_code || 'EUR',
     inStock: Boolean(row.is_in_stock),
+    name: row.name || '',
+    categorySlugs: categories.map((cat) => cat && (cat.slug || cat.name)).filter(Boolean),
   };
 }
 
@@ -278,11 +278,19 @@ async function criccracLookup(query, fetchImpl = fetch) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
-  const row = Object.values(json.results || {}).find((item) => sameSku(item && item.product_code, query));
-  if (!row) return null;
-  const slots = row.custom_slots || {};
+  const rows = Object.values(json.results || {});
+  const row = rows.find((item) => {
+    if (!sameSku(item && item.product_code, query)) return false;
+    return !isSpareProduct(criccracHit(item));
+  });
+  return row ? criccracHit(row) : null;
+}
+
+function criccracHit(row) {
+  const slots = (row && row.custom_slots) || {};
   const href = String(slots.thumbnail_link || '').match(/href="([^"]+)"/);
   const shown = String(slots.item_add_to_cart_and_price || '').match(/price_with_vat[^>]*>([^<]+)/i);
+  const name = String(row.product_name || row.name || slots.item_name || '').trim();
   return {
     productUrl: href ? absoluteUrl(href[1], 'https://www.criccrac.com') : null,
     price: parseEuroAmount(shown && shown[1]),
@@ -290,6 +298,7 @@ async function criccracLookup(query, fetchImpl = fetch) {
     inStock: String(row.is_salable) === '1',
     sku: row.product_code,
     gtin: null,
+    name: name || null,
   };
 }
 
@@ -408,7 +417,7 @@ function slotmaniaCandidates(html, query) {
 
 async function htycLookup(query, fetchImpl = fetch) {
   const products = await listHtycProducts(fetchImpl);
-  return products.find((hit) => sameSku(hit.sku, query)) || null;
+  return products.find((hit) => sameSku(hit.sku, query) && !isSpareProduct(hit)) || null;
 }
 
 const catalogShopAdapters = [

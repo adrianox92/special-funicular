@@ -185,6 +185,7 @@ function parseJsonLdProduct(html, pageUrl) {
         inStock: /\/(?:InStock|LimitedAvailability)$/i.test(availability),
         sku: node.sku || null,
         gtin: node.gtin13 || node.gtin || null,
+        name: typeof node.name === 'string' ? plainText(node.name).replace(/\s+/g, ' ').trim() : null,
       };
     });
   }
@@ -235,8 +236,8 @@ function parseDataProduct(html, pageUrl) {
  * recambio en otra (RS0139 es un Escort y también un chasis). El segmento de
  * categoría de la ficha, las categorías Woo y las primeras palabras del nombre
  * tienen que delatar el recambio.
- * `body`, `light` o `track` sí valen como categoría, pero no como título:
- * hay coches «white body kit» o «light blue» archivados como coche.
+ * `body`, `light`, `track` o `trophy` sí valen como categoría, pero no como título:
+ * hay coches «white body kit», «light blue» o «Transit Trophy» archivados como coche.
  */
 const SPARE_TOKENS = new Set([
   'chasis', 'chassis', 'accchasis',
@@ -290,6 +291,7 @@ const NAME_EXEMPT = new Set([
   'kit', 'kits', 'set', 'sets',
   'circuit', 'circuits', 'circuito', 'circuitos',
   'paint', 'paints', 'painting', 'pintura', 'pinturas',
+  'trophy', 'trophies', 'trofeo', 'trofeos',
   'display', 'case', 'cases', 'supply', 'supplies',
 ]);
 
@@ -326,6 +328,17 @@ function categorySlugFromProductUrl(url) {
     /* una URL rara no aporta categoría */
   }
   return '';
+}
+
+/** 11547-neumaticos-as20.html → neumaticos-as20. El coche «…-con-chasis-…» no empieza por el recambio. */
+function productSlug(url) {
+  try {
+    const parts = new URL(url).pathname.split('/').filter(Boolean);
+    const last = decodeURIComponent(parts[parts.length - 1] || '').replace(/\.html$/i, '');
+    return last.replace(/^\d+-/, '');
+  } catch {
+    return '';
+  }
 }
 
 function breadcrumbCategorySlugs(html) {
@@ -381,12 +394,18 @@ function slugIsSpare(slug) {
   return spareTokens(slug).some((token) => tokenIsSpare(token));
 }
 
+function leadingTokensAreSpare(value) {
+  return spareTokens(value).slice(0, 3).some((token) => tokenIsSpare(token, { name: true }));
+}
+
 /** true si la ficha es un recambio y no debe guardarse como oferta de un coche. */
 function isSpareProduct(hit) {
   if (!hit) return false;
-  if (slugIsSpare(categorySlugFromProductUrl(hit.productUrl || hit.url))) return true;
+  const url = hit.productUrl || hit.url;
+  if (slugIsSpare(categorySlugFromProductUrl(url))) return true;
   if ((hit.categorySlugs || []).some(slugIsSpare)) return true;
-  return spareTokens(hit.name).slice(0, 3).some((token) => tokenIsSpare(token, { name: true }));
+  if (leadingTokensAreSpare(hit.name)) return true;
+  return leadingTokensAreSpare(productSlug(url));
 }
 
 function searchQueries(reference, ean) {

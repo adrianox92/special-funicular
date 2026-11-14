@@ -518,6 +518,85 @@ describe('runShopOfferBatch listing', () => {
     });
   });
 
+  test('un chasis con la misma referencia no sustituye al coche', async () => {
+    clearAdapters();
+    registerAdapter({
+      key: 'woo-test',
+      async listProducts() {
+        return [
+          {
+            sku: 'RS0060',
+            productUrl: 'https://evotecshop.com/en/chasis/9265-chasis-p-bancada.html',
+            price: 7.5,
+            currency: 'EUR',
+            inStock: true,
+            name: 'Chasis P Bancada externa',
+          },
+          {
+            sku: 'RS0060',
+            productUrl: 'https://shop.example/ferrari-333',
+            price: 70,
+            currency: 'EUR',
+            inStock: true,
+            name: 'Ferrari 333SP Twin Pack',
+          },
+        ];
+      },
+      async findByReference() {
+        throw new Error('no buscar por referencia');
+      },
+      async checkProduct() {
+        return null;
+      },
+    });
+    const inserts = [];
+    const updates = [];
+    const io = {
+      listActiveShops: async () => ([{
+        id: 'shop-woo',
+        adapter_key: 'woo-test',
+        currency: 'EUR',
+        active: true,
+      }]),
+      listOffersToRecheck: async () => [],
+      listCatalogReferences: async () => ([{
+        id: 'item-1',
+        reference: 'RS0060',
+        model_name: 'Ferrari 333SP',
+        manufacturer: 'Revoslot',
+      }]),
+      listShopOffers: async () => ([{
+        id: 'off-chassis',
+        catalog_item_id: 'item-1',
+        product_url: 'https://evotecshop.com/en/chasis/9265-chasis-p-bancada.html',
+        price: 7.5,
+        previous_price: null,
+        in_stock: true,
+      }]),
+      findOffer: async () => ({ id: 'off-chassis', price: 7.5, previous_price: null, in_stock: true }),
+      updateOffer: async (id, patch) => { updates.push({ id, patch }); },
+      insertOffer: async (row) => { inserts.push(row); },
+      setDiscoverCursor: async () => { throw new Error('no mueve el cursor'); },
+      listCatalogItems: async () => [],
+    };
+
+    const summary = await runShopOfferBatch({
+      io,
+      getAdapter,
+      now: new Date('2026-11-14T06:00:00.000Z'),
+      newShortCode: () => 'Ab3kX9p',
+    });
+
+    expect(inserts).toEqual([]);
+    expect(summary.errors).toBe(0);
+    expect(updates).toHaveLength(1);
+    expect(updates[0].patch).toMatchObject({
+      product_url: 'https://shop.example/ferrari-333',
+      price: 70,
+      in_stock: true,
+    });
+  });
+
   test('una referencia en stock se busca en las demás tiendas', async () => {
     clearAdapters();
     const calls = [];

@@ -25,6 +25,7 @@ const {
   textHasCode,
   itemListUrls,
   urlsContainingCode,
+  isSpareProduct,
 } = require('../../lib/shopAdapters/productParse');
 
 const EVOTEC_SEARCH = `
@@ -92,6 +93,39 @@ describe('referencias de tienda', () => {
     expect(sameSku('C4555', 'C4545')).toBe(false);
     expect(searchQueries('RCSW82', null)).toEqual(['RCSW82', 'RCSW0082']);
   });
+
+  test('un chasis o un neumático con la misma referencia no es el coche', () => {
+    expect(isSpareProduct({
+      productUrl: 'https://evotecshop.com/en/chasis/9265-chasis-p-bancada-externa-ferrari-512-m-spirit.html',
+      name: 'Chasis P Bancada externa Ferrari 512 M - Spirit',
+    })).toBe(true);
+    expect(isSpareProduct({
+      productUrl: 'https://slotmania.es/es/coches/11547-neumaticos-as20-195x105-mm.html',
+      name: 'Neumáticos AS20',
+    })).toBe(true);
+    expect(isSpareProduct({
+      productUrl: 'https://trofeslot.com/producto/chasis-3dp-lmb/',
+      name: 'Chasis 3DP LMB',
+      categorySlugs: ['chasis', 'scaleauto'],
+    })).toBe(true);
+    expect(isSpareProduct({
+      productUrl: 'https://evotecshop.com/en/clasicos/21070-porsche-917k-azul-chasis-evo3-sidewinder.html',
+      name: 'Porsche 917K Azul - Chasis EVO3',
+    })).toBe(false);
+    expect(isSpareProduct({
+      productUrl: 'https://trofeslot.com/producto/lancia-037-martini-chasis-evo3-in-line/',
+      name: 'Lancia 037 Martini – Chasis EVO3 In-Line',
+      categorySlugs: ['rally', 'fly-car-model'],
+    })).toBe(false);
+    expect(isSpareProduct({
+      productUrl: 'https://www.htyc-slotshop.es/buscador/FORD-TRANSIT-TROPHY-26-p784457504',
+      name: 'Ford Transit Trophy',
+    })).toBe(false);
+    expect(isSpareProduct({
+      productUrl: 'https://evotecshop.com/en/trofeos/12-copa.html',
+      name: 'Trofeo copa',
+    })).toBe(true);
+  });
 });
 
 describe('adaptadores de tienda', () => {
@@ -123,6 +157,58 @@ describe('adaptadores de tienda', () => {
       currency: 'EUR',
       inStock: true,
     });
+  });
+
+  test('Evotec no enlaza el chasis cuando la referencia coincide con el coche', async () => {
+    const chassisUrl = 'https://evotecshop.com/en/chasis/9265-chasis-p-bancada-ferrari-512.html';
+    const carUrl = 'https://evotecshop.com/en/turismos/19492-ferrari-333-sp.html';
+    const search = `
+      <ul class="product_list">
+        <li class="ajax_block_product">
+          <div>Spirit (Ref.:RS0060)</div>
+          <a href="${chassisUrl}">Chasis</a>
+        </li>
+        <li class="ajax_block_product">
+          <div>Revoslot (Ref.:RS0060)</div>
+          <a href="${carUrl}">Ferrari</a>
+        </li>
+      </ul>
+    `;
+    const sheet = (sku) => `
+      <span id="our_price_display">${sku === 'RS-0060' ? '7,50€' : '157,90€'}</span>
+      <p id="availability_statut" style="display: none;"></p>
+      <p class="buttons_bottom_block" id="add_to_cart"></p>
+      <script>var productReference='${sku}';var productAvailableForOrder='1';</script>
+    `;
+    const adapter = createShopAdapter({
+      key: 'evotec',
+      origin: 'https://evotecshop.com',
+      searchUrl: (query) => `https://evotec.test/search?q=${encodeURIComponent(query)}`,
+      parse: parseEvotecProduct,
+      candidates(html, query) {
+        const urls = [];
+        for (const card of productListCards(html)) {
+          if (!textHasCode(card, query)) continue;
+          const url = cardProductUrl(card, 'https://evotecshop.com');
+          if (url) urls.push(url);
+        }
+        return [...new Set(urls)];
+      },
+    }, {
+      fetchPage: pages({
+        'https://evotec.test/search?q=RS0060': search,
+        [chassisUrl]: `<h1>Chasis P Bancada externa Ferrari 512 M - Spirit</h1>${sheet('RS-0060')}`,
+        [carUrl]: `<h1>Ferrari 333 SP Twin Pack</h1>${sheet('RS0060')}`,
+      }),
+    });
+
+    await expect(adapter.findByReference({ reference: 'RS0060', ean: null })).resolves.toEqual({
+      productUrl: carUrl,
+      price: 157.9,
+      currency: 'EUR',
+      inStock: true,
+    });
+    await expect(adapter.checkProduct(chassisUrl)).resolves.toBeNull();
   });
 
   test('Ministry usa el ItemList y no marca stock si la ficha no admite pedido', async () => {
