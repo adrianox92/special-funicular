@@ -4,6 +4,7 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { z } = require('zod');
 const tools = require('../lib/mcpReadTools');
+const insight = require('../lib/mcpInsightTools');
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
 
@@ -33,7 +34,7 @@ function wrap(fn) {
  * @param {string} userId
  */
 function createSlotMcpServer(userId, context = {}) {
-  const server = new McpServer({ name: 'slot-database', version: '1.0.0' });
+  const server = new McpServer({ name: 'slot-database', version: '1.1.0' });
   const call = (fn) => wrap((args) => fn(userId, args, context));
 
   server.registerTool('search_collection', {
@@ -105,6 +106,100 @@ function createSlotMcpServer(userId, context = {}) {
     },
     annotations: READ_ONLY,
   }, call(tools.getCatalogItem));
+
+  server.registerTool('list_capabilities', {
+    title: 'Opciones del conector',
+    description: 'Úsala cuando el usuario pregunte qué puedes hacer o qué opciones hay, antes de inventar capacidades. No consulta datos. Dice también lo que no hace: no lista el catálogo, no escribe y no ve ligas ni clubes.',
+    inputSchema: {},
+    annotations: READ_ONLY,
+  }, call(insight.listCapabilities));
+
+  server.registerTool('garage_summary', {
+    title: 'Resumen del garaje',
+    description: 'Totales del garaje: coches, modificados, digitales, suma de compra, marcas, tipos y cuántos no tienen ficha de catálogo. Máximo 1000 coches.',
+    inputSchema: {},
+    annotations: READ_ONLY,
+  }, call(insight.garageSummary));
+
+  server.registerTool('best_laps', {
+    title: 'Mejores vueltas',
+    description: 'Mejor vuelta por coche, circuito y carril. Filtros opcionales: vehicle_id, circuit_id, lane, date_from y date_to (YYYY-MM-DD). Máximo 25 grupos.',
+    inputSchema: {
+      vehicle_id: z.string().uuid().optional(),
+      circuit_id: z.string().uuid().optional(),
+      lane: z.string().max(8).optional(),
+      date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    },
+    annotations: READ_ONLY,
+  }, call(insight.bestLaps));
+
+  server.registerTool('training_goals', {
+    title: 'Metas de entrenamiento',
+    description: 'Metas activas del usuario y su progreso. Máximo 10.',
+    inputSchema: {},
+    annotations: READ_ONLY,
+  }, call(insight.trainingGoals));
+
+  server.registerTool('action_items', {
+    title: 'Pendientes',
+    description: 'Competiciones propias abiertas, recambios críticos bajo mínimo y mantenimientos que vencen en 7 días. Máximo 5 por bloque.',
+    inputSchema: {},
+    annotations: READ_ONLY,
+  }, call(insight.actionItems));
+
+  server.registerTool('get_circuit', {
+    title: 'Ficha de circuito',
+    description: 'Circuito personal del usuario, con longitudes de carril y comparativa de tiempos por carril. id es el UUID.',
+    inputSchema: { id: z.string().uuid() },
+    annotations: READ_ONLY,
+  }, call(insight.getCircuit));
+
+  server.registerTool('list_maintenance', {
+    title: 'Mantenimiento',
+    description: 'Con vehicle_id, las últimas 15 revisiones de ese coche. Sin vehicle_id, 8 revisiones recientes y hasta 10 vencimientos en 7 días.',
+    inputSchema: { vehicle_id: z.string().uuid().optional() },
+    annotations: READ_ONLY,
+  }, call(insight.listMaintenance));
+
+  server.registerTool('list_inventory', {
+    title: 'Inventario',
+    description: 'Recambios del usuario. Filtros opcionales: q, category y low_stock. Máximo 25.',
+    inputSchema: {
+      q: z.string().max(80).optional(),
+      category: z.string().max(40).optional(),
+      low_stock: z.boolean().optional(),
+      limit: z.number().int().min(1).max(25).optional(),
+    },
+    annotations: READ_ONLY,
+  }, call(insight.listInventory));
+
+  server.registerTool('get_catalog_offers', {
+    title: 'Ofertas de una ficha',
+    description: 'Precio y tienda de una ficha concreta, por referencia y marca exactas. No lista el catálogo. Comparte el máximo de 10 consultas por minuto y 100 al día con get_catalog_item.',
+    inputSchema: {
+      reference: z.string().min(2).max(80),
+      manufacturer: z.string().min(2).max(80),
+    },
+    annotations: READ_ONLY,
+  }, call(insight.getCatalogOffers));
+
+  const prompt = (text) => ({ messages: [{ role: 'user', content: { type: 'text', text } }] });
+
+  server.registerPrompt('available_options', {
+    title: 'Opciones disponibles',
+    description: 'Lista en lenguaje llano lo que este conector puede consultar, sin leer datos del usuario.',
+  }, () => prompt('Llama a list_capabilities y responde con esa lista en lenguaje llano. No llames a otras herramientas ni consultes datos.'));
+
+  server.registerPrompt('garage_briefing', {
+    title: 'Cómo va el garaje',
+    description: 'Resume el garaje y, si el usuario pregunta por pendientes o metas, también esos datos.',
+  }, () => prompt('Llama a garage_summary. Si el usuario pregunta por pendientes o metas, llama también a action_items y training_goals. Responde en español solo con los datos devueltos.'));
+
+  server.registerPrompt('next_race_briefing', {
+    title: 'Próxima carrera',
+    description: 'Resume la próxima competición abierta y, si hay id, su detalle.',
+  }, () => prompt('Llama a action_items. Si hay una competición abierta, llama a get_competition con su id. Si no hay ninguna, dilo. No inventes participantes ni tiempos.'));
 
   return server;
 }

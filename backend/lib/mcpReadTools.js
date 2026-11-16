@@ -376,7 +376,19 @@ async function oneItemId(db, table, column, reference, manufacturerId) {
   return column === 'reference' ? rows[0].id : rows[0].catalog_item_id;
 }
 
-async function getCatalogItem(userId, args = {}, context = {}) {
+async function findExactCatalogItemId(db, reference, manufacturer) {
+  const manufacturerId = await exactBrand(db, manufacturer);
+  const itemId = await oneItemId(db, 'slot_catalog_items', 'reference', reference, manufacturerId)
+    || await oneItemId(db, 'slot_catalog_item_aliases', 'alias_reference', reference, manufacturerId);
+  if (!itemId) httpError(404, 'Ítem no encontrado');
+  return itemId;
+}
+
+/**
+ * Cupo y registro compartidos por la ficha y sus ofertas.
+ * `fn` devuelve `{ outcome, value }`. Un 404 o 409 se registra y se relanza.
+ */
+async function withCatalogLookup(userId, args = {}, context = {}, fn) {
   assertUser(userId);
   const reference = normalizeReference(oneExactText(args.reference, 'reference'));
   const manufacturer = oneExactText(args.manufacturer, 'manufacturer');
@@ -389,19 +401,9 @@ async function getCatalogItem(userId, args = {}, context = {}) {
   assertCatalogLookupLimit(userId);
   let outcome = null;
   try {
-    const manufacturerId = await exactBrand(db, manufacturer);
-    const itemId = await oneItemId(db, 'slot_catalog_items', 'reference', reference, manufacturerId)
-      || await oneItemId(db, 'slot_catalog_item_aliases', 'alias_reference', reference, manufacturerId);
-    if (!itemId) httpError(404, 'Ítem no encontrado');
-    const { data, error } = await db
-      .from('slot_catalog_items_with_ratings')
-      .select(CATALOG_ITEM_FIELDS)
-      .eq('id', itemId)
-      .maybeSingle();
-    assertNoError(error);
-    if (!data) httpError(404, 'Ítem no encontrado');
-    outcome = 'found';
-    return { item: data };
+    const result = await fn(db, reference, manufacturer);
+    outcome = result && result.outcome;
+    return result && result.value;
   } catch (err) {
     if (err.statusCode === 409) outcome = 'ambiguous';
     else if (err.statusCode === 404) outcome = 'not_found';
@@ -419,6 +421,20 @@ async function getCatalogItem(userId, args = {}, context = {}) {
   }
 }
 
+async function getCatalogItem(userId, args = {}, context = {}) {
+  return withCatalogLookup(userId, args, context, async (db, reference, manufacturer) => {
+    const itemId = await findExactCatalogItemId(db, reference, manufacturer);
+    const { data, error } = await db
+      .from('slot_catalog_items_with_ratings')
+      .select(CATALOG_ITEM_FIELDS)
+      .eq('id', itemId)
+      .maybeSingle();
+    assertNoError(error);
+    if (!data) httpError(404, 'Ítem no encontrado');
+    return { outcome: 'found', value: { item: data } };
+  });
+}
+
 module.exports = {
   searchCollection,
   listVehicles,
@@ -428,5 +444,7 @@ module.exports = {
   listCompetitions,
   getCompetition,
   getCatalogItem,
+  findExactCatalogItemId,
+  withCatalogLookup,
   resetCatalogLookupLimit,
 };

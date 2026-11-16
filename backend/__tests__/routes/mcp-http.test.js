@@ -69,18 +69,71 @@ describe('MCP HTTP', () => {
     expect(res.status).toBe(200);
     const names = (res.body.result?.tools || []).map((tool) => tool.name).sort();
     expect(names).toEqual([
+      'action_items',
+      'best_laps',
+      'garage_summary',
       'get_catalog_item',
+      'get_catalog_offers',
+      'get_circuit',
       'get_competition',
       'get_vehicle',
+      'list_capabilities',
       'list_circuits',
       'list_competitions',
+      'list_inventory',
+      'list_maintenance',
       'list_timings',
       'list_vehicles',
       'search_collection',
+      'training_goals',
     ]);
     for (const tool of res.body.result.tools) {
       expect(tool.annotations?.readOnlyHint).toBe(true);
     }
+  });
+
+  test('list_capabilities nombra cada herramienta y no promete lo que el conector no hace', async () => {
+    seedToken({ plain: 'live-access', revoked: false });
+    const listed = await request(app)
+      .post('/mcp')
+      .set('Authorization', 'Bearer live-access')
+      .set('Accept', ACCEPT)
+      .set('Content-Type', 'application/json')
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const called = await request(app)
+      .post('/mcp')
+      .set('Authorization', 'Bearer live-access')
+      .set('Accept', ACCEPT)
+      .set('Content-Type', 'application/json')
+      .send({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'list_capabilities', arguments: {} },
+      });
+    expect(called.status).toBe(200);
+    const menu = JSON.parse(called.body.result.content[0].text);
+    const mentioned = menu.groups.flatMap((group) => group.options.map((option) => option.tool)).sort();
+    const names = (listed.body.result?.tools || []).map((tool) => tool.name).sort();
+    expect(mentioned).toEqual(names);
+    const denied = menu.cannot.join(' ');
+    expect(denied).toMatch(/No lista ni busca el catálogo/);
+    expect(denied).toMatch(/No crea, no edita y no borra/);
+    expect(denied).toMatch(/No consulta ligas ni clubes/);
+    expect(mentioned).not.toEqual(expect.arrayContaining(['list_leagues', 'list_clubs']));
+  });
+
+  test('prompts/list anuncia las tres guías', async () => {
+    seedToken({ plain: 'live-access', revoked: false });
+    const res = await request(app)
+      .post('/mcp')
+      .set('Authorization', 'Bearer live-access')
+      .set('Accept', ACCEPT)
+      .set('Content-Type', 'application/json')
+      .send({ jsonrpc: '2.0', id: 3, method: 'prompts/list' });
+    expect(res.status).toBe(200);
+    const names = (res.body.result?.prompts || []).map((prompt) => prompt.name).sort();
+    expect(names).toEqual(['available_options', 'garage_briefing', 'next_race_briefing']);
   });
 });
 
