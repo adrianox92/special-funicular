@@ -53,7 +53,7 @@ info:
     Unknown / server quirks are called out in operation descriptions
     (`UNKNOWN` / `NOTE`).
 servers:
-  - url: https://api.slotdatabase.es
+  - url: https://www.slotdatabase.es
     description: Production
   - url: http://localhost:5001
     description: Local development

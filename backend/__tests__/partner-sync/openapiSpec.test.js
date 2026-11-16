@@ -78,7 +78,7 @@ describe('Slot Database API OpenAPI (P1 + P4)', () => {
     expect(spec.startsWith('openapi: 3.')).toBe(true);
     expect(spec).toMatch(/title:\s*Slot Database API/);
     expect(spec).toContain('X-API-Key');
-    expect(spec).toContain('https://api.slotdatabase.es');
+    expect(spec).toContain('https://www.slotdatabase.es');
     expect(spec).toContain('http://localhost:5001');
     expect(spec).not.toMatch(/url:\s*https?:\/\/\S*staging\S*/i);
   });
@@ -125,7 +125,7 @@ describe('Slot Database API OpenAPI (P1 + P4)', () => {
     expect(api.components.securitySchemes.ApiKeyAuth.name).toBe('X-API-Key');
     const serverUrls = (api.servers || []).map((s) => s.url);
     expect(serverUrls).toEqual(
-      expect.arrayContaining(['https://api.slotdatabase.es', 'http://localhost:5001']),
+      expect.arrayContaining(['https://www.slotdatabase.es', 'http://localhost:5001']),
     );
     expect(serverUrls.every((url) => !/staging/i.test(url))).toBe(true);
   });

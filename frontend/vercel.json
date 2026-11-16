@@ -4,6 +4,18 @@
   "outputDirectory": "build",
   "rewrites": [
     {
+      "source": "/api/docs",
+      "destination": "https://special-funicular-3q60.onrender.com/api/docs"
+    },
+    {
+      "source": "/api/docs/:path*",
+      "destination": "https://special-funicular-3q60.onrender.com/api/docs/:path*"
+    },
+    {
+      "source": "/api/sync/:path*",
+      "destination": "https://special-funicular-3q60.onrender.com/api/sync/:path*"
+    },
+    {
       "source": "/go/:code",
       "destination": "https://special-funicular-3q60.onrender.com/api/go/:code"
     },

@@ -55,7 +55,7 @@ describe('Slot Database API docs (P2 Swagger UI)', () => {
     expect(res.text.startsWith('openapi: 3.')).toBe(true);
     expect(res.text).toContain('title: Slot Database API');
     expect(res.text).toContain('X-API-Key');
-    expect(res.text).toContain('https://api.slotdatabase.es');
+    expect(res.text).toContain('https://www.slotdatabase.es');
     expect(res.text).not.toContain('staging');
   });
 

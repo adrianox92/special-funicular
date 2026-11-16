@@ -74,8 +74,8 @@ describe('developers i18n', () => {
 
 describe('partner API URLs', () => {
   test('producción y local, sin staging', () => {
-    expect(PARTNER_SWAGGER_PRODUCTION_URL).toBe('https://api.slotdatabase.es/api/docs');
-    expect(PARTNER_OPENAPI_PRODUCTION_URL).toBe('https://api.slotdatabase.es/api/docs/openapi.yaml');
+    expect(PARTNER_SWAGGER_PRODUCTION_URL).toBe('https://www.slotdatabase.es/api/docs');
+    expect(PARTNER_OPENAPI_PRODUCTION_URL).toBe('https://www.slotdatabase.es/api/docs/openapi.yaml');
     expect(PARTNER_SWAGGER_LOCAL_URL).toBe('http://localhost:5001/api/docs');
     expect(PARTNER_API_PRODUCTION_ORIGIN).not.toMatch(/staging/i);
     expect(PARTNER_API_LOCAL_ORIGIN).not.toMatch(/staging/i);

@@ -1,6 +1,6 @@
 /** URLs públicas de Slot Database API (D14: solo producción y local). */
 
-export const PARTNER_API_PRODUCTION_ORIGIN = 'https://api.slotdatabase.es';
+export const PARTNER_API_PRODUCTION_ORIGIN = 'https://www.slotdatabase.es';
 export const PARTNER_API_LOCAL_ORIGIN = 'http://localhost:5001';
 
 /** URL que el usuario pega en Claude o ChatGPT. La web hace de proxy. */
