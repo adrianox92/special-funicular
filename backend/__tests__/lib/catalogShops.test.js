@@ -402,6 +402,45 @@ describe('criccrac', () => {
       'https://www.criccrac.com/tienda/product/21082-sc-6224rs',
     )).toMatchObject({ price: 89.52, inStock: true });
   });
+
+  test('SC6350R se busca también como SC-6350R y no se queda con la variante RS', async () => {
+    const fetchImpl = jest.fn(async (_url, init) => {
+      const ref = new URLSearchParams(init.body).get('form_data[referencia]');
+      if (ref !== 'SC-6350R') return { ok: true, json: async () => ({ results: {} }) };
+      return {
+        ok: true,
+        json: async () => ({
+          results: {
+            1: {
+              product_code: 'SC-6350RS',
+              is_salable: '1',
+              name: 'Callaway RS',
+              custom_slots: {
+                thumbnail_link: '<a href="/tienda/product/19199-sc-6350rs">foto</a>',
+                item_add_to_cart_and_price: '<span class="price_with_vat">89,95€</span>',
+              },
+            },
+            2: {
+              product_code: 'SC-6350R',
+              is_salable: '1',
+              name: 'Callaway R',
+              custom_slots: {
+                thumbnail_link: '<a href="/tienda/product/16263-sc-6350r">foto</a>',
+                item_add_to_cart_and_price: '<span class="price_with_vat">49,95€</span>',
+              },
+            },
+          },
+        }),
+      };
+    });
+
+    await expect(criccracLookup('SC6350R', fetchImpl)).resolves.toMatchObject({
+      productUrl: 'https://www.criccrac.com/tienda/product/16263-sc-6350r',
+      sku: 'SC-6350R',
+      price: 49.95,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('htyc-slotshop', () => {

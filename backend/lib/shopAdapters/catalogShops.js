@@ -1,6 +1,7 @@
 const { fetchShopPage } = require('./fetchShopPage');
 const {
   sameSku,
+  normalizeCode,
   absoluteUrl,
   itemListUrls,
   productListCards,
@@ -252,7 +253,22 @@ function parseCricProduct(html, pageUrl) {
   };
 }
 
-async function criccracLookup(query, fetchImpl = fetch) {
+/** Criccrac guarda SC-6350R y TOP-7301. El catálogo suele llevar SC6350R y TOP7301, y el filtro es literal. */
+function criccracAttempts(query) {
+  const attempts = [];
+  const add = (value) => {
+    const text = String(value || '').trim();
+    if (text.length < 4) return;
+    if (attempts.some((item) => item.toUpperCase() === text.toUpperCase())) return;
+    attempts.push(text);
+  };
+  add(query);
+  const split = normalizeCode(query).match(/^([A-Z]{2,4})(\d.+)$/);
+  if (split) add(`${split[1]}-${split[2]}`);
+  return attempts;
+}
+
+async function criccracSearch(query, fetchImpl) {
   const body = new URLSearchParams({
     'menu_data[parameter_id]': 'criccrac_website_list',
     'menu_data[session_variable]': 'lista-de-productos',
@@ -278,12 +294,19 @@ async function criccracLookup(query, fetchImpl = fetch) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
-  const rows = Object.values(json.results || {});
-  const row = rows.find((item) => {
-    if (!sameSku(item && item.product_code, query)) return false;
-    return !isSpareProduct(criccracHit(item));
-  });
-  return row ? criccracHit(row) : null;
+  return Object.values(json.results || {});
+}
+
+async function criccracLookup(query, fetchImpl = fetch) {
+  for (const attempt of criccracAttempts(query)) {
+    const rows = await criccracSearch(attempt, fetchImpl);
+    const row = rows.find((item) => {
+      if (!sameSku(item && item.product_code, query)) return false;
+      return !isSpareProduct(criccracHit(item));
+    });
+    if (row) return criccracHit(row);
+  }
+  return null;
 }
 
 function criccracHit(row) {
