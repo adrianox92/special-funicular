@@ -18,9 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
-import placeholderImage from '../assets/images/placeholder.png';
 import DuplicateVehicleDialog from './DuplicateVehicleDialog';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 
 const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
   const { t } = useTranslation('vehicles');
@@ -116,8 +116,14 @@ const VehicleCard = ({ vehicle, onDelete, onDuplicateSuccess }) => {
           <Trash2 className="size-4" />
         </Button>
       </div>
-      <div className="relative aspect-[4/3] bg-muted">
-        <img ref={imgRef} src={cachedStorageImageUrl(vehicle.image) || placeholderImage} alt={vehicle.model} className="w-full h-full object-cover" loading="lazy" />
+      <div className={`relative aspect-[4/3] overflow-hidden ${vehicle.image ? 'bg-muted' : 'bg-white'}`}>
+        <img
+          ref={imgRef}
+          src={cachedStorageImageUrl(vehicle.image) || CATALOG_PLACEHOLDER_PATH}
+          alt={vehicle.model}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
       </div>
       <CardContent className="p-4">
         <h3 className="font-semibold text-lg">{vehicle.model}</h3>

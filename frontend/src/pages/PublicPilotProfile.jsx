@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Trophy, Users, Flag, Car, Zap, GitCompare, Search } from 'lucide-react';
+import { Trophy, Users, Flag, Zap, GitCompare, Search } from 'lucide-react';
 import api from '../lib/axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -27,6 +27,7 @@ import {
 import Footer from '../components/Footer';
 import { formatDate } from '../utils/formatUtils';
 import { publicVehicleImageSrc } from '../utils/publicVehicleImageSrc';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 import { BRAND } from '../utils/documentTitle';
 import { useLocale } from '../hooks/useLocale';
 import { localizePath } from '../i18n/localeUtils';
@@ -95,20 +96,13 @@ function PublicVehicleCard({ vehicle, highlight, t }) {
 
   return (
     <article className="group h-full overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md">
-      <div className="relative aspect-[4/3] bg-muted overflow-hidden">
-        {src ? (
-          <img
-            src={src}
-            alt={title}
-            className="absolute inset-0 size-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Car className="size-8 opacity-50" aria-hidden />
-            <span className="text-xs">{t('pilot.noImage')}</span>
-          </div>
-        )}
+      <div className={`relative aspect-[4/3] overflow-hidden ${src ? 'bg-muted' : 'bg-white'}`}>
+        <img
+          src={src || CATALOG_PLACEHOLDER_PATH}
+          alt={src ? title : t('pilot.noImage')}
+          className="absolute inset-0 size-full object-cover"
+          loading="lazy"
+        />
       </div>
       <div className="space-y-1.5 p-3">
         {vehicle.manufacturer ? (

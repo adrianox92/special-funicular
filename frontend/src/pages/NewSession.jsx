@@ -36,6 +36,7 @@ import {
   isBlockingCaptureIssue,
 } from '../utils/sessionCaptureValidation';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 
 const VEHICLES_PAGE_LIMIT = 10000;
 const STEPS = ['circuit', 'vehicle', 'capture', 'summary'];
@@ -776,17 +777,11 @@ const NewSession = () => {
                           )}
                           onClick={() => setVehicleId(String(vehicle.id))}
                         >
-                          {vehicle.image ? (
-                            <img
-                              src={cachedStorageImageUrl(vehicle.image)}
-                              alt=""
-                              className="size-10 rounded object-cover bg-muted"
-                            />
-                          ) : (
-                            <span className="flex size-10 items-center justify-center rounded bg-muted">
-                              <Car className="size-4 text-muted-foreground" aria-hidden />
-                            </span>
-                          )}
+                          <img
+                            src={cachedStorageImageUrl(vehicle.image) || CATALOG_PLACEHOLDER_PATH}
+                            alt=""
+                            className={`size-10 rounded object-cover ${vehicle.image ? 'bg-muted' : 'bg-white'}`}
+                          />
                           <span className="min-w-0 flex-1">
                             <span className="block font-medium truncate">{vehicleLabel(vehicle)}</span>
                             <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">

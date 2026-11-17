@@ -26,6 +26,7 @@ import {
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 import CatalogTechSpecsSection from './CatalogTechSpecsSection';
 
 const imageFields = [
@@ -308,7 +309,11 @@ const VehicleDetail = () => {
                           ) : null}
                         </>
                       ) : (
-                        <span className="text-muted-foreground text-xs sm:text-sm text-center px-1">Sin imagen</span>
+                        <img
+                          src={CATALOG_PLACEHOLDER_PATH}
+                          alt="Sin imagen"
+                          className="max-w-full max-h-[72px] sm:max-h-[90px] object-contain bg-white"
+                        />
                       )}
                     </div>
                   </div>

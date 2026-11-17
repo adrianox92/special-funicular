@@ -150,7 +150,10 @@ describe('PublicPilotProfile', () => {
     const porscheImg = screen.getByRole('img', { name: 'Slot.it Porsche 911 RSR' });
     expect(porscheImg).toHaveAttribute('src', expect.stringContaining('porsche.webp'));
     expect(screen.queryByRole('img', { name: 'Ninco Audi R8' })).not.toBeInTheDocument();
-    expect(within(collection).getByText(/sin imagen|no image|kein bild/i)).toBeInTheDocument();
+    expect(within(collection).getByRole('img', { name: /sin imagen|no image|kein bild/i })).toHaveAttribute(
+      'src',
+      '/catalog-placeholder.png',
+    );
 
     expect(screen.getByText('Copa Skoda')).toBeInTheDocument();
     expect(screen.getByText('Club Slot')).toBeInTheDocument();
@@ -174,7 +177,9 @@ describe('PublicPilotProfile', () => {
       ],
     });
     expect(screen.queryByRole('img', { name: 'Slot.it Porsche 911 RSR' })).not.toBeInTheDocument();
-    expect(screen.getByText(/sin imagen|no image|kein bild/i)).toBeInTheDocument();
+    const fallback = screen.getByRole('img', { name: /sin imagen|no image|kein bild/i });
+    expect(fallback).toHaveAttribute('src', '/catalog-placeholder.png');
+    expect(fallback.getAttribute('src')).not.toContain('picsum');
   });
 
   test('filtra la parrilla de la colección', async () => {

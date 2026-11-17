@@ -31,9 +31,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './ui/tooltip';
-import placeholderImage from '../assets/images/placeholder.png';
 import DuplicateVehicleDialog from './DuplicateVehicleDialog';
 import { cachedStorageImageUrl } from '../utils/cachedStorageImageUrl';
+import { CATALOG_PLACEHOLDER_PATH } from '../constants/catalogPlaceholder';
 
 const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
   const { t } = useTranslation('vehicles');
@@ -80,6 +80,7 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
   };
 
   const handleRowClick = () => navigate(`/vehicles/${vehicle.id}`);
+  const imageSrc = cachedStorageImageUrl(vehicle.image) || CATALOG_PLACEHOLDER_PATH;
 
   const formatPrice = () => {
     if (vehicle.total_price !== undefined && vehicle.total_price !== null && vehicle.total_price !== vehicle.price) {
@@ -126,18 +127,18 @@ const VehicleTableRow = ({ vehicle, onDelete, onDuplicate }) => {
               <TooltipTrigger asChild>
                 <span className="inline-block cursor-pointer rounded overflow-hidden">
                   <img
-                    src={cachedStorageImageUrl(vehicle.image) || placeholderImage}
+                    src={imageSrc}
                     alt={vehicle.model}
-                    className="w-10 h-[30px] object-cover rounded"
+                    className={`w-10 h-[30px] rounded ${vehicle.image ? 'object-cover' : 'object-contain bg-white'}`}
                     loading="lazy"
                   />
                 </span>
               </TooltipTrigger>
               <TooltipContent side="right" className="p-1 bg-background border shadow-lg">
                 <img
-                  src={cachedStorageImageUrl(vehicle.image) || placeholderImage}
+                  src={imageSrc}
                   alt={vehicle.model}
-                  className="w-48 h-32 object-contain rounded-md"
+                  className={`w-48 h-32 object-contain rounded-md ${vehicle.image ? '' : 'bg-white'}`}
                 />
               </TooltipContent>
             </Tooltip>

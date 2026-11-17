@@ -71,6 +71,17 @@ describe('VehicleDetail foto de catálogo', () => {
     expect(img.parentElement.querySelector('button')).toBeNull();
   });
 
+  test('sin foto propia ni de catálogo usa el placeholder del catálogo', async () => {
+    mockVehicle({ imageUrl: null, images: [] });
+    renderDetail();
+
+    const imgs = await screen.findAllByAltText('Sin imagen');
+    expect(imgs.length).toBeGreaterThan(0);
+    imgs.forEach((img) => {
+      expect(img).toHaveAttribute('src', '/catalog-placeholder.png');
+    });
+  });
+
   test('la foto propia de la vista frontal sí se puede borrar', async () => {
     mockVehicle({
       imageUrl: CATALOG,

@@ -56,6 +56,10 @@ describe('VehicleCard', () => {
     );
 
     expect(screen.getByText('Audi Quattro')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Audi Quattro' })).toHaveAttribute(
+      'src',
+      '/catalog-placeholder.png',
+    );
     expect(screen.getByText(/Scalextric/)).toBeInTheDocument();
     expect(screen.queryByText('Información técnica')).not.toBeInTheDocument();
     expect(screen.queryByText('Escala')).not.toBeInTheDocument();
