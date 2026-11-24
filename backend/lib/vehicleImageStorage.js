@@ -1,16 +1,18 @@
 /**
- * Supabase Storage helpers for bucket `vehicle-images`.
+ * Helpers de borrado para el bucket lógico `vehicle-images` (Supabase Storage o R2).
  *
- * Env (documentación): las rutas públicas incluyen /object/public/vehicle-images/<path>
- * o /storage/v1/object/public/vehicle-images/<path> según despliegue.
+ * Las URLs guardadas incluyen /vehicle-images/<path>: en Supabase tras
+ * /storage/v1/object/public/ y en R2 tras /api/img/r2/.
  *
  * @see processVehicleImageBuffer.js — VEHICLE_IMAGE_MAX_UPLOAD_BYTES, VEHICLE_IMAGE_MAX_EDGE_PX
  */
 
+const { removeObjects, removePrefix, providerForUrl } = require('./imageObjectStorage');
+
 const VEHICLE_IMAGES_BUCKET = 'vehicle-images';
 
 /**
- * Extrae la clave del objeto dentro del bucket a partir de la URL pública devuelta por Supabase.
+ * Extrae la clave del objeto dentro del bucket a partir de la URL pública guardada en BD.
  * @param {string} publicUrl
  * @returns {string|null}
  */
@@ -26,7 +28,7 @@ function storagePathFromPublicUrl(publicUrl) {
 }
 
 /**
- * Elimina un objeto del bucket usando la URL pública almacenada en BD.
+ * Elimina un objeto usando la URL pública almacenada en BD.
  * @param {import('@supabase/supabase-js').SupabaseClient} storageClient
  * @param {string} publicUrl
  * @returns {Promise<{ error: Error | null }>}
@@ -34,37 +36,16 @@ function storagePathFromPublicUrl(publicUrl) {
 async function removeObjectByPublicUrl(storageClient, publicUrl) {
   const storagePath = storagePathFromPublicUrl(publicUrl);
   if (!storagePath) return { error: new Error('URL de imagen inválida') };
-  const { error } = await storageClient.storage.from(VEHICLE_IMAGES_BUCKET).remove([storagePath]);
-  return { error: error || null };
+  return removeObjects(storageClient, providerForUrl(publicUrl), VEHICLE_IMAGES_BUCKET, [storagePath]);
 }
 
 /**
- * Lista y elimina todos los objetos bajo vehicles/{vehicleId}/ (paginado).
+ * Elimina todos los objetos bajo vehicles/{vehicleId}/ en Supabase y en R2.
  * @param {import('@supabase/supabase-js').SupabaseClient} storageClient
  * @param {string} vehicleId
  */
 async function removeAllObjectsInVehicleFolder(storageClient, vehicleId) {
-  const folder = `vehicles/${vehicleId}`;
-  const limit = 100;
-  let offset = 0;
-  for (;;) {
-    const { data: files, error } = await storageClient.storage.from(VEHICLE_IMAGES_BUCKET).list(folder, {
-      limit,
-      offset,
-      sortBy: { column: 'name', order: 'asc' },
-    });
-    if (error) {
-      throw new Error(error.message);
-    }
-    if (!files || files.length === 0) break;
-    const paths = files.map((f) => `${folder}/${f.name}`);
-    const { error: removeError } = await storageClient.storage.from(VEHICLE_IMAGES_BUCKET).remove(paths);
-    if (removeError) {
-      throw new Error(removeError.message);
-    }
-    if (files.length < limit) break;
-    offset += limit;
-  }
+  await removePrefix(storageClient, VEHICLE_IMAGES_BUCKET, `vehicles/${vehicleId}`);
 }
 
 module.exports = {

@@ -6,6 +6,30 @@ const {
   allowImgHotlink,
   resetImgAccessControlForTests,
 } = require('../../../frontend/api/_lib/imgAccessControl');
+const { signR2GetRequest } = require('../../../frontend/api/_lib/r2Fetch');
+const crypto = require('crypto');
+const { SignatureV4 } = require('@smithy/signature-v4');
+
+class NodeSha256 {
+  constructor(secret) {
+    this.hash = secret ? crypto.createHmac('sha256', Buffer.from(secret)) : crypto.createHash('sha256');
+  }
+
+  update(data) {
+    this.hash.update(typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data));
+  }
+
+  async digest() {
+    return new Uint8Array(this.hash.digest());
+  }
+}
+
+const R2_READ_ENV = {
+  R2_ACCOUNT_ID: 'acc123',
+  R2_ACCESS_KEY_ID: 'key',
+  R2_SECRET_ACCESS_KEY: 'secret',
+  R2_BUCKET: 'slot-images',
+};
 
 function mockRes() {
   const res = {
@@ -202,6 +226,82 @@ describe('api/img proxy', () => {
       allowed,
     );
     expect(allowed.statusCode).toBe(200);
+  });
+
+  test('/api/img/r2/... lee del bucket privado de R2 con petición firmada', async () => {
+    Object.assign(process.env, R2_READ_ENV);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get(name) {
+          return name === 'content-type' ? 'image/webp' : null;
+        },
+      },
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+    const res = mockRes();
+    await handler(
+      { method: 'GET', query: { p: 'r2/vehicle-images/vehicles/u1/1790000000-front.webp' } },
+      res,
+    );
+    const [url, init] = global.fetch.mock.calls[0];
+    expect(url).toBe(
+      'https://acc123.r2.cloudflarestorage.com/slot-images/vehicle-images/vehicles/u1/1790000000-front.webp',
+    );
+    expect(init).toMatchObject({ method: 'GET', redirect: 'manual' });
+    expect(init.headers.authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=key\/\d{8}\/auto\/s3\/aws4_request, /);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Cache-Control']).toContain('immutable');
+  });
+
+  test('la firma SigV4 de R2 coincide con la del SDK de AWS', async () => {
+    const now = new Date('2026-11-24T08:30:15.123Z');
+    const cfg = { accountId: 'acc123', accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG', bucket: 'slot-images' };
+    const ours = signR2GetRequest(cfg, 'catalog-images', 'catalog/1790000000-ab12cd-thumb.webp', now);
+
+    const signer = new SignatureV4({
+      credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
+      region: 'auto',
+      service: 's3',
+      sha256: NodeSha256,
+      uriEscapePath: false,
+    });
+    const sdk = await signer.sign(
+      {
+        method: 'GET',
+        protocol: 'https:',
+        hostname: 'acc123.r2.cloudflarestorage.com',
+        path: '/slot-images/catalog-images/catalog/1790000000-ab12cd-thumb.webp',
+        headers: {
+          host: 'acc123.r2.cloudflarestorage.com',
+          'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+        },
+      },
+      { signingDate: now },
+    );
+
+    expect(ours.url).toBe(
+      'https://acc123.r2.cloudflarestorage.com/slot-images/catalog-images/catalog/1790000000-ab12cd-thumb.webp',
+    );
+    expect(ours.headers['x-amz-date']).toBe(sdk.headers['x-amz-date']);
+    expect(ours.headers.authorization).toBe(sdk.headers.authorization);
+  });
+
+  test('/api/img/r2/... devuelve 404 si el objeto no existe en R2', async () => {
+    Object.assign(process.env, R2_READ_ENV);
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 404, headers: { get: () => null } });
+    const res = mockRes();
+    await handler({ method: 'GET', query: { p: 'r2/catalog-images/catalog/missing.webp' } }, res);
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('/api/img/r2/... sin R2 configurado responde 503 sin fetch', async () => {
+    for (const k of Object.keys(R2_READ_ENV)) delete process.env[k];
+    const res = mockRes();
+    await handler({ method: 'GET', query: { p: 'r2/catalog-images/catalog/a.webp' } }, res);
+    expect(res.statusCode).toBe(503);
+    expect(global.fetch).toBe(originalFetch);
   });
 
   test('rechaza path traversal y buckets ajenos sin fetch', async () => {

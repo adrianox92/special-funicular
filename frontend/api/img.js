@@ -1,5 +1,5 @@
 /**
- * Proxy same-origin de imágenes públicas de Supabase Storage.
+ * Proxy same-origin de imágenes públicas de Supabase Storage y del bucket privado de R2 (`/api/img/r2/...`).
  * Cachea en el edge (Vercel CDN) con s-maxage largo e immutable.
  * Solo permite hosts de nuestro proyecto y buckets catalog-images / vehicle-images.
  */
@@ -9,6 +9,7 @@ const {
 } = require('../src/utils/cachedStorageImageUrl');
 const { allowImgRateLimit, allowImgHotlink } = require('./_lib/imgAccessControl');
 const { isBlockedClientIp } = require('./_lib/catalogBotGate');
+const { fetchR2Object } = require('./_lib/r2Fetch');
 
 const FETCH_MS = 8000;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -75,13 +76,21 @@ module.exports = async function handler(req, res) {
       typeof AbortSignal !== 'undefined' && AbortSignal.timeout
         ? AbortSignal.timeout(FETCH_MS)
         : undefined;
-    upstream = await fetch(resolved.sourceUrl, {
-      redirect: 'manual',
-      headers: { Accept: 'image/*,*/*;q=0.8' },
-      signal: ctrl,
-    });
+    if (resolved.provider === 'r2') {
+      upstream = await fetchR2Object(resolved.bucket, resolved.objectPath, { signal: ctrl });
+      if (!upstream) {
+        sendText(res, 503, 'Origen R2 no configurado');
+        return;
+      }
+    } else {
+      upstream = await fetch(resolved.sourceUrl, {
+        redirect: 'manual',
+        headers: { Accept: 'image/*,*/*;q=0.8' },
+        signal: ctrl,
+      });
+    }
   } catch (e) {
-    console.error('[api/img] fetch failed', resolved.sourceUrl, e);
+    console.error('[api/img] fetch failed', resolved.provider === 'r2' ? 'r2' : resolved.sourceUrl, e);
     sendText(res, 502, 'Bad gateway fetching image');
     return;
   }

@@ -87,6 +87,35 @@ El JSON público (`/api/public/catalog/*`) y el bootstrap SSR (`window.__PUBLIC_
 
 Rollback: revertir el PR (el JSON vuelve a exponer Storage; el proxy `/api/img` puede quedarse). Desactivar límites: `IMG_RATE_LIMIT=off`, `IMG_HOTLINK_CHECK=off`. Quitar o vaciar `BLOCKED_IPS` y redeploy para dejar de bloquear IPs. El techo de página del catálogo público pasa de 100 a 48 y el rate limit de lectura de 200/min a 120/min (el SSR interno no cuenta si hay `CATALOG_INTERNAL_SECRET`).
 
+### Imágenes nuevas en Cloudflare R2
+
+El plan gratuito de Supabase da 1 GB de Storage. Las subidas nuevas de catálogo, logos de marca y fotos de vehículos van a Cloudflare R2 (10 GB gratis, salida de datos sin coste) cuando `IMAGE_STORAGE_PROVIDER=r2`. Lo ya subido se queda en Supabase: la BD guarda la URL de cada proveedor y no hay migración.
+
+- Clave en R2: `<bucket lógico>/<ruta>` dentro de un único bucket (`catalog-images/catalog/<stem>.webp`, `catalog-images/catalog/<stem>-thumb.webp`, `catalog-images/brands/...`, `vehicle-images/vehicles/<id>/...`).
+- El bucket es **privado**: no tiene dominio ni acceso público, así que no hace falta que `slotdatabase.es` esté en Cloudflare (su DNS sigue en IONOS).
+- URL en BD: `<PUBLIC_IMAGE_ORIGIN>/api/img/r2/<bucket>/<ruta>` (por defecto `https://www.slotdatabase.es`). `/api/img` lee el objeto de R2 con una petición firmada (SigV4, `frontend/api/_lib/r2Fetch.js`) y lo cachea en Vercel como las de Supabase, con el mismo rate limit y control de hotlink. Las de Supabase siguen en `/api/img/<bucket>/<ruta>`.
+- La SPA y el JSON público reescriben esas URLs al origen actual, así que funcionan igual en previews.
+- Los borrados eligen proveedor según la URL guardada. Al borrar un vehículo o una cuenta se vacía `vehicles/<id>/` en los dos.
+- `/api/sync/*` y partners reciben la URL `https://www.slotdatabase.es/api/img/r2/...` tal cual.
+
+**Alta en Cloudflare (una vez)**
+
+1. Cloudflare Dashboard → **R2** → activar R2 (pide tarjeta; con el plan gratuito no se cobra hasta pasar de 10 GB o de las operaciones gratuitas). No hace falta añadir ningún dominio a Cloudflare.
+2. **Create bucket** (p. ej. `slotdatabase-images`, ubicación automática o `EEUR`). Deja el acceso público desactivado.
+3. **R2 → Manage API tokens → Create API token**, dos veces, ambos restringidos a ese bucket:
+   - Para Render: permiso *Object Read & Write*.
+   - Para Vercel: permiso *Object Read only*.
+   Guarda Access Key ID y Secret Access Key de cada uno; el Account ID sale en la misma pantalla.
+
+**Variables**
+
+- Render (API): `IMAGE_STORAGE_PROVIDER=r2`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (token de lectura y escritura), `R2_BUCKET`. Si falta alguna, la API avisa en el log y sigue subiendo a Supabase. `PUBLIC_IMAGE_ORIGIN` decide el origen de las URLs guardadas.
+- Vercel (frontend): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (token de solo lectura), `R2_BUCKET`. Solo las usa la función `/api/img`; no hace falta rebuild de la SPA, pero sí redeploy para que la función las vea. Sin ellas, `/api/img/r2/...` responde 503.
+
+Orden de despliegue: primero Vercel (variables + redeploy), después Render con `IMAGE_STORAGE_PROVIDER=r2`. Comprobación: sube una foto, abre su URL `/api/img/r2/...` y debe responder 200 con la imagen. Rollback: `IMAGE_STORAGE_PROVIDER=supabase` (o quitarla) en Render; lo ya subido a R2 se sigue sirviendo mientras Vercel tenga las credenciales.
+
+Huérfanos en Supabase: `node backend/scripts/cleanup-orphan-storage-objects.js` lista los objetos de `catalog-images` y `vehicle-images` que ninguna fila referencia; con `--apply` los borra.
+
 ### Render (backend / API)
 
 Servicio de producción: **`special-funicular-3q60`** (host `special-funicular-3q60.onrender.com`, o el web service que esté sirviendo la API actual).

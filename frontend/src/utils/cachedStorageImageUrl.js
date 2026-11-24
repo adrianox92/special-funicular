@@ -5,11 +5,15 @@
  * CJS para que SSR (Node) y SPA (webpack) compartan la misma fuente.
  * La invalidación es por clave: cada subida usa un path único
  * (`catalog/<timestamp>-<rand>.webp`); un `image_url` nuevo cambia la URL cacheada.
+ *
+ * Las subidas nuevas viven en un bucket privado de Cloudflare R2: la BD guarda
+ * `<origen del sitio>/api/img/r2/<bucket>/<path>` y el proxy lee R2 con credenciales.
  */
 
 const ALLOWED_BUCKETS = Object.freeze(['catalog-images', 'vehicle-images']);
 const STORAGE_PUBLIC_PREFIX = '/storage/v1/object/public/';
 const PROXY_PREFIX = '/api/img/';
+const R2_PROXY_SEGMENT = 'r2';
 const MAX_OBJECT_PATH_LEN = 512;
 
 function allowedBucketsSet() {
@@ -85,6 +89,32 @@ function hostIsAllowed(hostname, allowedHosts) {
 }
 
 /**
+ * `<cualquier origen>/api/img/r2/<bucket>/<path>` → `{ bucket, objectPath }` si es válido.
+ * @param {unknown} rawUrl
+ * @returns {{ bucket: string, objectPath: string }|null}
+ */
+function parseR2ProxyUrl(rawUrl) {
+  if (rawUrl == null) return null;
+  const s = String(rawUrl).trim();
+  if (!s) return null;
+  let pathname;
+  try {
+    pathname = decodeURI(new URL(s, 'https://placeholder.invalid').pathname);
+  } catch {
+    return null;
+  }
+  const prefix = `${PROXY_PREFIX}${R2_PROXY_SEGMENT}/`;
+  if (!pathname.startsWith(prefix)) return null;
+  const rest = pathname.slice(prefix.length);
+  const slash = rest.indexOf('/');
+  if (slash <= 0) return null;
+  const bucket = rest.slice(0, slash);
+  const objectPath = rest.slice(slash + 1);
+  if (!allowedBucketsSet().has(bucket) || !isSafeObjectPath(objectPath)) return null;
+  return { bucket, objectPath };
+}
+
+/**
  * @param {unknown} rawUrl
  * @param {{ allowedHosts?: Set<string> }} [opts]
  * @returns {{ host: string, bucket: string, objectPath: string, sourceUrl: string }|null}
@@ -124,12 +154,13 @@ function parseAllowedStorageUrl(rawUrl, opts) {
   return { host: url.hostname.toLowerCase(), bucket, objectPath, sourceUrl };
 }
 
-function proxyPathFor(bucket, objectPath) {
+function proxyPathFor(bucket, objectPath, provider) {
   const encoded = String(objectPath)
     .split('/')
     .map((seg) => encodeURIComponent(seg))
     .join('/');
-  return `${PROXY_PREFIX}${bucket}/${encoded}`;
+  const prefix = provider === 'r2' ? `${PROXY_PREFIX}${R2_PROXY_SEGMENT}/` : PROXY_PREFIX;
+  return `${prefix}${bucket}/${encoded}`;
 }
 
 function isProxyEnabled(opts) {
@@ -169,6 +200,12 @@ function cachedStorageImageUrl(rawUrl, opts) {
   const origin = originFromOpts(opts);
   if (s.startsWith('/')) return absolutizeProxyPath(s, origin);
   if (!isProxyEnabled(opts)) return s;
+
+  const r2 = parseR2ProxyUrl(s);
+  if (r2) {
+    const rel = proxyPathFor(r2.bucket, r2.objectPath, 'r2');
+    return origin ? `${origin}${rel}` : rel;
+  }
 
   const parsed = parseAllowedStorageUrl(s, opts);
   if (!parsed) return s;
@@ -246,6 +283,17 @@ function resolveStorageImageRequest(input) {
   }
 
   const segments = ((input && input.pathSegments) || []).map((s) => String(s || '')).filter(Boolean);
+  if (segments[0] === R2_PROXY_SEGMENT) {
+    if (segments.length < 3) {
+      return { ok: false, status: 400, message: 'Ruta de imagen inválida' };
+    }
+    const r2Bucket = segments[1];
+    const r2ObjectPath = segments.slice(2).join('/');
+    if (!allowedBucketsSet().has(r2Bucket) || !isSafeObjectPath(r2ObjectPath)) {
+      return { ok: false, status: 400, message: 'Ruta de imagen no permitida' };
+    }
+    return { ok: true, provider: 'r2', bucket: r2Bucket, objectPath: r2ObjectPath };
+  }
   if (segments.length < 2) {
     return { ok: false, status: 400, message: 'Ruta de imagen inválida' };
   }
@@ -313,6 +361,9 @@ module.exports = {
   ALLOWED_BUCKETS,
   STORAGE_PUBLIC_PREFIX,
   PROXY_PREFIX,
+  R2_PROXY_SEGMENT,
+  parseR2ProxyUrl,
+  proxyPathFor,
   allowedStorageHostsFromEnv,
   primaryStorageHost,
   isSafeObjectPath,

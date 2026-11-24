@@ -6,6 +6,7 @@ const {
   allowedStorageHostsFromEnv,
   isSafeObjectPath,
   rewritePublicCatalogMediaUrls,
+  parseR2ProxyUrl,
 } = require('../../utils/cachedStorageImageUrl');
 const { catalogThumbUrl } = require('../../utils/catalogImageVariants');
 
@@ -187,6 +188,76 @@ describe('resolveStorageImageRequest', () => {
     expect(hosts.has('abcdxyz.supabase.co')).toBe(true);
     expect(hosts.has('abcdxyz.storage.supabase.co')).toBe(true);
     expect(hosts.has('cdn.slotdatabase.es')).toBe(true);
+  });
+});
+
+describe('Cloudflare R2 (bucket privado tras /api/img/r2/)', () => {
+  const R2_CATALOG = 'https://www.slotdatabase.es/api/img/r2/catalog-images/catalog/1790000000-ab12cd.webp';
+  const R2_VEHICLE = 'https://www.slotdatabase.es/api/img/r2/vehicle-images/vehicles/u1/1790000000-front.webp';
+  const env = { REACT_APP_SUPABASE_URL: 'https://abcdxyz.supabase.co' };
+
+  test('parseR2ProxyUrl acepta cualquier origen y valida bucket y ruta', () => {
+    expect(parseR2ProxyUrl(R2_CATALOG)).toEqual({
+      bucket: 'catalog-images',
+      objectPath: 'catalog/1790000000-ab12cd.webp',
+    });
+    expect(parseR2ProxyUrl('/api/img/r2/vehicle-images/vehicles/u1/a.webp')).toMatchObject({
+      bucket: 'vehicle-images',
+    });
+    expect(parseR2ProxyUrl('https://www.slotdatabase.es/api/img/r2/secret/x.webp')).toBeNull();
+    expect(parseR2ProxyUrl('https://www.slotdatabase.es/api/img/r2/catalog-images/../x.webp')).toBeNull();
+    expect(parseR2ProxyUrl(CATALOG)).toBeNull();
+  });
+
+  test('reescribe al proxy relativo y la miniatura conserva el prefijo', () => {
+    const proxied = cachedStorageImageUrl(R2_CATALOG);
+    expect(proxied).toBe('/api/img/r2/catalog-images/catalog/1790000000-ab12cd.webp');
+    expect(catalogThumbUrl(proxied)).toBe('/api/img/r2/catalog-images/catalog/1790000000-ab12cd-thumb.webp');
+    expect(
+      cachedStorageImageUrl('https://preview.example/api/img/r2/vehicle-images/vehicles/u1/1790000000-front.webp', {
+        origin: 'https://www.slotdatabase.es',
+      }),
+    ).toBe(R2_VEHICLE);
+  });
+
+  test('con el proxy desactivado (dev local) deja la URL absoluta', () => {
+    expect(cachedStorageImageUrl(R2_CATALOG, { enabled: false })).toBe(R2_CATALOG);
+  });
+
+  test('rewritePublicCatalogMediaUrls mezcla Supabase y R2', () => {
+    const out = rewritePublicCatalogMediaUrls(
+      { items: [{ image_url: R2_CATALOG }, { image_url: CATALOG }] },
+      { origin: 'https://www.slotdatabase.es' },
+    );
+    expect(out.items[0].image_url).toBe(
+      'https://www.slotdatabase.es/api/img/r2/catalog-images/catalog/1790000000-ab12cd.webp',
+    );
+    expect(out.items[1].image_url).toBe(
+      'https://www.slotdatabase.es/api/img/catalog-images/catalog/1710000000-ab12cd.webp',
+    );
+  });
+
+  test('resolveStorageImageRequest marca el segmento r2 sin URL de origen', () => {
+    expect(
+      resolveStorageImageRequest({
+        pathSegments: ['r2', 'catalog-images', 'catalog', '1790000000-ab12cd.webp'],
+        env: {},
+      }),
+    ).toEqual({
+      ok: true,
+      provider: 'r2',
+      bucket: 'catalog-images',
+      objectPath: 'catalog/1790000000-ab12cd.webp',
+    });
+  });
+
+  test('segmento r2: 400 con bucket o path no permitidos', () => {
+    expect(
+      resolveStorageImageRequest({ pathSegments: ['r2', 'secret', 'x.webp'], env }),
+    ).toMatchObject({ ok: false, status: 400 });
+    expect(
+      resolveStorageImageRequest({ pathSegments: ['r2', 'catalog-images'], env }),
+    ).toMatchObject({ ok: false, status: 400 });
   });
 });
 

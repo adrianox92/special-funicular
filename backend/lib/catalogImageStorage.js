@@ -1,5 +1,5 @@
 const { processVehicleImageBuffer, DEFAULT_THUMB_EDGE } = require('./processVehicleImageBuffer');
-const { STORAGE_UPLOAD_CACHE } = require('./storageCacheControl');
+const { uploadObject, removeObjects, providerForUrl } = require('./imageObjectStorage');
 
 function isThumbPath(storagePath) {
   return /-thumb\.[A-Za-z0-9]+$/.test(String(storagePath || ''));
@@ -17,15 +17,6 @@ function randomCatalogStem() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function uploadOptions(contentType, extra = {}) {
-  return {
-    contentType,
-    upsert: false,
-    ...STORAGE_UPLOAD_CACHE,
-    ...extra,
-  };
-}
-
 /**
  * Sube imagen al bucket catálogo (detalle + miniatura `-thumb`) y devuelve URL pública del detalle.
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
@@ -36,29 +27,27 @@ async function uploadCatalogImageBuffer(supabase, buffer, mimetype) {
   const processed = await processVehicleImageBuffer(buffer, mimetype);
   const stem = `catalog/${randomCatalogStem()}`;
   const filePath = `${stem}${processed.ext}`;
-  const { error: storageError } = await supabase.storage
-    .from(CATALOG_IMAGES_BUCKET)
-    .upload(filePath, processed.buffer, uploadOptions(processed.contentType));
-  if (storageError) throw new Error(storageError.message);
+  const publicUrl = await uploadObject(
+    supabase,
+    CATALOG_IMAGES_BUCKET,
+    filePath,
+    processed.buffer,
+    processed.contentType,
+  );
 
   try {
     const thumb = await processVehicleImageBuffer(buffer, mimetype, { maxEdgePx: DEFAULT_THUMB_EDGE });
     const thumbPath = `${stem}-thumb${thumb.ext}`;
-    const { error: thumbError } = await supabase.storage
-      .from(CATALOG_IMAGES_BUCKET)
-      .upload(thumbPath, thumb.buffer, uploadOptions(thumb.contentType));
-    if (thumbError) {
-      console.warn('[catalogImageStorage] no se pudo subir miniatura:', thumbError.message);
-    }
+    await uploadObject(supabase, CATALOG_IMAGES_BUCKET, thumbPath, thumb.buffer, thumb.contentType);
   } catch (thumbErr) {
-    console.warn('[catalogImageStorage] no se pudo generar miniatura:', thumbErr.message);
+    console.warn('[catalogImageStorage] no se pudo generar o subir miniatura:', thumbErr.message);
   }
 
-  const { data: publicUrlData } = supabase.storage.from(CATALOG_IMAGES_BUCKET).getPublicUrl(filePath);
-  return publicUrlData.publicUrl;
+  return publicUrl;
 }
 
 /**
+ * Ruta del objeto dentro del bucket lógico; vale para URLs de Supabase y de R2.
  * @param {string} publicUrl
  * @returns {string|null}
  */
@@ -88,8 +77,7 @@ async function removeCatalogObjectByPublicUrl(supabase, publicUrl) {
   const paths = [storagePath];
   const thumbPath = thumbStoragePathFromDetailPath(storagePath);
   if (thumbPath && thumbPath !== storagePath) paths.push(thumbPath);
-  const { error } = await supabase.storage.from(CATALOG_IMAGES_BUCKET).remove(paths);
-  return { error: error || null };
+  return removeObjects(supabase, providerForUrl(publicUrl), CATALOG_IMAGES_BUCKET, paths);
 }
 
 /**
@@ -98,12 +86,7 @@ async function removeCatalogObjectByPublicUrl(supabase, publicUrl) {
 async function uploadBrandLogoBuffer(supabase, buffer, mimetype) {
   const processed = await processVehicleImageBuffer(buffer, mimetype);
   const filePath = `brands/${randomCatalogStem()}${processed.ext}`;
-  const { error: storageError } = await supabase.storage
-    .from(CATALOG_IMAGES_BUCKET)
-    .upload(filePath, processed.buffer, uploadOptions(processed.contentType));
-  if (storageError) throw new Error(storageError.message);
-  const { data: publicUrlData } = supabase.storage.from(CATALOG_IMAGES_BUCKET).getPublicUrl(filePath);
-  return publicUrlData.publicUrl;
+  return uploadObject(supabase, CATALOG_IMAGES_BUCKET, filePath, processed.buffer, processed.contentType);
 }
 
 module.exports = {

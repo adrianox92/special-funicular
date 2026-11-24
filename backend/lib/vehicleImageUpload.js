@@ -1,6 +1,6 @@
 const { removeObjectByPublicUrl } = require('./vehicleImageStorage');
 const { processVehicleImageBuffer } = require('./processVehicleImageBuffer');
-const { STORAGE_UPLOAD_CACHE } = require('./storageCacheControl');
+const { uploadObject } = require('./imageObjectStorage');
 
 const VEHICLE_IMAGES_BUCKET = 'vehicle-images';
 
@@ -65,15 +65,14 @@ async function saveVehicleImagesFromMultipart(supabase, vehicleId, files, option
     }
 
     const filePath = `vehicles/${vehicleId}/${Date.now()}-${view_type}${processed.ext}`;
-    const { error: storageError } = await supabase.storage.from(VEHICLE_IMAGES_BUCKET).upload(filePath, processed.buffer, {
-      contentType: processed.contentType,
-      upsert: !!replacePerView,
-      ...STORAGE_UPLOAD_CACHE,
-    });
-    if (storageError) throw new Error(storageError.message);
-
-    const { data: publicUrlData } = supabase.storage.from(VEHICLE_IMAGES_BUCKET).getPublicUrl(filePath);
-    const imageUrl = publicUrlData.publicUrl;
+    const imageUrl = await uploadObject(
+      supabase,
+      VEHICLE_IMAGES_BUCKET,
+      filePath,
+      processed.buffer,
+      processed.contentType,
+      { upsert: !!replacePerView },
+    );
 
     const { error: imgError } = await supabase
       .from('vehicle_images')
@@ -94,15 +93,13 @@ async function saveVehicleViewProcessed(supabase, vehicleId, viewType, processed
     throw new Error(`Vista no válida: ${viewType}`);
   }
   const filePath = `vehicles/${vehicleId}/${Date.now()}-${viewType}${processed.ext}`;
-  const { error: storageError } = await supabase.storage.from(VEHICLE_IMAGES_BUCKET).upload(filePath, processed.buffer, {
-    contentType: processed.contentType,
-    upsert: false,
-    ...STORAGE_UPLOAD_CACHE,
-  });
-  if (storageError) throw new Error(storageError.message);
-
-  const { data: publicUrlData } = supabase.storage.from(VEHICLE_IMAGES_BUCKET).getPublicUrl(filePath);
-  const imageUrl = publicUrlData.publicUrl;
+  const imageUrl = await uploadObject(
+    supabase,
+    VEHICLE_IMAGES_BUCKET,
+    filePath,
+    processed.buffer,
+    processed.contentType,
+  );
 
   const { error: imgError } = await supabase
     .from('vehicle_images')

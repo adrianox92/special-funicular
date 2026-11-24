@@ -110,6 +110,34 @@ describe('GET /api/public/catalog image URLs', () => {
     expect(JSON.stringify(items.body)).not.toMatch(/storage\/v1\/object\/public/i);
   });
 
+  test('fotos de R2 guardadas con otro origen se sirven desde PUBLIC_IMAGE_ORIGIN', async () => {
+    mockSupabase.from.mockImplementation(() =>
+      thenable({
+        data: [
+          {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            reference: 'C9999',
+            image_url: 'https://preview.example/api/img/r2/catalog-images/catalog/1790000000-ab12cd.webp',
+            manufacturer_logo_url: LOGO,
+          },
+        ],
+        error: null,
+        count: 1,
+      }),
+    );
+
+    const items = await request(app)
+      .get('/api/public/catalog/items?limit=24')
+      .set('User-Agent', CHROME)
+      .expect(200);
+    expect(items.body.items[0].image_url).toBe(
+      'https://www.slotdatabase.es/api/img/r2/catalog-images/catalog/1790000000-ab12cd.webp',
+    );
+    expect(items.body.items[0].manufacturer_logo_url).toBe(
+      'https://www.slotdatabase.es/api/img/catalog-images/brands/scx.webp',
+    );
+  });
+
   test(`limit público se recorta a ${PUBLIC_ITEMS_MAX_LIMIT}`, async () => {
     expect(PUBLIC_ITEMS_MAX_LIMIT).toBeLessThan(100);
     mockSupabase.from.mockImplementation(() => thenable({ data: [], error: null, count: 0 }));

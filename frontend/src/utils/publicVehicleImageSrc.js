@@ -2,11 +2,13 @@ import {
   cachedStorageImageUrl,
   parseAllowedStorageUrl,
   PROXY_PREFIX,
+  R2_PROXY_SEGMENT,
   ALLOWED_BUCKETS,
 } from './cachedStorageImageUrl';
 
 const ALLOWED_BUCKET_SET = new Set(ALLOWED_BUCKETS || ['catalog-images', 'vehicle-images']);
 const IMG_PROXY_PREFIX = PROXY_PREFIX || '/api/img/';
+const R2_PROXY_PREFIX = `${R2_PROXY_SEGMENT || 'r2'}/`;
 
 function proxyPathFromMaybeAbsolute(raw) {
   const s = String(raw || '');
@@ -23,7 +25,8 @@ function proxyPathFromMaybeAbsolute(raw) {
 function isProxiedAllowedBucket(path) {
   const proxied = proxyPathFromMaybeAbsolute(path);
   if (!proxied.startsWith(IMG_PROXY_PREFIX)) return false;
-  const rest = proxied.slice(IMG_PROXY_PREFIX.length);
+  let rest = proxied.slice(IMG_PROXY_PREFIX.length);
+  if (rest.startsWith(R2_PROXY_PREFIX)) rest = rest.slice(R2_PROXY_PREFIX.length);
   const slash = rest.indexOf('/');
   if (slash <= 0) return false;
   return ALLOWED_BUCKET_SET.has(rest.slice(0, slash));
