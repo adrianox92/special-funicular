@@ -105,7 +105,9 @@ El plan gratuito de Supabase da 1 GB de Storage. Las subidas nuevas de catálogo
 3. **R2 → Manage API tokens → Create API token**, dos veces, ambos restringidos a ese bucket:
    - Para Render: permiso *Object Read & Write*.
    - Para Vercel: permiso *Object Read only*.
-   Guarda Access Key ID y Secret Access Key de cada uno; el Account ID sale en la misma pantalla.
+   Guarda Access Key ID y Secret Access Key de cada uno.
+4. `R2_ACCOUNT_ID` es el **Account ID** (32 caracteres hex, en R2 → *Account details*, o el prefijo de la URL `https://<account_id>.r2.cloudflarestorage.com`). No es el Access Key ID ni el Token ID. Si es incorrecto, Cloudflare corta la conexión con `SSL alert number 40 (handshake failure)`; la API lo detecta si el formato no cuadra o coincide con el Access Key ID y sigue subiendo a Supabase.
+5. Si el bucket se creó con jurisdicción UE, añade `R2_JURISDICTION=eu` (endpoint `<account_id>.eu.r2.cloudflarestorage.com`) en Render y en Vercel.
 
 **Variables**
 

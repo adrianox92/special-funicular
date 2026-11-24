@@ -9,6 +9,7 @@
  */
 const { STORAGE_CACHE_CONTROL_SECONDS, STORAGE_UPLOAD_CACHE } = require('./storageCacheControl');
 const { publicImageOrigin } = require('./publicCatalogImageUrls');
+const { resolveR2Config, describeR2Error } = require('../../frontend/api/_lib/r2Config');
 
 const R2_PROXY_PATH_PREFIX = '/api/img/r2/';
 
@@ -25,12 +26,8 @@ function trimSlashes(s) {
 }
 
 function r2Config(env = process.env) {
-  const accountId = String(env.R2_ACCOUNT_ID || '').trim();
-  const accessKeyId = String(env.R2_ACCESS_KEY_ID || '').trim();
-  const secretAccessKey = String(env.R2_SECRET_ACCESS_KEY || '').trim();
-  const bucket = String(env.R2_BUCKET || '').trim();
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
-  return { accountId, accessKeyId, secretAccessKey, bucket };
+  const cfg = resolveR2Config(env);
+  return cfg.ok ? cfg : null;
 }
 
 /**
@@ -40,8 +37,9 @@ function r2Config(env = process.env) {
 function uploadProvider(env = process.env) {
   const wanted = String(env.IMAGE_STORAGE_PROVIDER || '').trim().toLowerCase();
   if (wanted !== PROVIDER_R2) return PROVIDER_SUPABASE;
-  if (!r2Config(env)) {
-    console.warn('[imageObjectStorage] IMAGE_STORAGE_PROVIDER=r2 sin configuración R2 completa; se usa Supabase');
+  const cfg = resolveR2Config(env);
+  if (!cfg.ok) {
+    console.warn(`[imageObjectStorage] IMAGE_STORAGE_PROVIDER=r2 pero ${cfg.reason}; se usa Supabase`);
     return PROVIDER_SUPABASE;
   }
   return PROVIDER_R2;
@@ -51,18 +49,28 @@ function r2Client(env = process.env) {
   if (r2ClientOverride) return r2ClientOverride;
   const cfg = r2Config(env);
   if (!cfg) throw new Error('Cloudflare R2 no está configurado');
-  const key = `${cfg.accountId}:${cfg.accessKeyId}`;
+  const key = `${cfg.endpoint}:${cfg.accessKeyId}`;
   if (r2ClientCached && r2ClientKey === key) return r2ClientCached;
   const { S3Client } = require('@aws-sdk/client-s3');
   r2ClientCached = new S3Client({
     region: 'auto',
-    endpoint: `https://${cfg.accountId}.r2.cloudflarestorage.com`,
+    endpoint: cfg.endpoint,
+    forcePathStyle: true,
     credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   });
   r2ClientKey = key;
   return r2ClientCached;
+}
+
+async function r2Send(command, env = process.env) {
+  try {
+    return await r2Client(env).send(command);
+  } catch (err) {
+    const cfg = r2Config(env);
+    throw describeR2Error(err, cfg ? cfg.host : 'R2');
+  }
 }
 
 /** Solo tests: inyecta un cliente con `send(command)`. */
@@ -117,7 +125,7 @@ async function uploadObject(supabase, bucket, objectPath, buffer, contentType, o
   const env = opts.env || process.env;
   if (uploadProvider(env) === PROVIDER_R2) {
     const { PutObjectCommand } = require('@aws-sdk/client-s3');
-    await r2Client(env).send(
+    await r2Send(
       new PutObjectCommand({
         Bucket: r2Config(env).bucket,
         Key: r2ObjectKey(bucket, objectPath),
@@ -125,6 +133,7 @@ async function uploadObject(supabase, bucket, objectPath, buffer, contentType, o
         ContentType: contentType,
         CacheControl: `public, max-age=${STORAGE_CACHE_CONTROL_SECONDS}, immutable`,
       }),
+      env,
     );
     return r2PublicUrl(bucket, objectPath, env);
   }
@@ -154,11 +163,12 @@ async function removeObjects(supabase, provider, bucket, paths, env = process.en
       const { DeleteObjectsCommand } = require('@aws-sdk/client-s3');
       for (let i = 0; i < list.length; i += R2_DELETE_BATCH) {
         const chunk = list.slice(i, i + R2_DELETE_BATCH);
-        const out = await r2Client(env).send(
+        const out = await r2Send(
           new DeleteObjectsCommand({
             Bucket: r2Config(env).bucket,
             Delete: { Objects: chunk.map((p) => ({ Key: r2ObjectKey(bucket, p) })), Quiet: true },
           }),
+          env,
         );
         if (out && Array.isArray(out.Errors) && out.Errors.length > 0) {
           return { error: new Error(out.Errors[0].Message || 'Error borrando en R2') };
@@ -197,21 +207,22 @@ async function removeSupabasePrefix(supabase, bucket, prefix) {
 
 async function removeR2Prefix(bucket, prefix, env = process.env) {
   const { ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
-  const client = r2Client(env);
   const r2Bucket = r2Config(env).bucket;
   const keyPrefix = `${r2ObjectKey(bucket, prefix)}/`;
   let token;
   do {
-    const page = await client.send(
+    const page = await r2Send(
       new ListObjectsV2Command({ Bucket: r2Bucket, Prefix: keyPrefix, ContinuationToken: token }),
+      env,
     );
     const keys = (page.Contents || []).map((o) => o.Key).filter(Boolean);
     if (keys.length > 0) {
-      const out = await client.send(
+      const out = await r2Send(
         new DeleteObjectsCommand({
           Bucket: r2Bucket,
           Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
         }),
+        env,
       );
       if (out && Array.isArray(out.Errors) && out.Errors.length > 0) {
         throw new Error(out.Errors[0].Message || 'Error borrando en R2');

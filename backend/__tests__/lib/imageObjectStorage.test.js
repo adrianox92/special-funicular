@@ -12,7 +12,7 @@ const { removeObjectByPublicUrl, removeAllObjectsInVehicleFolder } = require('..
 
 const R2_ENV = {
   IMAGE_STORAGE_PROVIDER: 'r2',
-  R2_ACCOUNT_ID: 'acc123',
+  R2_ACCOUNT_ID: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6',
   R2_ACCESS_KEY_ID: 'key',
   R2_SECRET_ACCESS_KEY: 'secret',
   R2_BUCKET: 'slot-images',
@@ -243,6 +243,25 @@ describe('imageObjectStorage', () => {
       '[catalogImageStorage] no se pudo generar o subir miniatura:',
       'R2 caído',
     );
+  });
+
+  test('Account ID inválido: avisa y sube a Supabase', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(uploadProvider({ ...R2_ENV, R2_ACCOUNT_ID: R2_ENV.R2_ACCESS_KEY_ID.padEnd(32, '0') })).toBe('supabase');
+    expect(console.warn).toHaveBeenCalledWith(expect.stringMatching(/R2_ACCOUNT_ID/));
+  });
+
+  test('un fallo TLS de R2 se traduce a un mensaje accionable', async () => {
+    setR2ClientForTests({
+      async send() {
+        throw Object.assign(new Error('write EPROTO ... alert handshake failure ... SSL alert number 40'), {
+          code: 'EPROTO',
+        });
+      },
+    });
+    await expect(
+      uploadObject(fakeSupabase(), 'catalog-images', 'catalog/a.webp', Buffer.from('x'), 'image/webp', { env: R2_ENV }),
+    ).rejects.toThrow(/revisa R2_ACCOUNT_ID/);
   });
 
   test('removePrefix en Supabase falla en vez de entrar en bucle si no borra nada', async () => {

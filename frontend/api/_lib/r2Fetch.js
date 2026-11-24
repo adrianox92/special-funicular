@@ -1,21 +1,22 @@
 /**
  * Lectura de objetos del bucket privado de Cloudflare R2 con firma AWS SigV4 (GET, payload sin firmar).
- * Env: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET.
+ * Env: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET y opcional R2_JURISDICTION.
  * Basta un token de solo lectura sobre el bucket.
  */
 const crypto = require('crypto');
+const { resolveR2Config, describeR2Error } = require('./r2Config');
 
 const REGION = 'auto';
 const SERVICE = 's3';
 const UNSIGNED_PAYLOAD = 'UNSIGNED-PAYLOAD';
 
 function r2ReadConfig(env = process.env) {
-  const accountId = String(env.R2_ACCOUNT_ID || '').trim();
-  const accessKeyId = String(env.R2_ACCESS_KEY_ID || '').trim();
-  const secretAccessKey = String(env.R2_SECRET_ACCESS_KEY || '').trim();
-  const bucket = String(env.R2_BUCKET || '').trim();
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
-  return { accountId, accessKeyId, secretAccessKey, bucket };
+  const cfg = resolveR2Config(env);
+  if (!cfg.ok) {
+    if (!cfg.missing) console.error(`[api/img] R2 mal configurado: ${cfg.reason}`);
+    return null;
+  }
+  return cfg;
 }
 
 function sha256Hex(data) {
@@ -37,13 +38,13 @@ function amzDates(now) {
 
 /**
  * URL y cabeceras firmadas para GET de `<logicalBucket>/<objectPath>` en R2.
- * @param {{ accountId: string, accessKeyId: string, secretAccessKey: string, bucket: string }} cfg
+ * @param {{ accountId: string, accessKeyId: string, secretAccessKey: string, bucket: string, host?: string }} cfg
  * @param {string} logicalBucket
  * @param {string} objectPath
  * @param {Date} [now]
  */
 function signR2GetRequest(cfg, logicalBucket, objectPath, now = new Date()) {
-  const host = `${cfg.accountId}.r2.cloudflarestorage.com`;
+  const host = cfg.host || `${cfg.accountId}.r2.cloudflarestorage.com`;
   const key = `${logicalBucket}/${objectPath}`;
   const canonicalUri = `/${[cfg.bucket, ...key.split('/')].map(encodeS3PathSegment).join('/')}`;
   const { amzDate, dateStamp } = amzDates(now);
@@ -86,12 +87,16 @@ async function fetchR2Object(logicalBucket, objectPath, opts = {}) {
   const cfg = r2ReadConfig(opts.env || process.env);
   if (!cfg) return null;
   const signed = signR2GetRequest(cfg, logicalBucket, objectPath);
-  return fetch(signed.url, {
-    method: 'GET',
-    redirect: 'manual',
-    headers: signed.headers,
-    signal: opts.signal,
-  });
+  try {
+    return await fetch(signed.url, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: signed.headers,
+      signal: opts.signal,
+    });
+  } catch (err) {
+    throw describeR2Error(err && err.cause ? err.cause : err, cfg.host);
+  }
 }
 
 module.exports = {

@@ -25,7 +25,7 @@ class NodeSha256 {
 }
 
 const R2_READ_ENV = {
-  R2_ACCOUNT_ID: 'acc123',
+  R2_ACCOUNT_ID: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6',
   R2_ACCESS_KEY_ID: 'key',
   R2_SECRET_ACCESS_KEY: 'secret',
   R2_BUCKET: 'slot-images',
@@ -247,7 +247,7 @@ describe('api/img proxy', () => {
     );
     const [url, init] = global.fetch.mock.calls[0];
     expect(url).toBe(
-      'https://acc123.r2.cloudflarestorage.com/slot-images/vehicle-images/vehicles/u1/1790000000-front.webp',
+      'https://a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.r2.cloudflarestorage.com/slot-images/vehicle-images/vehicles/u1/1790000000-front.webp',
     );
     expect(init).toMatchObject({ method: 'GET', redirect: 'manual' });
     expect(init.headers.authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=key\/\d{8}\/auto\/s3\/aws4_request, /);
