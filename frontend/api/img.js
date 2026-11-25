@@ -91,7 +91,8 @@ module.exports = async function handler(req, res) {
     }
   } catch (e) {
     console.error('[api/img] fetch failed', resolved.provider === 'r2' ? 'r2' : resolved.sourceUrl, e);
-    sendText(res, 502, 'Bad gateway fetching image');
+    const hint = e && /R2_ACCOUNT_ID|R2_JURISDICTION/.test(String(e.message || '')) ? `: ${e.message}` : '';
+    sendText(res, 502, `Bad gateway fetching image${hint}`);
     return;
   }
 
@@ -104,7 +105,8 @@ module.exports = async function handler(req, res) {
     return;
   }
   if (!upstream.ok) {
-    sendText(res, 502, 'Bad gateway fetching image');
+    console.error('[api/img] upstream', resolved.provider === 'r2' ? 'r2' : resolved.sourceUrl, upstream.status);
+    sendText(res, 502, `Bad gateway fetching image (${upstream.status})`);
     return;
   }
 

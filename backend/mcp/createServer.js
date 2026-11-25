@@ -3,10 +3,13 @@
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { z } = require('zod');
+const { getServiceClient } = require('../lib/supabaseClients');
 const tools = require('../lib/mcpReadTools');
 const insight = require('../lib/mcpInsightTools');
+const adminCatalog = require('../lib/mcpAdminCatalog');
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
+const ADMIN_WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: true };
 
 function textResult(data) {
   let text = JSON.stringify(data);
@@ -33,9 +36,11 @@ function wrap(fn) {
  * Servidor MCP nuevo por petición (transporte sin sesión).
  * @param {string} userId
  */
-function createSlotMcpServer(userId, context = {}) {
-  const server = new McpServer({ name: 'slot-database', version: '1.1.0' });
-  const call = (fn) => wrap((args) => fn(userId, args, context));
+async function createSlotMcpServer(userId, context = {}) {
+  const isAdmin = await adminCatalog.resolveMcpAdmin(getServiceClient(), userId);
+  const callContext = { ...context, isAdmin };
+  const server = new McpServer({ name: 'slot-database', version: '1.2.0' });
+  const call = (fn) => wrap((args) => fn(userId, args, callContext));
 
   server.registerTool('search_collection', {
     title: 'Buscar en la colección',
@@ -184,6 +189,36 @@ function createSlotMcpServer(userId, context = {}) {
     annotations: READ_ONLY,
   }, call(insight.getCatalogOffers));
 
+  if (isAdmin) {
+    server.registerTool('list_incomplete_catalog_items', {
+      title: 'Huecos de una marca',
+      description: 'Solo administradores. Lista las fichas de una marca a las que les falta algún dato. missing puede ser incomplete, image, model_name, vehicle_type, traction, motor, year o dorsal. Páginas de 25. No lista el catálogo completo.',
+      inputSchema: {
+        manufacturer: z.string().min(2).max(80),
+        missing: z.enum(['incomplete', 'image', 'model_name', 'vehicle_type', 'traction', 'motor', 'year', 'dorsal']).optional(),
+        page: z.number().int().min(1).max(200).optional(),
+        limit: z.number().int().min(1).max(25).optional(),
+      },
+      annotations: READ_ONLY,
+    }, call(adminCatalog.listIncompleteCatalogItems));
+
+    server.registerTool('update_catalog_item', {
+      title: 'Completar ficha de catálogo',
+      description: 'Solo administradores. Completa datos de una ficha existente, por referencia y marca exactas. Campos: model_name, vehicle_type, traction, motor_position (inline, angular o transverse), commercial_release_year y dorsal. Un valor vacío no borra lo que ya hay. No cambia referencia, marca ni foto.',
+      inputSchema: {
+        reference: z.string().min(2).max(80),
+        manufacturer: z.string().min(2).max(80),
+        model_name: z.string().max(200).optional(),
+        vehicle_type: z.string().max(80).optional(),
+        traction: z.string().max(80).optional(),
+        motor_position: z.string().max(40).optional(),
+        commercial_release_year: z.number().int().optional(),
+        dorsal: z.string().max(40).optional(),
+      },
+      annotations: ADMIN_WRITE,
+    }, call(adminCatalog.updateCatalogItem));
+  }
+
   const prompt = (text) => ({ messages: [{ role: 'user', content: { type: 'text', text } }] });
 
   server.registerPrompt('available_options', {
@@ -210,7 +245,7 @@ function createSlotMcpServer(userId, context = {}) {
  * @param {string} userId
  */
 async function handleMcpHttp(req, res, userId, context = {}) {
-  const server = createSlotMcpServer(userId, context);
+  const server = await createSlotMcpServer(userId, context);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

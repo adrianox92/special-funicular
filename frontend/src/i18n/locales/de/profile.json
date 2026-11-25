@@ -91,7 +91,7 @@
   },
   "mcp": {
     "title": "Lese-Verbindungen",
-    "description": "Apps wie Claude oder ChatGPT können Garage (auch eine Zusammenfassung), Strecken, Zeiten, Trainingsziele, Wettbewerbe, Wartung, Ersatzteile und eine konkrete Katalogkarte mit Ladenpreis abfragen. Sie können nichts ändern.",
+    "description": "Apps wie Claude oder ChatGPT können Garage (auch eine Zusammenfassung), Strecken, Zeiten, Trainingsziele, Wettbewerbe, Wartung, Ersatzteile und eine konkrete Katalogkarte mit Ladenpreis abfragen. Sie können nichts ändern. Ein Administratorkonto kann außerdem unvollständige Katalogkarten ergänzen.",
     "docs": "Assistenten verbinden",
     "loading": "Verbindungen werden geladen...",
     "loadError": "Verbindungen konnten nicht geladen werden",
@@ -104,7 +104,7 @@
     "unnamed": "App ohne Namen",
     "consentTitle": "Lesezugriff erlauben",
     "consentLead": "{{name}} möchte deine Garage (auch eine Zusammenfassung), Strecken, Zeiten, Trainingsziele, Wettbewerbe, Wartung, Ersatzteile und eine konkrete Katalogkarte mit Ladenpreis lesen.",
-    "consentReadOnly": "Nur Lesen. Es kann keine Daten anlegen, ändern oder löschen.",
+    "consentReadOnly": "Nur Lesen. Es kann keine Daten anlegen, ändern oder löschen. Ein Administratorkonto kann außerdem unvollständige Katalogkarten ergänzen.",
     "consentApprove": "Lesen erlauben",
     "consentDeny": "Ablehnen",
     "consentLoading": "App wird geprüft...",

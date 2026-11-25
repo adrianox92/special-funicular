@@ -445,6 +445,7 @@ module.exports = {
   getCompetition,
   getCatalogItem,
   findExactCatalogItemId,
+  resolveExactBrandId: exactBrand,
   withCatalogLookup,
   resetCatalogLookupLimit,
 };

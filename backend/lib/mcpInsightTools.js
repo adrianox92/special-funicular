@@ -247,9 +247,34 @@ function topCounts(rows, key, emptyLabel, limit = 15) {
     .map(([name, count]) => ({ name, count }));
 }
 
-function listCapabilities(userId) {
+const ADMIN_CAPABILITY_GROUP = {
+  name: 'Catálogo (admin)',
+  options: [
+    {
+      tool: 'list_incomplete_catalog_items',
+      summary: 'Lista las fichas de una marca a las que les falta algún dato. No lista el catálogo completo.',
+      example: 'Referencias de Avant Slot sin tipo de vehículo',
+    },
+    {
+      tool: 'update_catalog_item',
+      summary: 'Completa datos de una ficha existente. No borra campos, no cambia la referencia ni la marca y no sube la foto.',
+      example: 'Pon tracción 4x4 y motor inline a la 50402 de Avant Slot',
+    },
+  ],
+};
+
+function listCapabilities(userId, _args, context = {}) {
   assertUser(userId);
-  return CAPABILITY_MENU;
+  if (!context.isAdmin) return CAPABILITY_MENU;
+  return {
+    groups: [...CAPABILITY_MENU.groups, ADMIN_CAPABILITY_GROUP],
+    cannot: [
+      'Puedes listar solo las fichas incompletas de una marca y completar sus datos.',
+      'No crea fichas nuevas, no cambia la referencia ni la marca y no sube fotos.',
+      'No borra datos.',
+      'No consulta ligas ni clubes.',
+    ],
+  };
 }
 
 async function garageSummary(userId) {

@@ -163,6 +163,7 @@ function applyCatalogItemsMissingFilter(q, missing) {
   const key = String(missing ?? '').trim().toLowerCase();
   if (!key) return q;
   if (key === 'image') return q.or('image_url.is.null,image_url.eq.');
+  if (key === 'model' || key === 'model_name') return q.or('model_name.is.null,model_name.eq.');
   if (key === 'vehicle_type') return q.or('vehicle_type.is.null,vehicle_type.eq.');
   if (key === 'traction') return q.or('traction.is.null,traction.eq.');
   if (key === 'motor' || key === 'motor_position') {

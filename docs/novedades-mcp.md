@@ -2,6 +2,8 @@ Ya puedes conectar **Claude** o **ChatGPT** a tu cuenta de Slot Database. El asi
 
 Solo lectura: no puede crear, editar ni borrar nada. No lista el catálogo y no consulta ligas ni clubes.
 
+Una cuenta administradora puede, además, listar las fichas incompletas de una marca y completar sus datos. No crea fichas nuevas, no cambia la referencia ni la marca y no sube fotos. El resto de cuentas no ve esas herramientas.
+
 ## Cómo conectarlo
 
 1. En Claude: **Ajustes → Conectores → conector personalizado**.

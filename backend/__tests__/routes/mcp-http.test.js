@@ -123,6 +123,56 @@ describe('MCP HTTP', () => {
     expect(mentioned).not.toEqual(expect.arrayContaining(['list_leagues', 'list_clubs']));
   });
 
+  test('un administrador ve las herramientas de catálogo y el resto no', async () => {
+    const previous = process.env.LICENSE_ADMIN_EMAILS;
+    process.env.LICENSE_ADMIN_EMAILS = 'admin@slot.test';
+    global.__mcpMemory.auth = {
+      admin: {
+        getUserById: async () => ({ data: { user: { email: 'admin@slot.test' } }, error: null }),
+      },
+    };
+    seedToken({ plain: 'live-access', revoked: false });
+    try {
+      const res = await request(app)
+        .post('/mcp')
+        .set('Authorization', 'Bearer live-access')
+        .set('Accept', ACCEPT)
+        .set('Content-Type', 'application/json')
+        .send({ jsonrpc: '2.0', id: 4, method: 'tools/list' });
+      expect(res.status).toBe(200);
+      const tools = res.body.result?.tools || [];
+      const names = tools.map((tool) => tool.name);
+      expect(names).toEqual(expect.arrayContaining([
+        'list_incomplete_catalog_items',
+        'update_catalog_item',
+      ]));
+      expect(tools.find((tool) => tool.name === 'list_incomplete_catalog_items').annotations.readOnlyHint).toBe(true);
+      expect(tools.find((tool) => tool.name === 'update_catalog_item').annotations.readOnlyHint).toBe(false);
+      const called = await request(app)
+        .post('/mcp')
+        .set('Authorization', 'Bearer live-access')
+        .set('Accept', ACCEPT)
+        .set('Content-Type', 'application/json')
+        .send({
+          jsonrpc: '2.0',
+          id: 5,
+          method: 'tools/call',
+          params: { name: 'list_capabilities', arguments: {} },
+        });
+      const menu = JSON.parse(called.body.result.content[0].text);
+      const mentioned = menu.groups.flatMap((group) => group.options.map((option) => option.tool));
+      expect(mentioned).toEqual(expect.arrayContaining([
+        'list_incomplete_catalog_items',
+        'update_catalog_item',
+      ]));
+      expect(menu.cannot.join(' ')).not.toMatch(/No lista ni busca el catálogo/);
+    } finally {
+      delete global.__mcpMemory.auth;
+      if (previous == null) delete process.env.LICENSE_ADMIN_EMAILS;
+      else process.env.LICENSE_ADMIN_EMAILS = previous;
+    }
+  });
+
   test('prompts/list anuncia las tres guías', async () => {
     seedToken({ plain: 'live-access', revoked: false });
     const res = await request(app)

@@ -104,7 +104,7 @@
     "urlLabel": "Connector URL",
     "claude": "In Claude: Settings, Connectors, custom connector, and paste the URL. The browser opens Slot Database so you can allow read access.",
     "chatgpt": "In ChatGPT: Settings, Apps or Connectors, remote server, and paste the same URL. The permission is the same.",
-    "catalog": "The catalog cannot be listed. The assistant can only request one exact entry, with its reference and brand, and the shop price of that entry. Those lookups share a limit of 10 per minute and 100 per day, and each lookup is recorded.",
+    "catalog": "The catalog cannot be listed. The assistant can only request one exact entry, with its reference and brand, and the shop price of that entry. Those lookups share a limit of 10 per minute and 100 per day, and each lookup is recorded. An administrator account can also list a brand's incomplete entries and fill in their data. Other accounts do not see those tools.",
     "revoke": "You can revoke access in Profile, next to the API key."
   },
   "support": {

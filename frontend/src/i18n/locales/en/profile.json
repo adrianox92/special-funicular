@@ -91,7 +91,7 @@
   },
   "mcp": {
     "title": "Read-only connectors",
-    "description": "Apps such as Claude or ChatGPT can look up your garage (including a summary), circuits, timings, training goals, competitions, maintenance, spare parts, and one exact catalog entry with its shop price. They cannot change anything.",
+    "description": "Apps such as Claude or ChatGPT can look up your garage (including a summary), circuits, timings, training goals, competitions, maintenance, spare parts, and one exact catalog entry with its shop price. They cannot change anything. An administrator account can also fill in incomplete catalog entries.",
     "docs": "How to connect an assistant",
     "loading": "Loading connectors...",
     "loadError": "Could not load connectors",
@@ -104,7 +104,7 @@
     "unnamed": "Unnamed app",
     "consentTitle": "Allow read access",
     "consentLead": "{{name}} wants to read your garage (including a summary), circuits, timings, training goals, competitions, maintenance, spare parts, and one exact catalog entry with its shop price.",
-    "consentReadOnly": "Read only. It cannot create, edit, or delete data.",
+    "consentReadOnly": "Read only. It cannot create, edit, or delete data. An administrator account can also fill in incomplete catalog entries.",
     "consentApprove": "Allow reading",
     "consentDeny": "Deny",
     "consentLoading": "Checking the app...",

@@ -91,7 +91,7 @@
   },
   "mcp": {
     "title": "Conectores de lectura",
-    "description": "Aplicaciones como Claude o ChatGPT que pueden consultar tu garaje (también un resumen), circuitos, tiempos, metas, competiciones, mantenimiento e inventario, y una ficha concreta del catálogo con su precio en tiendas. No pueden modificar nada.",
+    "description": "Aplicaciones como Claude o ChatGPT que pueden consultar tu garaje (también un resumen), circuitos, tiempos, metas, competiciones, mantenimiento e inventario, y una ficha concreta del catálogo con su precio en tiendas. No pueden modificar nada. Si la cuenta es administradora, también puede completar fichas incompletas del catálogo.",
     "docs": "Cómo conectar un asistente",
     "loading": "Cargando conectores...",
     "loadError": "No se pudieron cargar los conectores",
@@ -104,7 +104,7 @@
     "unnamed": "Aplicación sin nombre",
     "consentTitle": "Permitir acceso de lectura",
     "consentLead": "{{name}} quiere leer tu garaje (también un resumen), circuitos, tiempos, metas, competiciones, mantenimiento e inventario, y una ficha concreta del catálogo con su precio en tiendas.",
-    "consentReadOnly": "Solo lectura. No puede crear, editar ni borrar datos.",
+    "consentReadOnly": "Solo lectura. No puede crear, editar ni borrar datos. Si la cuenta es administradora, también puede completar fichas incompletas del catálogo.",
     "consentApprove": "Permitir lectura",
     "consentDeny": "Denegar",
     "consentLoading": "Comprobando la aplicación...",
