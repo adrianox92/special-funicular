@@ -19,6 +19,8 @@ export default function CatalogTractionSelect({
   onChange,
   id = 'catalog-traction',
   disabled,
+  showLabel = true,
+  triggerClassName,
 }) {
   const { t } = useTranslation('catalog');
   const resolvedLabel = label ?? t('detail.fieldTraction');
@@ -28,8 +30,8 @@ export default function CatalogTractionSelect({
   const selectValue = v === '' ? '__none__' : isLegacy ? v : v;
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{resolvedLabel}</Label>
+    <div className={showLabel ? 'space-y-2' : undefined}>
+      {showLabel ? <Label htmlFor={id}>{resolvedLabel}</Label> : null}
       <Select
         value={selectValue}
         onValueChange={(nv) => {
@@ -38,7 +40,11 @@ export default function CatalogTractionSelect({
         }}
         disabled={disabled}
       >
-        <SelectTrigger id={id}>
+        <SelectTrigger
+          id={id}
+          className={triggerClassName}
+          aria-label={showLabel ? undefined : resolvedLabel}
+        >
           <SelectValue placeholder={t('detail.optional')} />
         </SelectTrigger>
         <SelectContent>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -61,6 +61,7 @@ import { Database, ExternalLink, LayoutDashboard, Upload, GitPullRequest, PlusCi
 import { catalogSlugify } from '../utils/catalogSlug';
 import CatalogBrandSelect from '../components/CatalogBrandSelect';
 import CatalogTractionSelect from '../components/CatalogTractionSelect';
+import CatalogListingInlineCells, { catalogInlineFieldEquals } from '../components/CatalogListingInlineCells';
 import { Switch } from '../components/ui/switch';
 import { VEHICLE_TYPES } from '../data/vehicleTypes';
 import { MOTOR_POSITION_OPTIONS, labelMotorPosition } from '../data/motorPosition';
@@ -262,6 +263,7 @@ function AdminSlotCatalog() {
   const [statsError, setStatsError] = useState(null);
 
   const [items, setItems] = useState([]);
+  const itemSaveChainRef = useRef(new Map());
   const [itemsLoading, setItemsLoading] = useState(false);
   const [itemsError, setItemsError] = useState(null);
   const [page, setPage] = useState(1);
@@ -988,6 +990,61 @@ function AdminSlotCatalog() {
     }
   };
 
+  const patchCatalogItemFields = useCallback((id, body) => {
+    const run = async () => {
+      let snapshot = null;
+      setItems((prev) => {
+        const row = prev.find((r) => r.id === id);
+        snapshot = row ? { ...row } : null;
+        if (!row) return prev;
+        const nextRow = { ...row };
+        for (const key of Object.keys(body)) {
+          const raw = body[key];
+          nextRow[key] = raw == null || String(raw).trim() === '' ? null : raw;
+        }
+        return prev.map((r) => (r.id === id ? nextRow : r));
+      });
+      try {
+        const { data } = await api.put(`/catalog/items/${id}`, body);
+        setItems((prev) =>
+          prev.map((row) => {
+            if (row.id !== id) return row;
+            const patch = {};
+            for (const key of Object.keys(body)) {
+              if (!catalogInlineFieldEquals(row[key], body[key])) continue;
+              if (data && Object.prototype.hasOwnProperty.call(data, key)) {
+                patch[key] = data[key];
+              }
+            }
+            return { ...row, ...patch };
+          }),
+        );
+        return data;
+      } catch (e) {
+        if (snapshot) {
+          setItems((prev) =>
+            prev.map((row) => {
+              if (row.id !== id) return row;
+              const restored = { ...row };
+              for (const key of Object.keys(body)) {
+                if (!catalogInlineFieldEquals(row[key], body[key])) continue;
+                restored[key] = snapshot[key];
+              }
+              return restored;
+            }),
+          );
+        }
+        toast.error(e.response?.data?.error || e.message || 'Error al guardar');
+        throw e;
+      }
+    };
+
+    const prev = itemSaveChainRef.current.get(id) || Promise.resolve();
+    const next = prev.catch(() => {}).then(run);
+    itemSaveChainRef.current.set(id, next);
+    return next;
+  }, []);
+
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
@@ -1326,8 +1383,7 @@ function AdminSlotCatalog() {
                       <TableHead>Tracción</TableHead>
                       <TableHead>Motor</TableHead>
                       <TableHead>Año</TableHead>
-                      <TableHead className="whitespace-nowrap">Desc.</TableHead>
-                      <TableHead className="whitespace-nowrap">Próx.</TableHead>
+                      <TableHead>Dorsal</TableHead>
                       <TableHead className="w-0 text-right align-top">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1349,12 +1405,7 @@ function AdminSlotCatalog() {
                         <TableCell className="font-mono text-sm">{row.reference}</TableCell>
                         <TableCell>{row.manufacturer}</TableCell>
                         <TableCell>{row.model_name}</TableCell>
-                        <TableCell>{row.vehicle_type || '—'}</TableCell>
-                        <TableCell>{row.traction || '—'}</TableCell>
-                        <TableCell>{labelMotorPosition(row.motor_position)}</TableCell>
-                        <TableCell>{row.commercial_release_year ?? '—'}</TableCell>
-                        <TableCell className="text-sm">{row.discontinued ? 'Sí' : '—'}</TableCell>
-                        <TableCell className="text-sm">{row.upcoming_release ? 'Sí' : '—'}</TableCell>
+                        <CatalogListingInlineCells row={row} onPatch={patchCatalogItemFields} />
                         <TableCell className="align-top text-right">
                           <div className="inline-flex min-w-[12.5rem] max-w-[16rem] flex-col items-stretch gap-2 sm:min-w-[17rem] sm:max-w-none">
                             <Button size="sm" variant="outline" className="w-full justify-center" asChild>
