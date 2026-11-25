@@ -104,7 +104,7 @@
     "urlLabel": "Connector-URL",
     "claude": "In Claude: Einstellungen, Connectors, eigener Connector, und die URL einfügen. Der Browser öffnet Slot Database, damit du den Lesezugriff erlaubst.",
     "chatgpt": "In ChatGPT: Einstellungen, Apps oder Connectors, Remote-Server, und dieselbe URL einfügen. Die Freigabe ist dieselbe.",
-    "catalog": "Der Katalog kann nicht aufgelistet werden. Der Assistent kann nur eine genaue Karte abfragen, mit Referenz und Marke, und den Ladenpreis dieser Karte. Diese Abfragen teilen sich ein Limit von 10 pro Minute und 100 pro Tag, und jede Abfrage wird gespeichert. Ein Administratorkonto kann außerdem die unvollständigen Karten einer Marke auflisten und ihre Daten ergänzen. Andere Konten sehen diese Werkzeuge nicht.",
+    "catalog": "Der Katalog kann nicht aufgelistet werden. Der Assistent kann nur eine genaue Karte abfragen, mit Referenz und Marke, und den Ladenpreis dieser Karte. Diese Abfragen teilen sich ein Limit von 10 pro Minute und 100 pro Tag, und jede Abfrage wird gespeichert. Ein Administratorkonto kann außerdem die unvollständigen Karten einer Marke oder aller Marken auflisten, bis zu 25 Karten pro Aufruf ergänzen und unterliegt nicht dem Limit von 10 pro Minute oder 100 pro Tag. Andere Konten sehen diese Werkzeuge nicht.",
     "revoke": "Den Zugriff kannst du im Profil widerrufen, neben dem API-Key."
   },
   "support": {

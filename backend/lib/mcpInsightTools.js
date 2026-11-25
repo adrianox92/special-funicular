@@ -252,13 +252,13 @@ const ADMIN_CAPABILITY_GROUP = {
   options: [
     {
       tool: 'list_incomplete_catalog_items',
-      summary: 'Lista las fichas de una marca a las que les falta algún dato. No lista el catálogo completo.',
-      example: 'Referencias de Avant Slot sin tipo de vehículo',
+      summary: 'Lista fichas incompletas de una marca o de todas, si omites manufacturer. Páginas de 25. No lista las fichas completas.',
+      example: 'Referencias de todas las marcas sin año',
     },
     {
       tool: 'update_catalog_item',
-      summary: 'Completa datos de una ficha existente. No borra campos, no cambia la referencia ni la marca y no sube la foto.',
-      example: 'Pon tracción 4x4 y motor inline a la 50402 de Avant Slot',
+      summary: 'Completa una ficha o hasta 25 en una sola llamada. No borra campos, no cambia la referencia ni la marca y no sube la foto.',
+      example: 'Rellena el año de estas referencias de BRM',
     },
   ],
 };
@@ -269,7 +269,8 @@ function listCapabilities(userId, _args, context = {}) {
   return {
     groups: [...CAPABILITY_MENU.groups, ADMIN_CAPABILITY_GROUP],
     cannot: [
-      'Puedes listar solo las fichas incompletas de una marca y completar sus datos.',
+      'Puedes listar las fichas incompletas, de una marca o de todas, y completar hasta 25 por llamada.',
+      'No tienes el máximo de 10 consultas de catálogo por minuto ni el de 100 al día.',
       'No crea fichas nuevas, no cambia la referencia ni la marca y no sube fotos.',
       'No borra datos.',
       'No consulta ligas ni clubes.',

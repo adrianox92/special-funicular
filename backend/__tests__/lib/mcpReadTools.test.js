@@ -176,6 +176,37 @@ describe('mcpReadTools', () => {
     ]);
   });
 
+  test('un administrador consulta el catálogo aunque el cupo diario esté lleno', async () => {
+    const inserts = [];
+    getServiceClient.mockReturnValue({
+      from: jest.fn((table) => {
+        if (table !== 'mcp_catalog_lookups') return builder({ data: [], error: null });
+        const result = { data: null, error: null, count: 100 };
+        const b = {
+          select: jest.fn(() => b),
+          eq: jest.fn(() => b),
+          in: jest.fn(() => b),
+          gte: jest.fn(() => b),
+          insert: jest.fn((row) => {
+            inserts.push(row);
+            return b;
+          }),
+          then(onFulfilled, onRejected) {
+            return Promise.resolve(result).then(onFulfilled, onRejected);
+          },
+        };
+        return b;
+      }),
+    });
+    await expect(getCatalogItem(
+      USER,
+      { reference: '50402', manufacturer: 'Avant Slot' },
+      { isAdmin: true },
+    )).rejects.toMatchObject({ statusCode: 404 });
+    expect(inserts.map((row) => row.outcome)).not.toContain('daily_limited');
+    expect(inserts).toEqual([expect.objectContaining({ outcome: 'not_found' })]);
+  });
+
   test('una ficha no encontrada queda registrada', async () => {
     const inserts = [];
     getServiceClient.mockReturnValue({

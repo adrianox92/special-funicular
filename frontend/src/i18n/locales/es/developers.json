@@ -104,7 +104,7 @@
     "urlLabel": "URL del conector",
     "claude": "En Claude: Ajustes, Conectores, conector personalizado, y pega la URL. El navegador abre Slot Database para aceptar el acceso de lectura.",
     "chatgpt": "En ChatGPT: Ajustes, Aplicaciones o Conectores, servidor remoto, y pega la misma URL. El permiso es el mismo.",
-    "catalog": "El catálogo no se puede listar. El asistente solo pide una ficha concreta, con la referencia y la marca, y el precio en tiendas de esa ficha. Esas consultas comparten un máximo de 10 por minuto y 100 al día, y cada consulta queda registrada. Una cuenta administradora puede, además, listar las fichas incompletas de una marca y completar sus datos. El resto de cuentas no ve esas herramientas.",
+    "catalog": "El catálogo no se puede listar. El asistente solo pide una ficha concreta, con la referencia y la marca, y el precio en tiendas de esa ficha. Esas consultas comparten un máximo de 10 por minuto y 100 al día, y cada consulta queda registrada. Una cuenta administradora puede, además, listar las fichas incompletas de una marca o de todas, completar hasta 25 fichas por llamada y no tiene el máximo de 10 por minuto ni el de 100 al día. El resto de cuentas no ve esas herramientas.",
     "revoke": "Puedes revocar el acceso en Perfil, junto a la API key."
   },
   "support": {

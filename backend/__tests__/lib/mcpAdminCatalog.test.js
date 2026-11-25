@@ -104,6 +104,37 @@ describe('mcpAdminCatalog', () => {
     expect(body.pagination).toMatchObject({ total: 1, page: 1, limit: 25 });
   });
 
+  test('sin marca no filtra manufacturer_id y ordena por marca y referencia', async () => {
+    const items = builder({
+      data: [{
+        reference: 'BRM01',
+        manufacturer: 'BRM',
+        model_name: 'P160',
+        vehicle_type: 'GT',
+        traction: null,
+        motor_position: null,
+        commercial_release_year: null,
+        dorsal: null,
+        image_url: null,
+      }],
+      error: null,
+      count: 1,
+    });
+    getServiceClient.mockReturnValue(client({
+      email: ADMIN_EMAIL,
+      from: jest.fn((table) => {
+        if (table === 'slot_catalog_brands') throw new Error('no debe resolver una marca');
+        return items;
+      }),
+    }));
+    const body = await listIncompleteCatalogItems(USER, { missing: 'year' });
+    expect(items.eq).not.toHaveBeenCalled();
+    expect(items.order).toHaveBeenCalledWith('manufacturer', { ascending: true });
+    expect(items.order).toHaveBeenCalledWith('reference', { ascending: true });
+    expect(body.manufacturer).toBeNull();
+    expect(body.items[0].missing).toEqual(expect.arrayContaining(['commercial_release_year']));
+  });
+
   test('la actualización escribe solo los campos enviados y no vacía los demás', async () => {
     const updates = [];
     const brands = builder({ data: [{ id: 'brand-1' }], error: null });
@@ -130,6 +161,46 @@ describe('mcpAdminCatalog', () => {
     expect(updates[0].commercial_release_year).toBeUndefined();
     expect(updates[0].image_url).toBeUndefined();
     expect(updates[0].reference).toBeUndefined();
+  });
+
+  test('un lote escribe las fichas válidas y deja en failed la que no existe', async () => {
+    const updates = [];
+    getServiceClient.mockReturnValue(client({
+      email: ADMIN_EMAIL,
+      from: jest.fn((table) => {
+        if (table === 'slot_catalog_brands') return builder({ data: [{ id: 'brand-1' }], error: null });
+        const filters = [];
+        const b = builder({ data: [{ id: 'item-1' }], error: null });
+        b.eq = jest.fn((col, val) => {
+          filters.push([col, val]);
+          return b;
+        });
+        b.update = jest.fn((row) => {
+          updates.push(row);
+          return b;
+        });
+        b.then = (onFulfilled, onRejected) => {
+          const reference = filters.find(([col]) => col === 'reference');
+          const result = reference && reference[1] === 'NOPE'
+            ? { data: [], error: null }
+            : { data: [{ id: 'item-1' }], error: null };
+          return Promise.resolve(result).then(onFulfilled, onRejected);
+        };
+        return b;
+      }),
+    }));
+    const body = await updateCatalogItem(USER, {
+      items: [
+        { reference: '50402', manufacturer: 'Avant Slot', commercial_release_year: 1968 },
+        { reference: '50403', manufacturer: 'Avant Slot', model_name: 'Porsche' },
+        { reference: 'NOPE', manufacturer: 'Avant Slot', model_name: 'Fantasma' },
+      ],
+    });
+    expect(body.updated).toHaveLength(2);
+    expect(updates).toHaveLength(2);
+    expect(body.failed).toEqual([
+      expect.objectContaining({ reference: 'NOPE', manufacturer: 'Avant Slot' }),
+    ]);
   });
 
   test('un motor inválido responde 400 y no escribe', async () => {

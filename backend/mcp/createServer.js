@@ -39,7 +39,7 @@ function wrap(fn) {
 async function createSlotMcpServer(userId, context = {}) {
   const isAdmin = await adminCatalog.resolveMcpAdmin(getServiceClient(), userId);
   const callContext = { ...context, isAdmin };
-  const server = new McpServer({ name: 'slot-database', version: '1.2.0' });
+  const server = new McpServer({ name: 'slot-database', version: '1.3.0' });
   const call = (fn) => wrap((args) => fn(userId, args, callContext));
 
   server.registerTool('search_collection', {
@@ -192,9 +192,9 @@ async function createSlotMcpServer(userId, context = {}) {
   if (isAdmin) {
     server.registerTool('list_incomplete_catalog_items', {
       title: 'Huecos de una marca',
-      description: 'Solo administradores. Lista las fichas de una marca a las que les falta algún dato. missing puede ser incomplete, image, model_name, vehicle_type, traction, motor, year o dorsal. Páginas de 25. No lista el catálogo completo.',
+      description: 'Solo administradores. Lista fichas incompletas. manufacturer es opcional: sin marca, recorre todas. missing puede ser incomplete, image, model_name, vehicle_type, traction, motor, year o dorsal. Páginas de 25, ordenadas por marca y referencia. No lista las fichas completas.',
       inputSchema: {
-        manufacturer: z.string().min(2).max(80),
+        manufacturer: z.string().max(80).optional(),
         missing: z.enum(['incomplete', 'image', 'model_name', 'vehicle_type', 'traction', 'motor', 'year', 'dorsal']).optional(),
         page: z.number().int().min(1).max(200).optional(),
         limit: z.number().int().min(1).max(25).optional(),
@@ -204,16 +204,26 @@ async function createSlotMcpServer(userId, context = {}) {
 
     server.registerTool('update_catalog_item', {
       title: 'Completar ficha de catálogo',
-      description: 'Solo administradores. Completa datos de una ficha existente, por referencia y marca exactas. Campos: model_name, vehicle_type, traction, motor_position (inline, angular o transverse), commercial_release_year y dorsal. Un valor vacío no borra lo que ya hay. No cambia referencia, marca ni foto.',
+      description: 'Solo administradores. Completa una ficha (reference y manufacturer) o hasta 25 en items. Campos: model_name, vehicle_type, traction, motor_position (inline, angular o transverse), commercial_release_year y dorsal. Un valor vacío no borra lo que ya hay. No cambia referencia, marca ni foto. Un fallo en una ficha del lote no deshace las demás.',
       inputSchema: {
-        reference: z.string().min(2).max(80),
-        manufacturer: z.string().min(2).max(80),
+        reference: z.string().min(2).max(80).optional(),
+        manufacturer: z.string().min(2).max(80).optional(),
         model_name: z.string().max(200).optional(),
         vehicle_type: z.string().max(80).optional(),
         traction: z.string().max(80).optional(),
         motor_position: z.string().max(40).optional(),
         commercial_release_year: z.number().int().optional(),
         dorsal: z.string().max(40).optional(),
+        items: z.array(z.object({
+          reference: z.string().min(2).max(80),
+          manufacturer: z.string().min(2).max(80),
+          model_name: z.string().max(200).optional(),
+          vehicle_type: z.string().max(80).optional(),
+          traction: z.string().max(80).optional(),
+          motor_position: z.string().max(40).optional(),
+          commercial_release_year: z.number().int().optional(),
+          dorsal: z.string().max(40).optional(),
+        })).max(25).optional(),
       },
       annotations: ADMIN_WRITE,
     }, call(adminCatalog.updateCatalogItem));

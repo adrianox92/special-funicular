@@ -395,10 +395,12 @@ async function withCatalogLookup(userId, args = {}, context = {}, fn) {
   if (!reference) httpError(400, 'reference debe ser un texto concreto');
   const clientId = context.clientId || null;
   const db = requireDb();
-  const blocked = await assertPersistedCatalogLimit(db, userId, reference, manufacturer, clientId);
-  if (blocked === 'day') httpError(429, 'Demasiadas consultas al catálogo. Máximo 100 al día.');
-  if (blocked === 'minute') httpError(429, 'Demasiadas consultas al catálogo. Máximo 10 por minuto.');
-  assertCatalogLookupLimit(userId);
+  if (context.isAdmin !== true) {
+    const blocked = await assertPersistedCatalogLimit(db, userId, reference, manufacturer, clientId);
+    if (blocked === 'day') httpError(429, 'Demasiadas consultas al catálogo. Máximo 100 al día.');
+    if (blocked === 'minute') httpError(429, 'Demasiadas consultas al catálogo. Máximo 10 por minuto.');
+    assertCatalogLookupLimit(userId);
+  }
   let outcome = null;
   try {
     const result = await fn(db, reference, manufacturer);

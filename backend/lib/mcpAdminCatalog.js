@@ -137,22 +137,32 @@ function toListItem(row, manufacturer) {
   };
 }
 
+function optionalManufacturer(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (text === '') return null;
+  return oneExactText(text, 'manufacturer');
+}
+
 async function listIncompleteCatalogItems(userId, args = {}) {
   const db = await assertAdmin(userId);
-  const manufacturer = oneExactText(args.manufacturer, 'manufacturer');
+  const manufacturer = optionalManufacturer(args.manufacturer);
   const missing = String(args.missing || 'incomplete').trim().toLowerCase();
   if (!MISSING_FILTERS.has(missing)) httpError(400, 'missing no es un filtro válido');
   const page = clampInt(args.page, 1, 1, 200);
   const limit = clampInt(args.limit, 25, 1, 25);
-  const manufacturerId = await resolveExactBrandId(db, manufacturer);
   const from = (page - 1) * limit;
   const to = from + limit - 1;
   let query = db
     .from('slot_catalog_items_with_ratings')
-    .select(LIST_FIELDS, { count: 'exact' })
-    .eq('manufacturer_id', manufacturerId);
+    .select(LIST_FIELDS, { count: 'exact' });
+  if (manufacturer) {
+    const manufacturerId = await resolveExactBrandId(db, manufacturer);
+    query = query.eq('manufacturer_id', manufacturerId);
+  }
   query = applyCatalogItemsMissingFilter(query, missing);
   const { data, error, count } = await query
+    .order('manufacturer', { ascending: true })
     .order('reference', { ascending: true })
     .range(from, to);
   assertNoError(error);
@@ -198,8 +208,7 @@ function patchFromArgs(args) {
   return patch;
 }
 
-async function updateCatalogItem(userId, args = {}) {
-  const db = await assertAdmin(userId);
+async function writeCatalogPatch(db, args) {
   const reference = normalizeReference(oneExactText(args.reference, 'reference'));
   const manufacturer = oneExactText(args.manufacturer, 'manufacturer');
   if (!reference) httpError(400, 'reference debe ser un texto concreto');
@@ -212,6 +221,34 @@ async function updateCatalogItem(userId, args = {}) {
     .eq('id', itemId);
   assertNoError(error);
   return { reference, manufacturer, updated: patch };
+}
+
+async function updateCatalogItem(userId, args = {}) {
+  const db = await assertAdmin(userId);
+  if (Array.isArray(args.items)) {
+    if (args.reference != null && String(args.reference).trim() !== '') {
+      httpError(400, 'No envíes reference junto con items');
+    }
+    if (args.items.length === 0) httpError(400, 'items está vacío');
+    if (args.items.length > 25) httpError(400, 'Máximo 25 fichas por llamada');
+    const updated = [];
+    const failed = [];
+    for (const item of args.items) {
+      const reference = item && item.reference != null ? String(item.reference) : null;
+      const manufacturer = item && item.manufacturer != null ? String(item.manufacturer) : null;
+      try {
+        updated.push(await writeCatalogPatch(db, item || {}));
+      } catch (err) {
+        failed.push({
+          reference,
+          manufacturer,
+          error: err && err.message ? err.message : 'Error al actualizar',
+        });
+      }
+    }
+    return { updated, failed };
+  }
+  return writeCatalogPatch(db, args);
 }
 
 module.exports = {

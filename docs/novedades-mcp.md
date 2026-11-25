@@ -2,7 +2,7 @@ Ya puedes conectar **Claude** o **ChatGPT** a tu cuenta de Slot Database. El asi
 
 Solo lectura: no puede crear, editar ni borrar nada. No lista el catálogo y no consulta ligas ni clubes.
 
-Una cuenta administradora puede, además, listar las fichas incompletas de una marca y completar sus datos. No crea fichas nuevas, no cambia la referencia ni la marca y no sube fotos. El resto de cuentas no ve esas herramientas.
+Una cuenta administradora puede, además, listar las fichas incompletas de una marca o de todas, completar hasta 25 fichas en una llamada y consultar el catálogo sin el máximo de 10 por minuto ni el de 100 al día. No crea fichas nuevas, no cambia la referencia ni la marca y no sube fotos. El resto de cuentas no ve esas herramientas y mantiene el cupo.
 
 ## Cómo conectarlo
 
