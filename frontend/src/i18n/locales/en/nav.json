@@ -27,5 +27,22 @@
   "settings": "Settings",
   "logout": "Log out",
   "toggleTheme": "Toggle theme",
-  "openMenu": "Open menu"
+  "openMenu": "Open menu",
+  "bell": {
+    "aria": "Notices",
+    "title": "Notices",
+    "markRead": "Mark as read",
+    "loading": "Loading…",
+    "empty": "No notices.",
+    "prices": "Looking for it",
+    "changelog": "What's new",
+    "viewAll": "See all",
+    "priceItem": "{{shop}} has it for {{price}}",
+    "category": {
+      "feature": "New",
+      "fix": "Fix",
+      "improvement": "Improvement",
+      "breaking": "Breaking change"
+    }
+  }
 }

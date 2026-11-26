@@ -30,5 +30,22 @@
   "settings": "Configuración",
   "logout": "Cerrar Sesión",
   "toggleTheme": "Cambiar tema",
-  "openMenu": "Abrir menú"
+  "openMenu": "Abrir menú",
+  "bell": {
+    "aria": "Avisos",
+    "title": "Avisos",
+    "markRead": "Marcar leídas",
+    "loading": "Cargando…",
+    "empty": "No hay avisos.",
+    "prices": "Lo busco",
+    "changelog": "Novedades",
+    "viewAll": "Ver todas",
+    "priceItem": "{{shop}} lo tiene por {{price}}",
+    "category": {
+      "feature": "Novedad",
+      "fix": "Corrección",
+      "improvement": "Mejora",
+      "breaking": "Cambio importante"
+    }
+  }
 }

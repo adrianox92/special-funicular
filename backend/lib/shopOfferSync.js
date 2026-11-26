@@ -507,6 +507,15 @@ async function runShopOfferLookup({
 }
 
 function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
+  async function notifyPriceWatches(offerId) {
+    try {
+      const { matchStoredOffer } = require('./priceWatchMatch');
+      await matchStoredOffer(admin, offerId);
+    } catch (err) {
+      console.error('[price-watch]', err && err.message ? err.message : err);
+    }
+  }
+
   async function brandNames(ids) {
     const brandIds = [...new Set((ids || []).filter(Boolean))];
     const brands = new Map();
@@ -565,6 +574,7 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
     async updateOffer(id, patch) {
       const { error } = await admin.from('catalog_shop_offers').update(patch).eq('id', id);
       if (error) throw new Error(error.message);
+      if (patch.in_stock && patch.price != null) await notifyPriceWatches(id);
     },
 
     async findOffer(shopId, catalogItemId) {
@@ -585,8 +595,15 @@ function createSupabaseShopOfferIo(admin, { createShortCode } = {}) {
         const short_code = attempt === 0 && shortFromCaller
           ? shortFromCaller
           : (createShortCode ? createShortCode() : shortFromCaller);
-        const { error } = await admin.from('catalog_shop_offers').insert({ ...row, short_code });
-        if (!error) return short_code;
+        const { data, error } = await admin
+          .from('catalog_shop_offers')
+          .insert({ ...row, short_code })
+          .select('id')
+          .maybeSingle();
+        if (!error) {
+          if (data?.id && row.in_stock && row.price != null) await notifyPriceWatches(data.id);
+          return short_code;
+        }
         lastError = error;
         const msg = `${error.message || ''} ${error.details || ''}`;
         const shortCollision = error.code === '23505' && /short_code/i.test(msg);

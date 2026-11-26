@@ -36,6 +36,7 @@ import {
 } from '../utils/catalogItemSeo';
 import { ChevronRight, ExternalLink, Star, X } from 'lucide-react';
 import StoreListingsSection from '../components/StoreListingsSection';
+import CatalogPriceWatchButton from '../components/CatalogPriceWatchButton';
 import CatalogSimilarVehicles from '../components/CatalogSimilarVehicles';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
@@ -670,11 +671,14 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">{t('detail.addToGarageHint')}</p>
-              <Button asChild>
-                <Link to={`/vehicles/new?catalogItemId=${encodeURIComponent(item.id)}`}>
-                  {t('detail.addToGarage')}
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link to={`/vehicles/new?catalogItemId=${encodeURIComponent(item.id)}`}>
+                    {t('detail.addToGarage')}
+                  </Link>
+                </Button>
+                <CatalogPriceWatchButton catalogItemId={item.id} />
+              </div>
             </CardContent>
           </Card>
         )}

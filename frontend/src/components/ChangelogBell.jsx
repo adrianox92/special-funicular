@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import api from '../lib/axios';
+import { useLocale } from '../hooks/useLocale';
+import { catalogSlugify } from '../utils/catalogSlug';
+import { localizePath } from '../i18n/localeUtils';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
@@ -15,37 +19,54 @@ import {
 const CHANGELOG_SEEN_EVENT = 'slotdb-changelog-seen';
 const UNREAD_POLL_MS = 10 * 60 * 1000;
 
-const CATEGORY_LABEL = {
-  feature: 'Novedad',
-  fix: 'Corrección',
-  improvement: 'Mejora',
-  breaking: 'Cambio importante',
-};
-
-function formatRelativeTime(iso) {
+function formatRelativeTime(iso, locale) {
   if (!iso) return '';
-  const d = new Date(iso);
-  const diff = Date.now() - d.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Ahora';
-  if (mins < 60) return `Hace ${mins} min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `Hace ${hours} h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `Hace ${days} d`;
-  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const diffSec = Math.round((date.getTime() - Date.now()) / 1000);
+  const abs = Math.abs(diffSec);
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  if (abs < 45) return rtf.format(diffSec, 'second');
+  const mins = Math.round(diffSec / 60);
+  if (Math.abs(mins) < 60) return rtf.format(mins, 'minute');
+  const hours = Math.round(mins / 60);
+  if (Math.abs(hours) < 24) return rtf.format(hours, 'hour');
+  const days = Math.round(hours / 24);
+  if (Math.abs(days) < 7) return rtf.format(days, 'day');
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatMoney(price, currency, intlLocale) {
+  const amount = Number(price);
+  if (!Number.isFinite(amount)) return '';
+  try {
+    return new Intl.NumberFormat(intlLocale, {
+      style: 'currency',
+      currency: currency || 'EUR',
+    }).format(amount);
+  } catch {
+    return `${amount} ${currency || ''}`.trim();
+  }
 }
 
 export function ChangelogBell() {
+  const { t } = useTranslation('nav');
+  const { locale, intlLocale } = useLocale();
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [entries, setEntries] = useState([]);
+  const [notices, setNotices] = useState([]);
   const [loadingList, setLoadingList] = useState(false);
 
   const fetchCount = useCallback(async () => {
     try {
-      const { data } = await api.get('/changelog/unread-count');
-      setCount(typeof data?.count === 'number' ? data.count : 0);
+      const [changelog, prices] = await Promise.all([
+        api.get('/changelog/unread-count'),
+        api.get('/notifications/unread-count'),
+      ]);
+      const changelogCount = typeof changelog.data?.count === 'number' ? changelog.data.count : 0;
+      const priceCount = typeof prices.data?.count === 'number' ? prices.data.count : 0;
+      setCount(changelogCount + priceCount);
     } catch {
       setCount(0);
     }
@@ -54,10 +75,15 @@ export function ChangelogBell() {
   const fetchPreview = useCallback(async () => {
     setLoadingList(true);
     try {
-      const { data } = await api.get('/changelog', { params: { limit: 5 } });
-      setEntries(Array.isArray(data?.entries) ? data.entries : []);
+      const [changelog, prices] = await Promise.all([
+        api.get('/changelog', { params: { limit: 5 } }),
+        api.get('/notifications', { params: { limit: 8 } }),
+      ]);
+      setEntries(Array.isArray(changelog.data?.entries) ? changelog.data.entries : []);
+      setNotices(Array.isArray(prices.data?.notices) ? prices.data.notices : []);
     } catch {
       setEntries([]);
+      setNotices([]);
     } finally {
       setLoadingList(false);
     }
@@ -68,8 +94,16 @@ export function ChangelogBell() {
   }, [fetchCount]);
 
   useEffect(() => {
-    const t = setInterval(() => void fetchCount(), UNREAD_POLL_MS);
-    return () => clearInterval(t);
+    const timer = setInterval(() => void fetchCount(), UNREAD_POLL_MS);
+    return () => clearInterval(timer);
+  }, [fetchCount]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void fetchCount();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [fetchCount]);
 
   useEffect(() => {
@@ -84,12 +118,31 @@ export function ChangelogBell() {
 
   const handleMarkRead = async () => {
     try {
-      await api.post('/changelog/mark-read');
+      await Promise.all([
+        api.post('/changelog/mark-read'),
+        api.post('/notifications/mark-read'),
+      ]);
       setCount(0);
+      setNotices([]);
       window.dispatchEvent(new CustomEvent(CHANGELOG_SEEN_EVENT));
     } catch {
       /* noop */
     }
+  };
+
+  const markNoticeRead = async (id) => {
+    try {
+      await api.post(`/notifications/${id}/read`);
+      setNotices((list) => list.filter((notice) => notice.id !== id));
+      setCount((value) => Math.max(0, value - 1));
+    } catch {
+      /* la ficha sigue siendo el destino */
+    }
+  };
+
+  const noticePath = (notice) => {
+    const slug = catalogSlugify(notice.model_name || notice.reference);
+    return localizePath(locale, `/catalogo/${notice.catalog_item_id}/${slug}`);
   };
 
   return (
@@ -100,7 +153,7 @@ export function ChangelogBell() {
           variant="ghost"
           size="icon"
           className="relative shrink-0"
-          aria-label="Novedades"
+          aria-label={t('bell.aria')}
         >
           <Bell className="size-5" aria-hidden />
           {count > 0 && (
@@ -112,53 +165,84 @@ export function ChangelogBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[min(calc(100vw-2rem),22rem)] p-0">
         <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-          <span className="text-sm font-semibold">Novedades</span>
+          <span className="text-sm font-semibold">{t('bell.title')}</span>
           {count > 0 && (
             <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={handleMarkRead}>
-              Marcar leídas
+              {t('bell.markRead')}
             </Button>
           )}
         </div>
         <ScrollArea className="max-h-[min(60vh,320px)]">
           <div className="p-2">
             {loadingList && (
-              <p className="px-2 py-6 text-center text-sm text-muted-foreground">Cargando…</p>
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t('bell.loading')}</p>
             )}
-            {!loadingList && entries.length === 0 && (
-              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                No hay entradas publicadas todavía.
-              </p>
+            {!loadingList && notices.length === 0 && entries.length === 0 && (
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t('bell.empty')}</p>
             )}
-            {!loadingList &&
-              entries.map((e) => (
-                <div key={e.id} className="rounded-md px-2 py-2 hover:bg-accent/60">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="secondary" className="text-[10px] font-normal">
-                      {CATEGORY_LABEL[e.category] || e.category}
-                    </Badge>
-                    {e.version ? (
-                      <span className="text-[10px] text-muted-foreground">{e.version}</span>
-                    ) : null}
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      {formatRelativeTime(e.published_at)}
+            {!loadingList && notices.length > 0 && (
+              <div className="mb-2">
+                <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {t('bell.prices')}
+                </p>
+                {notices.map((notice) => (
+                  <div key={notice.id} className="rounded-md px-2 py-2 hover:bg-accent/60">
+                    <span className="block text-right text-[10px] text-muted-foreground">
+                      {formatRelativeTime(notice.created_at, locale)}
                     </span>
+                    <Link
+                      to={noticePath(notice)}
+                      className="block text-sm font-medium leading-snug text-foreground hover:underline"
+                      onClick={() => {
+                        void markNoticeRead(notice.id);
+                        setOpen(false);
+                      }}
+                    >
+                      {t('bell.priceItem', {
+                        shop: notice.shop_name,
+                        price: formatMoney(notice.price, notice.currency, intlLocale),
+                      })}
+                    </Link>
                   </div>
-                  <Link
-                    to={`/changelog#${e.id}`}
-                    className="mt-1 block text-sm font-medium leading-snug text-foreground hover:underline"
-                    onClick={() => setOpen(false)}
-                  >
-                    {e.title}
-                  </Link>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+            {!loadingList && entries.length > 0 && (
+              <div>
+                <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {t('bell.changelog')}
+                </p>
+                {entries.map((entry) => (
+                  <div key={entry.id} className="rounded-md px-2 py-2 hover:bg-accent/60">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="secondary" className="text-[10px] font-normal">
+                        {t(`bell.category.${entry.category}`, { defaultValue: entry.category })}
+                      </Badge>
+                      {entry.version ? (
+                        <span className="text-[10px] text-muted-foreground">{entry.version}</span>
+                      ) : null}
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        {formatRelativeTime(entry.published_at, locale)}
+                      </span>
+                    </div>
+                    <Link
+                      to={`/changelog#${entry.id}`}
+                      className="mt-1 block text-sm font-medium leading-snug text-foreground hover:underline"
+                      onClick={() => setOpen(false)}
+                    >
+                      {entry.title}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </ScrollArea>
         <Separator />
         <div className="p-2">
           <Button variant="outline" size="sm" className="w-full" asChild>
             <Link to="/changelog" onClick={() => setOpen(false)}>
-              Ver todas
+              {t('bell.viewAll')}
             </Link>
           </Button>
         </div>

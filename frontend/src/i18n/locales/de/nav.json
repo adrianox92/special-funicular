@@ -30,5 +30,22 @@
   "settings": "Einstellungen",
   "logout": "Abmelden",
   "toggleTheme": "Design wechseln",
-  "openMenu": "Menü öffnen"
+  "openMenu": "Menü öffnen",
+  "bell": {
+    "aria": "Hinweise",
+    "title": "Hinweise",
+    "markRead": "Als gelesen markieren",
+    "loading": "Laden…",
+    "empty": "Keine Hinweise.",
+    "prices": "Ich suche es",
+    "changelog": "Neuigkeiten",
+    "viewAll": "Alle ansehen",
+    "priceItem": "{{shop}} hat es für {{price}}",
+    "category": {
+      "feature": "Neu",
+      "fix": "Korrektur",
+      "improvement": "Verbesserung",
+      "breaking": "Wichtige Änderung"
+    }
+  }
 }
