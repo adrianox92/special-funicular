@@ -685,6 +685,145 @@ async function htycLookup(query, fetchImpl = fetch) {
   return products.find((hit) => sameSku(hit.sku, query) && !isSpareProduct(hit)) || null;
 }
 
+const COCHESLOT_CARS = 'https://www.cocheslot.net/7919-vehiculos';
+const COCHESLOT_MAX_PAGES = 400;
+
+function cocheslotText(value) {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** La referencia de PrestaShop es el id interno. El código de catálogo va en el título: REFSICA54A, REF.H4301. */
+function cocheslotReference(value) {
+  const match = cocheslotText(value).match(/\bREF[.\-]?\s*([A-Z]{0,6}\d[A-Z0-9]{2,})\b/i);
+  return match ? match[1] : '';
+}
+
+function cocheslotPathSlug(url) {
+  try {
+    const parts = new URL(url).pathname.split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    if (parts.length >= 2 && /^\d+-/.test(last)) {
+      return decodeURIComponent(parts[parts.length - 2]).toLowerCase();
+    }
+  } catch {
+    /* una URL rara no aporta categoría */
+  }
+  return '';
+}
+
+function cocheslotCardInStock(card) {
+  if (/product-unavailable/i.test(card)) return false;
+  for (const badge of String(card).matchAll(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi)) {
+    if (!/class="[^"]*\bbadge\b/i.test(badge[1]) || /\bd-none\b/i.test(badge[1])) continue;
+    if (/agotado|sin stock|fuera de stock|no disponible/i.test(badge[2])) return false;
+  }
+  return true;
+}
+
+/**
+ * Coches de /7919-vehiculos. El padre también enseña recambios; la categoría
+ * de la miniatura y el primer tramo de la URL los descartan después.
+ */
+function cocheslotListingHits(html) {
+  const hits = [];
+  for (const card of String(html || '').split(/<article[^>]*\bproduct-miniature\b/i).slice(1)) {
+    const href = card.match(/href="(https:\/\/www\.cocheslot\.net\/[^"?#]+\.html)"/i);
+    if (!href) continue;
+    const name = cocheslotText((card.match(/product-title[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) || [])[1]);
+    const sku = cocheslotReference(name) || cocheslotReference(decodeURIComponent(href[1]));
+    if (!sku) continue;
+    const categoryName = cocheslotText((card.match(/product-category-name[^>]*>([^<]+)/i) || [])[1]);
+    const pathSlug = cocheslotPathSlug(href[1]);
+    const categorySlugs = [];
+    if (pathSlug) categorySlugs.push(pathSlug);
+    if (categoryName) categorySlugs.push(categoryName.toLowerCase());
+    const price = parseEuroAmount((card.match(/class="product-price"[^>]*content="([^"]+)"/i) || [])[1]);
+    const regular = parseEuroAmount((card.match(/class="regular-price[^"]*"[^>]*>([^<]+)/i) || [])[1]);
+    const hit = {
+      productUrl: href[1],
+      sku,
+      name,
+      price,
+      currency: 'EUR',
+      inStock: cocheslotCardInStock(card),
+      categorySlugs,
+    };
+    if (regular != null && price != null && regular > price) hit.regularPrice = regular;
+    hits.push(hit);
+  }
+  return hits;
+}
+
+function cocheslotHasNext(html, page) {
+  return new RegExp(`[?&]page=${page + 1}(?:&|"|')`).test(String(html || ''));
+}
+
+function cocheslotArticleCount(html) {
+  return (String(html || '').match(/<article[^>]*\bproduct-miniature\b/gi) || []).length;
+}
+
+/** Listado de vehículos. Una página a medias no se da por buena: faltan coches y se marcarían agotados. */
+async function listCocheslotCatalog(fetchPage) {
+  const products = [];
+  const seen = new Set();
+  for (let page = 1; page <= COCHESLOT_MAX_PAGES; page += 1) {
+    const url = page === 1 ? COCHESLOT_CARS : `${COCHESLOT_CARS}?page=${page}`;
+    const raw = await fetchPage(url);
+    if (!raw || cocheslotArticleCount(raw) === 0) {
+      throw new Error(page === 1 ? 'Listado Cocheslot vacío' : 'Listado Cocheslot incompleto');
+    }
+    for (const hit of cocheslotListingHits(raw)) {
+      if (seen.has(hit.productUrl)) continue;
+      seen.add(hit.productUrl);
+      products.push(hit);
+    }
+    if (!cocheslotHasNext(raw, page)) {
+      if (products.length === 0) throw new Error('Listado Cocheslot vacío');
+      return products;
+    }
+    if (page === COCHESLOT_MAX_PAGES) throw new Error('Listado Cocheslot incompleto');
+  }
+  return products;
+}
+
+function cocheslotCandidates(html, query) {
+  const urls = [];
+  for (const hit of cocheslotListingHits(html)) {
+    if (sameSku(hit.sku, query)) urls.push(hit.productUrl);
+  }
+  return [...new Set(urls)];
+}
+
+function parseCocheslotProduct(html, pageUrl) {
+  const source = String(html || '');
+  const h1 = source.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+  const sku = cocheslotReference(h1 ? h1[1] : '') || cocheslotReference(pageUrl);
+  if (!sku) return null;
+  const block = source.match(/class="product-prices js-product-prices"[\s\S]{0,1800}/i);
+  const scope = block ? block[0] : '';
+  const price = parseEuroAmount((scope.match(/class="product-price[^"]*"[^>]*content="([^"]+)"/i) || [])[1]);
+  const regular = parseEuroAmount((scope.match(/class="regular-price[^"]*"[^>]*>([^<]+)/i) || [])[1]);
+  const availability = scope.match(/class="([^"]*\bjs-product-availability\b[^"]*)"/i);
+  const pathSlug = cocheslotPathSlug(String(pageUrl || '').split('?')[0]);
+  const hit = {
+    productUrl: String(pageUrl || '').split('?')[0],
+    sku,
+    name: cocheslotText(h1 ? h1[1] : ''),
+    price,
+    currency: 'EUR',
+    inStock: !(availability && /product-unavailable|out-of-stock/i.test(availability[1])),
+    categorySlugs: pathSlug ? [pathSlug] : [],
+  };
+  if (regular != null && price != null && regular > price) hit.regularPrice = regular;
+  return hit;
+}
+
 const catalogShopAdapters = [
   createShopAdapter({
     key: 'evotec',
@@ -782,6 +921,13 @@ const catalogShopAdapters = [
     parse: parseShopifyProduct,
     candidates: () => [],
   }), (fetchPage) => listShopifyCollection('https://clickslot.shop', 'coches', fetchPage)),
+  withListProducts(createShopAdapter({
+    key: 'cocheslot',
+    origin: 'https://www.cocheslot.net',
+    searchUrl: (query) => `https://www.cocheslot.net/busqueda?controller=search&s=${encodeURIComponent(query)}`,
+    parse: parseCocheslotProduct,
+    candidates: cocheslotCandidates,
+  }), (fetchPage) => listCocheslotCatalog(fetchPage)),
 ];
 
 module.exports = {
@@ -804,6 +950,10 @@ module.exports = {
   listShopifyCollection,
   shopifyLookup,
   parseShopifyProduct,
+  cocheslotListingHits,
+  listCocheslotCatalog,
+  cocheslotCandidates,
+  parseCocheslotProduct,
   parseAloyProduct,
   aloyCandidates,
 };

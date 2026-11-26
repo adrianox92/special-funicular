@@ -16,6 +16,10 @@ const {
   listShopifyCollection,
   shopifyLookup,
   parseShopifyProduct,
+  cocheslotListingHits,
+  listCocheslotCatalog,
+  cocheslotCandidates,
+  parseCocheslotProduct,
   parseAloyProduct,
   aloyCandidates,
 } = require('../../lib/shopAdapters/catalogShops');
@@ -690,6 +694,102 @@ describe('clickslot', () => {
       sku: 'SC-6122R',
       price: 79.94,
       inStock: true,
+    });
+  });
+});
+
+describe('cocheslot', () => {
+  const card = ({
+    path, title, category, skuDiv, price, regular, stock,
+  }) => `
+    <article class="product-miniature">
+      <a href="https://www.cocheslot.net/${path}">${title}</a>
+      <div class="product-category-name text-muted">${category}</div>
+      <h2 class="h3 product-title"><a href="https://www.cocheslot.net/${path}">${title}</a></h2>
+      <div class="product-reference text-muted">${skuDiv}</div>
+      <span class="product-price" content="${price}">${price} €</span>
+      ${regular ? `<span class="regular-price text-muted">${regular}</span>` : ''}
+      ${stock || '<span class="badge badge-warning d-none product-last-items">Últimas unidades en stock</span>'}
+    </article>`;
+
+  test('el código sale del título, no del id interno, y el recambio se descarta', () => {
+    const html = [
+      card({
+        path: 'mercedes/6160-MERCEDES-C-CLASS-ITC-1996-REF-SLOTIT.html',
+        title: 'MERCEDES C - CLASS - ITC 1996 REFSICA54A. SLOT.IT',
+        category: 'MERCEDES',
+        skuDiv: '6160',
+        price: '64.99',
+        regular: '79,99 €',
+      }),
+      card({
+        path: 'ejes/1431-TREN-DE-RUEDAS.html',
+        title: 'TREN DE RUEDAS POSTERIOR REF.8852 TECNITOYS',
+        category: 'EJES',
+        skuDiv: '1431',
+        price: '4.99',
+      }),
+      card({
+        path: 'nissan/1-nissan.html',
+        title: 'NISSAN R89C Nº24 LE MANS 1984 REF.CA28H SLOT.IT',
+        category: 'NISSAN',
+        skuDiv: '1',
+        price: '70.00',
+        stock: '<span class="badge badge-danger">Agotado</span>',
+      }),
+    ].join('');
+
+    const hits = cocheslotListingHits(html);
+    expect(hits.map((hit) => hit.sku)).toEqual(['SICA54A', '8852', 'CA28H']);
+    expect(hits[0]).toMatchObject({ price: 64.99, regularPrice: 79.99, inStock: true });
+    expect(hits[2].inStock).toBe(false);
+    expect(isSpareProduct(hits[0])).toBe(false);
+    expect(isSpareProduct(hits[1])).toBe(true);
+    expect(cocheslotCandidates(html, 'SICA54A')).toEqual([
+      'https://www.cocheslot.net/mercedes/6160-MERCEDES-C-CLASS-ITC-1996-REF-SLOTIT.html',
+    ]);
+  });
+
+  test('el listado pagina hasta que no hay página siguiente', async () => {
+    const page = (sku, next) => `
+      <article class="product-miniature">
+        <a href="https://www.cocheslot.net/lotus/${sku}.html">Lotus REF.${sku} SUPERSLOT</a>
+        <h2 class="h3 product-title"><a href="https://www.cocheslot.net/lotus/${sku}.html">Lotus REF.${sku}</a></h2>
+        <div class="product-category-name">LOTUS</div>
+        <span class="product-price" content="39.99">39,99 €</span>
+      </article>
+      ${next}`;
+    const fetchPage = jest.fn(async (url) => (
+      String(url).includes('page=2')
+        ? page('H4301', '')
+        : `${page('CA28H', '<a href="https://www.cocheslot.net/7919-vehiculos?page=2">2</a><a href="https://www.cocheslot.net/7919-vehiculos?page=20">20</a>')}`
+    ));
+
+    const products = await listCocheslotCatalog(fetchPage);
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+    expect(products.map((hit) => hit.sku)).toEqual(['CA28H', 'H4301']);
+  });
+
+  test('la ficha usa el precio del producto y no el de los relacionados', () => {
+    const html = `
+      <h1 class="h1 page-title"><span>MERCEDES C - CLASS - ITC 1996 REFSICA54A. SLOT.IT</span></h1>
+      <div class="product-reference"><span>6160</span></div>
+      <div class="product-prices js-product-prices">
+        <span class="js-product-availability badge badge-warning product-last-items">Últimas unidades</span>
+        <span class="product-price current-price-value" content="64.99">64,99 €</span>
+        <span class="regular-price text-muted">79,99 €</span>
+      </div>
+      <article class="product-miniature">
+        <span class="product-price" content="10.00">10,00 €</span>
+      </article>
+    `;
+    expect(parseCocheslotProduct(html, 'https://www.cocheslot.net/mercedes/6160-coche.html?q=1')).toMatchObject({
+      sku: 'SICA54A',
+      price: 64.99,
+      regularPrice: 79.99,
+      inStock: true,
+      productUrl: 'https://www.cocheslot.net/mercedes/6160-coche.html',
+      categorySlugs: ['mercedes'],
     });
   });
 });
