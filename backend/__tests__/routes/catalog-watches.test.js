@@ -90,6 +90,7 @@ describe('POST /api/catalog-watches', () => {
           catalog_item_id: ITEM_ID,
           price: 40,
           currency: 'EUR',
+          short_code: 'Ab3kX9p',
           in_stock: true,
           last_checked_at: new Date().toISOString(),
           catalog_shops: { name: 'Evotec', active: true },
@@ -128,6 +129,7 @@ describe('POST /api/catalog-watches', () => {
       max_price: 50,
     }));
     expect(res.body.noticesCreated).toBe(1);
+    expect(res.body.matchedOfferIds).toEqual([OFFER_ID]);
     expect(saved.payload).toEqual(expect.objectContaining({
       user_id: USER_ID,
       catalog_item_id: ITEM_ID,
@@ -140,8 +142,112 @@ describe('POST /api/catalog-watches', () => {
       shop_name: 'Evotec',
       price: 40,
       currency: 'EUR',
+      short_code: 'Ab3kX9p',
       reference: 'C4555',
       model_name: 'Porsche 911',
+    }));
+  });
+
+  test('sin catalogItemId lista las alertas y marca las tiendas que cumplen ahora', async () => {
+    const otherId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const brandId = '11111111-1111-4111-8111-111111111111';
+    const cheapId = '22222222-2222-4222-8222-222222222222';
+    const fresh = new Date().toISOString();
+    const stale = new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString();
+
+    mockSupabase.from.mockImplementation((table) => {
+      if (table !== 'catalog_price_watches') throw new Error(`tabla inesperada ${table}`);
+      return listApi([
+        {
+          id: WATCH_ID,
+          catalog_item_id: ITEM_ID,
+          max_price: 50,
+          currency: 'EUR',
+          updated_at: '2026-11-26T10:00:00.000Z',
+        },
+        {
+          id: otherId,
+          catalog_item_id: ITEM_ID,
+          max_price: 20,
+          currency: 'EUR',
+          updated_at: '2026-11-26T12:00:00.000Z',
+        },
+      ]);
+    });
+
+    mockServiceClient.from.mockImplementation((table) => {
+      if (table === 'slot_catalog_items') {
+        return listApi([{
+          id: ITEM_ID,
+          reference: 'C4555',
+          model_name: 'Porsche 911',
+          manufacturer_id: brandId,
+        }]);
+      }
+      if (table === 'slot_catalog_brands') {
+        return listApi([{ id: brandId, name: 'Scalextric' }]);
+      }
+      if (table === 'catalog_shop_offers') {
+        return listApi([
+          {
+            id: OFFER_ID,
+            catalog_item_id: ITEM_ID,
+            price: 40,
+            currency: 'EUR',
+            in_stock: true,
+            short_code: 'Ab3kX9p',
+            last_checked_at: fresh,
+            catalog_shops: { name: 'Evotec', active: true },
+          },
+          {
+            id: cheapId,
+            catalog_item_id: ITEM_ID,
+            price: 10,
+            currency: 'USD',
+            in_stock: true,
+            short_code: 'Zz9kX9p',
+            last_checked_at: fresh,
+            catalog_shops: { name: 'Otra', active: true },
+          },
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            catalog_item_id: ITEM_ID,
+            price: 30,
+            currency: 'EUR',
+            in_stock: true,
+            short_code: 'OldCode',
+            last_checked_at: stale,
+            catalog_shops: { name: 'Vieja', active: true },
+          },
+        ]);
+      }
+      throw new Error(`tabla inesperada ${table}`);
+    });
+
+    const res = await request(app)
+      .get('/api/catalog-watches')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.alerts).toHaveLength(2);
+    expect(res.body.alerts[0]).toEqual(expect.objectContaining({
+      id: WATCH_ID,
+      reference: 'C4555',
+      model_name: 'Porsche 911',
+      manufacturer: 'Scalextric',
+      max_price: 50,
+    }));
+    expect(res.body.alerts[0].matches).toEqual([
+      expect.objectContaining({
+        offer_id: OFFER_ID,
+        shop_name: 'Evotec',
+        price: 40,
+        short_code: 'Ab3kX9p',
+      }),
+    ]);
+    expect(res.body.alerts[1]).toEqual(expect.objectContaining({
+      id: otherId,
+      matches: [],
     }));
   });
 

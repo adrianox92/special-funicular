@@ -514,5 +514,22 @@
     "purchasePrice": "Purchase price (€)",
     "creating": "Creating…",
     "duplicate": "Duplicate"
+  },
+  "alerts": {
+    "title": "My alerts",
+    "loading": "Loading alerts…",
+    "loadError": "Could not load alerts",
+    "empty": "An alert tells you when a shop has the car you want in stock at a price that works for you. You create it on the catalog page with “I'm looking for it” and a maximum price. If a shop has it at that price or below, the notice shows up in the bell. Offers are checked once a day. You can remove it from this list, from the catalog page with “Stop looking”, or it goes away on its own when you save that car to your garage.",
+    "browseCatalog": "Browse the catalog",
+    "maxPrice": "Up to {{price}}",
+    "waiting": "We'll let you know when a shop has it at that price or below.",
+    "viewInStore": "View in shop",
+    "remove": "Remove",
+    "confirmTitle": "Remove this alert?",
+    "confirmBody": "You will stop getting notices for this reference. Notices you have already read in the bell stay there.",
+    "cancel": "Cancel",
+    "confirm": "Remove alert",
+    "removed": "Alert removed",
+    "removeError": "Could not remove the alert"
   }
 }

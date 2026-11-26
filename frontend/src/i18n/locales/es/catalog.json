@@ -135,8 +135,6 @@
     "watchSaveError": "No se pudo guardar la búsqueda",
     "watchStopError": "No se pudo quitar la búsqueda",
     "watchWaiting": "Te avisaremos en la campana cuando una tienda lo tenga a ese precio o por debajo.",
-    "watchMatched_one": "Hay una tienda a ese precio o por debajo. El aviso está en la campana.",
-    "watchMatched_other": "Hay {{count}} tiendas a ese precio o por debajo. Los avisos están en la campana.",
     "similarTitle": "Vehículos similares",
     "similarAria": "Carrusel de vehículos similares",
     "legacyValue": "{{value}} (valor anterior)"

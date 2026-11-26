@@ -27,7 +27,7 @@ function formatEuro(value, intlLocale) {
   return new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'EUR' }).format(n);
 }
 
-export default function CatalogPriceWatchButton({ catalogItemId }) {
+export default function CatalogPriceWatchButton({ catalogItemId, onMatchedOffers }) {
   const { t } = useTranslation('catalog');
   const { intlLocale } = useLocale();
   const [watch, setWatch] = useState(null);
@@ -72,7 +72,15 @@ export default function CatalogPriceWatchButton({ catalogItemId }) {
     try {
       const { data } = await api.post('/catalog-watches', { catalogItemId, maxPrice });
       setWatch(data?.watch || null);
-      setResult({ noticesCreated: Number(data?.noticesCreated) || 0 });
+      const matchedOfferIds = Array.isArray(data?.matchedOfferIds) ? data.matchedOfferIds : [];
+      if (matchedOfferIds.length > 0) {
+        setResult(null);
+        setOpen(false);
+        onMatchedOffers?.(matchedOfferIds);
+        return;
+      }
+      onMatchedOffers?.([]);
+      setResult({ waiting: true });
     } catch (err) {
       toast.error(err?.response?.data?.error || t('detail.watchSaveError'));
     } finally {
@@ -110,11 +118,7 @@ export default function CatalogPriceWatchButton({ catalogItemId }) {
           <DialogHeader>
             <DialogTitle>{t('detail.watchTitle')}</DialogTitle>
             <DialogDescription>
-              {result
-                ? (result.noticesCreated > 0
-                  ? t('detail.watchMatched', { count: result.noticesCreated })
-                  : t('detail.watchWaiting'))
-                : t('detail.watchBody')}
+              {result ? t('detail.watchWaiting') : t('detail.watchBody')}
             </DialogDescription>
           </DialogHeader>
           {!result && (

@@ -86,6 +86,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
   const [suggestForm, setSuggestForm] = useState({});
   const [suggestImage, setSuggestImage] = useState(null);
   const [catalogImageZoomOpen, setCatalogImageZoomOpen] = useState(false);
+  const [matchedOfferIds, setMatchedOfferIds] = useState([]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.__PUBLIC_CATALOG_BOOTSTRAP__?.kind === 'item') {
@@ -188,6 +189,10 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
       clearCatalogItemPageSeo();
     };
   }, [item, id, locale]);
+
+  useEffect(() => {
+    setMatchedOfferIds([]);
+  }, [id]);
 
   const catalogListHref = localizePath(locale, '/catalogo');
   const homeHref = locale === 'es' ? '/' : `/${locale}`;
@@ -677,7 +682,10 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
                     {t('detail.addToGarage')}
                   </Link>
                 </Button>
-                <CatalogPriceWatchButton catalogItemId={item.id} />
+                <CatalogPriceWatchButton
+                  catalogItemId={item.id}
+                  onMatchedOffers={setMatchedOfferIds}
+                />
               </div>
             </CardContent>
           </Card>
@@ -691,7 +699,7 @@ export default function PublicCatalogDetail({ catalogItemId, catalogSlug } = {})
             <p className="text-sm text-muted-foreground leading-relaxed">{collectionBlurb}</p>
           </CardContent>
         </Card>
-        <StoreListingsSection catalogItemId={item.id} />
+        <StoreListingsSection catalogItemId={item.id} highlightOfferIds={matchedOfferIds} />
         <CatalogSimilarVehicles items={item.similar} />
         <CatalogThirdPartyNotice />
 

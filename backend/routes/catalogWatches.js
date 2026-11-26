@@ -1,7 +1,8 @@
 /**
  * Búsquedas de precio («Lo busco») sobre una referencia del catálogo.
  *
- *   GET    /?catalogItemId=
+ *   GET    /                 alertas del usuario, con tiendas que cumplen ahora
+ *   GET    /?catalogItemId=  la búsqueda de esa referencia
  *   POST   /                 { catalogItemId, maxPrice }
  *   DELETE /:id
  */
@@ -11,7 +12,12 @@ const { body, param, query } = require('express-validator');
 const { getServiceClient, createUserScopedClient } = require('../lib/supabaseClients');
 const authMiddleware = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validateRequest');
-const { normalizePrice } = require('../lib/shopOfferSync');
+const {
+  isPublicOffer,
+  publicOfferCutoff,
+  normalizeCurrency,
+  normalizePrice,
+} = require('../lib/shopOfferSync');
 const { matchPublicOffersForWatch } = require('../lib/priceWatchMatch');
 
 const router = express.Router();
@@ -47,13 +53,124 @@ function toWatch(row) {
   };
 }
 
+function shopOf(row) {
+  const shop = row?.catalog_shops;
+  return Array.isArray(shop) ? shop[0] : shop;
+}
+
+function priceAtOrBelow(offerPrice, maxPrice) {
+  const price = normalizePrice(offerPrice);
+  const max = normalizePrice(maxPrice);
+  if (price == null || max == null) return false;
+  return Math.round(price * 100) <= Math.round(max * 100);
+}
+
+async function listUserAlerts(req, res) {
+  const svc = requireServiceDb(res);
+  if (!svc) return;
+
+  const db = userDb(req);
+  const { data: watches, error } = await db
+    .from('catalog_price_watches')
+    .select('id, catalog_item_id, max_price, currency, updated_at')
+    .eq('user_id', req.user.id)
+    .order('updated_at', { ascending: false });
+  if (error) {
+    console.error('[catalog-watches] list', error);
+    return res.status(500).json({ error: 'No se pudieron cargar las alertas' });
+  }
+  if (!watches?.length) return res.json({ alerts: [] });
+
+  const itemIds = [...new Set(watches.map((watch) => watch.catalog_item_id))];
+  const { data: items, error: itemErr } = await svc
+    .from('slot_catalog_items')
+    .select('id, reference, model_name, manufacturer_id')
+    .in('id', itemIds);
+  if (itemErr) {
+    console.error('[catalog-watches] list items', itemErr);
+    return res.status(500).json({ error: 'No se pudieron cargar las alertas' });
+  }
+
+  const brandIds = [...new Set((items || []).map((item) => item.manufacturer_id).filter(Boolean))];
+  let brands = [];
+  if (brandIds.length) {
+    const { data, error: brandErr } = await svc
+      .from('slot_catalog_brands')
+      .select('id, name')
+      .in('id', brandIds);
+    if (brandErr) {
+      console.error('[catalog-watches] list brands', brandErr);
+      return res.status(500).json({ error: 'No se pudieron cargar las alertas' });
+    }
+    brands = data || [];
+  }
+
+  const { data: offers, error: offerErr } = await svc
+    .from('catalog_shop_offers')
+    .select('id, catalog_item_id, price, currency, in_stock, short_code, last_checked_at, catalog_shops!inner(name, active)')
+    .in('catalog_item_id', itemIds)
+    .eq('in_stock', true)
+    .gte('last_checked_at', publicOfferCutoff());
+  if (offerErr) {
+    console.error('[catalog-watches] list offers', offerErr);
+    return res.status(500).json({ error: 'No se pudieron cargar las alertas' });
+  }
+
+  const now = new Date();
+  const brandName = new Map(brands.map((brand) => [brand.id, brand.name]));
+  const itemById = new Map((items || []).map((item) => [item.id, item]));
+
+  const alerts = watches.map((watch) => {
+    const item = itemById.get(watch.catalog_item_id);
+    const currency = normalizeCurrency(watch.currency);
+    const matches = (offers || [])
+      .filter((row) => {
+        if (row.catalog_item_id !== watch.catalog_item_id) return false;
+        if (!isPublicOffer(row, shopOf(row), now)) return false;
+        if (normalizeCurrency(row.currency) !== currency) return false;
+        return priceAtOrBelow(row.price, watch.max_price);
+      })
+      .map((row) => ({
+        offer_id: row.id,
+        shop_name: shopOf(row)?.name || 'Tienda',
+        price: row.price,
+        currency: row.currency,
+        short_code: row.short_code || null,
+      }))
+      .sort((a, b) => Number(a.price) - Number(b.price));
+
+    return {
+      id: watch.id,
+      catalog_item_id: watch.catalog_item_id,
+      reference: item?.reference || null,
+      model_name: item?.model_name || null,
+      manufacturer: item?.manufacturer_id ? brandName.get(item.manufacturer_id) || null : null,
+      max_price: watch.max_price,
+      currency: watch.currency,
+      matches,
+    };
+  });
+
+  alerts.sort((a, b) => {
+    const rank = (alert) => (alert.matches.length > 0 ? 0 : 1);
+    return rank(a) - rank(b);
+  });
+
+  return res.json({ alerts });
+}
+
 router.use(authMiddleware);
 
 router.get(
   '/',
-  query('catalogItemId').custom((value) => isUuid(value)).withMessage('catalogItemId inválido'),
+  query('catalogItemId')
+    .optional({ values: 'falsy' })
+    .custom((value) => isUuid(value))
+    .withMessage('catalogItemId inválido'),
   handleValidationErrors,
   async (req, res) => {
+    if (!req.query.catalogItemId) return listUserAlerts(req, res);
+
     const db = userDb(req);
     const { data, error } = await db
       .from('catalog_price_watches')
@@ -117,14 +234,17 @@ router.post(
     }
 
     let noticesCreated = 0;
+    let matchedOfferIds = [];
     try {
-      noticesCreated = await matchPublicOffersForWatch(svc, data);
+      const match = await matchPublicOffersForWatch(svc, data);
+      noticesCreated = match.created;
+      matchedOfferIds = match.matchedOfferIds;
     } catch (err) {
       console.error('[catalog-watches] match', err);
       return res.status(500).json({ error: 'La búsqueda se guardó, pero no se pudieron revisar las tiendas' });
     }
 
-    return res.status(201).json({ watch: toWatch(data), noticesCreated });
+    return res.status(201).json({ watch: toWatch(data), noticesCreated, matchedOfferIds });
   },
 );
 

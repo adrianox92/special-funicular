@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import {
   Trophy,
   Car,
+  Bell,
   Clock,
   Flag,
   Package,
@@ -118,7 +119,7 @@ function MobileNavItem({ item, isItemActive, isActive, NavLink }) {
                 to={child.path}
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                  isActive(child.path)
+                  isActive(child.path, { exact: Boolean(child.exact) })
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                 )}
@@ -165,8 +166,9 @@ const Navbar = () => {
     }
   };
 
-  const isActive = (path) => {
+  const isActive = (path, { exact = false } = {}) => {
     if (path === '/dashboard') return location.pathname === '/' || location.pathname === '/dashboard';
+    if (exact) return location.pathname === path;
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
@@ -192,7 +194,15 @@ const Navbar = () => {
 
   const navItems = [
     { path: '/dashboard', label: t('home'), icon: Home },
-    { path: '/vehicles', label: t('vehicles'), icon: Car },
+    {
+      path: '/vehicles',
+      label: t('vehicles'),
+      icon: Car,
+      children: [
+        { path: '/vehicles', label: t('myGarage'), icon: Car, exact: true },
+        { path: '/vehicles/alerts', label: t('myAlerts'), icon: Bell },
+      ],
+    },
     {
       path: '/timings',
       label: t('timings'),
@@ -220,7 +230,7 @@ const Navbar = () => {
 
   const isItemActive = (item) => {
     if (item.children?.length) {
-      return item.children.some((child) => isActive(child.path)) || isActive(item.path);
+      return item.children.some((child) => isActive(child.path, { exact: Boolean(child.exact) })) || isActive(item.path);
     }
     return isActive(item.path);
   };

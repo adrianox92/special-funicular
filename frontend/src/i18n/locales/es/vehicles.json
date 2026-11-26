@@ -514,5 +514,22 @@
     "purchasePrice": "Precio de compra (€)",
     "creating": "Creando…",
     "duplicate": "Duplicar"
+  },
+  "alerts": {
+    "title": "Mis alertas",
+    "loading": "Cargando alertas…",
+    "loadError": "No se pudieron cargar las alertas",
+    "empty": "Una alerta avisa cuando una tienda tiene en stock el coche que buscas a un precio que te encaja. Se crea en la ficha del catálogo con «Lo busco» y un precio máximo. Si una tienda lo tiene a ese precio o por debajo, el aviso llega a la campana. Las ofertas se revisan una vez al día. Puedes quitarla desde esta lista, desde la ficha con «Dejar de buscar», o desaparece sola al guardar ese coche en el garaje.",
+    "browseCatalog": "Ir al catálogo",
+    "maxPrice": "Hasta {{price}}",
+    "waiting": "Te avisaremos cuando una tienda lo tenga a ese precio o por debajo.",
+    "viewInStore": "Ver en tienda",
+    "remove": "Eliminar",
+    "confirmTitle": "¿Quitar esta alerta?",
+    "confirmBody": "Dejarás de recibir avisos de esta referencia. Los avisos que ya hayas leído en la campana se quedan.",
+    "cancel": "Cancelar",
+    "confirm": "Quitar alerta",
+    "removed": "Alerta eliminada",
+    "removeError": "No se pudo eliminar la alerta"
   }
 }

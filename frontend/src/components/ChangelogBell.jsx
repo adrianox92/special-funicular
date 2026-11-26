@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import api from '../lib/axios';
 import { useLocale } from '../hooks/useLocale';
-import { catalogSlugify } from '../utils/catalogSlug';
-import { localizePath } from '../i18n/localeUtils';
+import { offerHref } from '../utils/offerHref';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
@@ -140,11 +139,6 @@ export function ChangelogBell() {
     }
   };
 
-  const noticePath = (notice) => {
-    const slug = catalogSlugify(notice.model_name || notice.reference);
-    return localizePath(locale, `/catalogo/${notice.catalog_item_id}/${slug}`);
-  };
-
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
@@ -185,26 +179,39 @@ export function ChangelogBell() {
                 <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {t('bell.prices')}
                 </p>
-                {notices.map((notice) => (
-                  <div key={notice.id} className="rounded-md px-2 py-2 hover:bg-accent/60">
-                    <span className="block text-right text-[10px] text-muted-foreground">
-                      {formatRelativeTime(notice.created_at, locale)}
-                    </span>
-                    <Link
-                      to={noticePath(notice)}
-                      className="block text-sm font-medium leading-snug text-foreground hover:underline"
-                      onClick={() => {
-                        void markNoticeRead(notice.id);
-                        setOpen(false);
-                      }}
-                    >
-                      {t('bell.priceItem', {
-                        shop: notice.shop_name,
-                        price: formatMoney(notice.price, notice.currency, intlLocale),
-                      })}
-                    </Link>
-                  </div>
-                ))}
+                {notices.map((notice) => {
+                  const href = offerHref(notice.short_code);
+                  const label = t('bell.priceItem', {
+                    shop: notice.shop_name,
+                    price: formatMoney(notice.price, notice.currency, intlLocale),
+                  });
+                  return (
+                    <div key={notice.id} className="rounded-md px-2 py-2 hover:bg-accent/60">
+                      <span className="block text-right text-[10px] text-muted-foreground">
+                        {formatRelativeTime(notice.created_at, locale)}
+                      </span>
+                      {href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          className="block text-sm font-medium leading-snug text-foreground hover:underline"
+                          onClick={() => {
+                            void markNoticeRead(notice.id);
+                            setOpen(false);
+                          }}
+                        >
+                          {label}
+                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                            {t('bell.priceRedirect')}
+                          </span>
+                        </a>
+                      ) : (
+                        <p className="text-sm font-medium leading-snug">{label}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {!loadingList && entries.length > 0 && (

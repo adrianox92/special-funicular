@@ -32,6 +32,7 @@ export function getDocumentTitle(pathname) {
   if (normalized === '/reset-password') return withBrand(i18n.t('resetPassword', { ns: 'meta' }));
   if (normalized === '/dashboard') return withBrand(i18n.t('dashboard', { ns: 'meta' }));
   if (normalized === '/vehicles/new') return withBrand(i18n.t('vehiclesNew', { ns: 'meta' }));
+  if (normalized === '/vehicles/alerts') return withBrand(i18n.t('vehiclesAlerts', { ns: 'meta' }));
   if (normalized.startsWith('/vehicles/') || normalized === '/vehicles') {
     return withBrand(i18n.t('vehicles', { ns: 'meta' }));
   }

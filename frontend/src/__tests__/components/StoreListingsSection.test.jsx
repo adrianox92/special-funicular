@@ -66,4 +66,25 @@ describe('StoreListingsSection', () => {
     expect(screen.getByRole('region', { name: 'Reino Unido' }).querySelector('.line-through')).toBeNull();
     expect(screen.getByRole('region', { name: 'Reino Unido' })).not.toHaveTextContent('%');
   });
+
+  test('marca la oferta que ya cumple el precio de Lo busco', async () => {
+    api.get.mockResolvedValue({
+      data: [
+        {
+          id: 'a',
+          short_code: 'Ab3kX9p',
+          price: 42.5,
+          currency: 'EUR',
+          shop_name: 'Slot Norte',
+          country_code: 'ES',
+        },
+      ],
+    });
+
+    render(<StoreListingsSection catalogItemId={ITEM_ID} highlightOfferIds={['a']} />);
+
+    const row = await screen.findByRole('listitem');
+    expect(row).toHaveClass('ring-primary');
+    expect(document.getElementById('catalog-store-listings')).toBe(row.closest('#catalog-store-listings'));
+  });
 });

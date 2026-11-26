@@ -25,7 +25,7 @@ function userDb(req) {
   return createUserScopedClient(req.headers.authorization);
 }
 
-const NOTICE_FIELDS = 'id, price, currency, shop_name, catalog_item_id, reference, model_name, read_at, created_at';
+const NOTICE_FIELDS = 'id, price, currency, shop_name, short_code, catalog_item_id, reference, model_name, read_at, created_at';
 
 router.use(authMiddleware);
 

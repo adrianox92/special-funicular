@@ -9,6 +9,8 @@ jest.mock('react-i18next', () => ({
       const map = {
         home: 'Inicio',
         vehicles: 'Vehículos',
+        myGarage: 'Garaje',
+        myAlerts: 'Mis alertas',
         newSession: 'Nueva sesión',
         timings: 'Tiempos',
         timingsList: 'Historial',
@@ -71,9 +73,9 @@ jest.mock('../../components/ChangelogBell', () => ({
 
 import Navbar from '../../components/Navbar';
 
-function renderNavbar() {
+function renderNavbar(path = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <Navbar />
     </MemoryRouter>,
   );
@@ -104,5 +106,19 @@ describe('Navbar — grupo Tiempos', () => {
     const childLinks = within(sessionLink.parentElement).getAllByRole('link');
     expect(childLinks[0]).toHaveAttribute('href', '/session');
     expect(childLinks[1]).toHaveAttribute('href', '/timings');
+  });
+
+  test('móvil: Mis alertas enlaza a /vehicles/alerts y el garaje no queda activo ahí', async () => {
+    renderNavbar('/vehicles/alerts');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const garage = within(dialog).getByRole('link', { name: 'Garaje' });
+    const alerts = within(dialog).getByRole('link', { name: 'Mis alertas' });
+    expect(garage).toHaveAttribute('href', '/vehicles');
+    expect(alerts).toHaveAttribute('href', '/vehicles/alerts');
+    expect(alerts.className).toContain('bg-primary');
+    expect(garage.className).not.toContain('bg-primary');
   });
 });

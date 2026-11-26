@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import PrivateRoute from './components/PrivateRoute';
 import VehicleList from './pages/VehicleList';
+import PriceWatchList from './pages/PriceWatchList';
 import Dashboard from './pages/Dashboard';
 import AddVehicle from './components/AddVehicle';
 import EditVehicle from './components/EditVehicle';
@@ -260,6 +261,17 @@ const AppContent = () => {
             <PrivateRoute>
               <AuthedShell>
                 <AddVehicle />
+              </AuthedShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/vehicles/alerts"
+          element={
+            <PrivateRoute>
+              <AuthedShell>
+                <PriceWatchList />
               </AuthedShell>
             </PrivateRoute>
           }

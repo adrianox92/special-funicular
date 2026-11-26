@@ -7,6 +7,8 @@
   "home": "Inicio",
   "newSession": "Nueva sesión",
   "vehicles": "Vehículos",
+  "myGarage": "Garaje",
+  "myAlerts": "Mis alertas",
   "timings": "Tiempos",
   "timingsList": "Historial",
   "circuits": "Circuitos",
@@ -41,6 +43,7 @@
     "changelog": "Novedades",
     "viewAll": "Ver todas",
     "priceItem": "{{shop}} lo tiene por {{price}}",
+    "priceRedirect": "Se abrirá la web de la tienda en una pestaña nueva.",
     "category": {
       "feature": "Novedad",
       "fix": "Corrección",

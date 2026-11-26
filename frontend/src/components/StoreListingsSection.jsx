@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../lib/axios';
+import { cn } from '../lib/utils';
+import { offerHref } from '../utils/offerHref';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { ExternalLink, ShoppingCart } from 'lucide-react';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 function formatPrice(price, currency) {
   if (price == null) return null;
@@ -36,14 +36,6 @@ function discountPercent(previous, current) {
   }
   const percent = Math.round(((previous - current) / previous) * 100);
   return percent >= 1 ? percent : null;
-}
-
-function offerHref(shortCode) {
-  if (process.env.NODE_ENV === 'production') {
-    return `/go/${encodeURIComponent(shortCode)}`;
-  }
-  const base = String(API_BASE).replace(/\/$/, '');
-  return `${base}/go/${encodeURIComponent(shortCode)}`;
 }
 
 function StoreInitials({ name }) {
@@ -82,9 +74,11 @@ export function groupOffersByCountry(offers) {
  * Dónde comprar: una fila por tienda, agrupada por país.
  * El enlace es el acortador propio. Sin ofertas en stock no se pinta.
  */
-export default function StoreListingsSection({ catalogItemId }) {
+export default function StoreListingsSection({ catalogItemId, highlightOfferIds = [] }) {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const rootRef = useRef(null);
+  const highlightKey = highlightOfferIds.join(',');
 
   useEffect(() => {
     if (!catalogItemId) {
@@ -107,11 +101,17 @@ export default function StoreListingsSection({ catalogItemId }) {
   }, [catalogItemId]);
 
   const groups = useMemo(() => groupOffersByCountry(offers), [offers]);
+  const highlighted = useMemo(() => new Set(highlightOfferIds), [highlightOfferIds]);
+
+  useEffect(() => {
+    if (!highlightKey || loading || offers.length === 0) return;
+    rootRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [highlightKey, loading, offers.length]);
 
   if (loading || offers.length === 0) return null;
 
   return (
-    <Card className="border shadow-sm">
+    <Card id="catalog-store-listings" ref={rootRef} className="scroll-mt-20 border shadow-sm">
       <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
         <h2 className="text-base font-semibold leading-none tracking-tight flex items-center gap-2">
           <ShoppingCart className="size-4 text-muted-foreground" aria-hidden />
@@ -140,8 +140,16 @@ export default function StoreListingsSection({ catalogItemId }) {
                 const discount = hasDrop ? discountPercent(previousValue, currentValue) : null;
                 const previousStr = hasDrop ? formatPrice(offer.previous_price, offer.currency) : null;
                 const name = offer.shop_name || 'Tienda';
+                const isMatch = highlighted.has(offer.id);
                 return (
-                  <li key={offer.id} className="flex items-center gap-3 py-3">
+                  <li
+                    key={offer.id}
+                    id={`store-offer-${offer.id}`}
+                    className={cn(
+                      'flex items-center gap-3 py-3',
+                      isMatch && 'rounded-md bg-primary/10 px-2 ring-2 ring-inset ring-primary',
+                    )}
+                  >
                     {offer.logo_url ? (
                       <img
                         src={offer.logo_url}

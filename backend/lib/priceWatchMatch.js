@@ -55,6 +55,7 @@ async function insertNotice(admin, { watch, offer, shopName, reference, modelNam
     model_name: modelName || null,
     price: normalizePrice(offer.price),
     currency: normalizeCurrency(offer.currency),
+    short_code: offer.short_code || null,
   });
   if (error) throw new Error(error.message);
 }
@@ -114,7 +115,7 @@ async function matchOfferToWatches(admin, offer, meta = {}) {
 async function matchStoredOffer(admin, offerId) {
   const { data, error } = await admin
     .from('catalog_shop_offers')
-    .select('id, shop_id, catalog_item_id, price, currency, in_stock, catalog_shops(name), slot_catalog_items(reference, model_name)')
+    .select('id, shop_id, catalog_item_id, price, currency, in_stock, short_code, catalog_shops(name), slot_catalog_items(reference, model_name)')
     .eq('id', offerId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -131,11 +132,11 @@ async function matchStoredOffer(admin, offerId) {
 async function matchPublicOffersForWatch(admin, watch) {
   const currency = normalizeCurrency(watch.currency);
   const maxPrice = normalizePrice(watch.max_price);
-  if (maxPrice == null) return 0;
+  if (maxPrice == null) return { created: 0, matchedOfferIds: [] };
 
   const { data, error } = await admin
     .from('catalog_shop_offers')
-    .select('id, shop_id, catalog_item_id, price, currency, in_stock, last_checked_at, catalog_shops!inner(name, active), slot_catalog_items(reference, model_name)')
+    .select('id, shop_id, catalog_item_id, price, currency, in_stock, short_code, last_checked_at, catalog_shops!inner(name, active), slot_catalog_items(reference, model_name)')
     .eq('catalog_item_id', watch.catalog_item_id)
     .eq('in_stock', true)
     .eq('currency', currency)
@@ -145,9 +146,11 @@ async function matchPublicOffersForWatch(admin, watch) {
 
   const now = new Date();
   let created = 0;
+  const matchedOfferIds = [];
   for (const row of data || []) {
     const shop = embedOne(row.catalog_shops);
     if (!isPublicOffer(row, shop, now)) continue;
+    matchedOfferIds.push(row.id);
     const item = embedOne(row.slot_catalog_items);
     const ids = await matchOfferToWatches(admin, row, {
       shopName: shop?.name,
@@ -156,7 +159,7 @@ async function matchPublicOffersForWatch(admin, watch) {
     });
     created += ids.length;
   }
-  return created;
+  return { created, matchedOfferIds };
 }
 
 module.exports = {

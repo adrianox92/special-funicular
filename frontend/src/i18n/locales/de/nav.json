@@ -7,6 +7,8 @@
   "home": "Start",
   "newSession": "Neue Session",
   "vehicles": "Fahrzeuge",
+  "myGarage": "Garage",
+  "myAlerts": "Meine Hinweise",
   "timings": "Zeiten",
   "timingsList": "Verlauf",
   "circuits": "Strecken",
@@ -41,6 +43,7 @@
     "changelog": "Neuigkeiten",
     "viewAll": "Alle ansehen",
     "priceItem": "{{shop}} hat es für {{price}}",
+    "priceRedirect": "Die Website des Shops öffnet sich in einem neuen Tab.",
     "category": {
       "feature": "Neu",
       "fix": "Korrektur",

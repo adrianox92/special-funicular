@@ -514,5 +514,22 @@
     "purchasePrice": "Kaufpreis (€)",
     "creating": "Wird erstellt…",
     "duplicate": "Duplizieren"
+  },
+  "alerts": {
+    "title": "Meine Hinweise",
+    "loading": "Hinweise werden geladen…",
+    "loadError": "Hinweise konnten nicht geladen werden",
+    "empty": "Ein Hinweis meldet, wenn ein Shop das gesuchte Auto auf Lager hat und der Preis passt. Du legst ihn in der Katalogkarte mit „Ich suche es“ und einem Höchstpreis an. Hat ein Shop es zu diesem Preis oder darunter, erscheint die Meldung in der Glocke. Angebote werden einmal am Tag geprüft. Du kannst ihn in dieser Liste entfernen, in der Katalogkarte mit „Suche beenden“, oder er verschwindet von selbst, wenn du das Auto in die Garage speicherst.",
+    "browseCatalog": "Zum Katalog",
+    "maxPrice": "Bis {{price}}",
+    "waiting": "Wir melden uns, wenn ein Shop es zu diesem Preis oder darunter hat.",
+    "viewInStore": "Im Shop ansehen",
+    "remove": "Entfernen",
+    "confirmTitle": "Diesen Hinweis entfernen?",
+    "confirmBody": "Du erhältst keine weiteren Meldungen zu dieser Referenz. Bereits gelesene Meldungen in der Glocke bleiben.",
+    "cancel": "Abbrechen",
+    "confirm": "Hinweis entfernen",
+    "removed": "Hinweis entfernt",
+    "removeError": "Hinweis konnte nicht entfernt werden"
   }
 }

@@ -4,6 +4,8 @@
   "home": "Home",
   "newSession": "New session",
   "vehicles": "Vehicles",
+  "myGarage": "Garage",
+  "myAlerts": "My alerts",
   "timings": "Timings",
   "timingsList": "History",
   "circuits": "Circuits",
@@ -38,6 +40,7 @@
     "changelog": "What's new",
     "viewAll": "See all",
     "priceItem": "{{shop}} has it for {{price}}",
+    "priceRedirect": "The shop website will open in a new tab.",
     "category": {
       "feature": "New",
       "fix": "Fix",
