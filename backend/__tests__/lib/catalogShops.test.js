@@ -10,6 +10,12 @@ const {
   listHtycProducts,
   parseSlotmaniaProduct,
   slotmaniaCandidates,
+  listSlotmaniaCatalog,
+  slotmaniaCarCategories,
+  shopifyCatalogHits,
+  listShopifyCollection,
+  shopifyLookup,
+  parseShopifyProduct,
   parseAloyProduct,
   aloyCandidates,
 } = require('../../lib/shopAdapters/catalogShops');
@@ -314,7 +320,7 @@ describe('adaptadores de tienda', () => {
     });
   });
 
-  test('listWooCatalog recorre todas las páginas sin filtrar por stock ni oferta', async () => {
+  test('listWooCatalog recorre todas las páginas y recupera el agotado oculto', async () => {
     const fullPage = Array.from({ length: 100 }, (_, index) => ({
       sku: `SKU${index}`,
       permalink: `https://trofeslot.com/producto/${index}/`,
@@ -327,23 +333,37 @@ describe('adaptadores de tienda', () => {
       is_in_stock: false,
       prices: { price: '6750', regular_price: '7500', currency_code: 'EUR', currency_minor_unit: 2 },
     }];
+    const hidden = {
+      sku: 'SC6237R',
+      permalink: 'https://www.speedslot.es/producto/peugeot-208-rally-artic-2013/',
+      is_in_stock: false,
+      prices: { price: '7994', regular_price: '7994', currency_code: 'EUR', currency_minor_unit: 2 },
+    };
     const fetchPage = jest.fn(async (url) => {
       const parsed = new URL(url);
-      expect(parsed.searchParams.get('stock_status')).toBeNull();
       expect(parsed.searchParams.get('on_sale')).toBeNull();
       expect(parsed.searchParams.get('category')).toBe('22');
+      const stock = parsed.searchParams.get('stock_status');
       const page = Number(parsed.searchParams.get('page'));
+      if (stock === 'outofstock') return JSON.stringify(page === 1 ? [hidden, lastPage[0]] : []);
+      if (stock === 'onbackorder') return JSON.stringify([]);
+      expect(stock).toBeNull();
       return JSON.stringify(page === 1 ? fullPage : lastPage);
     });
 
     const products = await listWooCatalog('https://model-hobbyred.com', fetchPage, { category: 22 });
 
-    expect(fetchPage).toHaveBeenCalledTimes(2);
-    expect(products).toHaveLength(101);
+    expect(fetchPage).toHaveBeenCalledTimes(4);
+    expect(products).toHaveLength(102);
     expect(products[100]).toMatchObject({
       sku: 'Referencia: AV52310',
       price: 67.5,
       regularPrice: 75,
+      inStock: false,
+    });
+    expect(products[101]).toMatchObject({
+      sku: 'SC6237R',
+      price: 79.94,
       inStock: false,
     });
   });
@@ -514,6 +534,46 @@ describe('slotmania', () => {
     const html = product.replace('product-available', 'product-unavailable').replace('InStock', 'OutOfStock');
     expect(parseSlotmaniaProduct(html, 'https://slotmania.es/es/coches/11632-ford-rs200.html').inStock).toBe(false);
   });
+
+  test('el listado de coches trae referencia, precio y stock sin abrir la ficha', async () => {
+    const card = (sku, stockClass) => `
+      <article class="product-miniature">
+        <a href="https://slotmania.es/es/coches/10263-${sku.toLowerCase()}.html">coche</a>
+        <span class="badge ${stockClass}">estado</span>
+        <h2 class="h3 product-title"><a href="https://slotmania.es/es/coches/10263-${sku.toLowerCase()}.html">Peugeot</a></h2>
+        <div class="product-reference text-muted">${sku}</div>
+        <span class="product-price" content="79.95">79,95 €</span>
+      </article>`;
+    const fetchPage = jest.fn(async (url) => {
+      if (url.endsWith('?page=2')) {
+        return `${card('SC6300R', 'product-unavailable')}`;
+      }
+      return `${card('SC6237R', 'product-available')}<a href="https://slotmania.es/es/168-coches?page=2">2</a>`;
+    });
+
+    const products = await listSlotmaniaCatalog(fetchPage);
+
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+    expect(products).toEqual([
+      expect.objectContaining({ sku: 'SC6237R', price: 79.95, inStock: true }),
+      expect.objectContaining({ sku: 'SC6300R', price: 79.95, inStock: false }),
+    ]);
+  });
+
+  test('el menú de coches no sigue hacia recambios', () => {
+    const html = `
+      <a href="https://slotmania.es/es/168-coches">COCHES</a>
+      <a href="https://slotmania.es/es/713-brm">BRM</a>
+      <a href="https://slotmania.es/es/642-coches-gt">Coches GT</a>
+      <a href="https://slotmania.es/es/103-chasis">CHASIS</a>
+      <a href="https://slotmania.es/es/648-scalextric">Scalextric</a>
+    `;
+    expect(slotmaniaCarCategories(html)).toEqual([
+      'https://slotmania.es/es/168-coches',
+      'https://slotmania.es/es/713-brm',
+      'https://slotmania.es/es/642-coches-gt',
+    ]);
+  });
 });
 
 describe('aloyshop', () => {
@@ -559,5 +619,77 @@ describe('aloyshop', () => {
       .replace('InStock', 'OutOfStock')
       .replace('En Stock. Envío inmediato.', 'Este producto ya no est&aacute; en stock');
     expect(parseAloyProduct(html, 'https://www.aloyshop.com/es/precio-neto/8942-corvette.html').inStock).toBe(false);
+  });
+});
+
+describe('clickslot', () => {
+  const product = {
+    title: 'Porsche 911 RSR',
+    handle: 'porsche-911-rsr',
+    variants: [
+      {
+        id: 1,
+        sku: 'SC-6122R',
+        price: '79.94',
+        compare_at_price: '89.95',
+        available: false,
+      },
+      { id: 2, sku: '', price: '10.00', available: true },
+    ],
+  };
+
+  test('products.json trae el precio en euros y el agotado', () => {
+    expect(shopifyCatalogHits(product, 'https://clickslot.shop')).toEqual([
+      expect.objectContaining({
+        sku: 'SC-6122R',
+        price: 79.94,
+        regularPrice: 89.95,
+        inStock: false,
+        productUrl: 'https://clickslot.shop/products/porsche-911-rsr?variant=1',
+      }),
+    ]);
+  });
+
+  test('la colección de coches pagina y el .js confirma la referencia', async () => {
+    const page = Array.from({ length: 250 }, (_, index) => ({
+      title: `Coche ${index}`,
+      handle: `coche-${index}`,
+      variants: [{ id: index, sku: `SC${index}R`, price: '10.00', compare_at_price: null, available: true }],
+    }));
+    const last = [product];
+    const fetchPage = jest.fn(async (url) => {
+      if (String(url).includes('/search/suggest.json')) {
+        return JSON.stringify({ resources: { results: { products: [{ handle: 'porsche-911-rsr' }] } } });
+      }
+      if (String(url).endsWith('.js')) {
+        return JSON.stringify({
+          title: product.title,
+          handle: product.handle,
+          variants: [{ id: 1, sku: 'SC-6122R', price: 7994, compare_at_price: null, available: true }],
+        });
+      }
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get('limit')).toBe('250');
+      return JSON.stringify({ products: parsed.searchParams.get('page') === '1' ? page : last });
+    });
+
+    const products = await listShopifyCollection('https://clickslot.shop', 'coches', fetchPage);
+    expect(products).toHaveLength(251);
+    expect(products[250]).toMatchObject({ sku: 'SC-6122R', inStock: false, price: 79.94 });
+
+    await expect(shopifyLookup('https://clickslot.shop', fetchPage, 'SC6122R')).resolves.toMatchObject({
+      sku: 'SC-6122R',
+      price: 79.94,
+      inStock: true,
+    });
+  });
+
+  test('la ficha HTML lee el precio publicado', () => {
+    const html = `ShopifyAnalytics.lib.track("Viewed Product",{"currency":"EUR","name":"Porsche","price":"79.94","sku":"SC-6122R","available":true},undefined);`;
+    expect(parseShopifyProduct(html, 'https://clickslot.shop/products/porsche-911-rsr')).toMatchObject({
+      sku: 'SC-6122R',
+      price: 79.94,
+      inStock: true,
+    });
   });
 });

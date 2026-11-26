@@ -181,36 +181,47 @@ function wooProductHit(row) {
 }
 
 /**
- * Listado completo de la Store API. Sin stock_status ni on_sale:
- * el stock sale de is_in_stock y el precio tachado de regular_price.
- * category acota la tienda (coches en Model Hobby Red).
+ * Listado completo de la Store API. No filtra on_sale.
+ * El catálogo visible a veces oculta agotados (Speed Slot): por eso se pide
+ * también outofstock y onbackorder. El stock sale de is_in_stock y el
+ * precio tachado de regular_price.
+ * category acota la tienda (coches: 22 en Model Hobby Red, 344 en Speed Slot).
  */
+const WOO_STOCK_PASSES = [null, 'outofstock', 'onbackorder'];
+
 async function listWooCatalog(origin, fetchPage, { category } = {}) {
   const products = [];
-  for (let page = 1; page <= WOO_MAX_PAGES; page += 1) {
-    const params = new URLSearchParams({
-      per_page: String(WOO_PAGE_SIZE),
-      page: String(page),
-      orderby: 'date',
-      order: 'desc',
-    });
-    if (category) params.set('category', String(category));
-    const raw = await fetchPage(`${origin}/wp-json/wc/store/v1/products?${params}`);
-    if (!raw) throw new Error('Listado WooCommerce vacío');
-    let rows;
-    try {
-      rows = JSON.parse(raw);
-    } catch {
-      throw new Error('Listado WooCommerce no es JSON');
+  const seen = new Set();
+  for (const stockStatus of WOO_STOCK_PASSES) {
+    for (let page = 1; page <= WOO_MAX_PAGES; page += 1) {
+      const params = new URLSearchParams({
+        per_page: String(WOO_PAGE_SIZE),
+        page: String(page),
+        orderby: 'date',
+        order: 'desc',
+      });
+      if (category) params.set('category', String(category));
+      if (stockStatus) params.set('stock_status', stockStatus);
+      const raw = await fetchPage(`${origin}/wp-json/wc/store/v1/products?${params}`);
+      if (!raw) throw new Error('Listado WooCommerce vacío');
+      let rows;
+      try {
+        rows = JSON.parse(raw);
+      } catch {
+        throw new Error('Listado WooCommerce no es JSON');
+      }
+      if (!Array.isArray(rows)) throw new Error('Listado WooCommerce no es una lista');
+      for (const row of rows) {
+        const hit = wooProductHit(row);
+        if (!hit || seen.has(hit.productUrl)) continue;
+        seen.add(hit.productUrl);
+        products.push(hit);
+      }
+      if (rows.length < WOO_PAGE_SIZE) break;
+      if (page === WOO_MAX_PAGES) throw new Error('Listado WooCommerce incompleto');
     }
-    if (!Array.isArray(rows)) throw new Error('Listado WooCommerce no es una lista');
-    for (const row of rows) {
-      const hit = wooProductHit(row);
-      if (hit) products.push(hit);
-    }
-    if (rows.length < WOO_PAGE_SIZE) return products;
   }
-  throw new Error('Listado WooCommerce incompleto');
+  return products;
 }
 
 function parseJoaquiProduct(html, pageUrl) {
@@ -438,6 +449,237 @@ function slotmaniaCandidates(html, query) {
   return [...new Set(urls)];
 }
 
+const SLOTMANIA_CARS = 'https://slotmania.es/es/168-coches';
+const SLOTMANIA_MAX_PAGES = 40;
+
+function slotmaniaListingHits(html) {
+  const hits = [];
+  for (const card of String(html || '').split(/<article[^>]*\bproduct-miniature\b/i).slice(1)) {
+    const href = card.match(/href="(https:\/\/slotmania\.es\/es\/[^"?#]+\.html)"/i);
+    const sku = card.match(/product-reference[^>]*>\s*([^<]+)/i);
+    const price = card.match(/class="product-price"[^>]*content="([^"]+)"/i);
+    const name = card.match(/product-title[\s\S]*?<a[^>]*>([^<]+)/i);
+    if (!href || !sku || !sku[1].trim()) continue;
+    const unavailable = /product-unavailable/i.test(card);
+    const available = /product-available/i.test(card);
+    hits.push({
+      productUrl: href[1],
+      sku: sku[1].trim(),
+      name: name ? name[1].trim() : '',
+      price: parseEuroAmount(price && price[1]),
+      currency: 'EUR',
+      inStock: available && !unavailable,
+      categorySlugs: ['coches'],
+    });
+  }
+  return hits;
+}
+
+function slotmaniaHasNext(html, page) {
+  return new RegExp(`[?&]page=${page + 1}(?:&|"|')`).test(String(html || ''));
+}
+
+/**
+ * A partir de COCHES en el menú lateral. El padre no enseña los coches
+ * guardados solo en una subcategoría (marca, GT, kit, 1/43).
+ */
+function slotmaniaCarCategories(html) {
+  const urls = [SLOTMANIA_CARS];
+  const seen = new Set(urls);
+  const source = String(html || '');
+  const marker = source.lastIndexOf('/168-coches');
+  const slice = marker >= 0 ? source.slice(marker) : '';
+  for (const match of slice.matchAll(/href="(https:\/\/slotmania\.es\/es\/\d+-[^"?#]+)"/g)) {
+    const url = match[1];
+    if (url.endsWith('/168-coches') || seen.has(url)) continue;
+    if (/recambios|accesorios|chasis|neumaticos|circuitos|tornilleria|trencillas|llantas|pinones|coronas|mandos|herramientas|pinturas|pistas|mercadillo|ofertas|motores|cojinetes|correas|ejes|calcomanias|cuentavueltas|separadores|soportes|suspensiones|tuercas|arandelas|cables/i.test(url)) {
+      break;
+    }
+    seen.add(url);
+    urls.push(url);
+  }
+  return urls;
+}
+
+async function appendSlotmaniaCategory(fetchPage, products, seen, categoryUrl, firstHtml) {
+  for (let page = 1; page <= SLOTMANIA_MAX_PAGES; page += 1) {
+    const raw = page === 1 && firstHtml && categoryUrl === SLOTMANIA_CARS
+      ? firstHtml
+      : await fetchPage(page === 1 ? categoryUrl : `${categoryUrl}?page=${page}`);
+    if (!raw) {
+      if (categoryUrl === SLOTMANIA_CARS && page === 1) throw new Error('Listado Slotmania vacío');
+      return;
+    }
+    const hits = slotmaniaListingHits(raw);
+    if (hits.length === 0) return;
+    let added = 0;
+    for (const hit of hits) {
+      if (seen.has(hit.productUrl)) continue;
+      seen.add(hit.productUrl);
+      products.push(hit);
+      added += 1;
+    }
+    if (!slotmaniaHasNext(raw, page) || added === 0) return;
+    if (page === SLOTMANIA_MAX_PAGES) throw new Error('Listado Slotmania incompleto');
+  }
+}
+
+/** Categorías de coches. La miniatura trae referencia, precio y stock. */
+async function listSlotmaniaCatalog(fetchPage) {
+  const first = await fetchPage(SLOTMANIA_CARS);
+  if (!first) throw new Error('Listado Slotmania vacío');
+  const products = [];
+  const seen = new Set();
+  for (const categoryUrl of slotmaniaCarCategories(first)) {
+    await appendSlotmaniaCategory(
+      fetchPage,
+      products,
+      seen,
+      categoryUrl,
+      categoryUrl === SLOTMANIA_CARS ? first : null,
+    );
+  }
+  if (products.length === 0) throw new Error('Listado Slotmania vacío');
+  return products;
+}
+
+const SHOPIFY_PAGE_SIZE = 250;
+const SHOPIFY_MAX_PAGES = 20;
+
+function shopifyAmount(raw, { cents = false } = {}) {
+  if (raw == null || raw === '') return null;
+  if (cents) {
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    return Math.round(amount) / 100;
+  }
+  const amount = parseEuroAmount(raw);
+  if (amount == null || amount <= 0) return null;
+  return amount;
+}
+
+function shopifyVariantHit(product, variant, origin, { cents = false, variants = 1 } = {}) {
+  const sku = String(variant && variant.sku || '').trim();
+  if (!product || !product.handle || !sku) return null;
+  const price = shopifyAmount(variant.price, { cents });
+  const regular = shopifyAmount(variant.compare_at_price, { cents });
+  const variantQuery = variants > 1 && variant.id ? `?variant=${variant.id}` : '';
+  const hit = {
+    sku,
+    name: product.title || product.name || '',
+    productUrl: `${origin}/products/${product.handle}${variantQuery}`,
+    price,
+    currency: 'EUR',
+    inStock: Boolean(variant.available),
+    categorySlugs: ['coches'],
+  };
+  if (regular != null && price != null && regular > price) hit.regularPrice = regular;
+  return hit;
+}
+
+function shopifyCatalogHits(product, origin) {
+  const variants = Array.isArray(product && product.variants) ? product.variants : [];
+  return variants
+    .map((variant) => shopifyVariantHit(product, variant, origin, { variants: variants.length }))
+    .filter(Boolean);
+}
+
+/** products/{handle}.js guarda el precio en céntimos. products.json, en euros. */
+function shopifyJsHits(product, origin) {
+  const variants = Array.isArray(product && product.variants) ? product.variants : [];
+  return variants
+    .map((variant) => shopifyVariantHit(product, variant, origin, { cents: true, variants: variants.length }))
+    .filter(Boolean);
+}
+
+function parseShopifyProduct(html, pageUrl) {
+  const track = String(html || '').match(/track\("Viewed Product",(\{[\s\S]*?\})\s*,/);
+  if (!track) return null;
+  let data;
+  try {
+    data = JSON.parse(track[1]);
+  } catch {
+    return null;
+  }
+  if (!data || !data.sku) return null;
+  const handle = String(pageUrl || '').match(/\/products\/([^/?#]+)/);
+  return {
+    productUrl: String(pageUrl || '').split('?')[0],
+    sku: data.sku,
+    name: data.name || '',
+    price: shopifyAmount(data.price),
+    currency: data.currency || 'EUR',
+    inStock: Boolean(data.available),
+    categorySlugs: ['coches'],
+    handle: handle && handle[1],
+  };
+}
+
+/**
+ * Colección pública de Shopify. Sin clave: /collections/{handle}/products.json.
+ * Click Slot guarda los coches en `coches` (rally, GT y F1 incluidos).
+ */
+async function listShopifyCollection(origin, handle, fetchPage) {
+  const products = [];
+  const seen = new Set();
+  for (let page = 1; page <= SHOPIFY_MAX_PAGES; page += 1) {
+    const raw = await fetchPage(`${origin}/collections/${handle}/products.json?limit=${SHOPIFY_PAGE_SIZE}&page=${page}`);
+    if (!raw) throw new Error('Listado Shopify vacío');
+    let json;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error('Listado Shopify no es JSON');
+    }
+    const rows = json && json.products;
+    if (!Array.isArray(rows)) throw new Error('Listado Shopify no es una lista');
+    for (const row of rows) {
+      for (const hit of shopifyCatalogHits(row, origin)) {
+        const key = `${hit.sku}\n${hit.productUrl}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        products.push(hit);
+      }
+    }
+    if (rows.length < SHOPIFY_PAGE_SIZE) return products;
+    if (page === SHOPIFY_MAX_PAGES) throw new Error('Listado Shopify incompleto');
+  }
+  return products;
+}
+
+async function shopifyLookup(origin, fetchPage, query) {
+  const params = new URLSearchParams({
+    q: query,
+    'resources[type]': 'product',
+    'resources[limit]': '8',
+    'resources[options][fields]': 'title,variants.sku,tag',
+  });
+  const raw = await fetchPage(`${origin}/search/suggest.json?${params}`);
+  if (!raw) return null;
+  let json;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const rows = json && json.resources && json.resources.results && json.resources.results.products;
+  if (!Array.isArray(rows)) return null;
+  for (const row of rows) {
+    if (!row || !row.handle) continue;
+    const detailRaw = await fetchPage(`${origin}/products/${row.handle}.js`);
+    if (!detailRaw) continue;
+    let detail;
+    try {
+      detail = JSON.parse(detailRaw);
+    } catch {
+      continue;
+    }
+    const hit = shopifyJsHits(detail, origin).find((item) => sameSku(item.sku, query) && !isSpareProduct(item));
+    if (hit) return hit;
+  }
+  return null;
+}
+
 async function htycLookup(query, fetchImpl = fetch) {
   const products = await listHtycProducts(fetchImpl);
   return products.find((hit) => sameSku(hit.sku, query) && !isSpareProduct(hit)) || null;
@@ -506,13 +748,13 @@ const catalogShopAdapters = [
     parse: parseAloyProduct,
     candidates: aloyCandidates,
   }),
-  createShopAdapter({
+  withListProducts(createShopAdapter({
     key: 'slotmania',
     origin: 'https://slotmania.es',
     searchUrl: (query) => `https://slotmania.es/es/busqueda?search_query=${encodeURIComponent(query)}`,
     parse: parseSlotmaniaProduct,
     candidates: slotmaniaCandidates,
-  }),
+  }), (fetchPage) => listSlotmaniaCatalog(fetchPage)),
   withListProducts(createShopAdapter({
     key: 'trofeslot',
     origin: 'https://trofeslot.com',
@@ -522,6 +764,24 @@ const catalogShopAdapters = [
     parse: parseWooProduct,
     candidates: () => [],
   }), (fetchPage) => listWooCatalog('https://trofeslot.com', fetchPage)),
+  withListProducts(createShopAdapter({
+    key: 'speedslot',
+    origin: 'https://www.speedslot.es',
+    lookupOnly: true,
+    lookup: (fetchPage, query) => wooStoreLookup('https://www.speedslot.es', fetchPage, query),
+    searchUrl: (query) => `https://www.speedslot.es/wp-json/wc/store/v1/products?search=${encodeURIComponent(query)}`,
+    parse: parseWooProduct,
+    candidates: () => [],
+  }), (fetchPage) => listWooCatalog('https://www.speedslot.es', fetchPage, { category: 344 })),
+  withListProducts(createShopAdapter({
+    key: 'clickslot',
+    origin: 'https://clickslot.shop',
+    lookupOnly: true,
+    lookup: (fetchPage, query) => shopifyLookup('https://clickslot.shop', fetchPage, query),
+    searchUrl: (query) => `https://clickslot.shop/search/suggest.json?q=${encodeURIComponent(query)}&resources[type]=product`,
+    parse: parseShopifyProduct,
+    candidates: () => [],
+  }), (fetchPage) => listShopifyCollection('https://clickslot.shop', 'coches', fetchPage)),
 ];
 
 module.exports = {
@@ -537,6 +797,13 @@ module.exports = {
   listHtycProducts,
   parseSlotmaniaProduct,
   slotmaniaCandidates,
+  slotmaniaListingHits,
+  slotmaniaCarCategories,
+  listSlotmaniaCatalog,
+  shopifyCatalogHits,
+  listShopifyCollection,
+  shopifyLookup,
+  parseShopifyProduct,
   parseAloyProduct,
   aloyCandidates,
 };
